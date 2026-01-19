@@ -28,12 +28,13 @@
 
 **✅ Acceptance Criteria**
 - [ ] Spring Boot 3.x 애플리케이션이 성공적으로 실행되어야 한다.
-- [ ] `docker-compose up` 실행 시 MySQL 8.0과 Redis 컨테이너가 정상 작동해야 한다.
+- [ ] `docker-compose up` 실행 시 Redis 컨테이너가 정상 작동해야 한다.
+- [ ] 외부 서버에서 제공되는 MySQL 데이터베이스 연결이 성공해야 한다.
 - [ ] 전역 에러 처리 및 공통 DTO 패턴이 수립되어야 한다.
 
 **🛠 Implementation Tasks**
 - [ ] Spring Initializr로 프로젝트 생성 (Web, JPA, Lombok, Validation)
-- [ ] `docker-compose.yml` 작성 (MySQL, Redis)
+- [ ] `docker-compose.yml` 작성 (Redis)
 - [ ] GlobalExceptionHandler 구현
 - [ ] `ApiResponse` 공통 DTO 클래스 작성
 
