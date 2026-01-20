@@ -7,6 +7,7 @@
 - **Estimated Effort**: 1-2 days
 - **Priority**: High
 - **Dependencies**: None
+- **Status**: Review
 
 ---
 
@@ -493,6 +494,21 @@ curl -k https://localhost/openvidu/api/health
 - [x] OpenVidu `.env` 설정 (Coturn 연동)
 - [x] OpenVidu Dashboard 접속 가능
 - [x] WebRTC 연결 테스트 성공
+
+## 📝 Dev Agent Record
+
+### Implementation Notes (2026-01-20)
+- **Infrastructure Setup**:
+  - Created `docker/coturn` and `docker/openvidu` configurations.
+  - Configured `turnserver.conf` with local loopback IP (127.0.0.1) for development environment.
+  - Configured OpenVidu with ports 8080/8443 to avoid macOS privilege issues.
+  - Successfully launched both Coturn and OpenVidu containers via `docker compose`.
+- **Testing**:
+  - Created `docker/test-webrtc.html` for local WebRTC connectivity testing.
+  - Verified container status: Both services are UP.
+- **Environment**:
+  - Adjusted configuration for macOS compatibility (ports, network mode emulation).
+  - Used `127.0.0.1` for local testing; for production, `turnserver.conf` and `env` need public IP updates.
 
 ---
 
