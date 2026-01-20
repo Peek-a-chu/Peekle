@@ -5,7 +5,28 @@
 
 ## 📋 Stories
 
-### S3-1. 소셜 로그인 UI (Frontend)
+### S3-1. 랜딩 페이지 (Frontend)
+🧾User Story
+
+방문자로서, 서비스에 대한 소개를 보고 로그인할 수 있는 진입점이 필요하다.
+
+서비스가 무엇인지 파악하고 회원가입/로그인을 시작하기 위함이다.
+
+✅ Acceptance Criteria
+
+ 랜딩 페이지(`/`)에서 서비스 한 줄 소개 및 핵심 기능이 나열되어야 한다.
+
+ "로그인" 버튼 클릭 시 `/login` 페이지로 이동해야 한다.
+
+ 깔끔하고 매력적인 UI로 사용자의 첫인상을 긍정적으로 만들어야 한다.
+
+**🛠 Implementation Tasks**
+[ ] 랜딩 페이지(`app/page.tsx`) 레이아웃 구현
+[ ] 서비스 소개 섹션 (히어로 섹션) 디자인
+[ ] 핵심 기능 카드 컴포넌트 구현 (스터디, 게임, 리그 시스템 등)
+[ ] 로그인 버튼 및 라우팅 연결
+
+### S3-2. 소셜 로그인 UI (Frontend)
 🧾User Story
 
 게스트 사용자로서, Google, Naver 또는 Kakao 계정을 사용하여 로그인하고 싶다.
@@ -25,7 +46,7 @@
 [ ] 각 소셜 버튼 컴포넌트 및 아이콘 추가
 [ ] OAuth 리다이렉트 URL 처리 로직 구현
 
-### S3-2. OAuth2 통합 (Backend)
+### S3-3. OAuth2 통합 (Backend)
 🧾User Story
 
 시스템으로서, Google/Naver/Kakao를 통해 신원을 확인하고 싶다.
@@ -45,7 +66,7 @@
 [ ] `application.yml`에 Google, Kakao, Naver 등록 정보 설정
 [ ] `OAuth2UserService` 커스텀 구현 (UserInfo 추출 및 DB 조회)
 
-### S3-3. 닉네임 설정 폼 (Frontend)
+### S3-4. 닉네임 설정 폼 (Frontend)
 🧾User Story
 
 신규 사용자로서, 고유한 닉네임을 설정하고 싶다.
@@ -65,7 +86,7 @@
 [ ] 닉네임 유효성 검사 정규식(Regex) 적용
 [ ] 닉네임 중복 확인 API 연동 (`useDebounce` 훅 활용)
 
-### S3-4. 사용자 관리 API (Backend)
+### S3-5. 사용자 관리 API (Backend)
 🧾User Story
 
 클라이언트 애플리케이션으로서, 사용자를 생성하고 조회하는 API가 필요하다.
@@ -85,7 +106,7 @@
 [ ] `UserRestController` 및 `UserService` 구현
 [ ] 닉네임 중복 체크 쿼리 메소드 작성 (`existsByNickname`)
 
-### S3-5. 확장 프로그램 설치 확인 (Frontend)
+### S3-6. 확장 프로그램 설치 확인 (Frontend)
 🧾User Story
 
 사용자로서, 브라우저 확장 프로그램이 설치되어 있는지 알고 싶다.
@@ -105,7 +126,7 @@
 [ ] 설치 안내 모달 컴포넌트 구현
 [ ] `window.postMessage` 통신 로직 작성
 
-### S3-6. JWT 서비스 & 보안 설정 (Backend)
+### S3-7. JWT 서비스 & 보안 설정 (Backend)
 🧾User Story
 
 시스템으로서, JWT 토큰을 발급하고 검증하고 싶다.
@@ -125,7 +146,7 @@
 [ ] `JwtTokenProvider` 클래스 구현 (생성, 검증, 파싱)
 [ ] Spring Security `SecurityFilterChain` 설정 (CSRF 비활성화, 필터 등록)
 
-### S3-7. 확장 프로그램 보안 API (Backend)
+### S3-8. 확장 프로그램 보안 API (Backend)
 🧾User Story
 
 시스템으로서, 확장 프로그램 전용 토큰을 발급하고 검증하고 싶다.
