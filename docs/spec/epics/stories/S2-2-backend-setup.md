@@ -633,14 +633,14 @@ curl -X POST http://localhost:8080/api/test/validation \
 
 ## 📦 Deliverables
 
-- [ ] Spring Boot 3.4.x 프로젝트 구조
-- [ ] Gradle 빌드 설정 (build.gradle)
-- [ ] Docker Compose (Redis)
-- [ ] application.yml 설정 (dev/prod 분리)
-- [ ] GlobalExceptionHandler
-- [ ] ApiResponse DTO
-- [ ] RedisConfig
-- [ ] README.md (프로젝트 실행 방법)
+- [x] Spring Boot 3.4.x 프로젝트 구조
+- [x] Gradle 빌드 설정 (build.gradle)
+- [x] Docker Compose (Redis)
+- [x] application.yml 설정 (dev/prod 분리)
+- [x] GlobalExceptionHandler
+- [x] ApiResponse DTO
+- [x] RedisConfig
+- [x] README.md (프로젝트 실행 방법)
 
 ---
 
@@ -658,3 +658,39 @@ curl -X POST http://localhost:8080/api/test/validation \
 - [Spring Data JPA](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/)
 - [Spring Data Redis](https://docs.spring.io/spring-data/redis/docs/current/reference/html/)
 - [QueryDSL](http://querydsl.com/static/querydsl/latest/reference/html/)
+
+## 📝 Dev Agent Record
+
+### Implementation Plan
+- [x] Initialize Spring Boot project
+- [x] Configure build.gradle
+- [x] Setup Docker Compose for Redis
+- [x] Configure application.yml (dev/prod)
+- [x] Implement GlobalExceptionHandler
+- [x] Create ApiResponse DTO
+- [x] Configure Redis
+- [x] README.md
+
+### Completion Notes
+Successfully initialized backend project with Spring Boot 3.4.1. Configured Redis, MySQL drivers, Exception Handling, and DTOs. Tests passing locally using H2. Docker Compose file created but verified only statically due to WSL limitations.
+
+## 📂 File List
+- apps/backend/build.gradle
+- apps/backend/src/main/resources/application.yml
+- apps/backend/src/main/resources/application-dev.yml
+- apps/backend/src/main/java/com/peekle/global/exception/ErrorCode.java
+- apps/backend/src/main/java/com/peekle/global/exception/BusinessException.java
+- apps/backend/src/main/java/com/peekle/global/exception/GlobalExceptionHandler.java
+- apps/backend/src/main/java/com/peekle/global/dto/ApiResponse.java
+- apps/backend/src/main/java/com/peekle/global/config/RedisConfig.java
+- apps/backend/README.md
+- docker/docker-compose.yml
+
+## 🔄 Change Log
+- Initial project setup
+
+## 🚦 Status
+- [ ] ready-for-dev
+- [ ] in-progress
+- [x] review
+- [ ] done
