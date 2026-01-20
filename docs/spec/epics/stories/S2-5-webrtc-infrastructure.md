@@ -7,6 +7,7 @@
 - **Estimated Effort**: 1-2 days
 - **Priority**: High
 - **Dependencies**: None
+- **Status**: Review
 
 ---
 
@@ -439,6 +440,34 @@ curl -X POST https://YOUR_PUBLIC_IP/openvidu/api/sessions \
 </html>
 ```
 
+### Task 5: Makefile을 통한 서비스 관리
+
+프로젝트 루트의 `Makefile`을 통해 WebRTC 인프라를 간편하게 관리할 수 있습니다.
+
+#### 5-1. 통합 관리 명령어
+
+```bash
+# Coturn 및 OpenVidu 서버 동시 실행
+make webrtc-up
+
+# Coturn 및 OpenVidu 서버 동시 중지
+make webrtc-down
+```
+
+#### 5-2. 개별 서비스 관리 명령어
+
+```bash
+# Coturn 서버
+make coturn-up      # 실행
+make coturn-down    # 중지
+make coturn-logs    # 로그 모니터링
+
+# OpenVidu 서버
+make openvidu-up    # 실행
+make openvidu-down  # 중지
+make openvidu-logs  # 로그 모니터링
+```
+
 ---
 
 ## 🧪 Testing & Validation
@@ -493,6 +522,21 @@ curl -k https://localhost/openvidu/api/health
 - [x] OpenVidu `.env` 설정 (Coturn 연동)
 - [x] OpenVidu Dashboard 접속 가능
 - [x] WebRTC 연결 테스트 성공
+
+## 📝 Dev Agent Record
+
+### Implementation Notes (2026-01-20)
+- **Infrastructure Setup**:
+  - Created `docker/coturn` and `docker/openvidu` configurations.
+  - Configured `turnserver.conf` with local loopback IP (127.0.0.1) for development environment.
+  - Configured OpenVidu with ports 8080/8443 to avoid macOS privilege issues.
+  - Successfully launched both Coturn and OpenVidu containers via `docker compose`.
+- **Testing**:
+  - Created `docker/test-webrtc.html` for local WebRTC connectivity testing.
+  - Verified container status: Both services are UP.
+- **Environment**:
+  - Adjusted configuration for macOS compatibility (ports, network mode emulation).
+  - Used `127.0.0.1` for local testing; for production, `turnserver.conf` and `env` need public IP updates.
 
 ---
 

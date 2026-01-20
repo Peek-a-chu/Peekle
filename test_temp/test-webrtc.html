@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OpenVidu + Coturn Test</title>
+    <script src="https://unpkg.com/openvidu-browser@2.29.0/static/js/openvidu-browser-2.29.0.min.js"></script>
+</head>
+<body>
+    <h1>WebRTC Connection Test</h1>
+    <div style="background-color: #f0f0f0; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+        <h3>⚠️ 필독: 테스트 전 체크</h3>
+        <p>1. OpenVidu 서버가 실행 중이어야 합니다 (http://127.0.0.1:8443).</p>
+        <p>2. 이 페이지는 로컬(localhost)에서만 작동합니다 (HTTPS 미적용).</p>
+    </div>
+
+    <div id="status" style="font-weight: bold; margin-bottom: 10px;">상태: 초기화 중...</div>
+    <ul id="logs" style="background: #333; color: #fff; padding: 10px; height: 150px; overflow-y: scroll; font-family: monospace;"></ul>
+    <div id="video-container"></div>
+
+    <script>
+        function log(msg) {
+            console.log(msg);
+            const statusDiv = document.getElementById('status');
+            const logList = document.getElementById('logs');
+            const li = document.createElement('li');
+            li.textContent = '> ' + msg;
+            logList.appendChild(li);
+            logList.scrollTop = logList.scrollHeight;
+            
+            if(msg.includes('❌') || msg.includes('✅')) {
+                statusDiv.innerText = msg;
+            }
+        }
+
+        window.onload = function() {
+            log("페이지 로드 완료");
+
+            if (typeof OpenVidu === 'undefined') {
+                log("❌ 오류: OpenVidu 라이브러리를 로드하지 못했습니다. 인터넷 연결을 확인하거나 CDN 주소를 변경하세요.");
+                return;
+            }
+            log("OpenVidu 라이브러리 로드됨");
+
+            try {
+                const OV = new OpenVidu();
+                const session = OV.initSession();
+
+                session.on('streamCreated', (event) => {
+                    log("🎥 스트림 감지됨");
+                    const subscriber = session.subscribe(event.stream, 'video-container');
+                    log("✅ 비디오 수신 성공!");
+                });
+
+                // OpenVidu 서버 (127.0.0.1:8443 via HTTP)
+                const OPENVIDU_SERVER_URL = 'http://127.0.0.1:8443';
+                const OPENVIDU_SERVER_SECRET = 'peekle_secret_1234';
+
+                log("서버 연결 시도 중 (" + OPENVIDU_SERVER_URL + ")...");
+
+                fetch(OPENVIDU_SERVER_URL + '/openvidu/api/sessions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa('OPENVIDUAPP:' + OPENVIDU_SERVER_SECRET),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ customSessionId: 'test-session' })
+                })
+                .then(res => {
+                    if (res.status === 409) {
+                        log("⚠️ 세션이 이미 존재함 (재사용)");
+                        return { id: 'test-session' }; 
+                    }
+                    if (!res.ok) throw new Error('세션 생성 실패: ' + res.status);
+                    return res.json();
+                })
+                .then(sessionData => {
+                    log("세션 ID 확보: " + sessionData.id);
+                    return fetch(OPENVIDU_SERVER_URL + `/openvidu/api/sessions/${sessionData.id}/connection`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Basic ' + btoa('OPENVIDUAPP:' + OPENVIDU_SERVER_SECRET),
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('토큰 발급 실패: ' + res.status);
+                    return res.json();
+                })
+                .then(tokenData => {
+                    log("토큰 발급 성공. WebRTC 연결 시도...");
+                    session.connect(tokenData.token)
+                        .then(() => {
+                            log('✅ 세션 연결 성공 (Session connected)');
+                            const publisher = OV.initPublisher('video-container', {
+                                audioSource: undefined,
+                                videoSource: undefined,
+                                publishAudio: true,
+                                publishVideo: true,
+                                resolution: '640x480',
+                                frameRate: 30,
+                                insertMode: 'APPEND',
+                                mirror: false,
+                            });
+                            session.publish(publisher);
+                            log('✅ 내 카메라 송출 시작 (Publisher)');
+                        })
+                        .catch(error => {
+                            log('❌ WebRTC 연결 실패: ' + error.message);
+                        });
+                })
+                .catch(err => {
+                    log('❌ 서버 통신 실패: ' + err.message);
+                    log('💡 힌트: OpenVidu 컨테이너가 실행 중인지 확인하세요 (docker logs peekle-openvidu).');
+                });
+
+            } catch (e) {
+                 log("❌ 예기치 않은 스크립트 오류: " + e.message);
+            }
+        };
+    </script>
+</body>
+</html>

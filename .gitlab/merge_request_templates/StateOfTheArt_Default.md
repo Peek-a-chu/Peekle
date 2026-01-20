@@ -19,7 +19,7 @@
 
 # 🔗 Related Issue
 <!-- 관련된 이슈 번호를 링크해주세요 🔗 -->
-<!-- Closes S14P11A4088-<jira 티켓 넘버> ex) Closes S14P11A4088-47 -->
+<!-- Closes S14P11A408-<jira 티켓 넘버> ex) Closes S14P11A408-47 -->
 
 
 # ✅ Checklist
