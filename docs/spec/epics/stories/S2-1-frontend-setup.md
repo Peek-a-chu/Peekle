@@ -101,21 +101,24 @@ pnpm dlx shadcn-ui@latest add toast
 }
 ```
 
-### Task 3: Prettier 설정
+### Task 3: Prettier 설정 (Airbnb 스타일)
 ```bash
 pnpm add -D prettier eslint-config-prettier eslint-plugin-prettier
 ```
 
-**`.prettierrc` 파일 생성:**
+**`.prettierrc` 파일 생성 (Airbnb 스타일):**
 ```json
 {
-  "semi": false,
+  "semi": true,
   "singleQuote": true,
   "tabWidth": 2,
-  "trailingComma": "es5",
-  "printWidth": 80,
+  "trailingComma": "all",
+  "printWidth": 100,
   "arrowParens": "always",
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "bracketSpacing": true,
+  "jsxSingleQuote": false,
+  "quoteProps": "as-needed"
 }
 ```
 
@@ -128,12 +131,14 @@ build
 pnpm-lock.yaml
 ```
 
-### Task 4: ESLint (Strict) 설정
+### Task 4: ESLint (Strict + Airbnb) 설정
 **`.eslintrc.json` 업데이트:**
 ```json
 {
   "extends": [
     "next/core-web-vitals",
+    "airbnb",
+    "airbnb-typescript",
     "plugin:@typescript-eslint/recommended",
     "plugin:@typescript-eslint/recommended-requiring-type-checking",
     "prettier"
@@ -154,7 +159,10 @@ pnpm-lock.yaml
 
 **필요 패키지 설치:**
 ```bash
-pnpm add -D @typescript-eslint/eslint-plugin @typescript-eslint/parser
+pnpm add -D @typescript-eslint/eslint-plugin @typescript-eslint/parser \
+  eslint-config-airbnb eslint-config-airbnb-typescript \
+  eslint-plugin-import eslint-plugin-jsx-a11y \
+  eslint-plugin-react eslint-plugin-react-hooks
 ```
 
 ### Task 5: Husky 및 lint-staged 설정
@@ -185,7 +193,81 @@ pnpm exec husky add .husky/pre-commit "pnpm exec lint-staged"
 }
 ```
 
-### Task 6: .gitlab-ci.yml 작성 (GitLab CI)
+### Task 6: Pretendard 폰트 설정
+```bash
+pnpm add pretendard
+```
+
+**`src/app/globals.css` 파일 상단에 추가:**
+```css
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+```
+
+**`src/app/globals.css`의 body 스타일 업데이트:**
+```css
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+      system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo',
+      'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji',
+      'Segoe UI Symbol', sans-serif;
+  }
+}
+```
+
+### Task 7: React Compiler 설정
+```bash
+pnpm add -D babel-plugin-react-compiler
+```
+
+**`next.config.ts` 파일 업데이트:**
+```typescript
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  experimental: {
+    reactCompiler: true,
+  },
+};
+
+export default nextConfig;
+```
+
+### Task 8: VSCode 설정 (저장 시 자동 포맷팅)
+**`apps/frontend/.vscode/settings.json` 파일 생성:**
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "prettier.requireConfig": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
+```
+
+### Task 9: .gitlab-ci.yml 작성 (GitLab CI)
 **`.gitlab-ci.yml` 파일 생성 (프로젝트 루트):**
 ```yaml
 # GitLab CI/CD Configuration for Peekle
@@ -239,7 +321,7 @@ frontend-build:
 
 **참고:** 실제 CI/CD는 Jenkins(S2-3)를 통해 처리됩니다. 위 파일은 선택사항입니다.
 
-### Task 7: package.json scripts 정리
+### Task 10: package.json scripts 정리
 **`package.json`에 유용한 스크립트 추가:**
 ```json
 {
@@ -325,8 +407,11 @@ frontend-build:
 - [ ] Next.js 15 + TypeScript 프로젝트 구조
 - [ ] Tailwind CSS 설정 완료
 - [ ] Shadcn/UI 초기 컴포넌트 설치
-- [ ] ESLint + Prettier 설정
+- [ ] ESLint (Strict + Airbnb) + Prettier (Airbnb 스타일) 설정
 - [ ] Husky + lint-staged 설정
+- [ ] Pretendard 폰트 설정
+- [ ] React Compiler 설정 (babel-plugin-react-compiler)
+- [ ] VSCode 설정 (저장 시 자동 포맷팅)
 - [ ] GitLab CI 설정 (선택사항, Jenkins가 주 CI)
 - [ ] README.md (프로젝트 실행 방법 안내)
 
@@ -346,3 +431,7 @@ frontend-build:
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [Husky Documentation](https://typicode.github.io/husky/)
 - [GitLab CI/CD](https://docs.gitlab.com/ee/ci/)
+- [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascript)
+- [Airbnb React/JSX Style Guide](https://airbnb.io/javascript/react/)
+- [Pretendard Font](https://github.com/orioncactus/pretendard)
+- [React Compiler](https://react.dev/learn/react-compiler)

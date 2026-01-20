@@ -67,7 +67,7 @@ DevOps 엔지니어로서, Jenkins를 배포하고 GitLab 저장소에 연결하
  `Jenkinsfile` 파이프라인이 Frontend/Backend에 대해 Build 및 Test 단계를 실행해야 한다.
 
 **🛠 Implementation Tasks**
-[ ] Docker로 Jenkins 컨테이너 배포
+[ ] 외부 Jenkins 서버 접속 확인 및 연결
 [ ] Jenkins GitLab 플러그인 및 Credential 설정
 [ ] `Jenkinsfile` 작성 (Stage: Checkout -> Build -> Test)
 
