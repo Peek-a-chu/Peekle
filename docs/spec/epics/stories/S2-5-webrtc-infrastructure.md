@@ -440,6 +440,34 @@ curl -X POST https://YOUR_PUBLIC_IP/openvidu/api/sessions \
 </html>
 ```
 
+### Task 5: Makefile을 통한 서비스 관리
+
+프로젝트 루트의 `Makefile`을 통해 WebRTC 인프라를 간편하게 관리할 수 있습니다.
+
+#### 5-1. 통합 관리 명령어
+
+```bash
+# Coturn 및 OpenVidu 서버 동시 실행
+make webrtc-up
+
+# Coturn 및 OpenVidu 서버 동시 중지
+make webrtc-down
+```
+
+#### 5-2. 개별 서비스 관리 명령어
+
+```bash
+# Coturn 서버
+make coturn-up      # 실행
+make coturn-down    # 중지
+make coturn-logs    # 로그 모니터링
+
+# OpenVidu 서버
+make openvidu-up    # 실행
+make openvidu-down  # 중지
+make openvidu-logs  # 로그 모니터링
+```
+
 ---
 
 ## 🧪 Testing & Validation
