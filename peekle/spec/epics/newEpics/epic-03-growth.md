@@ -241,3 +241,23 @@ GitHub 스타일로 스트릭을 유지하고 성취감을 얻기 위함이다.
 [ ] `SettingsModal` 컴포넌트 및 탭 UI 구현
 [ ] `ThemeContext`에 Accent Color 상태 추가
 [ ] `useMediaDevices` 훅을 활용한 장치 제어 로직 구현 (Volume, constraints)
+
+### S4-14. 일반 문제 풀이 자동 기록 (Extension)
+🧾User Story
+
+사용자로서, 게임이나 스터디가 아닌 혼자 백준 문제를 풀 때도 내 성장에 기록되길 원한다.
+
+우리 서비스 밖에서 푼 문제도 자동으로 스트릭과 티어 점수에 반영하기 위함이다.
+
+✅ Acceptance Criteria
+
+ [컨텍스트 부재] 확장 프로그램에 저장된 특정 Room ID(게임/스터디)가 없을 경우, '일반 제출'로 간주한다.
+
+ [결과 감지] 백준 사이트에서 "맞았습니다!!"가 확인되면 `POST /api/submissions/general` (또는 `/api/solve/{userId}`)을 호출한다.
+
+ [성장 반영] 제출 성공 시 내 풀이 목록에 추가되고, 스트릭과 경험치가 즉시 갱신되어야 한다.
+
+**🛠 Implementation Tasks**
+[ ] (Extension) 백준 채점 결과 DOM 옵저버 구현 ('맞았습니다!!' 텍스트 감지)
+[ ] (Extension) 로컬 스토리지 확인(`currentContext`) 및 일반 제출 API 호출 분기 처리
+[ ] 일반 제출 처리 API 구현 (`SubmissionService.handleGeneralSubmission`)

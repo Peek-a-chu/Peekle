@@ -123,23 +123,27 @@
 [ ] 시간 동기화 훅 (`useServerTime`) 구현
 [ ] `Scoreboard` 컴포넌트 및 리스트 애니메이션 적용
 
-### S6-7. 제출 검증 (Webhook) (Backend)
+### S6-7. 게임 제출 및 검증 (Extension)
 🧾User Story
 
-시스템으로서, 브라우저 확장 프로그램으로부터 풀이 신호를 받고 싶다.
+플레이어로서, 게임 진행 중에 푼 문제는 자동으로 게임 점수로 인정받고 싶다.
 
-사용자가 백준에서 실제 문제를 해결했음을 검증하고 점수를 부여하기 위함이다.
+별도의 복잡한 인증 절차 없이 게임의 흐름을 유지하기 위함이다.
 
 ✅ Acceptance Criteria
 
- 확장 프로그램 헤더 토큰 검증 및 백준 문제 ID 일치 여부 확인.
+ [컨텍스트 주입] 게임 방 입장 시 `roomId`와 `gameId`가 확장 프로그램 스토리지에 저장되어야 한다. (퇴장/종료 시 삭제)
 
- [점수 계산] 개인전(순위별 차등), 팀전(승/패) 전략에 따라 점수를 부여한다.
+ [결과 전송] 백준에서 "맞았습니다!!" 판정 시, 저장된 `gameId`를 포함하여 `POST /api/games/{gameId}/submit`을 호출해야 한다.
 
- 점수 변동 시 클라이언트에 이벤트를 발행한다.
+ [실패 처리] "틀렸습니다" 등의 결과는 무시하거나, 게임 룰에 따라 감점 요인이 될 경우 전송한다.
+
+ [검증] 서버는 현재 진행 중인 게임의 유효한 제출인지 확인하고 점수를 부여한다.
 
 **🛠 Implementation Tasks**
-[ ] 제출 검증 API (`POST /api/games/submit`) 구현
+[ ] (Extension) Chrome Storage에 `currentContext` (`{ type: 'GAME', id: ... }`) 저장 로직
+[ ] (Extension) 컨텍스트 기반 API 라우팅 로직 구현
+[ ] 게임 제출 처리 API 및 점수 반영 로직 업데이트
 [ ] **점수 계산 전략(Strategy Pattern) 구현**
     - [ ] `IndividualScoreStrategy`: `(N - Rank + 1) * 10`
     - [ ] `TeamScoreStrategy`: Win `30`, Lose `10`
