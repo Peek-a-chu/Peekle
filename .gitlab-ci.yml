@@ -1,0 +1,47 @@
+# GitLab CI/CD Configuration for Peekle
+# Jenkins가 주 CI/CD 도구이지만, GitLab CI를 통한 간단한 검증도 가능
+
+stages:
+  - lint
+  - build
+
+# Frontend 린트 및 빌드는 Jenkins Jenkinsfile에서 처리
+# 이 파일은 GitLab 내장 CI를 사용하려는 경우에만 활성화
+
+frontend-lint:
+  stage: lint
+  image: node:20-alpine
+  only:
+    changes:
+      - apps/frontend/**/*
+  before_script:
+    - cd apps/frontend
+    - npm install -g pnpm@10.28.1
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm run lint
+    - pnpm run format:check
+    - pnpm run type-check
+  cache:
+    paths:
+      - apps/frontend/node_modules/
+
+frontend-build:
+  stage: build
+  image: node:20-alpine
+  only:
+    changes:
+      - apps/frontend/**/*
+  before_script:
+    - cd apps/frontend
+    - npm install -g pnpm@10.28.1
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm run build
+  artifacts:
+    paths:
+      - apps/frontend/.next
+    expire_in: 7 days
+  cache:
+    paths:
+      - apps/frontend/node_modules/
