@@ -193,15 +193,24 @@ GitHub 스타일로 스트릭을 유지하고 성취감을 얻기 위함이다.
 
 ✅ Acceptance Criteria
 
- `GET /api/v1/users/{id}/history` 호출 시 페이지네이션된 제출 로그 목록을 반환해야 한다.
+ **Endpoint**: `GET /api/v1/users/{userId}/history`
 
- 역정규화된 `problem_title`, `problem_tier` 정보를 포함하여 추가 조인 없이 효율적으로 조회해야 한다.
+ **Query Parameters**:
+   - `page`: 페이지 번호 (Default: 0)
+   - `size`: 페이지 크기 (Default: 20)
+   - `startDate`, `endDate`: 조회 기간 (Optional, YYYY-MM-DD)
+   - `result`: 결과 필터 (`SUCCESS`, `FAIL`, Optional)
 
- 날짜별, 결과별(성공/실패) 필터링 옵션을 지원해야 한다.
+ **Response**: `Page<SubmissionLogResponse>`
+   - 포함 필드: `id`, `problemId`, `problemTitle` (역정규화 데이터), `problemTier` (역정규화 데이터)
+   - `result`, `memory`, `executionTime`, `language`, `submittedAt`, `sourceType`
+
+ **Performance**: 역정규화된 컬럼을 활용하여 `PROBLEMS` 테이블 조인 없이 단일 테이블 조회로 처리해야 한다.
 
 **🛠 Implementation Tasks**
-[ ] `SubmissionLogRepository` 조회 메소드 작성 (`Pageable` 지원)
-[ ] 동적 쿼리(QueryDSL) 적용 (필터링 용)
+[ ] `SubmissionLogRepository` 조회 메소드 작성 (`Pageable` 및 `QueryDSL` 활용)
+[ ] 동적 쿼리 구현 (기간 및 결과 필터링)
+[ ] `SubmissionLogResponse` DTO 매핑
 
 ### S4-12. 히스토리 목록 & 코드 뷰어 (Frontend)
 🧾User Story
@@ -214,12 +223,15 @@ GitHub 스타일로 스트릭을 유지하고 성취감을 얻기 위함이다.
 
  히스토리 목록 테이블에 날짜, 문제 이름, 결과(성공여부), 사용 언어, 실행 시간이 표시되어야 한다.
 
+ [페이지네이션] 목록 하단에 페이지 번호, 이전/다음 버튼이 있는 페이지네이션 UI를 제공해야 한다. (무한 스크롤 아님)
+
  특정 행을 클릭하면 모달이 열리고, 당시 제출했던 코드가 읽기 전용 에디터에 로드되어야 한다.
 
  코드 복사 버튼이 제공되어야 한다.
 
 **🛠 Implementation Tasks**
 [ ] `SubmissionTable` 컴포넌트 구현 (TanStack Table 활용 권장)
+[ ] 페이지네이션 UI 컴포넌트 및 페이징 상태 관리 (`pageIndex`, `pageSize`)
 [ ] `CodeViewerModal` 구현 (Monaco Editor ReadOnly 설정)
 
 ### S4-13. 설정 모달 (Frontend)
@@ -255,9 +267,19 @@ GitHub 스타일로 스트릭을 유지하고 성취감을 얻기 위함이다.
 
  [결과 감지] 백준 사이트에서 "맞았습니다!!"가 확인되면 `POST /api/submissions/general` (또는 `/api/solve/{userId}`)을 호출한다.
 
+ [데이터 전송] 요청 Body에는 다음 필수 정보가 포함되어야 한다.
+   - `problemId` (필수): 백준 문제 번호 (DB 매핑용)
+   - `submissionId` (권장): 백준 제출 ID (중복 적립 방지용)
+   - `language`: 사용 언어
+   - `code`: 제출한 소스 코드
+   - `memory`: 메모리 사용량 (KB)
+   - `time`: 실행 시간 (ms)
+   - `submittedAt`: 제출 시각
+
  [성장 반영] 제출 성공 시 내 풀이 목록에 추가되고, 스트릭과 경험치가 즉시 갱신되어야 한다.
 
 **🛠 Implementation Tasks**
 [ ] (Extension) 백준 채점 결과 DOM 옵저버 구현 ('맞았습니다!!' 텍스트 감지)
 [ ] (Extension) 로컬 스토리지 확인(`currentContext`) 및 일반 제출 API 호출 분기 처리
 [ ] 일반 제출 처리 API 구현 (`SubmissionService.handleGeneralSubmission`)
+[ ] 제출 정보 저장 시 `problem_title`, `problem_tier`는 DB 조회하여 역정규화 저장

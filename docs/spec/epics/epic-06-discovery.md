@@ -84,9 +84,23 @@
 
 ✅ Acceptance Criteria
 
- 문제집-문제 매핑(`Many-to-Many`) 관계를 저장하고 수정한다.
+ **Endpoint Definition**:
+   - `GET /api/v1/workbooks`: 전체 문제집 목록 조회 (검색, 정렬 지원)
+   - `GET /api/v1/workbooks/me`: 내가 만든/스크랩한 문제집 조회
+   - `GET /api/v1/workbooks/{workbookId}`: 문제집 상세 조회 (문제 목록 포함)
+   - `POST /api/v1/workbooks`: 문제집 생성
+   - `PUT /api/v1/workbooks/{workbookId}`: 문제집 수정 (문제 추가/삭제/순서변경)
 
- 조회 시 로그인 유저의 풀이 여부(`isSolved`)를 포함하여 반환해야 한다.
+ **Request Body (Create/Update)**:
+   ```json
+   {
+     "title": "Core CS 알고리즘",
+     "description": "필수 문제 모음입니다.",
+     "problemIds": [1000, 1001, 2309, 2557] // 배열 순서대로 저장됨
+   }
+   ```
+
+ 문제집 상세 조회 시 로그인 유저의 풀이 여부(`isSolved`)를 매핑하여 반환해야 한다.
 
 **🛠 Implementation Tasks**
 [ ] `Workbook` 관련 Entity, Repository, Service 구현
