@@ -16,15 +16,17 @@
 
  Next.js 15 + TypeScript 프로젝트 구조가 생성되어야 한다.
 
+ pnpm 패키지 매니저가 설정되어야 한다.
+
  코드를 커밋할 때 Prettier 및 ESLint (Strict) 규칙이 강제되어야 한다.
 
- GitHub Actions에서 main에 푸시하면 빌드 및 린트 검사가 통과해야 한다.
+ Jenkins CI에서 main에 푸시하면 빌드 및 린트 검사가 통과해야 한다.
 
 **🛠 Implementation Tasks**
-[ ] `create-next-app`으로 프로젝트 초기화
+[ ] pnpm 설치 및 `pnpm create next-app`으로 프로젝트 초기화
 [ ] TailwindCSS 및 Shadcn/UI 설치 및 설정
 [ ] Husky 및 lint-staged 설정
-[ ] GitHub Actions workflow 파일 작성 (`build.yml`)
+[ ] Jenkinsfile 작성 (Frontend 빌드 파이프라인)
 
 ### S2-2. 프로젝트 초기 설정 (Backend)
 🧾User Story
@@ -35,9 +37,9 @@ API 구축을 시작할 수 있어야 하기 때문이다.
 
 ✅ Acceptance Criteria
 
- Spring Boot 3.x 애플리케이션이 성공적으로 실행되어야 한다.
+ Spring Boot 3.4.x 애플리케이션이 성공적으로 실행되어야 한다.
 
- `docker-compose up` 실행 시 Redis 컨테이너가 정상 작동해야 한다.
+ `docker compose up` 실행 시 Redis 컨테이너가 정상 작동해야 한다.
 
  외부 서버에서 제공되는 MySQL 데이터베이스 연결이 성공해야 한다.
 
@@ -45,7 +47,7 @@ API 구축을 시작할 수 있어야 하기 때문이다.
 
 **🛠 Implementation Tasks**
 [ ] Spring Initializr로 프로젝트 생성 (Web, JPA, Lombok, Validation)
-[ ] `docker-compose.yml` 작성 (Redis)
+[ ] `docker compose.yml` 작성 (Redis)
 [ ] GlobalExceptionHandler 구현
 [ ] `ApiResponse` 공통 DTO 클래스 작성
 
