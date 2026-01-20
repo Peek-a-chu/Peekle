@@ -28,52 +28,17 @@
 
 ## 🛠 Implementation Tasks
 
-### Task 1: Docker로 Jenkins 컨테이너 배포
+### Task 1: 외부 Jenkins 서버 연결 및 설정
 
-**`docker/jenkins/docker compose.yml` 파일 생성:**
-```yaml
-version: '3.8'
+**Jenkins 접속 정보 확인:**
+외부에서 제공되는 Jenkins 서버의 URL과 접속 정보를 확인합니다.
 
-services:
-  jenkins:
-    image: jenkins/jenkins:lts-jdk17
-    container_name: peekle-jenkins
-    user: root
-    ports:
-      - "8080:8080"
-      - "50000:50000"
-    volumes:
-      - jenkins-data:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
-    environment:
-      - JENKINS_OPTS=--prefix=/jenkins
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-    restart: unless-stopped
+1. 브라우저에서 Jenkins Server URL 접속
+2. 제공받은 관리자 계정 또는 프로젝트별 계정으로 로그인
 
-volumes:
-  jenkins-data:
-    driver: local
-```
-
-**Jenkins 실행:**
-```bash
-cd docker/jenkins
-docker compose up -d
-
-# 초기 관리자 비밀번호 확인
-docker exec peekle-jenkins cat /var/jenkins_home/secrets/initialAdminPassword
-```
-
-**Jenkins 초기 설정:**
-1. 브라우저에서 `http://localhost:8080/jenkins` 접속
-2. 초기 관리자 비밀번호 입력
-3. "Install suggested plugins" 선택
-4. 관리자 계정 생성
-   - Username: `admin`
-   - Password: `peekle-jenkins-admin`
-   - Full name: `Peekle Admin`
-   - Email: `admin@peekle.com`
+**Jenkins 초기 설정 (필요 시):**
+관리자 권한이 있는 경우, 프로젝트에 필요한 플러그인이 설치되어 있는지 확인합니다.
+(공용 서버인 경우, 이미 설치되어 있을 가능성이 높음)
 
 ### Task 2: Jenkins 필수 플러그인 설치
 
@@ -501,15 +466,15 @@ git push origin main
 
 ## 📦 Deliverables
 
-- [x] Jenkins Docker 컨테이너 실행
-- [x] 필수 플러그인 설치 (GitLab, NodeJS, Gradle 등)
-- [x] GitLab API Token 및 Credential 설정
-- [x] Node.js 20, Gradle 8, JDK 17 환경 설정
-- [x] Frontend Jenkinsfile (5 stages)
-- [x] Backend Jenkinsfile (6 stages)
-- [x] Multibranch Pipeline 생성 (Frontend, Backend)
-- [x] GitLab Webhook 연동 완료
-- [x] 빌드 테스트 성공
+- [ ] Jenkins Docker 컨테이너 실행
+- [ ] 필수 플러그인 설치 (GitLab, NodeJS, Gradle 등)
+- [ ] GitLab API Token 및 Credential 설정
+- [ ] Node.js 20, Gradle 8, JDK 17 환경 설정
+- [ ] Frontend Jenkinsfile (5 stages)
+- [ ] Backend Jenkinsfile (6 stages)
+- [ ] Multibranch Pipeline 생성 (Frontend, Backend)
+- [ ] GitLab Webhook 연동 완료
+- [ ] 빌드 테스트 성공
 
 ---
 
