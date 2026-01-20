@@ -1,0 +1,23 @@
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: peekle-coturn
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+      - "50000-50050:50000-50050/tcp"
+      - "50000-50050:50000-50050/udp"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - coturn-logs:/var/log
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    environment:
+      - DETECT_EXTERNAL_IP=yes
+      - DETECT_RELAY_IP=yes
+
+volumes:
+  coturn-logs:
+    driver: local
