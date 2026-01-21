@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            width: 320px;
+            padding: 10px;
+            font-family: sans-serif;
+            background-color: #f9f9f9;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #0076C0;
+            padding-bottom: 8px;
+        }
+
+        .solved-item {
+            background: white;
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .solved-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .solved-id {
+            font-weight: bold;
+            color: #0076C0;
+            font-size: 1.1em;
+        }
+
+        .timestamp {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .check-icon {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .item-details {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            font-size: 0.85em;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-badge {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 4px;
+        }
+
+        .code-toggle {
+            cursor: pointer;
+            color: #0076C0;
+            text-decoration: underline;
+            font-size: 0.85em;
+            margin-top: 5px;
+            align-self: flex-start;
+        }
+
+        .code-block {
+            display: none;
+            background: #272822;
+            color: #f8f8f2;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-family: monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 100%;
+            text-align: left;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #888;
+            padding: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h3>Peekle <span style="font-size:0.7em; font-weight:normal; color:#888;">힐끔힐끔코딩</span></h3>
+    <div id="solved-list">
+        <div class="empty-state">아직 감지된 해결 내역이 없습니다.</div>
+    </div>
+    <div style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px; text-align: center;">
+        <button id="test-submit-btn"
+            style="padding: 8px 12px; background-color: #0076C0; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            🛠️ 테스트 데이터 전송
+        </button>
+        <div id="test-status" style="margin-top: 5px; font-size: 0.8em; color: #555;"></div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>
