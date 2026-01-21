@@ -123,6 +123,29 @@ async function getProblemInfo(problemId) {
     return null;
 }
 
+
+
+async function sendToBackend(data) {
+    try {
+        console.log('Sending submission to backend:', data);
+        const response = await fetch('http://localhost:8080/api/submissions/general', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            console.log('Backend sync successful');
+        } else {
+            console.error('Backend sync failed:', response.status);
+        }
+    } catch (error) {
+        console.error('Failed to send to backend:', error);
+    }
+}
+
 async function handleSolvedSubmission(payload) {
     const { submitId, problemId, result, username, memory, time, language, code } = payload;
 
@@ -140,6 +163,24 @@ async function handleSolvedSubmission(payload) {
 
         // Fetch problem details (tier, title)
         const problemInfo = await getProblemInfo(problemId);
+
+        // --- Send to Backend (Peekle) ---
+        // Clean up memory/time strings (e.g. "123 KB" -> 123)
+        const memoryInt = parseInt(String(memory).replace(/[^0-9]/g, '')) || 0;
+        const timeInt = parseInt(String(time).replace(/[^0-9]/g, '')) || 0;
+
+        await sendToBackend({
+            problemId: parseInt(problemId) || 0,
+            problemTitle: problemInfo ? problemInfo.titleKo : "",
+            problemTier: problemInfo ? String(problemInfo.level) : "0",
+            language: language,
+            code: code,
+            memory: memoryInt,
+            executionTime: timeInt,
+            result: result,
+            submittedAt: new Date().toISOString(),
+            submitId: submitId
+        });
 
         // Save to storage
         processed[submitId] = {

@@ -10,7 +10,8 @@
     ],
     "host_permissions": [
         "https://www.acmicpc.net/*",
-        "https://solved.ac/*"
+        "https://solved.ac/*",
+        "http://localhost:8080/*"
     ],
     "background": {
         "service_worker": "background.js"

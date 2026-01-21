@@ -7,7 +7,52 @@ document.addEventListener('DOMContentLoaded', () => {
             updateList();
         }
     });
+
+    // Test Button Listener
+    const testBtn = document.getElementById('test-submit-btn');
+    if (testBtn) {
+        testBtn.addEventListener('click', sendTestSubmission);
+    }
 });
+
+async function sendTestSubmission() {
+    const statusEl = document.getElementById('test-status');
+    statusEl.innerText = '전송 중...';
+
+    const testData = {
+        problemId: 1000,
+        problemTitle: "A+B",
+        problemTier: "1",
+        language: "Java",
+        code: "public class Main { public static void main(String[] args) { System.out.println(\"Hello Extension!\"); } }",
+        memory: 14320,
+        executionTime: 120,
+        result: "맞았습니다!!",
+        submittedAt: new Date().toISOString(),
+        submitId: "TEST_" + Date.now()
+    };
+
+    try {
+        const response = await fetch('http://localhost:8080/api/submissions/general', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(testData)
+        });
+
+        if (response.ok) {
+            statusEl.innerText = '✅ 전송 성공! 백엔드 로그 확인.';
+            statusEl.style.color = 'green';
+        } else {
+            statusEl.innerText = `❌ 실패: ${response.status}`;
+            statusEl.style.color = 'red';
+        }
+    } catch (error) {
+        statusEl.innerText = `❌ 에러: ${error.message}`;
+        statusEl.style.color = 'red';
+    }
+}
 
 function updateList() {
     chrome.storage.local.get(['processed_submissions'], (items) => {
