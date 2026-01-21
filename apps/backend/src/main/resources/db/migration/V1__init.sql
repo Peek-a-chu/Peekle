@@ -1,7 +1,7 @@
 -- V1__init.sql
 
 -- User Table
-CREATE TABLE IF NOT EXISTS `user` (
+CREATE TABLE IF NOT EXISTS `users` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `social_id` VARCHAR(255) NOT NULL UNIQUE,
     `provider` VARCHAR(255) NOT NULL,
@@ -43,6 +43,6 @@ CREATE TABLE IF NOT EXISTS `submission_log` (
     `execution_time` INT,
     `language` VARCHAR(255),
     `submitted_at` DATETIME(6),
-    CONSTRAINT `fk_submission_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
+    CONSTRAINT `fk_submission_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
     CONSTRAINT `fk_submission_problem` FOREIGN KEY (`problem_id`) REFERENCES `problem` (`id`)
 );

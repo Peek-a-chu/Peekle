@@ -63,7 +63,7 @@ class FlywayMigrationTest {
         }
 
         // V1__init.sql에 정의된 테이블들이 존재하는지 검증
-        assertThat(tables).contains("user", "problem", "submission_log");
+        assertThat(tables).contains("users", "problem", "submission_log");
         
         // flyway_schema_history 테이블도 존재해야 함
         assertThat(tables).contains("flyway_schema_history");
