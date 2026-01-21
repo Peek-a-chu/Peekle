@@ -28,19 +28,6 @@ public class User {
     @Column(unique = true)
     private String nickname;
 
-    // ... fields ...
-
-    public User(String socialId, String provider, String nickname) {
-        this.socialId = socialId;
-        this.provider = provider;
-        this.nickname = nickname;
-        this.tier = "BRONZE";
-        this.leaguePoint = 0;
-        this.isDeleted = false;
-        this.createdAt = LocalDateTime.now();
-    }
-
-
     private String profileImg;
     private String profileImgThumb;
 
