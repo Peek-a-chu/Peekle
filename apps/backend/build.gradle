@@ -57,12 +57,35 @@ dependencies {
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    runtimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// 환경별 실행을 위한 편의용 태스크 (GradleBuild 타입)
+task runDev(type: GradleBuild) {
+    group = 'application'
+    description = 'Runs the application with the dev profile (H2, Flyway OFF).'
+    tasks = ['bootRun']
+    startParameter.projectProperties = [profile: 'dev']
+}
+
+task runProd(type: GradleBuild) {
+    group = 'application'
+    description = 'Runs the application with the prod profile (MySQL, Flyway ON).'
+    tasks = ['bootRun']
+    startParameter.projectProperties = [profile: 'prod']
+}
+
+// bootRun 실행 시 프로퍼티로 프로필을 받거나 기본값 사용
+tasks.named('bootRun') {
+    if (project.hasProperty('profile')) {
+        systemProperty 'spring.profiles.active', project.property('profile')
+    }
 }
 
 // QueryDSL 설정

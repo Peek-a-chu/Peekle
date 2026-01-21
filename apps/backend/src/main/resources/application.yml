@@ -1,20 +1,15 @@
 spring:
   profiles:
-    active: dev
+    active: dev # 기본값: 개발 모드 (H2)
 
   application:
     name: peekle-backend
 
+  # 공통 JPA 설정
   jpa:
     open-in-view: false
-    show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
-        highlight_sql: true
-    hibernate:
-      ddl-auto: validate
-
+    
+  # 공통 Redis 설정 (필요시 dev/prod 분리 가능)
   data:
     redis:
       host: localhost
@@ -38,5 +33,3 @@ logging:
   level:
     com.peekle: INFO
     org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
