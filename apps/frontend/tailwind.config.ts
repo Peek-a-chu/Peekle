@@ -6,6 +6,7 @@ const config: Config = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/domains/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     container: {
@@ -16,41 +17,83 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Pretendard Variable', 'Pretendard', 'sans-serif'],
+      },
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        border: '#F7E8F0', // 전역 테두리
+        input: '#F7E8F0',  // Input 컴포넌트 테두리
+        ring: '#E24EA0',   // 포커스 링
+
+        // 사이트 배경 및 글자
+        background: '#F7F8FC', // 사이트 전체 배경
+        foreground: '#111827', // 기본 글자 색상
+
+        // 메인 컬러 (Primary)
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: '#E24EA0',
+          foreground: '#FFFFFF', 
+          hover: '#D93A95',      
+          active: '#C92F86',    
         },
+
+        // 보조 컬러 (Secondary)
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: '#FCE7F3',
+          foreground: '#E24EA0', 
+          hover: '#F9D1E3',     
+          active: '#F6BAD2',     
         },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
-        },
+
+        // 카드 1 
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: '#FFFFFF',    
+          foreground: '#111827',
+          border: '#F7E8F0',     
+        },
+
+        // 카드 2
+        muted: {
+          DEFAULT: '#FAFAFF',    
+          foreground: '#111827', 
+          border: '#F7E8F0',     
+        },
+
+        // 상태 컬러 (성공/경고/위험)
+        // --- 성공 (Success) ---
+        success: {
+          DEFAULT: '#16A34A',    
+          foreground: '#111827', 
+          
+          light: {
+             DEFAULT: '#DCFCE7',    
+             foreground: '#6B7280', 
+          }
+        },
+
+        // --- 경고 (Warning) ---
+        warning: {
+          DEFAULT: '#F59E0B',    
+          foreground: '#111827', 
+          
+          light: {
+            DEFAULT: '#FEF3C7',  
+            foreground: '#92400E', 
+          }
+        },
+
+        // --- 위험 (Destructive) ---
+        destructive: {
+          DEFAULT: '#EF4444',    
+          foreground: '#FFFFFF', 
+          
+          light: {
+            DEFAULT: '#FEE2E2',    
+            foreground: '#991B1B', 
+          }
         },
       },
+
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
