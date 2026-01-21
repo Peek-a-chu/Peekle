@@ -123,6 +123,9 @@ const schema = z.object({
 - **폴더/파일 명 (페이지, 컴포넌트):**
     - `BuildingSelectButton.tsx` (컴포넌트)
     - `ProfilePage.tsx` (페이지)
+    - **Note:** 컴포넌트 파일명에는 SSR/CSR 여부에 따라 접두사를 붙입니다.
+      - **Server Component:** `SC` (예: `SCUserList.tsx`)
+      - **Client Component:** `CC` (예: `CCUserProfile.tsx`)
 
 ### SNAKE_CASE
 
@@ -238,8 +241,8 @@ if (!result.ok) {
 - **재사용성(Reusability):** 2곳 이상의 도메인에서 공통으로 사용되는 것만 `Global` 영역(`src/Components`, `src/hooks`)으로 승격시킵니다.
 - **Next.js 15:** 서버 액션(Server Actions)과 API 로직도 해당 도메인 폴더 내에 위치시킵니다.
     - **app 폴더:** 페이지와 레이아웃을 정의합니다. (소문자 폴더명 = URL)
-    - **Domains 폴더:** 기능/도메인별로 코드(컴포넌트, 훅 등)를 응집시킵니다.
-    - **Components 폴더:** 특정 도메인에 종속되지 않는 **공용 디자인 시스템** 컴포넌트만 위치합니다.
+    - **domains 폴더:** 기능/도메인별로 코드(컴포넌트, 훅 등)를 응집시킵니다.
+    - **components 폴더:** 특정 도메인에 종속되지 않는 **공용 디자인 시스템** 컴포넌트만 위치합니다.
 
 ### Tree 구조 예시
 
@@ -259,16 +262,16 @@ ROOT
 │   │   ├── images           # 예: logo.png, placeholder.jpg
 │   │   └── icons            # (SVG 파일들)
 │   │
-│   ├── Components           # [Shared UI]
-│   │   └── Button           # 예: className을 통해 Tailwind 적용
+│   ├── components           # [Shared UI]
+│   │   └── button           # 예: className을 통해 Tailwind 적용
 │   │
-│   ├── Domains              # [Features]
-│   │   ├── Game
-│   │   │   ├── assets       #  Game 도메인 전용 이미지/아이콘
+│   ├── domains              # [Features]
+│   │   ├── game
+│   │   │   ├── assets       #  game 도메인 전용 이미지/아이콘
 │   │   │   │   └── card-sprite.png
 │   │   │   ├── components
 │   │   │   └── ...
-│   │   └── User
+│   │   └── user
 │   │
 │   └── lib                  # [Utils]
 │       └── utils.ts         # Tailwind 병합 유틸리티 (cn 함수)
@@ -351,3 +354,65 @@ const message = 'Hello, World!';
 - URL 경로는 소문자(`lowercase`)를 사용합니다.
 - TypeScript `enum` 대신 Union Type이나 객체(const assertion)를 사용합니다.
 - 불필요한 `<div>` 래퍼 대신 Fragment `<>`를 사용합니다.
+---
+
+## 3. 추가 아키텍처 규칙 (Additional Architecture Rules)
+
+### 3.1 절대 경로 사용 (Absolute Imports Only)
+
+**Rule:** 모든 import 구문에서 상대 경로(`./`, `../`) 사용을 금지하고, 항상 **절대 경로(`@/...`)**를 사용합니다.
+
+**Code Example:**
+```typescript
+// ❌ Bad
+import { useRoomStore } from '../hooks/useRoomStore';
+import { Button } from '../../components/ui/button';
+
+// ✅ Good
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { Button } from '@/components/ui/button';
+```
+
+### 3.2 로직과 뷰의 철저한 분리 (Strict Separation of Logic & View)
+
+**Rule:** Page 컴포넌트와 일반 UI 컴포넌트 내부에서는 **절대 Hook(Store, API, State 등)을 직접 정의하거나 사용하지 않습니다.**
+모든 비즈니스 로직과 상태 관리는 해당 컴포넌트를 위한 **전용 Custom Hook**으로 분리해야 합니다.
+
+**Reasoning:**
+- 컴포넌트는 오직 '그리는 것(Rendering)'에만 집중합니다.
+- 로직의 재사용성과 테스트 용이성을 확보합니다.
+
+**Recommended Pattern:**
+
+```tsx
+// 1. Logic (Hook)
+// hooks/useMyFeature.ts
+export function useMyFeature() {
+  const data = useStore(state => state.data);
+  const [localState, setLocalState] = useState(false);
+  
+  const handleClick = () => { /* ... */ };
+
+  return { data, localState, handleClick };
+}
+
+// 2. View (Component)
+// components/MyFeature.tsx
+export function MyFeature() {
+  // 훅을 통해 필요한 데이터와 함수만 구조분해 할당
+  const { data, localState, handleClick } = useMyFeature();
+
+  return (
+    <div onClick={handleClick}>
+      {data} - {localState ? 'On' : 'Off'}
+    </div>
+  );
+}
+```
+
+### 3.3 폴더 네이밍 컨벤션 (Folder Naming)
+
+**Rule:** `domains`, `components` 등 모든 폴더명은 **소문자(lowercase)**를 원칙으로 합니다. PascalCase(대문자 시작)는 사용하지 않습니다.
+
+**Example:**
+- `src/Domains/Study` (❌) -> `src/domains/study` (✅)

@@ -119,3 +119,40 @@
 - `apps/frontend/src/tests/stores/useRoomStore.test.ts` (New)
 - `apps/frontend/src/tests/components/study/VideoTile.test.tsx` (New)
 - `apps/frontend/src/tests/components/study/StudyHeader.test.tsx` (New)
+
+### 2026-01-21 Refactoring Record (Amelia)
+
+- **Architecture Refactoring**: Moved Study domain code to `apps/frontend/src/Domains/Study/` to comply with standard.
+  - Components: `components/study/` -> `Domains/Study/components/`
+  - Hooks/Store: `stores/useRoomStore.ts` -> `Domains/Study/hooks/useRoomStore.ts`
+- **Spec Alignment**:
+  - Moved Date display and "Add Problem" button from `ProblemListPanel` to `StudyHeader` to match wireframe/spec.
+  - Updated `StudyHeader.tsx` and `ProblemListPanel.tsx`.
+  - Updated `page.tsx` to pass necessary state.
+- **Test Updates**:
+  - Updated `StudyHeader.test.tsx` and `ProblemListPanel.test.tsx` to match new responsibility distribution.
+- **Status**: Codebase refactored. Tests updated, though some verification issues persist in environment.
+
+### File List (Refactor)
+
+- `apps/frontend/src/Domains/Study/components/*` (Moved & Updated)
+- `apps/frontend/src/Domains/Study/hooks/useRoomStore.ts` (Moved)
+- `apps/frontend/src/app/study/[id]/page.tsx` (Updated imports & props)
+- `apps/frontend/src/tests/**/*.test.tsx` (Updated imports)
+
+### 2026-01-21 Refactoring Record (Amelia - Naming Convention)
+
+- **Naming Convention Update**: Enforced `CS` (Client Component) and `SS` (Server Component) prefixes for component files per user request.
+  - Updated `README.md` or instruction files (specifically `toss-frontend-rule.instructions.md`).
+- **File Renaming**:
+  - `Domains/Study/components/*.tsx` -> `CS*.tsx` (as all were Client Components).
+- **Import Updates**:
+  - Updated `index.ts` to re-export renamed components.
+  - Updated test file imports to point to new file names.
+
+### File List (Naming)
+
+- `apps/frontend/src/Domains/Study/components/CS*.tsx` (Renamed)
+- `apps/frontend/src/Domains/Study/components/CS*.test.tsx` (Renamed)
+- `apps/frontend/src/tests/**/*.test.tsx` (Imports updated)
+- `.github/instructions/toss-frontend-rule.instructions.md` (Rule added)

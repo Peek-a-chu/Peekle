@@ -118,14 +118,14 @@ apps/frontend/src/
 │   ├── layout.tsx          # Root layout
 │   ├── page.tsx            # Home page
 │   └── study/[id]/         # Dynamic route
-├── Components/             # Shared UI components (PascalCase)
-│   └── Button/
-├── Domains/                # Feature-organized code (PascalCase)
-│   ├── Game/
+├── components/             # Shared UI components (PascalCase)
+│   └── button/
+├── domains/                # Feature-organized code (PascalCase)
+│   ├── game/
 │   │   ├── components/
 │   │   ├── hooks/
 │   │   └── api/
-│   └── User/
+│   └── user/
 ├── assets/                 # Shared images/icons (camelCase)
 ├── hooks/                  # Shared hooks (camelCase)
 ├── lib/                    # Utils like cn() (camelCase)
