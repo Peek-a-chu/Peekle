@@ -30,11 +30,15 @@ public class User {
 
     // ... fields ...
 
+    @Column(unique = true)
+    private String bojId; // 백준 아이디
+
     public User(String socialId, String provider, String nickname) {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
-        this.tier = "BRONZE";
+        // this.bojId = null; // 기본값 null
+        this.league = "브론즈";
         this.leaguePoint = 0;
         this.isDeleted = false;
         this.createdAt = LocalDateTime.now();
@@ -44,8 +48,8 @@ public class User {
     private String profileImg;
     private String profileImgThumb;
 
-    @Column(name = "tier")
-    private String tier = "BRONZE_5";
+    @Column(name = "league")
+    private String league = "BRONZE";
 
     @Column(name = "league_point")
     private Integer leaguePoint = 0;
@@ -63,4 +67,12 @@ public class User {
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public void addLeaguePoint(int amount) {
+        this.leaguePoint += amount;
+    }
+
+    public void registerBojId(String bojId) {
+        this.bojId = bojId;
+    }
 }
