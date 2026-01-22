@@ -4,10 +4,14 @@ import com.peekle.domain.study.dto.request.StudyRoomCreateRequest;
 import com.peekle.domain.study.dto.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.response.StudyInviteCodeResponse;
 import com.peekle.domain.study.dto.response.StudyRoomCreateResponse;
+import com.peekle.domain.study.dto.response.StudyRoomListResponse;
 import com.peekle.domain.study.dto.response.StudyRoomResponse;
 import com.peekle.domain.study.service.StudyRoomService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -36,6 +40,17 @@ public class StudyRoomController {
             Principal principal) {
         Long userId = 1L; // Test User ID
         StudyRoomResponse response = studyRoomService.joinStudyRoom(userId, request);
+        return ApiResponse.success(response);
+    }
+
+    // 내 스터디 목록 조회
+    @GetMapping
+    public ApiResponse<Page<StudyRoomListResponse>> getMyStudyRooms(
+            @RequestParam(required = false) String keyword,
+            @PageableDefault(size = 6) Pageable pageable,
+            Principal principal) {
+        Long userId = 1L; // Test User ID
+        Page<StudyRoomListResponse> response = studyRoomService.getMyStudyRooms(userId, keyword, pageable);
         return ApiResponse.success(response);
     }
 
