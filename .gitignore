@@ -19,3 +19,4 @@ _bmad-output
 .vscode
 
 .idea
+apps/frontend/build.log
