@@ -1,7 +1,6 @@
 package com.peekle.domain.study.dto.response;
 
 import com.peekle.domain.study.entity.StudyRoom;
-import com.peekle.domain.user.entity.User;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -20,7 +19,7 @@ public class StudyRoomResponse {
         this.id = studyRoom.getId();
         this.title = studyRoom.getTitle();
         this.description = studyRoom.getDescription();
-        this.owner = OwnerInfo.from(studyRoom.getOwner());
+        this.owner = OwnerInfo.from(studyRoom.getOwnerId());
         this.rankingPoint = studyRoom.getRankingPoint();
         this.isActive = studyRoom.isActive();
         this.createdAt = studyRoom.getCreatedAt();
@@ -40,8 +39,9 @@ public class StudyRoomResponse {
             this.nickname = nickname;
         }
 
-        public static OwnerInfo from(User user) {
-            return new OwnerInfo(user.getId(), user.getNickname());
+        public static OwnerInfo from(Long ownerId) {
+            // User Table이 없으므로 닉네임을 알 수 없음. 임시값 사용.
+            return new OwnerInfo(ownerId, "Unknown User " + ownerId);
         }
     }
 }

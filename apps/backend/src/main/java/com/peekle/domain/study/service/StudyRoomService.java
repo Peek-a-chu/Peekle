@@ -12,6 +12,7 @@ import com.peekle.domain.study.dto.request.StudyRoomCreateRequest;
 import com.peekle.domain.study.dto.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.response.StudyInviteCodeResponse;
 import com.peekle.domain.study.dto.response.StudyRoomCreateResponse;
+import com.peekle.domain.study.dto.response.StudyRoomResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +26,15 @@ public class StudyRoomService {
     private final StudyMemberRepository studyMemberRepository;
     private final InviteCodeService inviteCodeService;
 
+    // 스터디 방 생성 (초대코드 반환)
+
     @Transactional
-    public StudyRoomCreateResponse createStudyRoom(User user, StudyRoomCreateRequest request) {
+    public StudyRoomCreateResponse createStudyRoom(Long userId, StudyRoomCreateRequest request) {
         // 1. 방 생성
         StudyRoom studyRoom = StudyRoom.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
-                .owner(user)
+                .ownerId(userId)
                 .isActive(true)
                 .build();
 
@@ -40,7 +43,7 @@ public class StudyRoomService {
         // 2. 방장(Owner) 등록
         StudyMember ownerMember = StudyMember.builder()
                 .study(studyRoom)
-                .user(user)
+                .userId(userId)
                 .role(StudyMember.StudyRole.OWNER)
                 .build();
 
@@ -53,8 +56,24 @@ public class StudyRoomService {
         return StudyRoomCreateResponse.of(inviteCode);
     }
 
+    // 스터디 방 상세 조회
+    @Transactional(readOnly = true)
+    public StudyRoomResponse getStudyRoom(Long userId, Long studyRoomId) {
+        StudyRoom studyRoom = studyRoomRepository.findById(studyRoomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
+
+        // 이미 멤버라면 스터디 상세 정보 반환
+        if (studyMemberRepository.existsByStudyAndUserId(studyRoom, userId)) {
+            return StudyRoomResponse.from(studyRoom);
+        }
+
+        // 멤버가 아니라면 접근 거부 (또는 상황에 따라 일부 정보만 줄 수도 있음)
+        throw new BusinessException(ErrorCode.UNAUTHORIZED);
+    }
+
+    // 스터디 방 가입 (초대코드 사용)
     @Transactional
-    public void joinStudyRoom(User user, StudyRoomJoinRequest request) {
+    public StudyRoomResponse joinStudyRoom(Long userId, StudyRoomJoinRequest request) {
         // 1. 초대 코드 검증 (Redis)
         String inviteCode = request.getInviteCode();
         Long studyRoomId = inviteCodeService.getStudyRoomId(inviteCode);
@@ -64,28 +83,31 @@ public class StudyRoomService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
         // 3. 이미 참여 중인지 확인
-        if (studyMemberRepository.existsByStudyAndUser(studyRoom, user)) {
+        if (studyMemberRepository.existsByStudyAndUserId(studyRoom, userId)) {
             throw new BusinessException(ErrorCode.ALREADY_JOINED_STUDY);
         }
 
         // 4. 멤버 등록
         StudyMember member = StudyMember.builder()
                 .study(studyRoom)
-                .user(user)
+                .userId(userId)
                 .role(StudyMember.StudyRole.MEMBER)
                 .build();
 
         studyMemberRepository.save(member);
+
+        return StudyRoomResponse.from(studyRoom);
     }
 
+    // 스터디 방 초대코드 생성 (방에 참여한 사람만 가능)
     @Transactional
-    public StudyInviteCodeResponse createInviteCode(User user, Long studyRoomId) {
+    public StudyInviteCodeResponse createInviteCode(Long userId, Long studyRoomId) {
         // 1. 스터디 방 조회
         StudyRoom studyRoom = studyRoomRepository.findById(studyRoomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
         // 2. 멤버 여부 확인 (방에 참여한 사람만 초대 코드를 만들 수 있음)
-        if (!studyMemberRepository.existsByStudyAndUser(studyRoom, user)) {
+        if (!studyMemberRepository.existsByStudyAndUserId(studyRoom, userId)) {
             // TODO: 권한 관련 에러 코드가 없다면 추가 필요. 현재는 적절한게 없으면 UNAUTHORIZED 혹은 FORBIDDEN 의미의 에러
             // 일단은 BusinessException(ErrorCode.UNAUTHORIZED) 사용 혹은 새 에러 코드 추가
             throw new BusinessException(ErrorCode.UNAUTHORIZED);

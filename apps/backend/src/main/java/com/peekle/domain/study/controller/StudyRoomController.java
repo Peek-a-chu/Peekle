@@ -4,14 +4,10 @@ import com.peekle.domain.study.dto.request.StudyRoomCreateRequest;
 import com.peekle.domain.study.dto.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.response.StudyInviteCodeResponse;
 import com.peekle.domain.study.dto.response.StudyRoomCreateResponse;
+import com.peekle.domain.study.dto.response.StudyRoomResponse;
 import com.peekle.domain.study.service.StudyRoomService;
-import com.peekle.domain.user.entity.User;
-import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.dto.ApiResponse;
-import com.peekle.global.exception.BusinessException;
-import com.peekle.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -22,47 +18,44 @@ import java.security.Principal;
 public class StudyRoomController {
 
     private final StudyRoomService studyRoomService;
-    private final UserRepository userRepository;
 
+    // 스터디 방 생성 (초대코드 반환)
     @PostMapping
     public ApiResponse<StudyRoomCreateResponse> createStudyRoom(
             @RequestBody StudyRoomCreateRequest request,
             Principal principal) {
-        User user = getUserFromPrincipal(principal);
-        StudyRoomCreateResponse response = studyRoomService.createStudyRoom(user, request);
+        Long userId = 1L; // Test User ID
+        StudyRoomCreateResponse response = studyRoomService.createStudyRoom(userId, request);
         return ApiResponse.success(response);
     }
 
+    // 스터디 방 참여 (초대코드 사용)
     @PostMapping("/join")
-    public ApiResponse<Void> joinStudyRoom(
+    public ApiResponse<StudyRoomResponse> joinStudyRoom(
             @RequestBody StudyRoomJoinRequest request,
             Principal principal) {
-        User user = getUserFromPrincipal(principal);
-        studyRoomService.joinStudyRoom(user, request);
-        return ApiResponse.success();
+        Long userId = 1L; // Test User ID
+        StudyRoomResponse response = studyRoomService.joinStudyRoom(userId, request);
+        return ApiResponse.success(response);
     }
 
+    // 스터디 방 상세 조회
+    @GetMapping("/{studyId}")
+    public ApiResponse<StudyRoomResponse> getStudyRoom(
+            @PathVariable Long studyId,
+            Principal principal) {
+        Long userId = 1L; // Test User ID
+        StudyRoomResponse response = studyRoomService.getStudyRoom(userId, studyId);
+        return ApiResponse.success(response);
+    }
+
+    // 스터디 방 초대코드 생성 (방에 참여한 사람만 가능)
     @PostMapping("/{studyId}/invite")
     public ApiResponse<StudyInviteCodeResponse> generateInviteCode(
             @PathVariable Long studyId,
             Principal principal) {
-        User user = getUserFromPrincipal(principal);
-        StudyInviteCodeResponse response = studyRoomService.createInviteCode(user, studyId);
+        Long userId = 1L; // Test User ID
+        StudyInviteCodeResponse response = studyRoomService.createInviteCode(userId, studyId);
         return ApiResponse.success(response);
-    }
-
-    private User getUserFromPrincipal(Principal principal) {
-        if (principal == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
-        }
-        try {
-            // TODO: Auth 로직 확정 시 수정 필요 (현재는 ID or Nickname 추정)
-            Long userId = Long.parseLong(principal.getName());
-            return userRepository.findById(userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        } catch (NumberFormatException e) {
-            return userRepository.findByNickname(principal.getName())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        }
     }
 }

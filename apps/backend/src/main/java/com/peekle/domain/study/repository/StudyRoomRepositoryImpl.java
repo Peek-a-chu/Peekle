@@ -13,7 +13,6 @@ import java.util.List;
 
 import static com.peekle.domain.study.entity.QStudyRoom.studyRoom;
 import static com.peekle.domain.study.entity.QStudyMember.studyMember;
-import static com.peekle.domain.user.entity.QUser.user;
 
 @RequiredArgsConstructor
 public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
@@ -23,16 +22,16 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
     @Override
     public Page<StudyRoom> findMyStudyRooms(Long userId, String keyword, Pageable pageable) {
 
-        // 1. Content Query (Fetch Join Owner for Performance)
+        // 1. Content Query
         List<StudyRoom> content = queryFactory
                 .selectFrom(studyRoom)
-                .leftJoin(studyRoom.owner, user).fetchJoin() // Optimization: N+1 prevention for Owner
-                .join(studyMember).on(studyMember.study.eq(studyRoom)) // Optimization: Inner join for filtering
+                // .leftJoin(studyRoom.owner, user).fetchJoin() // User Entity removed, no join
+                // needed
+                .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
-                        studyMember.user.id.eq(userId), // Filter by my participation
-                        containsKeyword(keyword) // Dynamic search
-                )
-                .orderBy(studyRoom.createdAt.desc()) // Default sort: Newest first
+                        studyMember.userId.eq(userId), // Filter by my participation (userId)
+                        containsKeyword(keyword))
+                .orderBy(studyRoom.createdAt.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -44,7 +43,7 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
                 .from(studyRoom)
                 .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
-                        studyMember.user.id.eq(userId),
+                        studyMember.userId.eq(userId),
                         containsKeyword(keyword));
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
