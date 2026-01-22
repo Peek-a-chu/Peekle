@@ -1,0 +1,43 @@
+
+> frontend@0.1.0 build C:\Users\SSAFY\Desktop\study\common-pjt\S14P11A408\apps\frontend
+> next build
+
+   ▲ Next.js 15.5.9
+   - Experiments (use with caution):
+     ✓ reactCompiler
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2.4s
+   Linting and checking validity of types ...
+
+./src/app/layout.tsx
+9:16  Warning: Missing return type on function.  @typescript-eslint/explicit-function-return-type
+
+./src/app/page.tsx
+5:16  Warning: Missing return type on function.  @typescript-eslint/explicit-function-return-type
+
+./src/lib/utils.ts
+4:8  Warning: Missing return type on function.  @typescript-eslint/explicit-function-return-type
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    3.44 kB         105 kB
+├ ○ /_not-found                            989 B         103 kB
+└ ○ /games                               12.5 kB         115 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/525-2fc1d11f19711b69.js       45.8 kB
+  ├ chunks/6b2318bf-861ffd38338fecde.js  54.2 kB
+  └ other shared chunks (total)          1.97 kB
+
+
+○  (Static)  prerendered as static content
+

@@ -3,11 +3,14 @@ package com.peekle.domain.problem.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+// import Tag removed (same package)
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Getter
 @NoArgsConstructor
-@Table(name = "problem")
+@Table(name = "problems")
 public class Problem {
 
     @Id
@@ -29,12 +32,24 @@ public class Problem {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String url;
 
-    // 생성자 등 필요시 추가
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "problem_tags",
+            joinColumns = @JoinColumn(name = "problem_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
+
     public Problem(String source, String externalId, String title, String tier, String url) {
         this.source = source;
         this.externalId = externalId;
         this.title = title;
         this.tier = tier;
         this.url = url;
+    }
+
+    // 태그 추가 편의 메서드
+    public void addTag(Tag tag) {
+        this.tags.add(tag);
     }
 }

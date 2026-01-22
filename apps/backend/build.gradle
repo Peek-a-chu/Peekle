@@ -64,6 +64,9 @@ dependencies {
     // Testcontainers
     testImplementation "org.testcontainers:junit-jupiter:1.19.3"
     testImplementation "org.testcontainers:mysql:1.19.3"
+
+    // Jsoup
+    implementation 'org.jsoup:jsoup:1.17.2'
 }
 
 tasks.named('test') {
