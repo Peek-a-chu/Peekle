@@ -113,12 +113,26 @@
     <div id="solved-list">
         <div class="empty-state">아직 감지된 해결 내역이 없습니다.</div>
     </div>
-    <div style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px; text-align: center;">
-        <button id="test-submit-btn"
-            style="padding: 8px 12px; background-color: #0076C0; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            🛠️ 테스트 데이터 전송
-        </button>
-        <div id="test-status" style="margin-top: 5px; font-size: 0.8em; color: #555;"></div>
+    <div style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
+        <div style="text-align: center; margin-bottom: 8px;">
+            <button id="test-submit-btn"
+                style="padding: 6px 12px; background-color: #0076C0; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+                🛠️ 백엔드 연동 테스트
+            </button>
+            <div id="test-status" style="margin-top: 5px; font-size: 0.8em; color: #555;"></div>
+        </div>
+
+        <div style="font-weight: bold; color: #555; font-size: 0.8em; margin-bottom: 6px;">UI 디버깅 (현재 탭에 표시)</div>
+        <div style="display: flex; gap: 5px;">
+            <button id="test-success-toast"
+                style="flex: 1; padding: 6px; background-color: #E24EA0; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em;">
+                🎉 성공 토스트 (1초후)
+            </button>
+            <button id="test-fail-toast"
+                style="flex: 1; padding: 6px; background-color: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em;">
+                🚨 실패 토스트 (1초후)
+            </button>
+        </div>
     </div>
     <script src="popup.js"></script>
 </body>

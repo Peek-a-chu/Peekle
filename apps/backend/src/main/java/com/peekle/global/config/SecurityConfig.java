@@ -23,6 +23,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS 설정 적용
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/submissions/**").permitAll() // 제출 API 허용
+                        .requestMatchers("/api/problems/sync").permitAll() // 문제 동기화 (내부 Key 검증)
                         .requestMatchers("/h2-console/**").permitAll() // H2 Console 허용
                         .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API 허용
                         .anyRequest().authenticated() // 그 외는 인증 필요
