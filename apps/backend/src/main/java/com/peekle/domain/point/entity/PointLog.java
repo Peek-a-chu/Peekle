@@ -1,20 +1,19 @@
 package com.peekle.domain.point.entity;
 
+import com.peekle.domain.point.enums.PointCategory;
 import com.peekle.domain.user.entity.User;
+import com.peekle.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "point_logs")
-public class PointLog {
+public class PointLog extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,7 +24,8 @@ public class PointLog {
     private User user;
 
     @Column(nullable = false)
-    private String category; // PROBLEM | GAME
+    @Enumerated(EnumType.STRING)
+    private PointCategory category; // PROBLEM | GAME
 
     @Column(nullable = false)
     private Integer amount;
@@ -35,11 +35,7 @@ public class PointLog {
     @Column(columnDefinition = "TEXT")
     private String metadata; // JSON Data
 
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    public PointLog(User user, String category, Integer amount, String description) {
+    public PointLog(User user, PointCategory category, Integer amount, String description) {
         this.user = user;
         this.category = category;
         this.amount = amount;

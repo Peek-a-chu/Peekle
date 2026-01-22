@@ -1,6 +1,7 @@
 package com.peekle.domain.submission.entity;
 
 import com.peekle.domain.problem.entity.Problem;
+import com.peekle.domain.submission.enums.SourceType;
 import com.peekle.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -31,8 +32,10 @@ public class SubmissionLog {
     @JoinColumn(name = "problem_id", nullable = false)
     private Problem problem;
 
+
     @Column(name = "source_type")
-    private String sourceType;
+    @Enumerated(EnumType.STRING)
+    private SourceType sourceType;
 
     @Column(name = "room_id")
     private Long roomId;
@@ -58,7 +61,7 @@ public class SubmissionLog {
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
-    public static SubmissionLog create(User user, Problem problem, String sourceType, 
+    public static SubmissionLog create(User user, Problem problem, SourceType sourceType, 
                                      String code, Integer memory, 
                                      Integer executionTime, String language, LocalDateTime submittedAt) {
         SubmissionLog log = new SubmissionLog();

@@ -4,6 +4,7 @@ import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.submission.dto.SubmissionRequest;
 import com.peekle.domain.submission.entity.SubmissionLog;
+import com.peekle.domain.submission.enums.SourceType;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
@@ -91,9 +92,10 @@ public class SubmissionService {
 
         // 4. SubmissionLog 저장
         LocalDateTime submittedAt = parseDateTime(request.getSubmittedAt());
-        
+
+
         SubmissionLog log = SubmissionLog.create(
-                user, problem, "EXTENSION",
+                user, problem, SourceType.EXTENSION,
                 request.getCode(),
                 request.getMemory(), request.getExecutionTime(),
                 request.getLanguage(), submittedAt

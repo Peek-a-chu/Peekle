@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `nickname` VARCHAR(255) UNIQUE,
     `profile_img` VARCHAR(255),
     `profile_img_thumb` VARCHAR(255),
-    `league` VARCHAR(255) DEFAULT 'GOLD',
+    `league` VARCHAR(20) DEFAULT 'GOLD',
     `league_point` INT DEFAULT 0,
     `league_group_id` BIGINT,
     `streak_current` INT DEFAULT 0,

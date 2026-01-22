@@ -1,5 +1,6 @@
 package com.peekle.domain.submission.dto;
 
+import com.peekle.domain.league.enums.LeagueTier;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -11,7 +12,7 @@ public class SubmissionResponse {
     private boolean firstSolve; // 처음 풀었는지 여부
     private int earnedPoints;     // 획득한 포인트
     private int totalPoints;      // 현재 내 총 포인트
-    private String currentLeague;
+    private LeagueTier currentLeague;
     private int currentRank;      // 현재 내 그룹 내 등수
     private String message;       // 표시할 메시지
 }
