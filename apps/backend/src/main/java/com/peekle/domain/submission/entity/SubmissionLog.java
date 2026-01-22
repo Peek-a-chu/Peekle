@@ -5,7 +5,7 @@ import com.peekle.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter; // Setter for easy updates from service
+import lombok.Setter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-@Table(name = "submission_log")
+@Table(name = "submission_logs")
 public class SubmissionLog {
 
     @Id
@@ -32,10 +32,10 @@ public class SubmissionLog {
     private Problem problem;
 
     @Column(name = "source_type")
-    private String sourceType; // STUDY | GAME | EXTENSION
+    private String sourceType;
 
     @Column(name = "room_id")
-    private Long roomId; // Nullable
+    private Long roomId;
 
     @Column(name = "problem_title")
     private String problemTitle;
@@ -47,7 +47,6 @@ public class SubmissionLog {
     @Column(columnDefinition = "TEXT")
     private String code;
 
-    private String result; // SUCCESS | FAIL
 
     private Integer memory;
 
@@ -59,9 +58,8 @@ public class SubmissionLog {
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
-    // 편의 생성자
     public static SubmissionLog create(User user, Problem problem, String sourceType, 
-                                     String code, String result, Integer memory, 
+                                     String code, Integer memory, 
                                      Integer executionTime, String language, LocalDateTime submittedAt) {
         SubmissionLog log = new SubmissionLog();
         log.user = user;
@@ -70,7 +68,6 @@ public class SubmissionLog {
         log.problemTitle = problem.getTitle();
         log.problemTier = problem.getTier();
         log.code = code;
-        log.result = result;
         log.memory = memory;
         log.executionTime = executionTime;
         log.language = language;
