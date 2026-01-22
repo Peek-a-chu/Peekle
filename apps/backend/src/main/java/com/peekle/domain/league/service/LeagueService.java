@@ -1,6 +1,7 @@
 package com.peekle.domain.league.service;
 
 import com.peekle.domain.point.entity.PointLog;
+import com.peekle.domain.point.enums.PointCategory;
 import com.peekle.domain.point.repository.PointLogRepository;
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
@@ -37,10 +38,6 @@ public class LeagueService {
             
             user.addLeaguePoint(pointAmount);
             userRepository.save(user);
-
-import com.peekle.domain.point.enums.PointCategory;
-
-//...
 
             String description = String.format("Solved problem: %s (%s)", problem.getTitle(), problem.getTier());
             PointLog pointLog = new PointLog(user, PointCategory.PROBLEM, pointAmount, description);
