@@ -5,6 +5,7 @@
 
 let observer = null;
 const pendingSubmissions = new Set(); // Track IDs that are currently being judged
+const sentSubmissions = new Set(); // Track IDs already sent to backend to prevent duplicates
 
 function getUsername() {
     // Try to find username in the top login bar
@@ -26,10 +27,10 @@ function scanForSuccess() {
     rows.forEach(row => {
         // Typical Structure:
         // ID | User | Problem | Result | Memory | Time | Lang | len | Time
+        const submitIdCell = row.querySelector('td:first-child');
         const userCell = row.querySelector('td:nth-child(2) a');
         const problemCell = row.querySelector('td:nth-child(3) a');
         const resultCell = row.querySelector('td.result');
-        const submitIdCell = row.querySelector('td:first-child');
 
         // Basic validation
         if (!userCell || !resultCell || !problemCell || !submitIdCell) return;
@@ -39,6 +40,9 @@ function scanForSuccess() {
 
         const resultText = resultCell.innerText.trim();
         const submitId = submitIdCell.innerText;
+
+        // Skip if already sent in this session
+        if (sentSubmissions.has(submitId)) return;
 
         // 1. Check if it's a Pending Status (Judging, Waiting, etc.)
         // "채점 준비중", "채점 중 (1%)", "재채점 대기 중" etc.
@@ -67,9 +71,14 @@ function scanForSuccess() {
         }
 
         // 3. Process Success
-        if (resultText.includes('맞았습니다')) {
+        // 결과 텍스트가 "맞았습니다" 혹은 "100점" 혹은 숫자 100점인 경우
+        if (resultText.includes('맞았습니다') || resultText.includes('100점') || (resultText.includes('점') && !resultText.includes('%') && parseInt(resultText) === 100)) {
             // Process if we were watching it OR if it looks recent
             if (wasPending || isRecent) {
+
+                // Mark as sent IMMEDIATELY to prevent dupes
+                sentSubmissions.add(submitId);
+
                 const problemId = problemCell.innerText;
                 const memory = row.querySelector('td:nth-child(5)')?.innerText?.trim() || '0';
                 const time = row.querySelector('td:nth-child(6)')?.innerText?.trim() || '0';
@@ -188,8 +197,6 @@ function injectFillerScript(code, language) {
             const cm = cmEl ? cmEl.CodeMirror : null;
             
             // 2. Find Language Select
-            // Baekjoon uses Chosen.js, so the select might be hidden (#language)
-            // or we might need to interact with the chosen container (#language_chosen)
             const langSelect = document.getElementById('language');
 
             if (!cm || !langSelect) {
@@ -237,3 +244,365 @@ function injectFillerScript(code, language) {
 
 // Run the check
 checkForPendingSubmission();
+
+// --- Feedback Toast Logic ---
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'SHOW_FEEDBACK') {
+        const payload = request.payload;
+        if (payload.delay && payload.delay > 0) {
+            setTimeout(() => {
+                showToast(payload);
+            }, payload.delay);
+        } else {
+            showToast(payload);
+        }
+        // Send response to acknowledge (helps with window.close in popup)
+        sendResponse({ received: true });
+    }
+});
+
+function showToast(data) {
+    // data structure: { success, isFirstSolve, earnedPoints, totalPoints, currentRank, message }
+
+    // If it's a success, show the Premium Toast (The "Wow" factor)
+    if (data.success) {
+        showSuccessToast(data);
+        return;
+    }
+
+    // Fallback for Errors / Others (Simple Toast)
+    const toastId = 'peekle-toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+
+    let bgColor = '#e74c3c'; // Red (Error)
+    let icon = '🚨';
+
+    // If successful but not first solve (duplicate), it might fall here if we treat "success" specifically as "points gained"
+    // But typically data.success is true even for duplicates in this logic, 
+    // unless the user wants ONLY high-fanfare for points.
+    // However, the user said "success", so we handled all success in showSuccessToast.
+    // If for some reason we end up here:
+    if (!data.success) {
+        // Validation errors, server errors
+        bgColor = '#e74c3c';
+        icon = '🚨';
+    }
+
+    Object.assign(toast.style, {
+        position: 'fixed',
+        top: '80px',
+        right: '25px',
+        backgroundColor: bgColor,
+        color: 'white',
+        padding: '16px 24px',
+        borderRadius: '12px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        zIndex: '2147483647',
+        fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
+        fontSize: '14px',
+        fontWeight: '500',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        animation: 'peekleSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.1)'
+    });
+
+    toast.innerHTML = `<span style="font-size: 18px;">${icon}</span> <span>${data.message}</span>`;
+
+    // Inject keyframes if not present
+    if (!document.getElementById('peekle-keyframes')) {
+        const styleSheet = document.createElement("style");
+        styleSheet.id = 'peekle-keyframes';
+        styleSheet.innerText = `
+            @keyframes peekleSlideIn {
+                from { transform: translateX(120%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes peekleSlideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(120%); opacity: 0; }
+            }
+            @font-face {
+                font-family: 'Pretendard';
+                src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff') format('woff');
+                font-weight: 400;
+                font-style: normal;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+    }
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'peekleSlideOut 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+        setTimeout(() => toast.remove(), 50000);
+    }, 40000);
+}
+
+function showSuccessToast(data) {
+    const toastId = 'peekle-success-toast-' + Date.now();
+    const container = document.createElement('div');
+    container.id = toastId;
+
+    // Define colors and styles
+    const primaryColor = '#E24EA0';
+    const secondaryColor = '#FFF0F7'; // Light pink background for icon
+
+    // Inject distinct styles for this toast
+    const styleId = 'peekle-toast-styles';
+    if (!document.getElementById(styleId)) {
+        const css = `
+            .peekle-toast-container {
+                position: fixed;
+                top: 80px;
+                right: 25px;
+                width: 380px;
+                background: white;
+                color: #171717;
+                box-shadow: 8px 8px 0px rgba(226,78,160,0.08), 0 5px 10px rgba(0,0,0,0.05);
+                border: 1px solid #E4E4E7; /* zinc-200 */
+                z-index: 2147483647;
+                font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+                overflow: hidden;
+                pointer-events: auto;
+                animation: peekleSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+            
+            .peekle-toast-container.exiting {
+                animation: peekleSlideOut 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+
+            @keyframes peekleSlideIn {
+                from { transform: translateX(120%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes peekleSlideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(120%); opacity: 0; }
+            }
+
+            .peekle-confetti {
+                position: absolute;
+                width: 6px;
+                height: 6px;
+                opacity: 0;
+                pointer-events: none;
+                animation: peekleFall 1.5s ease-out forwards;
+                /* Default drift if not set */
+                --fall-drift: 0px; 
+            }
+
+            @keyframes peekleFall {
+                0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+                100% { transform: translate(var(--fall-drift), 180px) rotate(360deg); opacity: 0; }
+            }
+
+            .peekle-header-line {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 4px;
+                background-color: ${primaryColor};
+            }
+
+            .peekle-content {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                position: relative;
+                z-index: 10;
+                padding: 12px 24px 0 24px;
+            }
+
+            .peekle-icon-box {
+                flex-shrink: 0;
+                width: 80px;
+                height: 80px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .peekle-text-col {
+                display: flex;
+                flex-direction: column;
+                flex: 1;
+            }
+
+            .peekle-title {
+                font-size: 18px;
+                font-weight: 900;
+                letter-spacing: -0.05em;
+                color: ${primaryColor} !important;
+                font-style: italic;
+                margin: 0;
+                line-height: 1.2;
+            }
+
+            .peekle-score-row {
+                display: flex;
+                align-items: baseline;
+                gap: 6px;
+                margin-top: 2px;
+            }
+
+            .peekle-points {
+                font-size: 32px;
+                font-weight: 900;
+                letter-spacing: -0.05em;
+                line-height: 1;
+                color: #000;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .peekle-points-label {
+                font-size: 12px;
+                font-weight: 700;
+                color: #A1A1AA; /* zinc-400 */
+                text-transform: uppercase;
+                letter-spacing: -0.05em;
+            }
+
+            .peekle-close-btn {
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: #D4D4D8; /* zinc-300 */
+                transition: color 0.2s, transform 0.2s;
+                padding: 4px;
+                position: absolute;
+                top: 20px;
+                right: 20px;
+            }
+            .peekle-close-btn:hover {
+                color: ${primaryColor};
+                transform: scale(1.1);
+            }
+
+            .peekle-footer {
+                margin-top: 8px;
+                padding: 16px 24px;
+                border-top: 1px solid #F4F4F5; /* zinc-100 */
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            .peekle-footer-total {
+                color: #71717A; /* zinc-500 */
+            }
+            .peekle-footer-total span {
+                color: #000;
+                font-weight: 900;
+                margin-left: 4px;
+            }
+
+            .peekle-rank-badge {
+                background-color: rgba(226, 78, 160, 0.05);
+                color: ${primaryColor};
+                padding: 2px 8px;
+                border: 1px solid rgba(226, 78, 160, 0.1);
+                border-radius: 10px !important;
+                font-size: 11px;
+            }
+        `;
+        const s = document.createElement('style');
+        s.id = styleId;
+        s.textContent = css;
+        document.head.appendChild(s);
+    }
+
+    container.className = 'peekle-toast-container';
+
+    // HTML Structure
+    container.innerHTML = `
+        <div class="peekle-header-line"></div>
+        <div id="${toastId}-confetti" style="position:absolute; inset:0; pointer-events:none; z-index:20;"></div>
+        
+        <button class="peekle-close-btn" id="${toastId}-close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+        </button>
+
+        <div class="peekle-content">
+            <div class="peekle-icon-box">
+                <img src="${chrome.runtime.getURL('icons/cute.svg')}" alt="Character" style="width: 100%; height: 100%; object-fit: contain;">
+            </div>
+            <div class="peekle-text-col">
+                <h3 class="peekle-title">Problem Solved!</h3>
+                <div class="peekle-score-row">
+                    ${(data.firstSolve || data.isFirstSolve)
+            ? `<span class="peekle-points">+${data.earnedPoints || 0}</span> <span class="peekle-points-label">Points</span>`
+            : `<span style="font-size:12px; color:#A1A1AA; font-weight:700;">이미 푼 문제입니다</span>`
+        }
+                </div>
+            </div>
+        </div>
+
+        <div class="peekle-footer">
+            <div class="peekle-footer-total">
+                현재 총점: <span>${data.totalPoints || 0}점</span>
+            </div>
+            <div class="peekle-rank-badge">
+                ${data.currentLeague || ''} · 그룹 ${data.currentRank || '-'}위
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(container);
+
+    // Logic: Confetti
+    const confettiColors = ['#E24EA0', '#FFD700', '#00C2FF', '#FF4D4D', '#16A34A'];
+    const confettiContainer = document.getElementById(`${toastId}-confetti`);
+
+    // Spawn particles
+    for (let i = 0; i < 25; i++) {
+        const p = document.createElement('div');
+        p.className = 'peekle-confetti';
+        p.style.backgroundColor = confettiColors[i % confettiColors.length];
+
+        // Random Position
+        p.style.left = (Math.random() * 100) + '%';
+        p.style.top = '-10%';
+
+        // Animation Param: Random Delay
+        p.style.animationDelay = (Math.random() * 0.4) + 's';
+
+        // Animation Param: Random Drift (wind effect) -30px to +30px
+        const drift = (Math.random() * 60 - 30) + 'px';
+        p.style.setProperty('--fall-drift', drift);
+
+        confettiContainer.appendChild(p);
+    }
+
+    // Stop confetti after 2s (remove node to cleanup)
+    setTimeout(() => {
+        if (confettiContainer) confettiContainer.remove();
+    }, 200000);
+
+    // Auto-Close after 6s (bit longer to admire)
+    const closeTimer = setTimeout(closeToast, 60000);
+
+    // Manual Close
+    function closeToast() {
+        container.classList.add('exiting');
+        setTimeout(() => {
+            if (container && container.parentNode) {
+                container.remove();
+            }
+        }, 6000); // match animation duration
+    }
+
+    document.getElementById(`${toastId}-close`).onclick = () => {
+        clearTimeout(closeTimer);
+        closeToast();
+    };
+}
