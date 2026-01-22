@@ -5,9 +5,9 @@ import { Plus, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { GameModeCard } from '@/domains/games/components/game-mode-card'
-import { GameRoomCard } from '@/domains/games/components/game-room-card'
-import { PasswordModal } from '@/domains/games/components/password-modal'
+import { GameModeCard } from '@/domains/game/components/game-mode-card'
+import { GameRoomCard } from '@/domains/game/components/game-room-card'
+import { PasswordModal } from '@/domains/game/components/password-modal'
 import {
     gameModes,
     mockGameRooms,
@@ -16,7 +16,7 @@ import {
     type GameMode,
     type TeamType,
     type GameStatus,
-} from '@/domains/games/mocks/mock-data'
+} from '@/domains/game/mocks/mock-data'
 
 type StatusFilter = GameStatus | 'ALL'
 
@@ -58,7 +58,7 @@ export default function GamesPage() {
         } else {
             // 공개 방일 경우 바로 입장
             console.log('Navigate to room:', room.id)
-            // 실제로는 router.push(`/games/${room.id}`) 사용
+            // 실제로는 router.push(`/game/${room.id}`) 사용
         }
     }
 
@@ -66,7 +66,7 @@ export default function GamesPage() {
         // Mock: 비밀번호 검증 후 입장
         console.log('Entering room with password:', selectedRoom?.id, password)
         setPasswordModalOpen(false)
-        // 실제로는 router.push(`/games/${selectedRoom?.id}`) 사용
+        // 실제로는 router.push(`/game/${selectedRoom?.id}`) 사용
     }
 
     return (
