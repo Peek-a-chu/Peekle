@@ -32,64 +32,64 @@ const config: Config = {
         // 메인 컬러 (Primary)
         primary: {
           DEFAULT: '#E24EA0',
-          foreground: '#FFFFFF', 
-          hover: '#D93A95',      
-          active: '#C92F86',    
+          foreground: '#FFFFFF',
+          hover: '#D93A95',
+          active: '#C92F86',
         },
 
         // 보조 컬러 (Secondary)
         secondary: {
           DEFAULT: '#FCE7F3',
-          foreground: '#E24EA0', 
-          hover: '#F9D1E3',     
-          active: '#F6BAD2',     
+          foreground: '#E24EA0',
+          hover: '#F9D1E3',
+          active: '#F6BAD2',
         },
 
         // 카드 1 
         card: {
-          DEFAULT: '#FFFFFF',    
+          DEFAULT: '#FFFFFF',
           foreground: '#111827',
-          border: '#F7E8F0',     
+          border: '#F7E8F0',
         },
 
         // 카드 2
         muted: {
-          DEFAULT: '#FAFAFF',    
-          foreground: '#111827', 
-          border: '#F7E8F0',     
+          DEFAULT: '#FAFAFF',
+          foreground: '#111827',
+          border: '#F7E8F0',
         },
 
         // 상태 컬러 (성공/경고/위험)
         // --- 성공 (Success) ---
         success: {
-          DEFAULT: '#16A34A',    
-          foreground: '#111827', 
-          
+          DEFAULT: '#16A34A',
+          foreground: '#111827',
+
           light: {
-             DEFAULT: '#DCFCE7',    
-             foreground: '#6B7280', 
+            DEFAULT: '#DCFCE7',
+            foreground: '#6B7280',
           }
         },
 
         // --- 경고 (Warning) ---
         warning: {
-          DEFAULT: '#F59E0B',    
-          foreground: '#111827', 
-          
+          DEFAULT: '#F59E0B',
+          foreground: '#111827',
+
           light: {
-            DEFAULT: '#FEF3C7',  
-            foreground: '#92400E', 
+            DEFAULT: '#FEF3C7',
+            foreground: '#92400E',
           }
         },
 
         // --- 위험 (Destructive) ---
         destructive: {
-          DEFAULT: '#EF4444',    
-          foreground: '#FFFFFF', 
-          
+          DEFAULT: '#EF4444',
+          foreground: '#FFFFFF',
+
           light: {
-            DEFAULT: '#FEE2E2',    
-            foreground: '#991B1B', 
+            DEFAULT: '#FEE2E2',
+            foreground: '#991B1B',
           }
         },
       },
