@@ -39,5 +39,15 @@
             ],
             "run_at": "document_idle"
         }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icons/cute.svg"
+            ],
+            "matches": [
+                "https://www.acmicpc.net/*"
+            ]
+        }
     ]
 }

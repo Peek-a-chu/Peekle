@@ -1,19 +1,18 @@
 package com.peekle.domain.user.entity;
 
+import com.peekle.domain.league.enums.LeagueTier;
+import com.peekle.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "users")
-public class User {
+public class User extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,22 +29,27 @@ public class User {
 
     // ... fields ...
 
+    @Column(unique = true)
+    private String bojId; // 백준 아이디
+
+
     public User(String socialId, String provider, String nickname) {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
-        this.tier = "BRONZE";
+        // this.bojId = null; // 기본값 null
+        this.league = LeagueTier.BRONZE;
         this.leaguePoint = 0;
         this.isDeleted = false;
-        this.createdAt = LocalDateTime.now();
     }
 
 
     private String profileImg;
     private String profileImgThumb;
 
-    @Column(name = "tier")
-    private String tier = "BRONZE_5";
+    @Column(name = "league")
+    @Enumerated(EnumType.STRING)
+    private LeagueTier league = LeagueTier.BRONZE;
 
     @Column(name = "league_point")
     private Integer leaguePoint = 0;
@@ -60,7 +64,11 @@ public class User {
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
-    @CreatedDate
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    public void addLeaguePoint(int amount) {
+        this.leaguePoint += amount;
+    }
+
+    public void registerBojId(String bojId) {
+        this.bojId = bojId;
+    }
 }

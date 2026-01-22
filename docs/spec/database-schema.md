@@ -118,7 +118,6 @@ erDiagram
         string source_type "STUDY | GAME | EXTENSION"
         bigint room_id FK "스터디/게임 방 ID (Nullable)"
         string code "제출 코드 (Text)"
-        string result "SUCCESS | FAIL"
         int memory
         int execution_time
         string language
@@ -168,7 +167,7 @@ erDiagram
 | `id` | BIGINT | PK | 사용자 ID |
 | `nickname` | VARCHAR(50) | NIX | 표시용 닉네임 |
 | `boj_id` | VARCHAR(50) | NULL | 확장프로그램 연동용 외부 ID |
-| `tier` | VARCHAR(20) | | 현재 티어 (예: SILVER_3) |
+| `league` | VARCHAR(20) | | 현재 리그 (예: SILVER) |
 | `league_point` | INT | Default 0 | 이번 주 획득 리그 포인트 |
 | `league_group_id` | BIGINT | FK -> league_groups.id | 이번 주 배정된 리그 그룹 ID |
 | `streak_current` | INT | Default 0 | 현재 연속 스트릭 |
@@ -178,7 +177,7 @@ erDiagram
 | 컬럼 (Column) | 타입 (Type) | 제약조건 (Constraints) | 설명 (Description) |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK | 그룹 ID |
-| `tier` | VARCHAR(20) | | 해당 그룹의 목표 티어 |
+| `tier` | VARCHAR(20) | | 해당 그룹의 현재 리그 |
 | `season_week` | INT | | 예: 202603 (YYYYWW) |
 
 **`league_history`**
@@ -186,7 +185,7 @@ erDiagram
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK | |
 | `user_id` | BIGINT | FK -> users.id | |
-| `tier` | VARCHAR(20) | | 리그 종료 시점 티어 |
+| `league` | VARCHAR(20) | | 종료 시점 리그 |
 | `final_point` | INT | | 최종 점수 |
 | `result` | VARCHAR(20) | | 승급(PROMOTED)/강등(DEMOTED) 여부 |
 | `season_week` | INT | | 시즌 주차 (YYYYWW) |

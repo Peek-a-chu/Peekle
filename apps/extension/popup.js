@@ -8,12 +8,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Test Button Listener
+    // Test Button Listener (Backend)
     const testBtn = document.getElementById('test-submit-btn');
     if (testBtn) {
         testBtn.addEventListener('click', sendTestSubmission);
     }
+
+    // UI Debug Buttons
+    const successToastBtn = document.getElementById('test-success-toast');
+    if (successToastBtn) {
+        successToastBtn.addEventListener('click', () => triggerToast(true, 1000));
+    }
+
+    const failToastBtn = document.getElementById('test-fail-toast');
+    if (failToastBtn) {
+        failToastBtn.addEventListener('click', () => triggerToast(false, 1000));
+    }
 });
+
+function triggerToast(isSuccess, delay = 0) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (!tabs || tabs.length === 0) return;
+
+        const payload = isSuccess
+            ? {
+                success: true,
+                message: "정답입니다! 완벽한 풀이네요.",
+                earnedPoints: 150,
+                totalPoints: 3450,
+                currentRank: 1,
+                isFirstSolve: true,
+                league: "골드",
+                delay: delay
+            }
+            : {
+                success: false,
+                message: "틀렸습니다. 다시 시도해보세요!",
+                isFirstSolve: false,
+                delay: delay
+            };
+
+        chrome.tabs.sendMessage(tabs[0].id, {
+            type: 'SHOW_FEEDBACK',
+            payload: payload
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.warn("Could not send message to tab. Is content script loaded?", chrome.runtime.lastError);
+                // Optionally show feedback in popup
+                const statusEl = document.getElementById('test-status');
+                if (statusEl) {
+                    statusEl.innerText = "⚠️ 백준 페이지에서만 동작합니다.";
+                    statusEl.style.color = "#f39c12";
+                }
+            } else {
+                window.close();
+            }
+        });
+    });
+}
 
 async function sendTestSubmission() {
     const statusEl = document.getElementById('test-status');
@@ -27,13 +79,13 @@ async function sendTestSubmission() {
         code: "public class Main { public static void main(String[] args) { System.out.println(\"Hello Extension!\"); } }",
         memory: 14320,
         executionTime: 120,
-        result: "맞았습니다!!",
+        // result: "맞았습니다!!", // Backend removed result field
         submittedAt: new Date().toISOString(),
         submitId: "TEST_" + Date.now()
     };
 
     try {
-        const response = await fetch('http://localhost:8080/api/submissions/general', {
+        const response = await fetch('http://localhost:8080/api/submissions/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

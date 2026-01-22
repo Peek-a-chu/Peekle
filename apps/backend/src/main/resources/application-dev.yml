@@ -4,7 +4,7 @@ spring:
       on-profile: dev
   
   datasource:
-    url: jdbc:h2:mem:peekledb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:./data/peekledb;MODE=MySQL;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password: 
