@@ -17,6 +17,9 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Pretendard Variable', 'Pretendard', 'sans-serif'],
+      },
       colors: {
         border: '#F7E8F0', // 전역 테두리
         input: '#F7E8F0',  // Input 컴포넌트 테두리
