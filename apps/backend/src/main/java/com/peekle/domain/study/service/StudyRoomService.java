@@ -4,7 +4,6 @@ import com.peekle.domain.study.entity.StudyMember;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
-import com.peekle.domain.user.entity.User;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import java.security.SecureRandom;
@@ -12,10 +11,20 @@ import com.peekle.domain.study.dto.request.StudyRoomCreateRequest;
 import com.peekle.domain.study.dto.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.response.StudyInviteCodeResponse;
 import com.peekle.domain.study.dto.response.StudyRoomCreateResponse;
+import com.peekle.domain.study.dto.response.StudyRoomListResponse;
 import com.peekle.domain.study.dto.response.StudyRoomResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,6 +63,50 @@ public class StudyRoomService {
         inviteCodeService.saveInviteCode(inviteCode, studyRoom.getId());
 
         return StudyRoomCreateResponse.of(inviteCode);
+    }
+
+    // 내 스터디 목록 조회
+    public Page<StudyRoomListResponse> getMyStudyRooms(Long userId, String keyword, Pageable pageable) {
+        // 1. 내 스터디 방 목록 조회 (Paging)
+        Page<StudyRoom> studyRooms = studyRoomRepository.findMyStudyRooms(userId, keyword, pageable);
+
+        if (studyRooms.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        // 2. 조회된 스터디 방 ID 목록 추출
+        List<Long> studyRoomIds = studyRooms.getContent().stream()
+                .map(StudyRoom::getId)
+                .toList();
+
+        // 3. 각 스터디 방의 멤버 조회 (Batch Fetch)
+        List<StudyMember> members = studyMemberRepository.findAllByStudyIdIn(studyRoomIds);
+
+        // 4. 스터디 방 별로 멤버 그룹화
+
+        Map<Long, List<StudyMember>> membersByStudyId = members.stream()
+                .collect(Collectors.groupingBy(m -> m.getStudy().getId()));
+
+        // 5. Response DTO 변환
+        List<StudyRoomListResponse> content = studyRooms.getContent().stream()
+                .map(studyRoom -> {
+                    //
+                    List<StudyMember> studyMembers = membersByStudyId.getOrDefault(studyRoom.getId(),
+                            Collections.emptyList());
+                    int memberCount = studyMembers.size();
+
+                    // 프로필 이미지 (Mock Data) - 최대 3개
+                    List<String> profileImages = studyMembers.stream()
+                            .limit(3)
+                            .map(m -> "https://api.dicebear.com/7.x/avataaars/svg?seed=" + m.getUserId()) // 예시용 더미 이미지
+                                                                                                          // 서비스 사용
+                            .toList();
+
+                    return StudyRoomListResponse.of(studyRoom, memberCount, profileImages);
+                }).toList();
+
+        return new PageImpl<>(content, pageable, studyRooms.getTotalElements());
+
     }
 
     // 스터디 방 상세 조회
