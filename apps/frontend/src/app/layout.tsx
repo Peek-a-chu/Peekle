@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import './globals.css';
+import Sidebar from '@/domains/lnb/components/Sidebar'
 
 export const metadata: Metadata = {
   title: 'Peekle',
@@ -14,9 +15,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>
-        {children}
-        <Toaster />
+      <body className="flex min-h-screen bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 ml-[240px] p-8 w-full">
+          {children}
+            <Toaster />
+        </main>
       </body>
     </html>
   );

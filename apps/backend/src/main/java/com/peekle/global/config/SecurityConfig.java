@@ -24,6 +24,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/submissions/**").permitAll() // 제출 API 허용
                         .requestMatchers("/h2-console/**").permitAll() // H2 Console 허용
+                        .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API 허용
                         .anyRequest().authenticated() // 그 외는 인증 필요
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console iframe 허용
@@ -34,7 +35,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+
         // 확장프로그램 Origin 허용
         // "chrome-extension://<ID>" 형식인데, 개발 중임으로 모든 Origin 일시 허용하거나 구체적으로 설정 가능
         configuration.setAllowedOriginPatterns(List.of("*"));
