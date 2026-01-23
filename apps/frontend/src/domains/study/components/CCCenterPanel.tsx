@@ -125,6 +125,11 @@ export function CCCenterPanel({
                 hideToolbar
                 initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : undefined}
                 theme={theme} // Sync theme
+                borderColorClass={
+                  viewMode === 'SPLIT_SAVED' 
+                    ? 'border-green-500' 
+                    : 'border-yellow-400'
+                }
               />
             </div>
           )}
