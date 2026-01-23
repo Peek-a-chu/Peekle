@@ -44,11 +44,11 @@
 - `/home` 메인 대시보드
 - `/study` 스터디 방 목록
 - `/study/[id]` 스터디 방
-- `/games` 게임 방 목록
-- `/games/new` 게임 방 생성
-- `/games/[id]` 게임 방 (대기/진행 상태 토글로 목업)
-- `/workbooks` 문제집 목록
-- `/workbooks/new` 문제집 만들기 (목업 폼)
+- `/game` 게임 방 목록
+- `/game/new` 게임 방 생성
+- `/game/[id]` 게임 방 (대기/진행 상태 토글로 목업)
+- `/workbook` 문제집 목록
+- `/workbook/new` 문제집 만들기 (목업 폼)
 - `/search` 통합 검색
 - `/profile/[id]` 유저 정보 (프로필)
 - `/ranking` 랭킹
@@ -61,7 +61,7 @@
 ### 3.1 좌측 네비게이션바 (고정)
 
 - 위치: 화면 왼쪽 고정 (스크롤 무관)
-- 예외 처리: `/study/[id]`, `/games/[id]` 진입 시 제거되며, 대신 좌측 상단에 `뒤로 가기` 버튼 제공
+- 예외 처리: `/study/[id]`, `/game/[id]` 진입 시 제거되며, 대신 좌측 상단에 `뒤로 가기` 버튼 제공
 - 구성 요소:
     1. 프로필 영역 (최상단):
         1. 프로필 이미지 + 닉네임 표시
@@ -71,8 +71,8 @@
     3. 메뉴 리스트 (상→하):
         1. 메인 (`/home`)
         2. 스터디 방 (`/study`)
-        3. 게임 방 (`/games`)
-        4. 문제집 (`/workbooks`)
+        3. 게임 방 (`/game`)
+        4. 문제집 (`/workbook`)
         5. 랭킹 (`ranking`)
         6. 리그 (`/league`) 
         7. 검색 (`/search`)
@@ -102,7 +102,7 @@
 
 ### 4.1 룸 입장 전 프리조인 모달 (스터디/게임 공통)
 
-- 트리거: `/study/[id]`, `/games/[id]` 페이지 진입 시 “입장 전 프리조인 모달”을 띄우는 흐름을 제공
+- 트리거: `/study/[id]`, `/game/[id]` 페이지 진입 시 “입장 전 프리조인 모달”을 띄우는 흐름을 제공
 - UI 구성:
     - 모달 내부에 스크롤 제공
     - 미디어 미리보기: 카메라/마이크 미리보기(실제 미디어 연결 X → Placeholder 카드로 대체)
@@ -381,9 +381,9 @@
     - 하단에 “화이트보드” 버튼 제공(실제 화이트보드 X → placeholder)
     - 열리면 화상 타일 목록에 “화이트보드 썸네일 타일”이 1번으로 나타나게
 
-### 5.8 게임 목록(`/games`)
+### 5.8 게임 목록(`/game`)
 
-- 상단: 타이틀 + “게임방 생성하기”(`/games/new`)
+- 상단: 타이틀 + “게임방 생성하기”(`/game/new`)
 - 게임 종류 4개
     - 카드에 게임에 대한 설명 간단히 나와있음
     - 개인전 (시간제한 많이 풀기/스피드 레이스)
@@ -409,7 +409,7 @@
     - A) BOJ 랜덤(리그/태그 기반): 난이도 범위 슬라이더 + 최소/최대 리그 드롭다운 + 태그 선택
     - B) 문제집 랜덤: 문제집 선택 + 문제 리스트 + 제거 + 검색으로 추가(전부 목업)
 
-### 5.10 게임 방(`/games/[id]`)
+### 5.10 게임 방(`/game/[id]`)
 
 - 스터디방 UI 재활용
 - 게임 방에서는 달력 제거
@@ -423,14 +423,14 @@
 - 진행 상태:
     - 스터디 룸과 같은 3열 레이아웃 재사용(좌 문제/달력/목록, 중앙 IDE+타이머/스톱워치, 우 채팅/참여자)
 
-### 5.11 문제집(`/workbooks`)
+### 5.11 문제집(`/workbook`)
 
 - 테이블(문제집 번호/제목/생성 유저/즐겨찾기 수/**진행률(조회자 기준)**)
 - 즐겨찾기 토글(별 아이콘)
 - 검색/필터(전체/ 북마크/ 내가 만든 것)/정렬(북마크 수, 최근 등록 수)
-- 우측 상단: “+ 문제집 만들기” → `/workbooks/new`
+- 우측 상단: “+ 문제집 만들기” → `/workbook/new`
 
-### 5.11.1 문제집 상세(`/workbooks`/[id])
+### 5.11.1 문제집 상세(`/workbook`/[id])
 
 - 문제집 이름, 문제집 설명, 생성한 사람, 북마크 갯수, 생성일, 진행률
 - 문제목록
@@ -534,7 +534,7 @@
 ## 6. Mock 데이터/상태 설계 (필수)
 
 - `/lib/mock-data.ts`에 타입과 데이터 정의:
-    - user, leagueInfo(등급/점수/순위/상태), streakDays, dailyRecords, aiRecommendations(이유 포함), weeklyPoints, rooms(study/game), participants, problems, chatMessages, workbooks, rankingTeams, leagueGroups 등
+    - user, leagueInfo(등급/점수/순위/상태), streakDays, dailyRecords, aiRecommendations(이유 포함), weeklyPoints, rooms(study/game), participants, problems, chatMessages, workbook, rankingTeams, leagueGroups 등
 - “확장프로그램 상태”, “로그인 상태”, “내가 방장 여부”, “게임 진행 상태”, “화이트보드 열림”, “현재 보고 있는 유저(타인 코드 보기)” 등은
     - localStorage + React 상태로 관리(네트워크 금지)
 - 차트는 Recharts 기반(shadcn chart 패턴 사용 가능)으로 목업 데이터 표시
