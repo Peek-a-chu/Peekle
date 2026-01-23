@@ -211,3 +211,137 @@ export function filterGameRooms(
         return true
     })
 }
+
+// ==========================================
+// 게임방 생성 모달용 Mock 데이터
+// ==========================================
+
+// BOJ 티어 정보
+export interface TierInfo {
+    id: string
+    name: string
+    color: string
+}
+
+export const BOJ_TIERS: TierInfo[] = [
+    { id: 'bronze', name: '브론즈', color: '#ad5600' },
+    { id: 'silver', name: '실버', color: '#435f7a' },
+    { id: 'gold', name: '골드', color: '#ec9a00' },
+    { id: 'platinum', name: '플래티넘', color: '#27e2a4' },
+    { id: 'diamond', name: '다이아몬드', color: '#00b4fc' },
+    { id: 'ruby', name: '루비', color: '#ff0062' },
+]
+
+// 알고리즘 태그 목록
+export const BOJ_TAGS: string[] = [
+    '구현',
+    '그래프',
+    'DP',
+    '그리디',
+    '문자열',
+    '수학',
+    '정렬',
+    '브루트포스',
+    'BFS',
+    'DFS',
+    '이분탐색',
+    '시뮬레이션',
+    '백트래킹',
+    '트리',
+    '최단경로',
+]
+
+// 문제집 인터페이스
+export interface Workbook {
+    id: string
+    title: string
+    description: string
+    problemCount: number
+    creator: string
+    isBookmarked: boolean
+}
+
+// Mock 문제집 데이터
+export const mockWorkbooks: Workbook[] = [
+    {
+        id: 'wb1',
+        title: '백준 실버 핵심 문제',
+        description: '실버 티어 필수 문제 모음',
+        problemCount: 20,
+        creator: 'CodeMaster',
+        isBookmarked: true,
+    },
+    {
+        id: 'wb2',
+        title: 'DP 입문',
+        description: '다이나믹 프로그래밍 기초 문제',
+        problemCount: 15,
+        creator: 'AlgoKing',
+        isBookmarked: true,
+    },
+    {
+        id: 'wb3',
+        title: '그래프 탐색 마스터',
+        description: 'BFS, DFS 완벽 정복',
+        problemCount: 12,
+        creator: '해론다이',
+        isBookmarked: false,
+    },
+    {
+        id: 'wb4',
+        title: '코딩테스트 빈출 문제',
+        description: '취업 준비 필수 문제집',
+        problemCount: 30,
+        creator: 'ProCoder',
+        isBookmarked: true,
+    },
+    {
+        id: 'wb5',
+        title: '문자열 알고리즘',
+        description: '문자열 처리의 모든 것',
+        problemCount: 10,
+        creator: '엔트립중',
+        isBookmarked: false,
+    },
+]
+
+// 게임 생성 폼 데이터 타입
+export type ProblemSource = 'BOJ_RANDOM' | 'WORKBOOK'
+
+export interface GameCreationFormData {
+    // Step 1: 기본 설정
+    title: string
+    isPrivate: boolean
+    password: string
+    mode: GameMode
+    teamType: TeamType
+    maxPlayers: number
+    timeLimit: number // 분 단위 (타임어택 전용)
+    problemCount: number
+
+    // Step 2: 문제 출제
+    problemSource: ProblemSource
+    // BOJ 랜덤 설정
+    tierMin: string
+    tierMax: string
+    selectedTags: string[]
+    // 문제집 설정
+    selectedWorkbookId: string | null
+}
+
+// 기본 폼 데이터
+export const defaultGameCreationForm: GameCreationFormData = {
+    title: '',
+    isPrivate: false,
+    password: '',
+    mode: 'TIME_ATTACK',
+    teamType: 'INDIVIDUAL',
+    maxPlayers: 4,
+    timeLimit: 30,
+    problemCount: 5,
+    problemSource: 'BOJ_RANDOM',
+    tierMin: 'bronze',
+    tierMax: 'gold',
+    selectedTags: [],
+    selectedWorkbookId: null,
+}

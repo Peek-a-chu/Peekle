@@ -22,14 +22,14 @@ const iconMap = {
 
 const colorMap = {
     INDIVIDUAL: {
-        border: 'border-red-400',       // 테두리 (항상 적용)
+        border: 'border-red-100',       // 테두리 (항상 적용)
         bg: 'bg-card',                  // 기본: 흰색 배경
         hoverBg: 'hover:bg-red-50',   // 호버: 연한 빨강 (Tailwind 기본)
         selectedBg: 'bg-red-100', // 선택: 더 진한 빨강 (Tailwind 기본)
         icon: 'text-red-500',            // 아이콘
     },
     TEAM: {
-        border: 'border-blue-400',       // 테두리 (항상 적용)
+        border: 'border-blue-100',       // 테두리 (항상 적용)
         bg: 'bg-card',                  // 기본: 흰색 배경
         hoverBg: 'hover:bg-blue-50',     // 호버: 연한 파랑 (Tailwind 기본)
         selectedBg: 'bg-blue-100',       // 선택: 더 진한 파랑 (Tailwind 기본)
@@ -54,7 +54,7 @@ export function GameModeCard({
             type="button"
             onClick={onClick}
             className={cn(
-                'flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-6 transition-all duration-200',
+                'flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all duration-200',
                 colors.border,  // 테두리 항상 적용
                 isSelected
                     ? colors.selectedBg  // 선택됨: 진한 배경
