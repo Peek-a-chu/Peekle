@@ -25,3 +25,5 @@ node_modules
 peekle.sqlite
 .idea
 apps/frontend/build.log
+
+.env
