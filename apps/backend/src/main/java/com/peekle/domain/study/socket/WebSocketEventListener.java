@@ -1,0 +1,71 @@
+package com.peekle.domain.study.socket;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.messaging.SessionConnectedEvent;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class WebSocketEventListener {
+
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final com.peekle.global.redis.RedisPublisher redisPublisher;
+
+    // 연결 연결 시 (SUBSCRIBEFrame이 아니라 최초 socket 연결 handshake 완료 시점, 혹은 CONNECTED)
+    // 여기서 userId와 sessionId 매핑을 저장
+    @EventListener
+    public void handleWebSocketConnectListener(SessionConnectedEvent event) {
+        StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
+        String sessionId = headerAccessor.getSessionId();
+
+        // Native Headers from CONNECT frame
+        String userIdStr = headerAccessor.getFirstNativeHeader("X-User-Id");
+        Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
+
+        if (userId != null) {
+            log.info("Received a new web socket connection. Session ID: {}, User ID: {}", sessionId, userId);
+            redisTemplate.opsForValue().set("user:" + userId + ":session", sessionId);
+            // Session Attribute에 미리 저장 (Disconnect 시 사용)
+            headerAccessor.getSessionAttributes().put("userId", userId);
+        } else {
+            log.info("Received a new web socket connection. Session ID: {} (Anonymous)", sessionId);
+        }
+    }
+
+    // 연결 종료 시
+    @EventListener
+    public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
+        StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
+        String sessionId = headerAccessor.getSessionId();
+
+        Object userIdObj = headerAccessor.getSessionAttributes().get("userId");
+        Object studyIdObj = headerAccessor.getSessionAttributes().get("studyId");
+
+        if (userIdObj != null) {
+            Long userId = (Long) userIdObj;
+            log.info("Web socket connection disconnected. Session ID: {}, User ID: {}", sessionId, userId);
+
+            // 1. Session 매핑 삭제
+            redisTemplate.delete("user:" + userId + ":session");
+
+            // 2. 스터디 방에 있었다면 Online Users 제거 및 퇴장 알림
+            if (studyIdObj != null) {
+                Long studyId = (Long) studyIdObj;
+                redisTemplate.opsForSet().remove("study:" + studyId + ":online_users", userId.toString());
+
+                // 퇴장 이벤트 발행 (비정상 종료 시에도 UI 반영을 위해)
+                redisPublisher.publish(
+                        new org.springframework.data.redis.listener.ChannelTopic("topic/studies/rooms/" + studyId),
+                        com.peekle.global.socket.SocketResponse.of("LEAVE", userId));
+            }
+        } else {
+            log.info("Web socket connection disconnected. Session ID: {} (Anonymous)", sessionId);
+        }
+    }
+}

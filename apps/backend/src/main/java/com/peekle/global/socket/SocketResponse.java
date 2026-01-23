@@ -1,11 +1,15 @@
-package com.peekle.domain.study.dto.socket.response;
+package com.peekle.global.socket;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 // 공통 알림 메시지 포맷
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SocketResponse<T> {
     private String type; // INFO, LEADER, ENTER, LEAVE, KICK
     private T data; // 실제 데이터 (User 정보, Study 정보 등)

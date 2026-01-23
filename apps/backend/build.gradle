@@ -32,6 +32,16 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+    // Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+
+    // WebSocket용
+    implementation 'io.github.springwolf:springwolf-ui:1.7.0' // UI 화면
+    implementation 'io.github.springwolf:springwolf-core:1.7.0'
+    // 사용하는 프로토콜에 따라 추가 (WebSocket, STOMP, Kafka 등)
+    implementation 'io.github.springwolf:springwolf-stomp:1.7.0'
+    // 또는 순수 웹소켓용 설정이 필요할 수 있음
+
     // Database
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'
