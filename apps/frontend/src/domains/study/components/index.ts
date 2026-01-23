@@ -1,4 +1,4 @@
-export { CCStudyRoomClient as StudyRoomClient } from './CCStudyRoomClient';
+export { CCStudyRoomClient as StudyRoomClient } from '@/domains/study/components/CCStudyRoomClient';
 export { CCStudyHeader as StudyHeader } from '@/domains/study/components/CCStudyHeader';
 export { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid';
 export { CCVideoTile as VideoTile } from '@/domains/study/components/CCVideoTile';
@@ -14,3 +14,5 @@ export {
   CCViewModeBanner as ViewModeBanner,
   ViewModeFooterBanner,
 } from '@/domains/study/components/CCViewModeBanner';
+export { StudyLayoutContent, type StudyLayoutContentProps } from '@/domains/study/components/StudyLayoutContent';
+export { StudyLayout } from '@/domains/study/layout';

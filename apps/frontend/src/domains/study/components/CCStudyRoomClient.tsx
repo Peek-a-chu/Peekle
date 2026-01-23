@@ -1,54 +1,15 @@
 'use client';
 
-import { useEffect, useState, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
-import {
-  StudyHeader,
-  ProblemListPanel,
-  CenterPanel,
-  RightPanel,
-} from '@/domains/study/components';
-
-// Mock problems with dates
-const MOCK_PROBLEMS = [
-  {
-    id: 1,
-    title: '1753 최단경로',
-    source: '백준 1753',
-    status: 'in_progress' as const,
-    solvedDate: new Date(),
-    tags: ['bfs', '다이나믹 프로그래밍'],
-    participantCount: 2,
-    totalParticipants: 4,
-    url: 'https://www.acmicpc.net/problem/1753',
-  },
-  {
-    id: 2,
-    title: '1753 스도쿠',
-    source: '백준 1753',
-    status: 'completed' as const,
-    solvedDate: new Date(Date.now() - 86400000),
-    tags: ['bfs', '다이나믹 프로그래밍'],
-    participantCount: 2,
-    totalParticipants: 4,
-    url: 'https://www.acmicpc.net/problem/1753',
-  },
-  {
-    id: 3,
-    title: '1753 최단경로',
-    source: '백준 11657',
-    status: 'not_started' as const,
-    solvedDate: new Date(),
-    tags: ['bfs', '다이나믹 프로그래밍'],
-    participantCount: 0,
-    totalParticipants: 4,
-    url: 'https://www.acmicpc.net/problem/1753',
-  },
-];
+import { CCStudyHeader as StudyHeader } from './CCStudyHeader';
+import { CCProblemListPanel as ProblemListPanel } from './CCProblemListPanel';
+import { CCCenterPanel as CenterPanel } from './CCCenterPanel';
+import { CCRightPanel as RightPanel } from './CCRightPanel';
+import { StudyLayoutContent } from './StudyLayoutContent';
+import { useProblems } from '@/domains/study/hooks/useProblems';
+import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 
 // Mock data for demo
 const MOCK_PARTICIPANTS = [
@@ -99,108 +60,10 @@ function formatDate(date: Date): string {
   return `${month}월 ${day}일`;
 }
 
-interface StudyLayoutContentProps {
-  header: ReactNode;
-  leftPanel: ReactNode;
-  centerPanel: ReactNode;
-  rightPanel: ReactNode;
-  isLeftPanelFolded: boolean;
-  onUnfoldLeftPanel: () => void;
-  isRightPanelFolded: boolean;
-  onUnfoldRightPanel: () => void;
-  className?: string;
-}
-
-function StudyLayoutContent({
-  header,
-  leftPanel,
-  centerPanel,
-  rightPanel,
-  isLeftPanelFolded,
-  onUnfoldLeftPanel,
-  isRightPanelFolded,
-  onUnfoldRightPanel,
-  className,
-}: StudyLayoutContentProps) {
-  return (
-    <div className={cn('flex h-full flex-col', className)}>
-      {/* Header */}
-      <header className="shrink-0 border-b border-border">{header}</header>
-
-      {/* Main Content */}
-      <div className="relative flex min-h-0 flex-1">
-        {/* Left Panel - Animation handled by width */}
-        <aside
-          className={cn(
-            'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card transition-all duration-300 ease-in-out',
-            isLeftPanelFolded ? 'w-0 border-r-0 overflow-hidden' : 'w-64',
-          )}
-        >
-          <div className="w-64 h-full">
-            {/* Inner container to maintain width during transition */}
-            {leftPanel}
-          </div>
-        </aside>
-
-        {/* Center Panel */}
-        <main
-          className={cn(
-            'relative flex min-w-0 flex-1 flex-col transition-all duration-300',
-            isLeftPanelFolded && 'pl-12',
-            isRightPanelFolded && 'pr-12',
-          )}
-        >
-          {/* Unfold Left Panel Button - Visible only when left folded */}
-          {isLeftPanelFolded && (
-            <div className="absolute left-2 top-2 z-10">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onUnfoldLeftPanel}
-                className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-                title="문제 목록 펼치기"
-              >
-                <PanelLeftOpen className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* Unfold Right Panel Button - Visible only when right folded */}
-          {isRightPanelFolded && (
-            <div className="absolute right-2 top-2 z-10">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onUnfoldRightPanel}
-                className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-                title="채팅/참여자 펼치기"
-              >
-                <PanelRightOpen className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {centerPanel}
-        </main>
-
-        {/* Right Panel */}
-        <aside
-          className={cn(
-            'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card transition-all duration-300 ease-in-out',
-            isRightPanelFolded ? 'w-0 border-l-0 overflow-hidden' : 'w-80',
-          )}
-        >
-          <div className="w-80 h-full">{rightPanel}</div>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
 export function CCStudyRoomClient() {
   const params = useParams();
   const router = useRouter();
-  const studyId = params.id as string;
+  const studyId = Number(params.id) || 0;
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
@@ -213,6 +76,11 @@ export function CCStudyRoomClient() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
+  const [selectedProblemId, setSelectedProblemId] = useState<number | undefined>(undefined);
+
+  // API Hooks
+  const { problems, addProblem, removeProblem } = useProblems(studyId, selectedDate);
+  const { submissions, loadSubmissions } = useSubmissions(studyId);
 
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
@@ -231,8 +99,9 @@ export function CCStudyRoomClient() {
     router.push('/study');
   };
 
-  const handleAddProblem = () => {
-    console.log('Add problem clicked');
+  const handleAddProblem = async (title: string, number: number, tags?: string[]) => {
+    await addProblem(title, number, tags);
+    console.log('Add problem clicked in header');
   };
 
   const handleInvite = () => {
@@ -250,7 +119,7 @@ export function CCStudyRoomClient() {
   };
 
   const handleSelectProblem = (problemId: number) => {
-    console.log('Selected problem:', problemId);
+    setSelectedProblemId(problemId);
   };
 
   const handleDateChange = (date: Date) => {
@@ -276,13 +145,17 @@ export function CCStudyRoomClient() {
       }
       leftPanel={
         <ProblemListPanel
-          problems={MOCK_PROBLEMS}
+          problems={problems}
           selectedDate={selectedDate}
           onDateChange={handleDateChange}
-          onAddProblem={handleAddProblem}
+          onAddProblem={addProblem}
+          onRemoveProblem={removeProblem}
           onSelectProblem={handleSelectProblem}
+          selectedProblemId={selectedProblemId}
           onToggleFold={handleToggleLeftPanel}
           isFolded={isLeftPanelFolded}
+          submissions={submissions}
+          onFetchSubmissions={loadSubmissions}
         />
       }
       centerPanel={<CenterPanel onWhiteboardClick={handleWhiteboardClick} />}
