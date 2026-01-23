@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GameModeCard } from '@/domains/game/components/game-mode-card'
 import { GameRoomCard } from '@/domains/game/components/game-room-card'
 import { PasswordModal } from '@/domains/game/components/password-modal'
+import { GameCreationModal } from '@/domains/game/components/game-creation-modal'
 import {
     gameModes,
     mockGameRooms,
@@ -29,6 +30,7 @@ export default function GamesPage() {
     // 모달 상태
     const [passwordModalOpen, setPasswordModalOpen] = useState(false)
     const [selectedRoom, setSelectedRoom] = useState<GameRoom | null>(null)
+    const [createModalOpen, setCreateModalOpen] = useState(false)
 
     const filteredRooms = useMemo(() => {
         return filterGameRooms(mockGameRooms, {
@@ -76,10 +78,7 @@ export default function GamesPage() {
                 <header className="mb-8 flex items-center justify-between">
                     <h1 className="text-2xl font-bold text-foreground">게임 방</h1>
                     <Button
-                        onClick={() => {
-                            // TODO: 방 만들기 모달 구현 예정
-                            console.log('방 만들기 버튼 클릭')
-                        }}
+                        onClick={() => setCreateModalOpen(true)}
                         className="bg-primary hover:bg-primary-hover"
                     >
                         <Plus className="mr-1 h-4 w-4" />방 만들기
@@ -163,6 +162,16 @@ export default function GamesPage() {
                     )}
                 </section>
             </div>
+
+            {/* 게임 생성 모달 */}
+            <GameCreationModal
+                open={createModalOpen}
+                onOpenChange={setCreateModalOpen}
+                onSubmit={(formData) => {
+                    console.log('게임 생성 완료:', formData)
+                    // TODO: 실제로는 생성된 방으로 이동
+                }}
+            />
 
             {/* 비밀번호 입력 모달 */}
             <PasswordModal
