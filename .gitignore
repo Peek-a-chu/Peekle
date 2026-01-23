@@ -18,9 +18,10 @@ _bmad-output
 .serena
 .vscode
 
-apps/nest-api/node_modules
+# Dependency Directories
+
 .turbo
-
 node_modules
-
 peekle.sqlite
+.idea
+apps/frontend/build.log
