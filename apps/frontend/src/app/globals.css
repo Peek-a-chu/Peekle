@@ -4,6 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
+.monaco-editor-overlaymessage,
+.monaco-editor .monaco-editor-overlaymessage,
+div[class*="monaco-editor-overlaymessage"],
+.monaco-editor .overlayWidgets .message {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: -9999 !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -75,3 +86,5 @@
       sans-serif;
   }
 }
+.monaco-editor-overlaymessage { display: none !important; }
+.monaco-editor-overlaymessage { display: none; }
