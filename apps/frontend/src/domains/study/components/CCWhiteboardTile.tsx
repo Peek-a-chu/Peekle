@@ -43,8 +43,8 @@ export function CCWhiteboardTile({ onClick, className }: CCWhiteboardTileProps) 
       {/* Bottom Info Bar */}
       <div className="flex items-center justify-center bg-white/80 px-2 py-1">
         <span className="text-xs font-medium text-rose-600">
-          {whiteboardOpenedBy?.nickname
-            ? `${whiteboardOpenedBy.nickname}님의 화이트보드`
+          {whiteboardOpenedBy
+            ? `${whiteboardOpenedBy}님의 화이트보드`
             : '화이트보드'}
         </span>
       </div>

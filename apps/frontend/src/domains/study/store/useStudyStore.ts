@@ -20,10 +20,8 @@ export const useStudyStore = create<StudyStoreState>((set) => ({
   isRightPanelFolded: false,
   selectedDate: new Date(),
 
-  toggleLeftPanel: () =>
-    set((state) => ({ isLeftPanelFolded: !state.isLeftPanelFolded })),
-  toggleRightPanel: () =>
-    set((state) => ({ isRightPanelFolded: !state.isRightPanelFolded })),
+  toggleLeftPanel: () => set((state) => ({ isLeftPanelFolded: !state.isLeftPanelFolded })),
+  toggleRightPanel: () => set((state) => ({ isRightPanelFolded: !state.isRightPanelFolded })),
   unfoldLeftPanel: () => set({ isLeftPanelFolded: false }),
   unfoldRightPanel: () => set({ isRightPanelFolded: false }),
   foldRightPanel: () => set({ isRightPanelFolded: true }),
