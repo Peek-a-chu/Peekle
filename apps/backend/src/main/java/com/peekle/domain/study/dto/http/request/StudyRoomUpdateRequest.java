@@ -1,11 +1,13 @@
-package com.peekle.domain.study.dto.request;
+package com.peekle.domain.study.dto.http.request;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-public class StudyRoomCreateRequest {
+@AllArgsConstructor
+public class StudyRoomUpdateRequest {
     private String title;
     private String description;
 }

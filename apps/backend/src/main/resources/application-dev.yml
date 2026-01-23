@@ -25,3 +25,20 @@ spring:
   
   flyway:
     enabled: false # 개발용: Flyway 비활성화
+
+springwolf:
+  docket:
+    # [필수 1] 스캔할 기본 패키지 경로 (내 프로젝트의 최상단 패키지)
+    base-package: com.peekle
+
+    # [필수 2] 문서 기본 정보
+    info:
+      title: Peekle WebSocket API
+      version: 1.0.0
+      description: Peekle 프로젝트 실시간 통신 API 명세서
+
+    # [필수 3] 연결할 서버 정보 (이게 있어야 UI에서 테스트 가능)
+    servers:
+      local-ws:
+        protocol: ws
+        host: localhost:8080

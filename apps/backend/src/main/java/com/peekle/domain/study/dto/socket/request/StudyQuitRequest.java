@@ -4,11 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 방장 위임 요청
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class StudyDelegateRequest {
+public class StudyQuitRequest {
     private Long studyId;
-    private Long targetUserId;
 }

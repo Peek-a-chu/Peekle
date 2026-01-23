@@ -1,4 +1,4 @@
-package com.peekle.domain.study.dto.response;
+package com.peekle.domain.study.dto.http.response;
 
 import lombok.Getter;
 

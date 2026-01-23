@@ -24,8 +24,9 @@ public class StudyMember {
     @JoinColumn(name = "study_room_id", nullable = false)
     private StudyRoom study;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -37,6 +38,10 @@ public class StudyMember {
     @PrePersist
     public void prePersist() {
         this.joinedAt = LocalDateTime.now();
+    }
+
+    public void updateRole(StudyRole role) {
+        this.role = role;
     }
 
     public enum StudyRole {

@@ -1,4 +1,4 @@
-package com.peekle.domain.study.dto.request;
+package com.peekle.domain.study.dto.http.request;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

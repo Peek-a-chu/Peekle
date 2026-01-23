@@ -1,14 +1,11 @@
 package com.peekle.domain.study.dto.socket.request;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 방장 위임 요청
+// 스터디 삭제(폭파) 요청
 @Getter
 @NoArgsConstructor
-@AllArgsConstructor
-public class StudyDelegateRequest {
+public class StudyDeleteRequest {
     private Long studyId;
-    private Long targetUserId;
 }
