@@ -55,7 +55,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
 
   const language = propLanguage || internalLanguage;
   const theme = propTheme || internalTheme;
-  
+
   // Update code when initialCode changes (esp for readOnly view)
   useEffect(() => {
     if (initialCode !== undefined) {
@@ -65,19 +65,19 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
 
   useEffect(() => {
     if (propLanguage) {
-        // If switching language from prop, only reset code if it was default
-        // But for simplicity, we respect internal logic unless it's a forced change
-        // For shared state, parent logic controls this best. 
-        // Here we just ensure we display correct code for the language if logic requires.
-        // But if `code` state is local, we need to be careful.
-        // Assuming parent handles code syncing if `propLanguage` is used.
-        // Actually, let's keep the simple logic: if lang changes and code matches default of old lang, update to new default.
-        setCode((prev) => 
-            prev === DEFAULT_CODE[internalLanguage as keyof typeof DEFAULT_CODE] 
-            ? DEFAULT_CODE[propLanguage as keyof typeof DEFAULT_CODE] 
-            : prev
-        );
-        setInternalLanguage(propLanguage);
+      // If switching language from prop, only reset code if it was default
+      // But for simplicity, we respect internal logic unless it's a forced change
+      // For shared state, parent logic controls this best. 
+      // Here we just ensure we display correct code for the language if logic requires.
+      // But if `code` state is local, we need to be careful.
+      // Assuming parent handles code syncing if `propLanguage` is used.
+      // Actually, let's keep the simple logic: if lang changes and code matches default of old lang, update to new default.
+      setCode((prev) =>
+        prev === DEFAULT_CODE[internalLanguage as keyof typeof DEFAULT_CODE]
+          ? DEFAULT_CODE[propLanguage as keyof typeof DEFAULT_CODE]
+          : prev
+      );
+      setInternalLanguage(propLanguage);
     }
   }, [propLanguage]);
 
@@ -108,7 +108,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
     container.addEventListener('cut', preventClipboard);
     container.addEventListener('paste', preventClipboard);
     container.addEventListener('keydown', stopKeyPropagation);
-    
+
     // Store for cleanup
     listenersRef.current = {
       preventClipboard,
@@ -159,7 +159,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
   const handleRefChat = () => {
     // Switch to chat tab first using the store action
     setRightPanelActiveTab('chat');
-    
+
     setTimeout(() => {
       const chatInput = document.getElementById('chat-input');
       if (chatInput) {
@@ -173,15 +173,25 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
   const handleSubmit = async () => {
     if (editorRef.current) {
       const value = editorRef.current.getValue();
-      try {
-        await navigator.clipboard.writeText(value);
-        window.open('https://www.acmicpc.net/submit', '_blank');
-      } catch (err) {
-        console.error('Failed to submit!', err);
-      }
+      // TODO: Get actual problem ID from store or context. currently hardcoded to 1000 for testing.
+      // In a real scenario, this '1' in /study/1 would likely map to a problem ID or the problem ID is in the store.
+      // Assuming problem 1000 for now as per user request.
+      const problemId = '1000'; // TODO: Dynamic Problem ID associated with current room
+
+      // 확장 프로그램에 메시지 전송 (확장 프로그램이 수신 후 스토리지 저장 -> 페이지 이동 처리)
+      window.postMessage({
+        type: 'PEEKLE_SUBMIT_CODE',
+        payload: {
+          problemId,
+          code: value,
+          language: language // 'python', 'java', 'cpp' 등
+        }
+      }, '*');
+
+      toast.info('자동 제출을 시작합니다...');
     }
   };
-  
+
   useImperativeHandle(ref, () => ({
     handleCopy,
     handleSubmit,
@@ -197,7 +207,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
     )}>
       {/* Toolbar */}
       {!hideToolbar && !readOnly && (
-        <IDEToolbar 
+        <IDEToolbar
           language={language}
           theme={theme}
           onLanguageChange={(val) => handleLanguageChange(val)} // pass value from event or direct
@@ -209,7 +219,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
       )}
 
       {/* Editor */}
-      <div 
+      <div
         className="flex-1 overflow-hidden"
         onMouseEnter={() => editorRef.current?.focus()}
       >

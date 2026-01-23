@@ -44,7 +44,8 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "icons/cute.svg"
+                "icons/cute.svg",
+                "inject_script.js"
             ],
             "matches": [
                 "https://www.acmicpc.net/*"

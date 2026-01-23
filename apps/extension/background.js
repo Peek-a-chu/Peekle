@@ -6,6 +6,20 @@ const PEEKLE_TOKEN_KEY = 'peekle_token';
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'SOLVED') {
         handleSolvedSubmission(request.payload, sender);
+    } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
+        console.log('Background: Saving pending submission and opening tab:', request.payload);
+        chrome.storage.local.set({
+            'pending_submission': {
+                ...request.payload,
+                timestamp: Date.now()
+            }
+        }, () => {
+            // Open new tab
+            const targetUrl = `https://www.acmicpc.net/submit/${request.payload.problemId}`;
+            chrome.tabs.create({ url: targetUrl });
+            sendResponse({ success: true });
+        });
+        return true;
     }
     return true; // Keep channel open
 });
