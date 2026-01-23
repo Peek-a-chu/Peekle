@@ -85,7 +85,7 @@ export function CCCenterPanel({
               targetSubmission={targetSubmission}
               onResetView={resetToOnlyMine}
               // Standard Handlers
-              onLanguageChange={setLanguage}
+              onLanguageChange={(lang) => leftPanelRef.current?.setLanguage(lang)}
               onThemeToggle={handleThemeToggle}
               onCopy={() => {
                 void handleCopy();
@@ -111,6 +111,7 @@ export function CCCenterPanel({
               <IDEPanel
                 ref={leftPanelRef}
                 language={language}
+                onLanguageChange={setLanguage}
                 theme={theme}
                 hideToolbar // Pass this so it doesn't render double toolbar
               />
@@ -126,9 +127,7 @@ export function CCCenterPanel({
                 initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : undefined}
                 theme={theme} // Sync theme
                 borderColorClass={
-                  viewMode === 'SPLIT_SAVED' 
-                    ? 'border-green-500' 
-                    : 'border-yellow-400'
+                  viewMode === 'SPLIT_SAVED' ? 'border-green-500' : 'border-yellow-400'
                 }
               />
             </div>

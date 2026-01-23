@@ -30,10 +30,13 @@ const getSafeLanguageKey = (lang: string): LanguageKey => {
 const getFileExtension = (lang: string) => {
   const key = getSafeLanguageKey(lang);
   switch (key) {
-    case 'cpp': return 'cpp';
-    case 'java': return 'java';
-    case 'python': 
-    default: return 'py';
+    case 'cpp':
+      return 'cpp';
+    case 'java':
+      return 'java';
+    case 'python':
+    default:
+      return 'py';
   }
 };
 
@@ -79,13 +82,13 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // ----------------------------------------------------------------------
     const [internalLanguage, setInternalLanguage] = useState<string>('python');
     const [internalTheme, setInternalTheme] = useState<'light' | 'vs-dark'>('light');
-    
+
     const language = propLanguage || internalLanguage;
     const theme = propTheme || internalTheme;
 
     // 현재 화면에 보여지는 코드
     const [code, setCode] = useState(initialCode || DEFAULT_CODE.python);
-    
+
     // [핵심] Monaco Editor 경로 캐싱 방지용 ID
     const [modelId, setModelId] = useState(0);
 
@@ -109,7 +112,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // ----------------------------------------------------------------------
 
     useEffect(() => {
-      // [핵심 해결책 1 적용] 
+      // [핵심 해결책 1 적용]
       // 언어 변경 중이거나, initialCode가 없는 경우 무시
       if (isSwitchingLanguageRef.current) return;
 
@@ -118,10 +121,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         originCodeRef.current = initialCode;
         // 외부에서 새 코드가 들어오면 Dirty 상태 해제
         isDirtyRef.current = false;
-        
+
         // 에디터가 이미 떠있다면 값 강제 업데이트
         if (editorRef.current && editorRef.current.getValue() !== initialCode) {
-           editorRef.current.setValue(initialCode);
+          editorRef.current.setValue(initialCode);
         }
       }
     }, [initialCode]);
@@ -142,10 +145,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       const newCode = DEFAULT_CODE[safeKey];
 
       setInternalLanguage(newLang);
-      
+
       // 2. State 업데이트: 새 언어의 스켈레톤 코드로 교체
       setCode(newCode);
-      
+
       // 3. 원본 기준점 리셋
       originCodeRef.current = newCode;
       isDirtyRef.current = false;
@@ -176,11 +179,11 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       // 변경 사항 확인 (Ref 기반 직접 비교)
       let isEdited = isDirtyRef.current;
       if (editorRef.current) {
-         const currentVal = normalizeCode(editorRef.current.getValue());
-         const originVal = normalizeCode(originCodeRef.current);
-         if (currentVal !== originVal) {
-            isEdited = true;
-         }
+        const currentVal = normalizeCode(editorRef.current.getValue());
+        const originVal = normalizeCode(originCodeRef.current);
+        if (currentVal !== originVal) {
+          isEdited = true;
+        }
       }
 
       if (isEdited) {
@@ -257,10 +260,32 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       const handleKeyDown = (e: KeyboardEvent) => {
         if (!readOnlyRef.current) return;
         const allowedKeys = [
-          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 
-          'Home', 'End', 'PageUp', 'PageDown', 
-          'Shift', 'Control', 'Alt', 'Meta', 'Escape', 'Tab',
-          'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'Home',
+          'End',
+          'PageUp',
+          'PageDown',
+          'Shift',
+          'Control',
+          'Alt',
+          'Meta',
+          'Escape',
+          'Tab',
+          'F1',
+          'F2',
+          'F3',
+          'F4',
+          'F5',
+          'F6',
+          'F7',
+          'F8',
+          'F9',
+          'F10',
+          'F11',
+          'F12',
         ];
         if (allowedKeys.includes(e.key)) return;
         const isModifier = e.ctrlKey || e.metaKey || e.altKey;
@@ -269,7 +294,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        toast.warning('타인의 코드에 작성할 수 없습니다.', { id: 'readonly-warning', duration: 1000 });
+        toast.warning('타인의 코드에 작성할 수 없습니다.', {
+          id: 'readonly-warning',
+          duration: 1000,
+        });
       };
 
       container.addEventListener('copy', preventClipboard);
@@ -293,8 +321,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           borderColorClass
             ? `border-2 ${borderColorClass} rounded-lg`
             : readOnly
-            ? 'border-2 border-yellow-400 rounded-lg'
-            : '',
+              ? 'border-2 border-yellow-400 rounded-lg'
+              : '',
         )}
       >
         {!hideToolbar && !readOnly && (
@@ -313,22 +341,18 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           <Editor
             // [중요] 키 변경으로 컴포넌트 완전 재생성
             key={`${language}-${modelId}`}
-            
             height="100%"
             language={language}
             theme={theme}
-            
             // [중요] 경로 유니크화로 모델 캐싱 방지
             path={`file_${modelId}.${getFileExtension(language)}`}
-            
             // [중요] Controlled Component 방식 사용 (value에 전적으로 의존)
             value={code}
-            
             onChange={(value) => {
               if (!readOnly) {
                 const newVal = value || '';
                 setCode(newVal);
-                
+
                 const normalizedNew = normalizeCode(newVal);
                 const normalizedOrigin = normalizeCode(originCodeRef.current);
                 isDirtyRef.current = normalizedNew !== normalizedOrigin;
@@ -353,7 +377,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
             <div className="w-[350px] rounded-lg bg-background p-6 shadow-lg border">
               <h3 className="text-lg font-semibold">언어 변경</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                작성 중인 코드가 초기화됩니다.<br />
+                기존 작성 내용이 사라집니다.
+                <br />
                 정말 변경하시겠습니까?
               </p>
               <div className="mt-4 flex justify-end gap-2">
