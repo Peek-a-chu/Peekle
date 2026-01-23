@@ -9,7 +9,7 @@ import { isSameDay } from 'date-fns';
 
 interface CCStudyHeaderProps {
   onBack?: () => void;
-  onAddProblem?: () => void;
+  onAddProblem?: (title: string, number: number, tags?: string[]) => Promise<void>;
   onInvite?: () => void;
   onSettings?: () => void;
   className?: string;

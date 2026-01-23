@@ -2,29 +2,17 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import {
-  ChevronLeft,
-  FileText,
-  CheckCircle2,
-  Plus,
-  ExternalLink,
-  Users,
-  Lightbulb,
-  Box,
-} from 'lucide-react';
+import { ChevronLeft, FileText, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CCCalendarWidget, CCInlineCalendar } from './CCCalendarWidget';
+import { CCProblemCard } from './CCProblemCard';
+import { Problem, Submission } from '@/domains/study/types';
+import { CCSubmissionViewerModal } from './CCSubmissionViewerModal';
+import { CCAddProblemModal } from './CCAddProblemModal';
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 
-export interface Problem {
-  id: number;
-  title: string;
-  source: string;
-  status: 'not_started' | 'in_progress' | 'completed';
-  tags?: string[];
-  participantCount?: number;
-  totalParticipants?: number;
-  url?: string;
-}
+// Re-export Problem type from types.ts to maintain potential compatibility if imported elsewhere
+export type { Problem } from '@/domains/study/types';
 
 export interface CCProblemListPanelProps {
   problems?: Problem[];
@@ -35,7 +23,11 @@ export interface CCProblemListPanelProps {
   isFolded: boolean;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  onAddProblem?: () => void;
+  onAddProblem?: (title: string, number: number, tags?: string[]) => Promise<void>;
+  onRemoveProblem?: (problemId: number) => Promise<void>;
+  submissions?: Submission[];
+  onFetchSubmissions?: (problemId: number) => void;
+  historyDates?: Date[];
 }
 
 export function CCProblemListPanel({
@@ -47,47 +39,104 @@ export function CCProblemListPanel({
   selectedDate,
   onDateChange,
   onAddProblem,
+  onRemoveProblem,
+  submissions = [],
+  onFetchSubmissions,
+  historyDates,
 }: CCProblemListPanelProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
+  const [addProblemModalOpen, setAddProblemModalOpen] = useState(false);
+  const [selectedSubmissionProblemId, setSelectedSubmissionProblemId] = useState<number | null>(
+    null,
+  );
+  
+  const setViewMode = useRoomStore((state) => state.setViewMode);
+  const setTargetSubmission = useRoomStore((state) => state.setTargetSubmission);
 
   const handleDateSelect = (date: Date) => {
     onDateChange(date);
     setIsCalendarOpen(false);
   };
 
+  const handleOpenSubmission = (problemId: number) => {
+    setSelectedSubmissionProblemId(problemId);
+    setSubmissionModalOpen(true);
+    onFetchSubmissions?.(problemId);
+  };
+
+  const handleViewCode = (submissionId: number) => {
+    const submission = submissions.find((s) => s.id === submissionId);
+    if (!submission) return;
+
+    // Use selectedProblem from outer scope logic or find it here
+    const currentProblem = problems.find(p => p.id === selectedSubmissionProblemId);
+    
+    setTargetSubmission({
+      id: submission.id,
+      problemTitle: currentProblem ? `${currentProblem.number}. ${currentProblem.title}` : 'Unknown Problem',
+      username: submission.username,
+      language: submission.language,
+      memory: submission.memory,
+      executionTime: submission.time,
+      code: submission.code || '// No code available',
+    });
+    setViewMode('SPLIT_SAVED');
+    setSubmissionModalOpen(false);
+  };
+
+  const handleAddProblem = async (title: string, number: number, tags?: string[]) => {
+    if (onAddProblem) {
+      await onAddProblem(title, number, tags);
+    }
+  };
+
+  const handleRemoveProblem = async (problemId: number) => {
+    if (onRemoveProblem) {
+      await onRemoveProblem(problemId);
+    }
+  };
+
+  const selectedProblem = problems.find((p) => p.id === selectedSubmissionProblemId);
+
   return (
-    <div className={cn('flex h-full flex-col relative', className)}>
-      {/* Panel Header */}
-      <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
+    <div className={cn('flex h-full flex-col relative bg-card', className)}>
+      {/* Top Row: Fold Button */}
+      <div className="flex items-center px-4 py-2 shrink-0 border-b border-border">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground p-0 h-8 gap-1"
+          onClick={onToggleFold}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          <span className="text-sm font-medium">접기</span>
+        </Button>
+      </div>
+
+      {/* Second Row: Date & Add Button */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-border">
         <CCCalendarWidget
           selectedDate={selectedDate}
           isOpen={isCalendarOpen}
           onToggle={() => setIsCalendarOpen(!isCalendarOpen)}
         />
-
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={onAddProblem}
-            className="bg-pink-500 hover:bg-pink-600 text-white h-8 text-sm px-3"
-          >
-            <Plus className="mr-1 h-3 w-3" />
-            문제 추가
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={onToggleFold}
-            title="접기"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          onClick={() => setAddProblemModalOpen(true)}
+          className="bg-pink-500 hover:bg-pink-600 text-white h-8 text-xs px-3 shadow-sm"
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          문제 추가
+        </Button>
       </div>
 
       {/* Inline Calendar */}
       {isCalendarOpen && (
-        <CCInlineCalendar selectedDate={selectedDate} onSelectDate={handleDateSelect} />
+        <CCInlineCalendar
+          selectedDate={selectedDate}
+          onSelectDate={handleDateSelect}
+          historyDates={historyDates}
+        />
       )}
 
       {/* Problem List */}
@@ -104,92 +153,36 @@ export function CCProblemListPanel({
           <ul className="space-y-3 p-4">
             {problems.map((problem) => (
               <li key={problem.id}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelectProblem?.(problem.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      onSelectProblem?.(problem.id);
-                    }
+                <CCProblemCard
+                  problem={{
+                    ...problem,
+                    url: `https://www.acmicpc.net/problem/${problem.number}`,
                   }}
-                  className={cn(
-                    'relative rounded-xl border bg-card p-3 shadow-sm transition-all hover:shadow-md cursor-pointer group',
-                    selectedProblemId === problem.id
-                      ? 'border-pink-500 ring-1 ring-pink-500 bg-pink-50/10'
-                      : 'border-border hover:border-pink-200',
-                  )}
-                >
-                  {/* Top Row: Title & Icons */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{problem.title}</span>
-                      {problem.url && (
-                        <a
-                          href={problem.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                        </a>
-                      )}
-                    </div>
-                    <Lightbulb
-                      className={cn(
-                        'h-4 w-4',
-                        selectedProblemId === problem.id
-                          ? 'text-yellow-400 fill-yellow-400'
-                          : 'text-muted-foreground',
-                      )}
-                    />
-                  </div>
-
-                  {/* Tags */}
-                  {problem.tags && problem.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {problem.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Bottom Row: Status & Participants */}
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-2">
-                      <Box className="h-4 w-4 text-muted-foreground" />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {problem.status === 'completed' ? (
-                        <div className="flex items-center gap-1 text-xs font-medium text-green-600">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>풀이 완료</span>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-muted-foreground">진행 중</div>
-                      )}
-
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users className="h-3 w-3" />
-                        <span>
-                          {problem.participantCount}/{problem.totalParticipants || 4}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  isSelected={selectedProblemId === problem.id}
+                  onSelect={() => onSelectProblem?.(problem.id)}
+                  onOpenSubmission={handleOpenSubmission}
+                />
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      <CCSubmissionViewerModal
+        isOpen={submissionModalOpen}
+        onClose={() => setSubmissionModalOpen(false)}
+        problemTitle={selectedProblem ? selectedProblem.title : ''}
+        problemNumber={selectedProblem ? selectedProblem.number : undefined}
+        submissions={submissions}
+        onViewCode={handleViewCode}
+      />
+
+      <CCAddProblemModal
+        isOpen={addProblemModalOpen}
+        onClose={() => setAddProblemModalOpen(false)}
+        onAdd={handleAddProblem}
+        onRemove={handleRemoveProblem}
+      />
     </div>
   );
 }
