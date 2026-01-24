@@ -606,3 +606,43 @@ function showSuccessToast(data) {
         closeToast();
     };
 }
+
+// --- Extension Detection for Peekle Frontend ---
+window.addEventListener('message', async (event) => {
+    // We only accept messages from ourselves
+    if (event.source !== window) return;
+
+    if (event.data?.type === 'PEEKLE_CHECK_EXTENSION') {
+        let token = null;
+        try {
+            const data = await chrome.storage.local.get(['peekle_token']);
+            token = data.peekle_token || null;
+        } catch (e) {
+            // Context might be invalidated or error
+        }
+
+        // Reply to the web page saying "I am here!" with the token
+        window.postMessage({
+            type: 'PEEKLE_EXTENSION_INSTALLED',
+            version: chrome.runtime.getManifest().version,
+            token: token
+        }, '*');
+        // console.log('[Peekle Content Script] Responded to check via window message. Token:', token ? 'YES' : 'NO');
+    }
+
+    // Handle Setting Token
+    if (event.data?.type === 'PEEKLE_SET_TOKEN') {
+        const token = event.data.token;
+        try {
+            if (token) {
+                await chrome.storage.local.set({ 'peekle_token': token });
+                console.log('[Peekle] Token saved:', token);
+            } else {
+                await chrome.storage.local.remove('peekle_token');
+                console.log('[Peekle] Token removed.');
+            }
+        } catch (e) {
+            console.error('[Peekle] Failed to access storage:', e);
+        }
+    }
+});
