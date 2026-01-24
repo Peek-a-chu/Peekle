@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import {
     mockGameRooms,
     filterGameRooms,
@@ -11,6 +13,8 @@ import {
 export type StatusFilter = GameStatus | 'ALL'
 
 export function useGamePageLogic() {
+    const router = useRouter()
+
     const [selectedMode, setSelectedMode] = useState<GameMode | null>(null)
     const [selectedTeamType, setSelectedTeamType] = useState<TeamType | null>(null)
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
@@ -42,22 +46,30 @@ export function useGamePageLogic() {
     }
 
     const handleRoomClick = (room: GameRoom) => {
+        // 진행 중인 방은 입장 불가
+        if (room.status === 'PLAYING') {
+            toast.error('진행 중인 방에는 입장할 수 없습니다')
+            return
+        }
+
         if (room.isPrivate) {
             // 비공개 방일 경우 비밀번호 모달 표시
             setSelectedRoom(room)
             setPasswordModalOpen(true)
         } else {
-            // 공개 방일 경우 바로 입장
-            console.log('Navigate to room:', room.id)
-            // 실제로는 router.push(`/game/${room.id}`) 사용
+            // 공개 방일 경우 바로 대기방으로 이동
+            router.push(`/game/${room.id}`)
         }
     }
 
     const handlePasswordSubmit = (password: string) => {
-        // Mock: 비밀번호 검증 후 입장
+        // TODO: 비밀번호 검증 API 호출
         console.log('Entering room with password:', selectedRoom?.id, password)
         setPasswordModalOpen(false)
-        // 실제로는 router.push(`/game/${selectedRoom?.id}`) 사용
+        // 비밀번호 검증 후 대기방으로 이동
+        if (selectedRoom) {
+            router.push(`/game/${selectedRoom.id}`)
+        }
     }
 
     const resetFilters = () => {

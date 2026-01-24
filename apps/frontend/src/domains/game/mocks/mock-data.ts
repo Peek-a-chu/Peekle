@@ -2,6 +2,30 @@
 export type GameMode = 'TIME_ATTACK' | 'SPEED_RACE'
 export type TeamType = 'INDIVIDUAL' | 'TEAM'
 export type GameStatus = 'WAITING' | 'PLAYING'
+export type ParticipantStatus = 'NOT_READY' | 'READY'
+export type Team = 'RED' | 'BLUE'
+
+// 참여자 인터페이스
+export interface Participant {
+    id: string
+    nickname: string
+    profileImg: string
+    isHost: boolean
+    status: ParticipantStatus
+    tier?: string // 예: 'gold5'
+    team?: Team // 팀전일 경우에만 사용
+}
+
+// 채팅 메시지 인터페이스
+export interface ChatMessage {
+    id: string
+    senderId: string
+    senderNickname: string
+    senderProfileImg: string
+    content: string
+    timestamp: string
+    senderTeam?: Team // 팀전일 경우에만 사용
+}
 
 // 게임방 인터페이스
 export interface GameRoom {
@@ -22,6 +46,13 @@ export interface GameRoom {
     isPrivate: boolean
     tags: string[]
     createdAt: string
+}
+
+// 게임방 상세 정보 (대기방용)
+export interface GameRoomDetail extends Omit<GameRoom, 'host'> {
+    participants: Participant[]
+    tierMin: string
+    tierMax: string
 }
 
 // 게임 모드 정보
@@ -344,4 +375,337 @@ export const defaultGameCreationForm: GameCreationFormData = {
     tierMax: 'gold',
     selectedTags: [],
     selectedWorkbookId: null,
+}
+
+// ==========================================
+// 게임 대기방용 Mock 데이터
+// ==========================================
+
+// Mock 채팅 메시지 데이터 (개인전용)
+export const mockChatMessages: ChatMessage[] = [
+    {
+        id: 'msg1',
+        senderId: 'user1',
+        senderNickname: 'CodeNinja',
+        senderProfileImg: '/avatars/default.png',
+        content: '오늘 문제 어떤거요? 👀',
+        timestamp: '2026-01-24T20:00:00',
+    },
+    {
+        id: 'msg2',
+        senderId: 'user3',
+        senderNickname: '백준킹',
+        senderProfileImg: '/avatars/default.png',
+        content: '그래프랑 DP 하면 좋겠습니다!',
+        timestamp: '2026-01-24T20:01:00',
+    },
+    {
+        id: 'msg3',
+        senderId: 'user2',
+        senderNickname: 'PS마스터',
+        senderProfileImg: '/avatars/default.png',
+        content: 'import heapq',
+        timestamp: '2026-01-24T20:02:00',
+    },
+    {
+        id: 'msg4',
+        senderId: 'user2',
+        senderNickname: 'PS마스터',
+        senderProfileImg: '/avatars/default.png',
+        content: '이렇게 시작하면 돼요',
+        timestamp: '2026-01-24T20:02:30',
+    },
+]
+
+// Mock 팀전 채팅 메시지 데이터
+export const mockTeamChatMessages: ChatMessage[] = [
+    {
+        id: 'team-msg1',
+        senderId: 'user3',
+        senderNickname: '해론다이',
+        senderProfileImg: '/avatars/default.png',
+        content: '레드팀 화이팅! 🔥',
+        timestamp: '2026-01-24T20:00:00',
+        senderTeam: 'RED',
+    },
+    {
+        id: 'team-msg2',
+        senderId: 'user6',
+        senderNickname: 'BlueLeader',
+        senderProfileImg: '/avatars/default.png',
+        content: '블루팀도 질 수 없죠 💙',
+        timestamp: '2026-01-24T20:01:00',
+        senderTeam: 'BLUE',
+    },
+    {
+        id: 'team-msg3',
+        senderId: 'user4',
+        senderNickname: 'RedPlayer1',
+        senderProfileImg: '/avatars/default.png',
+        content: 'DP 문제 나오면 좋겠다',
+        timestamp: '2026-01-24T20:02:00',
+        senderTeam: 'RED',
+    },
+    {
+        id: 'team-msg4',
+        senderId: 'user7',
+        senderNickname: 'BluePlayer1',
+        senderProfileImg: '/avatars/default.png',
+        content: '그래프가 더 재밌지 않나요?',
+        timestamp: '2026-01-24T20:02:30',
+        senderTeam: 'BLUE',
+    },
+]
+
+// 방 ID별 채팅 메시지 조회
+export function getMockChatMessages(roomId: string): ChatMessage[] {
+    // 팀전 방 (room 3)인 경우 팀 채팅 반환
+    if (roomId === '3') {
+        return mockTeamChatMessages
+    }
+    return mockChatMessages
+}
+
+// Mock 대기방 상세 정보 (각 방 ID별)
+const mockGameRoomDetails: Record<string, GameRoomDetail> = {
+    // 방 2: 실버 스피드 레이스 - 모두 준비 완료 (시작 버튼 활성화)
+    '2': {
+        id: '2',
+        title: '실버 스피드 레이스',
+        mode: 'SPEED_RACE',
+        teamType: 'INDIVIDUAL',
+        status: 'WAITING',
+        currentPlayers: 2,
+        maxPlayers: 4,
+        timeLimit: 30,
+        problemCount: 5,
+        isPrivate: false,
+        tags: ['실버', 'DP'],
+        createdAt: '2026-01-21T14:25:00',
+        tierMin: 'silver5',
+        tierMax: 'silver1',
+        participants: [
+            {
+                id: 'user1',
+                nickname: 'AlgoKing',
+                profileImg: '/avatars/default.png',
+                isHost: true,
+                status: 'READY',
+                tier: 'silver2',
+            },
+            {
+                id: 'user2',
+                nickname: 'SpeedCoder',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'NOT_READY', // 준비 버튼 테스트를 위해 대기 상태로 변경
+                tier: 'silver3',
+            },
+        ],
+    },
+    // 방 3: 팀전 대회 - 일부만 준비
+    '3': {
+        id: '3',
+        title: '팀전 대회',
+        mode: 'TIME_ATTACK',
+        teamType: 'TEAM',
+        status: 'WAITING',
+        currentPlayers: 7,
+        maxPlayers: 8,
+        timeLimit: 45,
+        problemCount: 8,
+        isPrivate: true,
+        tags: ['팀전', '브론즈'],
+        createdAt: '2026-01-21T14:20:00',
+        tierMin: 'bronze5',
+        tierMax: 'bronze1',
+        participants: [
+            {
+                id: 'user2',
+                nickname: 'PS마스터',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'NOT_READY',
+                tier: 'gold5',
+                team: 'RED',
+            },
+            // 레드팀 (상단 4명)
+            {
+                id: 'user3',
+                nickname: '해론다이',
+                profileImg: '/avatars/default.png',
+                isHost: true,
+                status: 'NOT_READY',
+                tier: 'bronze1',
+                team: 'RED',
+            },
+            {
+                id: 'user4',
+                nickname: 'RedPlayer1',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'READY',
+                tier: 'bronze2',
+                team: 'RED',
+            },
+            {
+                id: 'user5',
+                nickname: 'RedPlayer2',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'NOT_READY',
+                tier: 'bronze3',
+                team: 'RED',
+            },
+            // 블루팀 (하단 4명)
+            {
+                id: 'user6',
+                nickname: 'BlueLeader',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'READY',
+                tier: 'bronze1',
+                team: 'BLUE',
+            },
+            {
+                id: 'user7',
+                nickname: 'BluePlayer1',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'READY',
+                tier: 'bronze2',
+                team: 'BLUE',
+            },
+            {
+                id: 'user8',
+                nickname: 'BluePlayer2',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'NOT_READY',
+                tier: 'bronze3',
+                team: 'BLUE',
+            },
+        ],
+    },
+    // 방 4: 초보자 환영 - 방장만 있음
+    '4': {
+        id: '4',
+        title: '초보자 환영',
+        mode: 'TIME_ATTACK',
+        teamType: 'INDIVIDUAL',
+        status: 'WAITING',
+        currentPlayers: 1,
+        maxPlayers: 8,
+        timeLimit: 90,
+        problemCount: 15,
+        isPrivate: false,
+        tags: ['초보', '브론즈'],
+        createdAt: '2026-01-21T14:15:00',
+        tierMin: 'bronze5',
+        tierMax: 'silver5',
+        participants: [
+            {
+                id: 'user1',
+                nickname: '엔트립중',
+                profileImg: '/avatars/default.png',
+                isHost: true,
+                status: 'READY',
+                tier: 'bronze1',
+            },
+        ],
+    },
+    // 방 6: 다이아 도전
+    '6': {
+        id: '6',
+        title: '다이아 도전',
+        mode: 'TIME_ATTACK',
+        teamType: 'INDIVIDUAL',
+        status: 'WAITING',
+        currentPlayers: 2,
+        maxPlayers: 6,
+        timeLimit: 120,
+        problemCount: 5,
+        isPrivate: false,
+        tags: ['다이아', '그래프'],
+        createdAt: '2026-01-21T14:05:00',
+        tierMin: 'platinum1',
+        tierMax: 'diamond5',
+        participants: [
+            {
+                id: 'user6',
+                nickname: 'ProCoder',
+                profileImg: '/avatars/default.png',
+                isHost: true,
+                status: 'READY',
+                tier: 'diamond5',
+            },
+            {
+                id: 'user7',
+                nickname: 'DiamondHunter',
+                profileImg: '/avatars/default.png',
+                isHost: false,
+                status: 'NOT_READY',
+                tier: 'platinum2',
+            },
+        ],
+    },
+}
+
+// 기본 방 데이터 (없는 방 ID용)
+const defaultRoomDetail: GameRoomDetail = {
+    id: '1',
+    title: '기본 대기방',
+    mode: 'SPEED_RACE',
+    teamType: 'INDIVIDUAL',
+    status: 'WAITING',
+    currentPlayers: 3,
+    maxPlayers: 8,
+    timeLimit: 30,
+    problemCount: 1,
+    isPrivate: false,
+    tags: ['구현', '백트래킹'],
+    createdAt: '2026-01-24T19:30:00',
+    tierMin: 'gold5',
+    tierMax: 'gold1',
+    participants: [
+        {
+            id: 'user1',
+            nickname: 'CodeNinja',
+            profileImg: '/avatars/default.png',
+            isHost: true,
+            status: 'READY',
+            tier: 'gold3',
+        },
+        {
+            id: 'user2',
+            nickname: 'PS마스터',
+            profileImg: '/avatars/default.png',
+            isHost: false,
+            status: 'READY',
+            tier: 'gold5',
+        },
+        {
+            id: 'user3',
+            nickname: '백준킹',
+            profileImg: '/avatars/default.png',
+            isHost: false,
+            status: 'NOT_READY',
+            tier: 'silver1',
+        },
+    ],
+}
+
+// 방 ID로 Mock 상세 정보 조회
+export function getMockGameRoomDetail(roomId: string): GameRoomDetail | null {
+    if (!roomId) return null
+
+    // 정의된 방이 있으면 반환, 없으면 기본 데이터 반환
+    if (mockGameRoomDetails[roomId]) {
+        return mockGameRoomDetails[roomId]
+    }
+
+    return {
+        ...defaultRoomDetail,
+        id: roomId,
+    }
 }

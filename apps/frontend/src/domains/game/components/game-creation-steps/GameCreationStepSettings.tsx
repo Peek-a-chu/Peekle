@@ -48,7 +48,7 @@ export function GameCreationStepSettings({
             {/* 인원 수 */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <Label>인원 수 <span className="text-xs text-muted-foreground">({isTeamMode ? '4 ~ 12' : '2 ~ 8'})</span></Label>
+                    <Label>인원 수 <span className="text-xs text-muted-foreground">({isTeamMode ? '4 ~ 8' : '2 ~ 8'})</span></Label>
                     <span className="text-sm font-medium">{formData.maxPlayers}명</span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -56,7 +56,7 @@ export function GameCreationStepSettings({
                         value={[formData.maxPlayers]}
                         onValueChange={([value]) => onMaxPlayersChange(value)}
                         min={isTeamMode ? 4 : 2}
-                        max={isTeamMode ? 12 : 8}
+                        max={8}
                         step={isTeamMode ? 2 : 1}
                         className="flex-1"
                     />
@@ -66,14 +66,14 @@ export function GameCreationStepSettings({
                         onChange={(e) => {
                             setMaxPlayersInput(e.target.value)
                             const num = Number(e.target.value)
-                            if (!isNaN(num) && num >= (isTeamMode ? 4 : 2) && num <= (isTeamMode ? 12 : 8)) {
+                            if (!isNaN(num) && num >= (isTeamMode ? 4 : 2) && num <= 8) {
                                 onUpdateForm('maxPlayers', num)
                             }
                         }}
                         onBlur={onMaxPlayersBlur}
                         className="w-20"
                         min={isTeamMode ? 4 : 2}
-                        max={isTeamMode ? 12 : 8}
+                        max={8}
                         step={isTeamMode ? 2 : 1}
                     />
                 </div>
