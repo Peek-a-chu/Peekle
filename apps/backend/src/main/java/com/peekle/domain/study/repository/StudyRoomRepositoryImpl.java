@@ -22,28 +22,29 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
     @Override
     public Page<StudyRoom> findMyStudyRooms(Long userId, String keyword, Pageable pageable) {
 
-        // 1. Content Query
+        // 1. 목록 조회
         List<StudyRoom> content = queryFactory
                 .selectFrom(studyRoom)
-                // .leftJoin(studyRoom.owner, user).fetchJoin() // User Entity removed, no join
-                // needed
+                // .leftJoin(studyRoom.owner, user).fetchJoin() // User 엔티티 제거로 인한 조인 불필요
                 .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
-                        studyMember.userId.eq(userId), // Filter by my participation (userId)
+                        studyMember.user.id.eq(userId), // 내가 참여한 스터디만 필터링
+                        studyRoom.isActive.isTrue(), // 활성화된 스터디만
                         containsKeyword(keyword))
                 .orderBy(studyRoom.createdAt.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        // 2. Count Query (Optimized)
-        // Using PageableExecutionUtils to skip count query when not necessary
+        // 2. 카운트 쿼리 (최적화)
+        // PageableExecutionUtils를 사용하여 불필요한 카운트 쿼리 생략
         com.querydsl.jpa.impl.JPAQuery<Long> countQuery = queryFactory
                 .select(studyRoom.count())
                 .from(studyRoom)
                 .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
-                        studyMember.userId.eq(userId),
+                        studyMember.user.id.eq(userId),
+                        studyRoom.isActive.isTrue(), // 활성화된 스터디만
                         containsKeyword(keyword));
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);

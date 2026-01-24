@@ -4,14 +4,19 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@EnableAsync
+@EnableScheduling
 @EnableJpaAuditing
 @SpringBootApplication
 public class PeekleBackendApplication {
 
-	public static void main(String[] args) {
-        // Load .env file (Try current directory first, then assumes running from root -> apps/backend)
-        String[] searchPaths = {"./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend"};
+    public static void main(String[] args) {
+        // Load .env file (Try current directory first, then assumes running from root
+        // -> apps/backend)
+        String[] searchPaths = { "./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend" };
         boolean loaded = false;
 
         for (String path : searchPaths) {
@@ -32,10 +37,11 @@ public class PeekleBackendApplication {
         }
 
         if (!loaded) {
-            System.err.println("CRITICAL ERROR: .env file not found in any search path. Database connection will likely fail.");
+            System.err.println(
+                    "CRITICAL ERROR: .env file not found in any search path. Database connection will likely fail.");
         }
 
-		SpringApplication.run(PeekleBackendApplication.class, args);
-	}
+        SpringApplication.run(PeekleBackendApplication.class, args);
+    }
 
 }

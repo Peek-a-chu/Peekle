@@ -25,6 +25,7 @@ public enum ErrorCode {
     STUDY_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_001", "스터디 방을 찾을 수 없습니다."),
     ALREADY_JOINED_STUDY(HttpStatus.CONFLICT, "STUDY_002", "이미 가입된 스터디입니다."),
     INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "STUDY_003", "유효하지 않거나 만료된 초대 코드입니다."),
+<<<<<<< apps/backend/src/main/java/com/peekle/global/exception/ErrorCode.java
 
     // Submission
     BAEKJOON_SUBMISSION_NOT_FOUND(HttpStatus.BAD_REQUEST, "SUBMISSION_001", "백준 제출 기록을 찾을 수 없습니다."),
@@ -32,6 +33,7 @@ public enum ErrorCode {
     CODE_LENGTH_MISMATCH(HttpStatus.BAD_REQUEST, "SUBMISSION_003", "코드 길이가 일치하지 않습니다."),
     BAEKJOON_CONNECTION_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "SUBMISSION_004", "백준 사이트 접속에 실패했습니다."),
     USER_VERIFICATION_FAILED(HttpStatus.UNAUTHORIZED, "SUBMISSION_005", "사용자 검증에 실패했습니다.");
+    ALREADY_PARTICIPATING_IN_OTHER_STUDY(HttpStatus.CONFLICT, "STUDY_004", "이미 다른 스터디에 참여 중입니다.");
 
     private final HttpStatus status;
     private final String code;

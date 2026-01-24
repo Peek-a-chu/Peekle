@@ -32,6 +32,16 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+    // Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+
+    // Springwolf - AsyncAPI (WebSocket)
+    implementation 'io.github.springwolf:springwolf-ui:1.6.0'
+    implementation 'io.github.springwolf:springwolf-core:1.6.0'
+    implementation 'io.github.springwolf:springwolf-stomp:1.6.0'
+
+    // OpenVidu
+    implementation 'io.openvidu:openvidu-java-client:2.31.0'
     // Database
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'
