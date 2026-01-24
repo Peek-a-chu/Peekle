@@ -20,3 +20,4 @@ _bmad-output
 
 .idea
 apps/frontend/build.log
+.env
