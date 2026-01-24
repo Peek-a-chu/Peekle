@@ -10,6 +10,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
+
 @Slf4j
 @Component
 public class SubmissionValidator {
@@ -38,7 +41,7 @@ public class SubmissionValidator {
             
             if (targetRow == null) {
                 System.out.println("❌ Validation Failed: 제출 기록 없음 (Problem: " + problemId + ", User: " + userId + ")");
-                throw new IllegalArgumentException("백준 채점 현황에서 해당 제출 기록을 찾을 수 없습니다. (ID: " + submitId + ")");
+                throw new BusinessException(ErrorCode.BAEKJOON_SUBMISSION_NOT_FOUND, "백준 채점 현황에서 해당 제출 기록을 찾을 수 없습니다. (ID: " + submitId + ")");
             }
 
             // 결과(Result) 검증: "맞았습니다!!" 또는 "100점" 등 성공 여부 확인
@@ -50,7 +53,7 @@ public class SubmissionValidator {
             
             if (!isSuccess) {
                  System.out.println("❌ Validation Failed: 성공하지 못한 제출입니다. (Result: " + resultText + ")");
-                 throw new IllegalArgumentException("성공한 제출이 아닙니다. 상태: " + resultText);
+                 throw new BusinessException(ErrorCode.INVALID_SUBMISSION_STATUS, "성공한 제출이 아닙니다. 상태: " + resultText);
             }
 
             // ... (코드 길이 검증 로직)
@@ -73,7 +76,7 @@ public class SubmissionValidator {
 
             if (diff > LENGTH_TOLERANCE) {
                 System.out.println("❌ Validation Failed: 코드 길이 불일치! (허용오차: " + LENGTH_TOLERANCE + "B)");
-                throw new IllegalArgumentException("코드 길이 불일치! (제출: " + submittedLength + "B, 실제: " + bojLength + "B)");
+                throw new BusinessException(ErrorCode.CODE_LENGTH_MISMATCH, "코드 길이 불일치! (제출: " + submittedLength + "B, 실제: " + bojLength + "B)");
             }
             
             System.out.println("✅ Validation Passed! (User: " + userId + ", Problem: " + problemId + ")");
@@ -83,7 +86,7 @@ public class SubmissionValidator {
             log.error("BOJ Validation Failed (Network Error)", e);
             // 네트워크 에러 시에는 막아야 할까 통과시켜야 할까?
             // "일시적 오류"라고 알려주고 재시도 유도하는 게 안전함
-            throw new RuntimeException("백준 사이트 접속 실패로 검증할 수 없습니다.");
+            throw new BusinessException(ErrorCode.BAEKJOON_CONNECTION_ERROR);
         }
     }
 }
