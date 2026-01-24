@@ -43,6 +43,13 @@ public class WebSocketEventListener {
 
         Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
 
+        // 3. Try to get Study ID
+        String studyIdStr = headerAccessor.getFirstNativeHeader("X-Study-Id");
+        if (studyIdStr == null && connectAccessor != null) {
+            studyIdStr = connectAccessor.getFirstNativeHeader("X-Study-Id");
+        }
+        Long studyId = (studyIdStr != null) ? Long.parseLong(studyIdStr) : null;
+
         if (userId != null) {
             log.info("Received a new web socket connection. Session ID: {}, User ID: {}", sessionId, userId);
             redisTemplate.opsForValue().set("user:" + userId + ":session", sessionId);
@@ -55,6 +62,9 @@ public class WebSocketEventListener {
 
             if (attributes != null) {
                 attributes.put("userId", userId);
+                if (studyId != null) {
+                    attributes.put("studyId", studyId);
+                }
             } else {
                 log.warn("Failed to set userId in session attributes: Map is null");
             }
