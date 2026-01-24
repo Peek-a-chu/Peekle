@@ -3,32 +3,45 @@ package com.peekle.domain.study.controller;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
 import com.peekle.domain.study.dto.socket.request.*;
 import com.peekle.domain.study.service.StudyRoomService;
+import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Controller
 @RequiredArgsConstructor
+@Slf4j
 public class StudySocketController {
 
         private final RedisPublisher redisPublisher;
         private final RedisTemplate<String, Object> redisTemplate;
         private final StudyRoomService studyRoomService;
         private final com.peekle.domain.study.repository.StudyMemberRepository studyMemberRepository;
+        private final MediaService mediaService;
+        private final SimpMessagingTemplate messagingTemplate;
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
         public void enter(@Payload StudyEnterRequest request,
                         SimpMessageHeaderAccessor headerAccessor) {
-                // Header에서 userId 추출 (없으면 기본값 1L - 테스트 편의성)
-                String userIdHeader = headerAccessor.getFirstNativeHeader("X-User-Id");
-                Long userId = userIdHeader != null ? Long.parseLong(userIdHeader) : 1L;
+                // Session Attributes에서 userId 추출 (WebSocketEventListener에서 저장됨)
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                if (userId == null) {
+                        // 세션에 userId가 없으면 비정상 접근 (혹은 재연결 필요)
+                        log.warn("Study Enter Failed: userId not found in session attributes.");
+                        return;
+                }
 
                 Long studyId = request.getStudyId();
 
@@ -37,10 +50,12 @@ public class StudySocketController {
                                 com.peekle.domain.study.entity.StudyRoom.builder().id(studyId).build(), userId);
 
                 if (!isMember) {
-                        // 멤버가 아니면 진행하지 않음.
-                        // TODO: 에러 메시지를 클라이언트에게 전송할 수 있으면 좋음 (Errors Queue)
-                        // 현재는 단순히 무시하거나 로그 남김
-                        // log.warn("Unauthorized enter attempt: User {} to Study {}", userId, studyId);
+                        log.warn("Unauthorized OpenVidu access attempt: User {} is not a member of Study {}", userId,
+                                        studyId);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR",
+                                                        "Access Denied: You are not a member of this study."));
                         return;
                 }
 
@@ -50,7 +65,31 @@ public class StudySocketController {
 
                 // 1. Redis Presence: Online User 추가
                 redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
-                // 2. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Online 처리)
+
+                // 2. OpenVidu 토큰 발급 및 전송 (Private)
+                try {
+                        log.info("Try OpenVidu: study_{}, user_{}", studyId, userId);
+                        String sessionId = "study_" + studyId;
+                        mediaService.getOrCreateSession(sessionId);
+
+                        Map<String, Object> userData = new HashMap<>();
+                        userData.put("userId", userId);
+
+                        String token = mediaService.createConnection(sessionId, userData);
+                        log.info("Token Success: {}", token);
+
+                        // 해당 유저에게만 토큰 전송 (구독 경로: /topic/studies/{studyId}/video-token/{userId})
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("VIDEO_TOKEN", token));
+                } catch (Exception e) {
+                        log.error("OpenVidu Fail", e);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "OV Error: " + e.getMessage()));
+                }
+
+                // 3. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Online 처리)
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + studyId),
                                 SocketResponse.of("ENTER", userId));
