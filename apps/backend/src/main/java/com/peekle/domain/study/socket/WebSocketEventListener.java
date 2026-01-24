@@ -24,15 +24,40 @@ public class WebSocketEventListener {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = headerAccessor.getSessionId();
 
-        // Native Headers from CONNECT frame
+        // Native Headers 확인 (디버깅)
+        // GenericMessage의 headers에 nativeHeaders가 들어있음.
+        log.info("Headers: {}", headerAccessor.getMessageHeaders());
+
+        // 1. Prepare to access nested CONNECT message if needed
+        StompHeaderAccessor connectAccessor = null;
+        Object connectMessageObj = headerAccessor.getHeader("simpConnectMessage");
+        if (connectMessageObj instanceof org.springframework.messaging.Message) {
+            connectAccessor = StompHeaderAccessor.wrap((org.springframework.messaging.Message<?>) connectMessageObj);
+        }
+
+        // 2. Try to get User ID
         String userIdStr = headerAccessor.getFirstNativeHeader("X-User-Id");
+        if (userIdStr == null && connectAccessor != null) {
+            userIdStr = connectAccessor.getFirstNativeHeader("X-User-Id");
+        }
+
         Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
 
         if (userId != null) {
             log.info("Received a new web socket connection. Session ID: {}, User ID: {}", sessionId, userId);
             redisTemplate.opsForValue().set("user:" + userId + ":session", sessionId);
-            // Session Attribute에 미리 저장 (Disconnect 시 사용)
-            headerAccessor.getSessionAttributes().put("userId", userId);
+
+            // 3. Fix NPE: Get mutable session attributes from whichever accessor has them
+            java.util.Map<String, Object> attributes = headerAccessor.getSessionAttributes();
+            if (attributes == null && connectAccessor != null) {
+                attributes = connectAccessor.getSessionAttributes();
+            }
+
+            if (attributes != null) {
+                attributes.put("userId", userId);
+            } else {
+                log.warn("Failed to set userId in session attributes: Map is null");
+            }
         } else {
             log.info("Received a new web socket connection. Session ID: {} (Anonymous)", sessionId);
         }
