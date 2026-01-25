@@ -3,9 +3,7 @@
 import { useStudyHeader } from '@/domains/study/hooks/useStudyHeader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, Plus, Copy, Settings } from 'lucide-react';
-import { CCCalendarWidget } from '@/domains/study/components/CCCalendarWidget';
-import { isSameDay } from 'date-fns';
+import { ArrowLeft, Copy, Settings } from 'lucide-react';
 
 interface CCStudyHeaderProps {
   onBack?: () => void;
@@ -19,13 +17,10 @@ interface CCStudyHeaderProps {
 
 export function CCStudyHeader({
   onBack,
-  onAddProblem,
   onInvite,
   onSettings,
   className,
-  selectedDate,
-  onDateChange,
-}: CCStudyHeaderProps) {
+}: CCStudyHeaderProps): React.ReactElement {
   const { roomTitle, whiteboardMessage, isWhiteboardActive, isOwner } = useStudyHeader();
 
   return (
