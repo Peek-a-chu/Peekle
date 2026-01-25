@@ -17,13 +17,14 @@ export interface Participant {
 export interface TargetSubmission {
   id: number;
   problemTitle: string;
+  username: string;
   language: string;
   memory: number;
   executionTime: number;
   code: string;
 }
 
-interface RoomState {
+export interface RoomState {
   // Room info
   roomId: number | null;
   roomTitle: string;
@@ -31,61 +32,57 @@ interface RoomState {
   inviteCode: string;
   currentDate: string;
 
+  // View state
+  viewMode: ViewMode;
+  targetSubmission: TargetSubmission | null; // For SPLIT_SAVED mode
+  viewingUser: Participant | null; // For SPLIT_REALTIME mode
+
   // Participants
   participants: Participant[];
-  currentUserId: number | null;
+  currentUserId: number | null; // My ID
 
-  // View mode
-  viewMode: ViewMode;
-  viewingUser: Participant | null;
-  targetSubmission: TargetSubmission | null;
-
-  // Whiteboard
-  isWhiteboardActive: boolean;
-  whiteboardOpenedBy: Participant | null;
-  whiteboardMessage: string;
-
-  // UI state
-  isSettingsOpen: boolean;
+  // Modals
   isInviteModalOpen: boolean;
-  rightPanelActiveTab: 'chat' | 'participants';
+  isSettingsOpen: boolean;
+
+  // Layout State (migrated from other stores/components)
+  rightPanelActiveTab: string;
+  isWhiteboardActive: boolean;
+  whiteboardOpenedBy: string | null;
+  whiteboardMessage: string | null;
 }
 
-interface RoomActions {
-  // Room actions
-  setRoomInfo: (info: {
-    roomId: number;
-    roomTitle: string;
-    roomDescription: string;
-    inviteCode: string;
-  }) => void;
+export interface RoomActions {
+  // Room info actions
+  setRoomInfo: (
+    info: Partial<Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode'>>,
+  ) => void;
   setCurrentDate: (date: string) => void;
+
+  // View state actions
+  setViewMode: (mode: ViewMode) => void;
+  setTargetSubmission: (submission: TargetSubmission | null) => void;
+  viewRealtimeCode: (user: Participant) => void;
+  resetToOnlyMine: () => void;
 
   // Participant actions
   setParticipants: (participants: Participant[]) => void;
+  updateParticipant: (id: number, updates: Partial<Participant>) => void;
   addParticipant: (participant: Participant) => void;
-  removeParticipant: (participantId: number) => void;
-  updateParticipant: (participantId: number, updates: Partial<Participant>) => void;
-  setCurrentUserId: (userId: number) => void;
+  removeParticipant: (id: number) => void;
+  setCurrentUserId: (id: number) => void;
 
-  // View mode actions
-  setViewMode: (mode: ViewMode) => void;
-  setViewingUser: (user: Participant | null) => void;
-  setTargetSubmission: (submission: TargetSubmission | null) => void;
-  viewRealtimeCode: (user: Participant) => void;
-  viewSavedCode: (user: Participant, submission: TargetSubmission) => void;
-  resetToOnlyMine: () => void;
+  // Modal actions
+  setInviteModalOpen: (isOpen: boolean) => void;
+  setSettingsOpen: (isOpen: boolean) => void;
 
-  // Whiteboard actions
-  openWhiteboard: (user: Participant, message: string) => void;
-  closeWhiteboard: () => void;
+  // Layout Actions
+  setRightPanelActiveTab: (tab: string) => void;
+  setIsWhiteboardActive: (isActive: boolean) => void;
+  setWhiteboardOpenedBy: (user: string | null) => void;
+  setWhiteboardMessage: (message: string | null) => void;
 
-  // UI actions
-  setSettingsOpen: (open: boolean) => void;
-  setInviteModalOpen: (open: boolean) => void;
-  setRightPanelActiveTab: (tab: 'chat' | 'participants') => void;
-
-  // Reset
+  // Test helper
   reset: () => void;
 }
 
@@ -95,129 +92,80 @@ const initialState: RoomState = {
   roomDescription: '',
   inviteCode: '',
   currentDate: '',
+
+  viewMode: 'ONLY_MINE',
+  targetSubmission: null,
+  viewingUser: null,
+
   participants: [],
   currentUserId: null,
-  viewMode: 'ONLY_MINE',
-  viewingUser: null,
-  targetSubmission: null,
+
+  isInviteModalOpen: false,
+  isSettingsOpen: false,
+
+  rightPanelActiveTab: 'chat',
   isWhiteboardActive: false,
   whiteboardOpenedBy: null,
-  whiteboardMessage: '',
-  isSettingsOpen: false,
-  isInviteModalOpen: false,
-  rightPanelActiveTab: 'chat',
+  whiteboardMessage: null,
 };
 
 export const useRoomStore = create<RoomState & RoomActions>((set) => ({
   ...initialState,
 
-  setRoomInfo: (info) =>
-    set({
-      roomId: info.roomId,
-      roomTitle: info.roomTitle,
-      roomDescription: info.roomDescription,
-      inviteCode: info.inviteCode,
-    }),
-
+  // Actions
+  setRoomInfo: (info) => set((state) => ({ ...state, ...info })),
   setCurrentDate: (date) => set({ currentDate: date }),
 
-  setParticipants: (participants) => set({ participants }),
-
-  addParticipant: (participant) =>
-    set((state) => ({
-      participants: [...state.participants, participant],
-    })),
-
-  removeParticipant: (participantId) =>
-    set((state) => ({
-      participants: state.participants.filter((p) => p.id !== participantId),
-    })),
-
-  updateParticipant: (participantId, updates) =>
-    set((state) => ({
-      participants: state.participants.map((p) =>
-        p.id === participantId ? { ...p, ...updates } : p,
-      ),
-    })),
-
-  setCurrentUserId: (userId) => set({ currentUserId: userId }),
-
   setViewMode: (mode) => set({ viewMode: mode }),
-
-  setViewingUser: (user) => set({ viewingUser: user }),
-
   setTargetSubmission: (submission) => set({ targetSubmission: submission }),
+  viewRealtimeCode: (user) => set({ viewMode: 'SPLIT_REALTIME', viewingUser: user }),
+  resetToOnlyMine: () => set({ viewMode: 'ONLY_MINE', viewingUser: null, targetSubmission: null }),
 
-  viewRealtimeCode: (user) =>
-    set({
-      viewMode: 'SPLIT_REALTIME',
-      viewingUser: user,
-      targetSubmission: null,
-    }),
+  setParticipants: (participants) => set({ participants }),
+  updateParticipant: (id, updates) =>
+    set((state) => ({
+      participants: state.participants.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+    })),
+  addParticipant: (participant) =>
+    set((state) => ({ participants: [...state.participants, participant] })),
+  removeParticipant: (id) =>
+    set((state) => ({
+      participants: state.participants.filter((p) => p.id !== id),
+    })),
+  setCurrentUserId: (id) => set({ currentUserId: id }),
 
-  viewSavedCode: (user, submission) =>
-    set({
-      viewMode: 'SPLIT_SAVED',
-      viewingUser: user,
-      targetSubmission: submission,
-    }),
-
-  resetToOnlyMine: () =>
-    set({
-      viewMode: 'ONLY_MINE',
-      viewingUser: null,
-      targetSubmission: null,
-    }),
-
-  openWhiteboard: (user, message) =>
-    set({
-      isWhiteboardActive: true,
-      whiteboardOpenedBy: user,
-      whiteboardMessage: message,
-    }),
-
-  closeWhiteboard: () =>
-    set({
-      isWhiteboardActive: false,
-      whiteboardOpenedBy: null,
-      whiteboardMessage: '',
-    }),
-
-  setSettingsOpen: (open) => set({ isSettingsOpen: open }),
-
-  setInviteModalOpen: (open) => set({ isInviteModalOpen: open }),
+  setInviteModalOpen: (isOpen) => set({ isInviteModalOpen: isOpen }),
+  setSettingsOpen: (isOpen) => set({ isSettingsOpen: isOpen }),
 
   setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
+  setIsWhiteboardActive: (isActive) => set({ isWhiteboardActive: isActive }),
+  setWhiteboardOpenedBy: (user) => set({ whiteboardOpenedBy: user }),
+  setWhiteboardMessage: (message) => set({ whiteboardMessage: message }),
 
   reset: () => set(initialState),
 }));
 
 // Selectors
-export const selectSortedParticipants = (state: RoomState & RoomActions) => {
-  const { participants, currentUserId } = state;
+export const selectSortedParticipants = (state: RoomState) => {
+  return [...state.participants].sort((a, b) => {
+    // Owner first
+    if (a.isOwner) return -1;
+    if (b.isOwner) return 1;
 
-  // Self first, then sort by Active Speaker (lastSpeakingAt desc)
-  return [...participants].sort((a, b) => {
-    // Self always first
-    if (a.id === currentUserId) return -1;
-    if (b.id === currentUserId) return 1;
+    // Then online
+    if (a.isOnline && !b.isOnline) return -1;
+    if (!a.isOnline && b.isOnline) return 1;
 
-    // Then by lastSpeakingAt (most recent first)
-    const aTime = a.lastSpeakingAt ?? 0;
-    const bTime = b.lastSpeakingAt ?? 0;
-    return bTime - aTime;
+    // Alphabetical
+    return a.nickname.localeCompare(b.nickname);
   });
 };
 
-export const selectCurrentUser = (state: RoomState & RoomActions) => {
-  return state.participants.find((p) => p.id === state.currentUserId) ?? null;
-};
+export const selectOnlineCount = (state: RoomState) =>
+  state.participants.filter((p) => p.isOnline).length;
 
-export const selectIsOwner = (state: RoomState & RoomActions) => {
-  const currentUser = selectCurrentUser(state);
-  return currentUser?.isOwner ?? false;
-};
-
-export const selectOnlineCount = (state: RoomState & RoomActions) => {
-  return state.participants.filter((p) => p.isOnline).length;
+export const selectIsOwner = (state: RoomState) => {
+  if (!state.currentUserId) return false;
+  const me = state.participants.find((p) => p.id === state.currentUserId);
+  return me?.isOwner || false;
 };

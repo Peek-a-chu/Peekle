@@ -3,13 +3,14 @@
 import { useStudyHeader } from '@/domains/study/hooks/useStudyHeader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, Plus, Copy, Settings } from 'lucide-react';
-import { CCCalendarWidget } from '@/domains/study/components/CCCalendarWidget';
-import { isSameDay } from 'date-fns';
+import { ArrowLeft, Copy, Settings } from 'lucide-react';
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { CCInviteModal } from './CCInviteModal';
+import { CCStudySettingsModal } from './CCStudySettingsModal';
 
 interface CCStudyHeaderProps {
   onBack?: () => void;
-  onAddProblem?: () => void;
+  onAddProblem?: (title: string, number: number, tags?: string[]) => Promise<void>;
   onInvite?: () => void;
   onSettings?: () => void;
   className?: string;
@@ -19,14 +20,16 @@ interface CCStudyHeaderProps {
 
 export function CCStudyHeader({
   onBack,
-  onAddProblem,
   onInvite,
   onSettings,
   className,
-  selectedDate,
-  onDateChange,
-}: CCStudyHeaderProps) {
+}: CCStudyHeaderProps): React.ReactElement {
   const { roomTitle, whiteboardMessage, isWhiteboardActive, isOwner } = useStudyHeader();
+
+  const isInviteModalOpen = useRoomStore((state) => state.isInviteModalOpen);
+  const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
+  const isSettingsOpen = useRoomStore((state) => state.isSettingsOpen);
+  const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
 
   return (
     <div className={cn('flex h-14 items-center justify-between px-4', className)}>
@@ -62,6 +65,10 @@ export function CCStudyHeader({
           </Button>
         )}
       </div>
+
+      {/* Modals */}
+      <CCInviteModal isOpen={isInviteModalOpen} onClose={() => setInviteModalOpen(false)} />
+      <CCStudySettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

@@ -62,8 +62,8 @@
 *   **Private:**
     *   `/home` (대시보드)
     *   `/study`, `/study/[id]` (스터디)
-    *   `/games`, `/games/new`, `/games/[id]` (게임)
-    *   `/workbooks`, `/workbooks/new`, `/workbooks/[id]` (문제집)
+    *   `/game`, `/game/new`, `/game/[id]` (게임)
+    *   `/workbook`, `/workbook/new`, `/workbook/[id]` (문제집)
     *   `/profile/[id]`, `/profile/[id]/history` (프로필/히스토리)
     *   `/ranking`, `/league`, `/search`
 
@@ -74,7 +74,7 @@
     *   **네비게이션 메뉴:** 메뉴별 아이콘과 텍스트.
     *   **하단 설정 버튼:** 클릭 시 **전역 설정 모달** 호출.
 *   **레이아웃 예외:**
-    *   `/study/[id]`, `/games/[id]` 진입 시 **LNB 제거**.
+    *   `/study/[id]`, `/game/[id]` 진입 시 **LNB 제거**.
     *   대신 화면 좌측 상단에 `[< 뒤로 가기]` 버튼 배치하여 작업 공간 확보.
 
 ### 3.3 전역 모달 정책
@@ -144,8 +144,8 @@
         *   **제출 프로세스:** 클립보드 복사 -> BOJ 탭 오픈.
     3.  **Communication Area:** 채팅, 참여자 관리.
 
-#### [Epic-05] 문제집 및 검색 (`/workbooks`, `/search`)
-1.  **문제집 (`/workbooks`):**
+#### [Epic-05] 문제집 및 검색 (`/workbook`, `/search`)
+1.  **문제집 (`/workbook`):**
     *   생성/편집: 문제 드래그 앤 드롭 순서 변경.
     *   상세: 진행률(%) 표시 및 문제 풀러 가기 (`UserWorkbookProgress` 참조).
 2.  **통합 검색 (`/search`):**
@@ -157,7 +157,7 @@
 ### 4.3 Team Game (Competition & Real-time Domain)
 > **책임 범위:** 긴장감 있는 경쟁 환경, 게임 룰 엔진, 실시간 상태 동기화.
 
-#### [Epic-04] 경쟁 게임 시스템 (`/games`)
+#### [Epic-04] 경쟁 게임 시스템 (`/game`)
 > **Target:** 이경쟁에게 아드레날린과 즉각적인 보상 제공.
 1.  **게임 로비:**
     *   **필터:** 개인전(Red) / 팀전(Blue) 무드 전환.
@@ -167,7 +167,7 @@
 2.  **방 만들기:**
     *   설정 슬라이더(인원/시간/문제수).
     *   **문제 소스:** 랜덤(티어 범위) 또는 문제집 기반(Team Study Search Module 사용).
-3.  **게임 룸 (`/games/[id]`):**
+3.  **게임 룸 (`/game/[id]`):**
     *   **대기 상태:**
         *   Ready / Start 버튼.
         *   **팀 배정 (팀전):** 유저가 직접 팀 슬롯(Red/Blue)을 선택하여 참여한다 (**User Self-Selection**).
