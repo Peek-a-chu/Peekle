@@ -16,7 +16,7 @@ public class PeekleBackendApplication {
     public static void main(String[] args) {
         // Load .env file (Try current directory first, then assumes running from root
         // -> apps/backend)
-        String[] searchPaths = { "./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend" };
+        String[] searchPaths = { ".", "./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend" };
         boolean loaded = false;
 
         for (String path : searchPaths) {
