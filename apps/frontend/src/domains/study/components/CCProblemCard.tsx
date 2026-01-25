@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, getBojTierName, getBojTierColorClass } from '@/lib/utils';
 import { ExternalLink, Users, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { Problem } from '@/domains/study/types';
 import { Button } from '@/components/ui/button';
@@ -80,24 +80,32 @@ export function CCProblemCard({
             )}
           </div>
         </div>
-        
-        {/* Tags Row - Always Visible */}
-        {problem.tags && problem.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {problem.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
+
+        {/* Tier & Tags Row - Shown only when showHint is true */}
+        {showHint && (
+          <div className="flex flex-col gap-1.5 mt-0.5">
+            {problem.tier !== undefined && (
+              <div className="flex items-center gap-1">
+                <span className={cn('text-[10px] font-bold', getBojTierColorClass(problem.tier))}>
+                  {getBojTierName(problem.tier)}
+                </span>
+              </div>
+            )}
+            {problem.tags && problem.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {problem.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Hint Area (Extra Info if needed, currently reusing tags logic which is now moved up, so we can remove or keep for hint specific stuff) */}
-      {/* {showHint && ... } - Removed old tag display from here since it's moved up */}
 
       {/* Action Row */}
       <div className="flex items-center justify-between mt-2">
