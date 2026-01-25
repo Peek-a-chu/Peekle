@@ -2,11 +2,15 @@ package com.peekle.domain.study.entity;
 
 import com.peekle.domain.user.entity.User;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor
 @Entity
 @Table(name = "study_chat_logs")
@@ -31,8 +35,9 @@ public class StudyChatLog {
     @Column(nullable = false)
     private ChatType type;
 
-    @Column(name = "ref_submission_id")
-    private Long refSubmissionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private StudyChatLog parent;
 
     @Column(columnDefinition = "TEXT")
     private String metadata; // JSON stores as String
@@ -47,6 +52,7 @@ public class StudyChatLog {
 
     public enum ChatType {
         TALK,
+        CODE,
         SYSTEM
     }
 }

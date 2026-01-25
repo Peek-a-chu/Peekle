@@ -45,10 +45,7 @@ export function CCControlBar({
         <Button
           variant={isMuted ? 'destructive' : 'ghost'}
           size="icon"
-          className={cn(
-            'h-12 w-12 rounded-full',
-            !isMuted && 'bg-[#EDF2F8] hover:bg-[#DFE7F0]',
-          )}
+          className={cn('h-12 w-12 rounded-full', !isMuted && 'bg-[#EDF2F8] hover:bg-[#DFE7F0]')}
           onClick={handleMicToggle}
           aria-label={isMuted ? '마이크 켜기' : '마이크 끄기'}
         >
@@ -58,10 +55,7 @@ export function CCControlBar({
         <Button
           variant={isVideoOff ? 'destructive' : 'ghost'}
           size="icon"
-          className={cn(
-            'h-12 w-12 rounded-full',
-            !isVideoOff && 'bg-[#EDF2F8] hover:bg-[#DFE7F0]',
-          )}
+          className={cn('h-12 w-12 rounded-full', !isVideoOff && 'bg-[#EDF2F8] hover:bg-[#DFE7F0]')}
           onClick={handleVideoToggle}
           aria-label={isVideoOff ? '비디오 켜기' : '비디오 끄기'}
         >

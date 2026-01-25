@@ -10,16 +10,9 @@ interface BaseProps {
   className?: string;
 }
 
-export function StudyLayoutCenter({
-  children,
-  className,
-}: { children: ReactNode } & BaseProps) {
-  const {
-    isLeftPanelFolded,
-    isRightPanelFolded,
-    unfoldLeftPanel,
-    unfoldRightPanel,
-  } = useStudyStore();
+export function StudyLayoutCenter({ children, className }: { children: ReactNode } & BaseProps) {
+  const { isLeftPanelFolded, isRightPanelFolded, unfoldLeftPanel, unfoldRightPanel } =
+    useStudyStore();
 
   return (
     <main

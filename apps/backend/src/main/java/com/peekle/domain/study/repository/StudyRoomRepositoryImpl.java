@@ -28,7 +28,8 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
                 // .leftJoin(studyRoom.owner, user).fetchJoin() // User 엔티티 제거로 인한 조인 불필요
                 .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
-                        studyMember.userId.eq(userId), // 내가 참여한 스터디만 필터링
+                        studyMember.user.id.eq(userId), // 내가 참여한 스터디만 필터링
+                        studyRoom.isActive.isTrue(), // 활성화된 스터디만
                         containsKeyword(keyword))
                 .orderBy(studyRoom.createdAt.desc())
                 .offset(pageable.getOffset())
@@ -42,7 +43,8 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
                 .from(studyRoom)
                 .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
-                        studyMember.userId.eq(userId),
+                        studyMember.user.id.eq(userId),
+                        studyRoom.isActive.isTrue(), // 활성화된 스터디만
                         containsKeyword(keyword));
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);

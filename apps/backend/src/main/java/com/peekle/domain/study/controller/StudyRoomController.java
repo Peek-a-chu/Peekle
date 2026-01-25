@@ -1,12 +1,14 @@
 package com.peekle.domain.study.controller;
 
-import com.peekle.domain.study.dto.request.StudyRoomCreateRequest;
-import com.peekle.domain.study.dto.request.StudyRoomJoinRequest;
-import com.peekle.domain.study.dto.response.StudyInviteCodeResponse;
-import com.peekle.domain.study.dto.response.StudyRoomCreateResponse;
-import com.peekle.domain.study.dto.response.StudyRoomListResponse;
-import com.peekle.domain.study.dto.response.StudyRoomResponse;
+import com.peekle.domain.study.dto.http.request.StudyRoomCreateRequest;
+import com.peekle.domain.study.dto.http.request.StudyRoomJoinRequest;
+import com.peekle.domain.study.dto.http.response.StudyInviteCodeResponse;
+import com.peekle.domain.study.dto.http.response.StudyRoomCreateResponse;
+import com.peekle.domain.study.dto.http.response.StudyRoomListResponse;
+import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
 import com.peekle.domain.study.service.StudyRoomService;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,8 +29,9 @@ public class StudyRoomController {
     @PostMapping
     public ApiResponse<StudyRoomCreateResponse> createStudyRoom(
             @RequestBody StudyRoomCreateRequest request,
-            Principal principal) {
-        Long userId = 1L; // Test User ID
+            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+        // userId from header or default 1
+
         StudyRoomCreateResponse response = studyRoomService.createStudyRoom(userId, request);
         return ApiResponse.success(response);
     }
@@ -37,9 +40,25 @@ public class StudyRoomController {
     @PostMapping("/join")
     public ApiResponse<StudyRoomResponse> joinStudyRoom(
             @RequestBody StudyRoomJoinRequest request,
-            Principal principal) {
-        Long userId = 1L; // Test User ID
+            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+
         StudyRoomResponse response = studyRoomService.joinStudyRoom(userId, request);
+        return ApiResponse.success(response);
+    }
+
+    // 스터디 문제 제출 (가상의 submitStudyProblem 메서드 추가)
+    // 이 메서드는 요청에 따라 새로 추가된 것으로 가정합니다.
+    @PostMapping("/{studyId}/submit")
+    public ApiResponse<SubmissionResponse> submitStudyProblem(
+            @PathVariable Long studyId,
+            @RequestBody SubmissionRequest request, // Assuming SubmissionRequest DTO exists
+            Principal principal) {
+        System.out.println("[DEBUG] Received Study Specific Submission for Study: " + studyId);
+        System.out.println("[DEBUG] Request: " + request);
+
+        // Assuming studyRoomService has a submitStudyProblem method
+        // And SubmissionResponse DTO exists
+        SubmissionResponse response = studyRoomService.submitStudyProblem(studyId, request);
         return ApiResponse.success(response);
     }
 
@@ -48,8 +67,8 @@ public class StudyRoomController {
     public ApiResponse<Page<StudyRoomListResponse>> getMyStudyRooms(
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 6) Pageable pageable,
-            Principal principal) {
-        Long userId = 1L; // Test User ID
+            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+
         Page<StudyRoomListResponse> response = studyRoomService.getMyStudyRooms(userId, keyword, pageable);
         return ApiResponse.success(response);
     }
@@ -58,8 +77,8 @@ public class StudyRoomController {
     @GetMapping("/{studyId}")
     public ApiResponse<StudyRoomResponse> getStudyRoom(
             @PathVariable Long studyId,
-            Principal principal) {
-        Long userId = 1L; // Test User ID
+            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+
         StudyRoomResponse response = studyRoomService.getStudyRoom(userId, studyId);
         return ApiResponse.success(response);
     }
@@ -68,9 +87,10 @@ public class StudyRoomController {
     @PostMapping("/{studyId}/invite")
     public ApiResponse<StudyInviteCodeResponse> generateInviteCode(
             @PathVariable Long studyId,
-            Principal principal) {
-        Long userId = 1L; // Test User ID
+            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+
         StudyInviteCodeResponse response = studyRoomService.createInviteCode(userId, studyId);
         return ApiResponse.success(response);
     }
+
 }

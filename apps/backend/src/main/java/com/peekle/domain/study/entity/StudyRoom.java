@@ -26,8 +26,9 @@ public class StudyRoom {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "owner_id", nullable = false)
-    private Long ownerId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", nullable = false)
+    private User owner;
 
     @Builder.Default
     @Column(name = "is_active", nullable = false)
@@ -42,5 +43,16 @@ public class StudyRoom {
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    public void update(String title, String description) {
+        if (title != null)
+            this.title = title;
+        if (description != null)
+            this.description = description;
+    }
+
+    public void deactivate() {
+        this.isActive = false;
     }
 }

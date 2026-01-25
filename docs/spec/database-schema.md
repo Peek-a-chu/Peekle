@@ -167,6 +167,8 @@ erDiagram
 | `id` | BIGINT | PK | 사용자 ID |
 | `nickname` | VARCHAR(50) | NIX | 표시용 닉네임 |
 | `boj_id` | VARCHAR(50) | NULL | 확장프로그램 연동용 외부 ID |
+| `extension_token` | VARCHAR(100) | UQ | 확장프로그램 연동용 토큰 (UUID) |
+| `extension_token_updated_at` | DATETIME | | 토큰 발급/갱신 일시 |
 | `league` | VARCHAR(20) | | 현재 리그 (예: SILVER) |
 | `league_point` | INT | Default 0 | 이번 주 획득 리그 포인트 |
 | `league_group_id` | BIGINT | FK -> league_groups.id | 이번 주 배정된 리그 그룹 ID |

@@ -11,7 +11,8 @@
     "host_permissions": [
         "https://www.acmicpc.net/*",
         "https://solved.ac/*",
-        "http://localhost:8080/*"
+        "http://localhost:8080/*",
+        "http://localhost:3000/*"
     ],
     "background": {
         "service_worker": "background.js"
@@ -32,7 +33,8 @@
     "content_scripts": [
         {
             "matches": [
-                "https://www.acmicpc.net/*"
+                "https://www.acmicpc.net/*",
+                "http://localhost:3000/*"
             ],
             "js": [
                 "content.js"
@@ -43,7 +45,8 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "icons/cute.svg"
+                "icons/cute.svg",
+                "inject_script.js"
             ],
             "matches": [
                 "https://www.acmicpc.net/*"

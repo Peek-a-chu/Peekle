@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { useRoomStore, selectOnlineCount } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, Send } from 'lucide-react';
-
-type TabType = 'chat' | 'participants';
 
 interface CCRightPanelProps {
   chatContent?: ReactNode;

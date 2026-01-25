@@ -19,6 +19,8 @@ import com.peekle.domain.league.service.LeagueService;
 import com.peekle.global.util.SolvedAcLevelUtil;
 
 import com.peekle.domain.submission.dto.SubmissionResponse;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -33,14 +35,21 @@ public class SubmissionService {
     @Transactional
     public SubmissionResponse saveGeneralSubmission(SubmissionRequest request) {
 
-        // 1. 임시 유저 조회 (동시성 이슈 방어)
+        // 1. 유저 조회 (토큰 기반)
         User user;
-        try {
-            user = userRepository.findByNickname("test_user")
-                    .orElseGet(() -> userRepository.save(createTempUser()));
-        } catch (Exception e) {
-            user = userRepository.findByNickname("test_user")
-                    .orElseThrow(() -> new RuntimeException("User not found after creation failure"));
+        String token = request.getExtensionToken();
+
+        if (token != null && !token.isEmpty()) {
+            user = userRepository.findByExtensionToken(token)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+        } else {
+            // Fallback for mock/test (or throw exception properly in production)
+            try {
+                user = userRepository.findByNickname("test_user")
+                        .orElseGet(() -> userRepository.save(createTempUser()));
+            } catch (Exception e) {
+                throw new BusinessException(ErrorCode.USER_VERIFICATION_FAILED);
+            }
         }
 
         // 0. 검증 (Extension 변조 방지)
@@ -48,12 +57,11 @@ public class SubmissionService {
         if (user.getBojId() != null && !user.getBojId().isEmpty()) {
             try {
                 submissionValidator.validateSubmission(
-                    String.valueOf(request.getProblemId()), 
-                    user.getBojId(), 
-                    request.getSubmitId(), 
-                    request.getCode()
-                );
-            } catch (IllegalArgumentException e) {
+                        String.valueOf(request.getProblemId()),
+                        user.getBojId(),
+                        request.getSubmitId(),
+                        request.getCode());
+            } catch (BusinessException e) {
                 // 검증 실패 시: 저장하지 않고 실패 응답 반환
                 System.out.println("❌ Submission Validation Failed: " + e.getMessage());
                 return SubmissionResponse.builder()
@@ -61,14 +69,14 @@ public class SubmissionService {
                         .message("검증 실패: " + e.getMessage())
                         .build();
             } catch (Exception e) {
-                 System.out.println("❌ Submission Validation Error: " + e.getMessage());
-                 return SubmissionResponse.builder()
+                System.out.println("❌ Submission Validation Error: " + e.getMessage());
+                return SubmissionResponse.builder()
                         .success(false)
                         .message("검증 중 오류 발생: " + e.getMessage())
                         .build();
             }
         } else {
-             System.out.println("⚠️ Skip Validation: User has no BOJ ID linked.");
+            System.out.println("⚠️ Skip Validation: User has no BOJ ID linked.");
         }
 
         // 2. 문제 조회
@@ -85,30 +93,38 @@ public class SubmissionService {
 
                     Problem newProblem = new Problem(
                             "BOJ", externalId, request.getProblemTitle(),
-                            tierStr, "https://www.acmicpc.net/problem/" + externalId
-                    );
+                            tierStr, "https://www.acmicpc.net/problem/" + externalId);
                     return problemRepository.save(newProblem);
                 });
 
         // 4. SubmissionLog 저장
         LocalDateTime submittedAt = parseDateTime(request.getSubmittedAt());
 
+        SourceType sourceType = SourceType.EXTENSION;
+        if (request.getSourceType() != null) {
+            try {
+                sourceType = SourceType.valueOf(request.getSourceType().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                sourceType = SourceType.EXTENSION;
+            }
+        }
 
         SubmissionLog log = SubmissionLog.create(
-                user, problem, SourceType.EXTENSION,
+                user, problem, sourceType,
                 request.getCode(),
                 request.getMemory(), request.getExecutionTime(),
-                request.getLanguage(), submittedAt
-        );
+                request.getLanguage(), submittedAt);
+
+        log.setRoomId(request.getRoomId());
 
         submissionLogRepository.save(log);
-        
+
         // 5. 리그 포인트 & 랭킹 계산
         int earnedPoints = leagueService.updateLeaguePointForSolvedProblem(user, problem);
         int currentRank = leagueService.getUserRank(user);
-        
+
         System.out.println("✅ Submission saved! ID: " + log.getId());
-        
+
         return SubmissionResponse.builder()
                 .success(true)
                 .submissionId(log.getId())
@@ -126,7 +142,8 @@ public class SubmissionService {
     }
 
     private LocalDateTime parseDateTime(String isoString) {
-        if (isoString == null) return LocalDateTime.now();
+        if (isoString == null)
+            return LocalDateTime.now();
         try {
             return LocalDateTime.parse(isoString, DateTimeFormatter.ISO_DATE_TIME);
         } catch (Exception e) {

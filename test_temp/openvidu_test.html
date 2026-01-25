@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peekle Spec OpenVidu Test</title>
+    <!-- OpenVidu Browser -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/openvidu-browser@2.30.0/static/js/openvidu-browser-2.30.0.min.js"></script>
+    <!-- SockJS & Stomp -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --primary-color: #6200ea;
+            --primary-hover: #3700b3;
+            --text-color: #ffffff;
+            --secondary-text: #b0b0b0;
+            --border-radius: 8px;
+            --error-color: #cf6679;
+            --success-color: #03dac6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-wrapper label {
+            font-size: 0.75rem;
+            color: var(--secondary-text);
+            font-weight: 500;
+        }
+
+        input {
+            background-color: #2c2c2c;
+            border: 1px solid #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            width: 120px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--primary-color);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            height: 36px;
+            /* Match input height */
+            align-self: flex-end;
+            /* Align with input */
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            background-color: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        button.danger {
+            background-color: #b00020;
+        }
+
+        button.danger:hover:not(:disabled) {
+            background-color: #7f0000;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            background-color: #333;
+            color: #aaa;
+        }
+
+        .status-badge.connected {
+            background-color: rgba(3, 218, 198, 0.2);
+            color: var(--success-color);
+        }
+
+        .status-badge.error {
+            background-color: rgba(207, 102, 121, 0.2);
+            color: var(--error-color);
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .video-grid {
+            flex: 1;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+            align-content: center;
+            justify-content: center;
+        }
+
+        .video-card {
+            background-color: #000;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 4/3;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+        }
+
+        .video-card video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            pointer-events: none;
+        }
+
+        .log-panel {
+            width: 300px;
+            background-color: var(--panel-bg);
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-header {
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            font-weight: bold;
+            color: var(--secondary-text);
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            word-break: break-all;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            border-bottom: 1px solid #2a2a2a;
+            padding-bottom: 4px;
+        }
+
+        .log-time {
+            color: #666;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="controls">
+            <h1>Peekle Video Test</h1>
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="userId">User ID (DB PK)</label>
+                    <input type="text" id="userId" placeholder="예: 1" value="1" />
+                </div>
+                <div class="input-wrapper">
+                    <label for="studyId">Study Room ID</label>
+                    <input type="text" id="studyId" placeholder="예: 99" value="99" />
+                </div>
+            </div>
+            <div class="input-wrapper" style="justify-content: flex-end;">
+                <span id="socketStatus" class="status-badge" style="height: fit-content; align-self: center;">Socket:
+                    Disconnected</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="btnConnect" onclick="connectSocket()">1. Connect Socket</button>
+            <button id="btnEnter" onclick="enterStudy()" disabled>2. Enter Room</button>
+            <button id="btnLeave" onclick="leaveSession()" disabled class="danger">Leave</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="video-grid" id="videoContainer">
+            <!-- Videos inject here -->
+        </div>
+
+        <div class="log-panel">
+            <div class="log-header">System Logs</div>
+            <div class="log-content" id="logBox"></div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let OV = null;
+        let session = null;
+        let myToken = null;
+
+        const userIdInput = document.getElementById('userId');
+        const studyIdInput = document.getElementById('studyId');
+        const btnConnect = document.getElementById('btnConnect');
+        const btnEnter = document.getElementById('btnEnter');
+        const btnLeave = document.getElementById('btnLeave');
+        const socketStatus = document.getElementById('socketStatus');
+
+        function log(msg) {
+            const logBox = document.getElementById('logBox');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+            console.log(msg);
+        }
+
+        function setStatus(kind, msg, type = 'normal') {
+            if (kind === 'socket') {
+                socketStatus.innerText = msg;
+                socketStatus.className = 'status-badge ' + type;
+            }
+        }
+
+        // 1. Connect WebSocket
+        function connectSocket() {
+            const socket = new SockJS('http://localhost:8080/ws-stomp');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+
+            const userId = userIdInput.value;
+
+            stompClient.connect({ 'X-User-Id': userId }, function (frame) {
+                log('Socket Connected');
+                setStatus('socket', 'Socket: Connected', 'connected');
+
+                btnConnect.disabled = true;
+                btnEnter.disabled = false;
+                userIdInput.disabled = true;
+                studyIdInput.disabled = true;
+
+                const studyId = studyIdInput.value;
+
+                // Subscribe to Private Token Channel
+                stompClient.subscribe(`/topic/studies/${studyId}/video-token/${userId}`, function (message) {
+                    const body = JSON.parse(message.body);
+                    if (body.type === 'VIDEO_TOKEN') {
+                        log('Received Token! Connecting to OpenVidu...');
+                        myToken = body.data;
+                        joinOpenViduSession(myToken);
+                    } else if (body.type === 'ERROR') {
+                        log('Error: ' + body.data);
+                        alert(body.data);
+                    }
+                });
+
+                // Subscribe to Public Room Events
+                stompClient.subscribe(`/topic/studies/rooms/${studyId}`, function (message) {
+                    const body = JSON.parse(message.body);
+                    log(`Room Event: [${body.type}] User ${JSON.stringify(body.data)}`);
+                });
+
+            }, function (error) {
+                log('Socket Error: ' + error);
+                setStatus('socket', 'Socket: Error', 'error');
+            });
+        }
+
+        // 2. Request Entry (Get Token)
+        function enterStudy() {
+            if (!stompClient) return;
+            const studyId = parseInt(studyIdInput.value);
+            log(`Requesting Enter (Study ${studyId})...`);
+            // IMPORTANT: Sending to /pub (ApplicationDestinationPrefixes)
+            stompClient.send("/pub/studies/enter", {}, JSON.stringify({ 'studyId': studyId }));
+        }
+
+        // 3. Connect to OpenVidu
+        function joinOpenViduSession(token) {
+            OV = new OpenVidu();
+            session = OV.initSession();
+
+            // Handle Remote Streams
+            session.on('streamCreated', event => {
+                log(`New Stream: ${event.stream.streamId}`);
+                const subscriber = session.subscribe(event.stream, undefined);
+                addVideo(subscriber);
+            });
+
+            session.on('streamDestroyed', event => {
+                log(`Stream Destroyed: ${event.stream.streamId}`);
+                removeVideo(event.stream.streamManager);
+            });
+
+            session.on('exception', (exception) => {
+                console.warn(exception);
+            });
+
+            // Connect
+            session.connect(token, { clientData: "User_" + userIdInput.value })
+                .then(() => {
+                    log('OpenVidu Session Live!');
+                    btnEnter.disabled = true;
+                    btnLeave.disabled = false;
+
+                    // Publish Local Stream
+                    let publisher = OV.initPublisher(undefined, {
+                        audioSource: undefined,
+                        videoSource: undefined,
+                        publishAudio: true,
+                        publishVideo: true,
+                        resolution: '640x480',
+                        frameRate: 30,
+                        insertMode: 'APPEND',
+                        mirror: true
+                    });
+
+                    // Handle Local Stream
+                    session.publish(publisher);
+                    addVideo(publisher);
+                })
+                .catch(error => {
+                    log('OpenVidu Connect Error: ' + error.message);
+                });
+        }
+
+        function leaveSession() {
+            if (session) session.disconnect();
+            if (stompClient) stompClient.disconnect();
+
+            setStatus('socket', 'Socket: Disconnected');
+            btnConnect.disabled = false;
+            btnEnter.disabled = true;
+            btnLeave.disabled = true;
+            userIdInput.disabled = false;
+            studyIdInput.disabled = false;
+
+            document.getElementById('videoContainer').innerHTML = '';
+            OV = null;
+            session = null;
+            log('Session Closed');
+        }
+
+        function addVideo(streamManager) {
+            const videoContainer = document.getElementById('videoContainer');
+
+            const videoCard = document.createElement('div');
+            videoCard.className = 'video-card';
+            videoCard.id = 'video-' + streamManager.stream.streamId;
+
+            // Create Video Element
+            const video = document.createElement('video');
+            video.autoplay = true;
+            video.playsInline = true;
+            video.controls = false; // Cleaner look without controls? Actually controls useful for debug.
+            // Let's keep controls hidden for cleaner look but enable if needed
+            // video.controls = true; 
+
+            // Auto Mute Local
+            if (streamManager.remote === false) {
+                video.muted = true;
+                log('Rendering Local Video (Muted)');
+            } else {
+                log('Rendering Remote Video');
+            }
+
+            videoCard.appendChild(video);
+            streamManager.addVideoElement(video);
+
+            // Label
+            const label = document.createElement('div');
+            label.className = 'user-label';
+            try {
+                const data = JSON.parse(streamManager.stream.connection.data);
+                label.innerText = data.clientData || "User";
+            } catch (e) {
+                label.innerText = streamManager.remote ? "Remote User" : "Me";
+            }
+            videoCard.appendChild(label);
+
+            videoContainer.appendChild(videoCard);
+        }
+
+        function removeVideo(streamManager) {
+            const element = document.getElementById('video-' + streamManager.stream.streamId);
+            if (element) {
+                element.remove();
+            }
+        }
+    </script>
+</body>
+
+</html>

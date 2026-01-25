@@ -18,5 +18,15 @@ _bmad-output
 .serena
 .vscode
 
+# Dependency Directories
+
+.turbo
+node_modules
+peekle.sqlite
 .idea
 apps/frontend/build.log
+
+.env
+
+test-chat
+test-ide
