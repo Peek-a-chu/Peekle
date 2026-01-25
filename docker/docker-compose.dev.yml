@@ -25,6 +25,9 @@ services:
     build:
       context: ../apps/frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://localhost/api
+        - NEXT_PUBLIC_SOCKET_URL=https://localhost
     container_name: peekle-frontend-dev
     environment:
       - NODE_ENV=development
