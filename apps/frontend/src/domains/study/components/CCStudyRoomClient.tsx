@@ -10,55 +10,8 @@ import { CCRightPanel as RightPanel } from './CCRightPanel';
 import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
-
-// Mock data for demo
-const MOCK_PARTICIPANTS = [
-  {
-    id: 1,
-    odUid: 'user1',
-    nickname: '알고마스터',
-    isOwner: true,
-    isMuted: false,
-    isVideoOff: false,
-    isOnline: true,
-    lastSpeakingAt: Date.now() - 1000,
-  },
-  {
-    id: 2,
-    odUid: 'user2',
-    nickname: 'CodeNinja',
-    isOwner: false,
-    isMuted: false,
-    isVideoOff: false,
-    isOnline: true,
-    lastSpeakingAt: Date.now() - 5000,
-  },
-  {
-    id: 3,
-    odUid: 'user3',
-    nickname: 'PS러버',
-    isOwner: false,
-    isMuted: true,
-    isVideoOff: false,
-    isOnline: true,
-    lastSpeakingAt: Date.now() - 10000,
-  },
-  {
-    id: 4,
-    odUid: 'user4',
-    nickname: '백준킹',
-    isOwner: false,
-    isMuted: true,
-    isVideoOff: true,
-    isOnline: false,
-  },
-];
-
-function formatDate(date: Date): string {
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return `${month}월 ${day}일`;
-}
+import { fetchStudyParticipants, fetchStudyRoom } from '@/app/api/studyApi';
+import { formatDate } from '@/lib/utils';
 
 export function CCStudyRoomClient() {
   const params = useParams();
@@ -84,14 +37,16 @@ export function CCStudyRoomClient() {
 
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
-    setRoomInfo({
-      roomId: Number(studyId),
-      roomTitle: '알고리즘 마스터 스터디',
-      roomDescription: '매주 월/수/금 알고리즘 문제를 함께 풀어요!',
-      inviteCode: 'ABC123',
-    });
+    fetchStudyRoom(studyId)
+      .then(setRoomInfo)
+      .catch((err) => console.error('Failed to fetch room info:', err));
+
     setCurrentDate(formatDate(new Date()));
-    setParticipants(MOCK_PARTICIPANTS);
+
+    fetchStudyParticipants(studyId)
+      .then(setParticipants)
+      .catch((err) => console.error('Failed to fetch participants:', err));
+
     setCurrentUserId(1);
   }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId]);
 
@@ -155,7 +110,7 @@ export function CCStudyRoomClient() {
           onToggleFold={handleToggleLeftPanel}
           isFolded={isLeftPanelFolded}
           submissions={submissions}
-          onFetchSubmissions={loadSubmissions}
+          onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
         />
       }
       centerPanel={<CenterPanel onWhiteboardClick={handleWhiteboardClick} />}
