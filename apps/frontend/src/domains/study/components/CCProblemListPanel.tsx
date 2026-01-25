@@ -125,15 +125,16 @@ export function CCProblemListPanel({
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-foreground">{problem.title}</span>
                       {problem.url && (
-                        <a
-                          href={problem.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(problem.url, '_blank', 'noreferrer');
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity bg-transparent border-none p-0 cursor-pointer"
+                          title="문제 풀러 가기"
                         >
                           <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                        </a>
+                        </button>
                       )}
                     </div>
                     <Lightbulb

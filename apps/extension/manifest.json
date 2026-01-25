@@ -11,11 +11,24 @@
     "host_permissions": [
         "https://www.acmicpc.net/*",
         "https://solved.ac/*",
-        "http://localhost:8080/*"
+        "http://localhost:8080/*",
+        "http://localhost:3000/*"
     ],
     "background": {
         "service_worker": "background.js"
     },
+    // ...
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icons/cute.svg",
+                "inject_script.js"
+            ],
+            "matches": [
+                "https://www.acmicpc.net/*"
+            ]
+        }
+    ]
     "action": {
         "default_popup": "popup.html",
         "default_icon": {

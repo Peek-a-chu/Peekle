@@ -170,7 +170,12 @@ async function checkForPendingSubmission() {
         if (task && task.problemId === currentProblemId) {
             console.log("Peekle: Found pending task, injecting...");
             // Clear the task so it doesn't run again on reload
-            await chrome.storage.local.remove('pending_submission');
+            // await chrome.storage.local.remove('pending_submission');
+
+            // Do NOT remove the task immediately. 
+            // We need to keep 'studyId' in pending_submission so that:
+            // 1. Typically the popup shows the correct status (Study Mode)
+            // 2. The background script knows where to send the submission (Study API)
 
             // Inject script to manipulate the page
             injectFillerScript(task.code, task.language);
@@ -604,21 +609,19 @@ window.addEventListener('message', async (event) => {
 
     // Handle Auto-Submission Request from Frontend
     if (event.data?.type === 'PEEKLE_SUBMIT_CODE') {
-        console.log('[Peekle Content] Received PEEKLE_SUBMIT_CODE raw:', event.data);
-        const { problemId, code, language } = event.data.payload;
+        console.log('[Peekle Content] Received PEEKLE_SUBMIT_CODE:', event.data);
+        const { problemId, code, language, studyId } = event.data.payload;
         if (!problemId || !code) {
             console.error('[Peekle Content] Missing problemId or code');
             return;
         }
 
-        console.log('[Peekle] Processing auto-submit for problem:', problemId);
-
-        console.log('[Peekle] Processing auto-submit for problem:', problemId);
+        console.log(`[Peekle] Processing auto-submit for problem: ${problemId} ${studyId ? `(Study: ${studyId})` : ''}`);
 
         // Send to background to save (bypasses direct storage permission issues on localhost)
         chrome.runtime.sendMessage({
             type: 'SAVE_PENDING_SUBMISSION',
-            payload: { problemId, code, language }
+            payload: { problemId, code, language, studyId }
         }, (response) => {
             if (response && response.success) {
                 console.log('[Peekle] Storage saved via background, background will open tab.');

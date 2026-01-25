@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import { useParams } from 'next/navigation'; // Import useParams
 
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
 import { cn } from '@/lib/utils';
@@ -52,6 +53,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
   const [code, setCode] = useState(initialCode || DEFAULT_CODE.python);
   const editorRef = useRef<any>(null);
   const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
+  const params = useParams(); // Get params
+  const studyId = params.id as string; // Extract studyId
 
   const language = propLanguage || internalLanguage;
   const theme = propTheme || internalTheme;
@@ -67,7 +70,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
     if (propLanguage) {
       // If switching language from prop, only reset code if it was default
       // But for simplicity, we respect internal logic unless it's a forced change
-      // For shared state, parent logic controls this best. 
+      // For shared state, parent logic controls this best.
       // Here we just ensure we display correct code for the language if logic requires.
       // But if `code` state is local, we need to be careful.
       // Assuming parent handles code syncing if `propLanguage` is used.
@@ -184,7 +187,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(({
         payload: {
           problemId,
           code: value,
-          language: language // 'python', 'java', 'cpp' 등
+          language: language, // 'python', 'java', 'cpp' 등
+          studyId: studyId // <--- Inject Study ID from params
         }
       }, '*');
 
