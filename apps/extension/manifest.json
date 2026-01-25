@@ -17,18 +17,6 @@
     "background": {
         "service_worker": "background.js"
     },
-    // ...
-    "web_accessible_resources": [
-        {
-            "resources": [
-                "icons/cute.svg",
-                "inject_script.js"
-            ],
-            "matches": [
-                "https://www.acmicpc.net/*"
-            ]
-        }
-    ]
     "action": {
         "default_popup": "popup.html",
         "default_icon": {
