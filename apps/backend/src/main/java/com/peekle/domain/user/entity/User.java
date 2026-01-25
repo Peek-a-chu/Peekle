@@ -32,12 +32,19 @@ public class User extends BaseTimeEntity {
     @Column(unique = true)
     private String bojId; // 백준 아이디
 
+    @Column(unique = true)
+    private String extensionToken;
+
+    private java.time.LocalDateTime extensionTokenUpdatedAt;
+
 
     public User(String socialId, String provider, String nickname) {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
         // this.bojId = null; // 기본값 null
+        this.extensionToken = java.util.UUID.randomUUID().toString(); // 회원가입 시 토큰 자동 발급
+        this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
         this.league = LeagueTier.BRONZE;
         this.leaguePoint = 0;
         this.isDeleted = false;
@@ -70,5 +77,10 @@ public class User extends BaseTimeEntity {
 
     public void registerBojId(String bojId) {
         this.bojId = bojId;
+    }
+
+    public void updateExtensionToken(String extensionToken) {
+        this.extensionToken = extensionToken;
+        this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
     }
 }

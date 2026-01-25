@@ -19,6 +19,8 @@ import com.peekle.domain.league.service.LeagueService;
 import com.peekle.global.util.SolvedAcLevelUtil;
 
 import com.peekle.domain.submission.dto.SubmissionResponse;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -33,14 +35,21 @@ public class SubmissionService {
     @Transactional
     public SubmissionResponse saveGeneralSubmission(SubmissionRequest request) {
 
-        // 1. 임시 유저 조회 (동시성 이슈 방어)
+        // 1. 유저 조회 (토큰 기반)
         User user;
-        try {
-            user = userRepository.findByNickname("test_user")
-                    .orElseGet(() -> userRepository.save(createTempUser()));
-        } catch (Exception e) {
-            user = userRepository.findByNickname("test_user")
-                    .orElseThrow(() -> new RuntimeException("User not found after creation failure"));
+        String token = request.getExtensionToken();
+        
+        if (token != null && !token.isEmpty()) {
+            user = userRepository.findByExtensionToken(token)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+        } else {
+            // Fallback for mock/test (or throw exception properly in production)
+            try {
+                user = userRepository.findByNickname("test_user")
+                        .orElseGet(() -> userRepository.save(createTempUser()));
+            } catch (Exception e) {
+                 throw new BusinessException(ErrorCode.USER_VERIFICATION_FAILED);
+            }
         }
 
         // 0. 검증 (Extension 변조 방지)
@@ -53,7 +62,7 @@ public class SubmissionService {
                     request.getSubmitId(), 
                     request.getCode()
                 );
-            } catch (IllegalArgumentException e) {
+            } catch (BusinessException e) {
                 // 검증 실패 시: 저장하지 않고 실패 응답 반환
                 System.out.println("❌ Submission Validation Failed: " + e.getMessage());
                 return SubmissionResponse.builder()

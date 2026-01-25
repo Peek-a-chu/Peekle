@@ -1,75 +1,183 @@
 package com.peekle.domain.study.controller;
 
-import com.peekle.domain.study.dto.socket.request.StudyEnterRequest;
-import com.peekle.domain.study.dto.socket.request.StudyInfoUpdateRequest;
-import com.peekle.domain.study.dto.socket.request.StudyKickRequest;
-import com.peekle.domain.study.dto.socket.request.StudyLeaveRequest;
-import com.peekle.domain.study.dto.socket.response.SocketResponse;
+import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
+import com.peekle.domain.study.dto.socket.request.*;
 import com.peekle.domain.study.service.StudyRoomService;
+import com.peekle.global.media.service.MediaService;
+import com.peekle.global.redis.RedisPublisher;
+import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Controller
 @RequiredArgsConstructor
+@Slf4j
 public class StudySocketController {
 
-    private final SimpMessagingTemplate messagingTemplate;
-    private final StudyRoomService studyRoomService;
+        private final RedisPublisher redisPublisher;
+        private final RedisTemplate<String, Object> redisTemplate;
+        private final StudyRoomService studyRoomService;
+        private final com.peekle.domain.study.repository.StudyMemberRepository studyMemberRepository;
+        private final MediaService mediaService;
+        private final SimpMessagingTemplate messagingTemplate;
 
-    // 스터디 입장 알림
-    @MessageMapping("/study/enter")
-    public void enter(StudyEnterRequest request,
-            SimpMessageHeaderAccessor headerAccessor) {
-        // 실제로는 headerAccessor에서 유저 정보를 가져와야 함 (Spring Security 연동 시)
-        // 현재는 단순히 입장 메시지 전파 용도로 구현 (비즈니스 로직은 joinStudyRoom에서 처리됨)
-        // 만약 joinStudyRoom 호출이 소켓 연결 전에 선행되었다면, 여기서는 알림만 보내면 됨.
-        // 하지만 요구사항상 "입장" 시점에 소켓을 통해 알림을 보내야 한다면 여기서 broadcast.
+        // 스터디 입장 알림
+        @MessageMapping("/studies/enter")
+        public void enter(@Payload StudyEnterRequest request,
+                        SimpMessageHeaderAccessor headerAccessor) {
+                // Session Attributes에서 userId 추출 (WebSocketEventListener에서 저장됨)
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                if (userId == null) {
+                        // 세션에 userId가 없으면 비정상 접근 (혹은 재연결 필요)
+                        log.warn("Study Enter Failed: userId not found in session attributes.");
+                        return;
+                }
 
-        // TODO: headerAccessor.getUser() 등을 통해 userId 식별 필요
-        // 임시로 userId 1L 가정 혹은 request에 포함되어야 함 (하지만 request엔 없음) -> 세션/헤더 사용
-        // 여기서는 단순 broadcast 예시
+                Long studyId = request.getStudyId();
 
-        Long studyId = request.getStudyId();
-        // 구독 경로: /topic/study/room/{id}/participants
-        messagingTemplate.convertAndSend("/topic/study/room/" + studyId + "/participants",
-                SocketResponse.of("ENTER", "User Entered"));
-        // 상세 유저 정보는 DB 조회 후 전송 권장
-    }
+                // 0. 검증: 해당 유저가 실제로 이 스터디의 멤버인지 확인
+                boolean isMember = studyMemberRepository.existsByStudyAndUser_Id(
+                                com.peekle.domain.study.entity.StudyRoom.builder().id(studyId).build(), userId);
 
-    // 스터디 정보 수정
-    @MessageMapping("/study/info/update")
-    public void updateInfo(StudyInfoUpdateRequest request) {
-        Long studyId = request.getStudyId();
-        // 권한 체크 및 업데이트는 Service에서 REST API로 수행하는 것이 일반적임
-        // 만약 소켓으로 업데이트 요청을 받는다면:
-        // studyRoomService.updateStudyRoom(userId, studyId, dto);
+                if (!isMember) {
+                        log.warn("Unauthorized OpenVidu access attempt: User {} is not a member of Study {}", userId,
+                                        studyId);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR",
+                                                        "Access Denied: You are not a member of this study."));
+                        return;
+                }
 
-        // 업데이트 후 결과 브로드캐스트
-        messagingTemplate.convertAndSend("/topic/study/room/" + studyId + "/info",
-                SocketResponse.of("INFO", request));
-    }
+                // Session Attributes에 studyId, userId 저장 (Disconnect 핸들링 용)
+                headerAccessor.getSessionAttributes().put("studyId", studyId);
+                headerAccessor.getSessionAttributes().put("userId", userId);
 
-    // 스터디 퇴장 알림
-    @MessageMapping("/study/leave")
-    public void leave(StudyLeaveRequest request) {
-        // Service 호출 (REST API로 선행 가능)
-        // studyRoomService.leaveStudyRoom(userId, studyId);
+                // 1. Redis Presence: Online User 추가
+                redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
-        messagingTemplate.convertAndSend("/topic/study/room/" + request.getStudyId() + "/participants",
-                SocketResponse.of("LEAVE", "User Left")); // User Info 권장
-    }
+                // 2. OpenVidu 토큰 발급 및 전송 (Private)
+                try {
+                        log.info("Try OpenVidu: study_{}, user_{}", studyId, userId);
+                        String sessionId = "study_" + studyId;
+                        mediaService.getOrCreateSession(sessionId);
 
-    // 강퇴 알림
-    @MessageMapping("/study/kick")
-    public void kickUser(StudyKickRequest request) {
-        // Service 로직 호출 (REST API로 선행되었을 수도 있음)
-        // studyRoomService.kickMember(ownerId, ...);
+                        Map<String, Object> userData = new HashMap<>();
+                        userData.put("userId", userId);
 
-        // 강퇴 이벤트 전파 -> 대상 클라이언트는 이를 수신하고 연결 종료 처리
-        messagingTemplate.convertAndSend("/topic/study/room/" + request.getStudyId() + "/kick",
-                SocketResponse.of("KICK", request.getTargetUserId()));
-    }
+                        String token = mediaService.createConnection(sessionId, userData);
+                        log.info("Token Success: {}", token);
+
+                        // 해당 유저에게만 토큰 전송 (구독 경로: /topic/studies/{studyId}/video-token/{userId})
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("VIDEO_TOKEN", token));
+                } catch (Exception e) {
+                        log.error("OpenVidu Fail", e);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "OV Error: " + e.getMessage()));
+                }
+
+                // 3. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Online 처리)
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + studyId),
+                                SocketResponse.of("ENTER", userId));
+        }
+
+        // 스터디 정보 수정
+        @MessageMapping("/studies/info/update")
+        public void updateInfo(@Payload StudyInfoUpdateRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long studyId = request.getStudyId();
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                StudyRoomUpdateRequest serviceDto = new StudyRoomUpdateRequest(
+                                request.getTitle(), request.getDescription());
+
+                studyRoomService.updateStudyRoom(userId, studyId, serviceDto);
+
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + studyId),
+                                SocketResponse.of("INFO", request));
+        }
+
+        // 스터디 퇴장 알림
+        @MessageMapping("/studies/leave")
+        public void leave(@Payload StudyLeaveRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // 1. Redis Presence: Online User 제거
+                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+
+                // 2. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Offline 처리)
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                SocketResponse.of("LEAVE", userId));
+        }
+
+        // 스터디 영구 탈퇴 (Quit)
+        @MessageMapping("/studies/quit")
+        public void quit(@Payload StudyQuitRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // 1. DB에서 멤버 삭제
+                studyRoomService.leaveStudyRoom(userId, request.getStudyId());
+
+                // 2. Redis Presence: Online User 제거
+                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+
+                // 3. 세션에서 studyId 제거 (Disconnect 시 중복 처리 방지)
+                if (headerAccessor.getSessionAttributes() != null) {
+                        headerAccessor.getSessionAttributes().remove("studyId");
+                }
+
+                // 4. Pub/Sub: 메시지 발행 (QUIT 타입 전송 -> 클라이언트가 해당 유저 목록에서 영구 제거)
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                SocketResponse.of("QUIT", userId));
+        }
+
+        // 강퇴 알림
+        @MessageMapping("/studies/kick")
+        public void kickUser(@Payload StudyKickRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                studyRoomService.kickMemberByUserId(userId, request.getStudyId(), request.getTargetUserId());
+
+                // 강퇴된 유저는 Online Users에서 바로 제거보다는 Disconnect 시점에 제거될 것임.
+                // 혹은 여기서 강제 제거
+                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
+                                request.getTargetUserId().toString());
+
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                SocketResponse.of("KICK", request.getTargetUserId()));
+        }
+
+        // 스터디 삭제 (방 폭파)
+        @MessageMapping("/studies/delete")
+        public void deleteRoom(@Payload StudyDeleteRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // 1. Service 호출 (DB Soft Delete & AOP Check)
+                studyRoomService.deleteStudyRoom(userId, request.getStudyId());
+
+                // 2. Broadcast (DELETE event)
+                // 클라이언트에서 이 이벤트를 받으면 메인 화면으로 이동
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                SocketResponse.of("DELETE", "Room Deleted"));
+
+                // 3. (Optional) Redis Presence 전체 제거
+                redisTemplate.delete("study:" + request.getStudyId() + ":online_users");
+        }
 }

@@ -1,6 +1,7 @@
 // --- Baekjoon Solver Logic ---
 
 const PROCESSED_SUBMISSIONS_KEY = 'processed_submissions';
+const PEEKLE_TOKEN_KEY = 'peekle_token';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'SOLVED') {
@@ -8,6 +9,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return true; // Keep channel open
 });
+
+
+// storage에서 토큰 가져오기 (콜백 API를 Promise로 래핑)
+function getPeekleToken() {
+    return new Promise((resolve) => {
+        try {
+            chrome.storage.local.get([PEEKLE_TOKEN_KEY], (res) => {
+                resolve(res[PEEKLE_TOKEN_KEY] || null);
+            });
+        } catch (e) {
+            resolve(null);
+        }
+    });
+}
 
 // Solved.ac API Helper
 async function getProblemInfo(problemId) {
@@ -72,6 +87,21 @@ async function handleSolvedSubmission(payload, sender) {
         const memoryInt = parseInt(String(memory).replace(/[^0-9]/g, '')) || 0;
         const timeInt = parseInt(String(time).replace(/[^0-9]/g, '')) || 0;
 
+        const extensionToken = await getPeekleToken();
+
+        if (!extensionToken || String(extensionToken).trim() === '') {
+            if (sender?.tab) {
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    type: 'SHOW_FEEDBACK',
+                    payload: {
+                        success: false,
+                        message: "확장프로그램 토큰이 없습니다. Peekle에 로그인 후 다시 시도해주세요.",
+                        delay: 0
+                    }
+                });
+            }
+            return; // ✅ 백엔드 요청 차단
+        }
         const backendResponse = await sendToBackend({
             problemId: parseInt(problemId) || 0,
             problemTitle: problemInfo ? problemInfo.titleKo : "",
@@ -82,7 +112,8 @@ async function handleSolvedSubmission(payload, sender) {
             executionTime: timeInt,
             // result: result, // Backend assumes success for all received submissions
             submittedAt: new Date().toISOString(),
-            submitId: submitId
+            submitId: submitId,
+            extensionToken
         });
 
         // Save to storage

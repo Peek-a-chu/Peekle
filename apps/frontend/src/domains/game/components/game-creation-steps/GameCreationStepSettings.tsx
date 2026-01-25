@@ -38,7 +38,7 @@ export function GameCreationStepSettings({
   setMaxPlayersInput,
   setTimeLimitInput,
   setProblemCountInput,
-}: GameCreationStepSettingsProps) {
+}: GameCreationStepSettingsProps): React.ReactElement {
   // 개인전 스피드 모드인지 확인
   const isIndividualSpeed = formData.mode === 'SPEED_RACE' && formData.teamType === 'INDIVIDUAL';
   // 타임어택 모드인지 확인
