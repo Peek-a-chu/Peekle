@@ -27,3 +27,6 @@ peekle.sqlite
 apps/frontend/build.log
 
 .env
+
+test-chat
+test-ide

@@ -1,7 +1,9 @@
-import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { OnGatewayConnection, OnGatewayDisconnect } from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
 export declare class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     server: Server;
+    private mockTypingIntervals;
+    private sessionStore;
     handleConnection(client: Socket): void;
     handleDisconnect(client: Socket): void;
     handleJoinRoom(data: {
@@ -15,6 +17,10 @@ export declare class EventsGateway implements OnGatewayConnection, OnGatewayDisc
         roomId: string;
         message: string;
         sender: string;
+    }, client: Socket): void;
+    handleRequestCode(data: {
+        roomId: string;
+        targetUserId: number;
     }, client: Socket): void;
     handleOffer(data: {
         offer: RTCSessionDescriptionInit;
@@ -30,5 +36,13 @@ export declare class EventsGateway implements OnGatewayConnection, OnGatewayDisc
         candidate: RTCIceCandidate;
         to: string;
         roomId: string;
+    }, client: Socket): void;
+    handleCodeChange(data: {
+        roomId: string;
+        code: string;
+    }, client: Socket): void;
+    handleLanguageChange(data: {
+        roomId: string;
+        language: string;
     }, client: Socket): void;
 }

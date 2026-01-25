@@ -36,6 +36,16 @@ export class AppController {
     return this.appService.getSubmissions(studyId, problemId);
   }
 
+  @Get('study/:studyId/participants')
+  getParticipants(@Param('studyId') studyId: string) {
+    return this.appService.getParticipants(studyId);
+  }
+
+  @Get('study/:studyId')
+  getStudyRoom(@Param('studyId') studyId: string) {
+    return this.appService.getStudyRoom(studyId);
+  }
+
   @Post('study/:studyId/problems')
   createProblem(
     @Param('studyId') studyId: string,

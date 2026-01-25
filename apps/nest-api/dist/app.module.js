@@ -14,6 +14,7 @@ const app_service_1 = require("./app.service");
 const events_gateway_1 = require("./sockets/events.gateway");
 const problem_entity_1 = require("./entities/problem.entity");
 const submission_entity_1 = require("./entities/submission.entity");
+const available_problem_entity_1 = require("./entities/available-problem.entity");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -23,10 +24,10 @@ exports.AppModule = AppModule = __decorate([
             typeorm_1.TypeOrmModule.forRoot({
                 type: 'sqlite',
                 database: 'peekle.sqlite',
-                entities: [problem_entity_1.Problem, submission_entity_1.Submission],
+                entities: [problem_entity_1.Problem, submission_entity_1.Submission, available_problem_entity_1.AvailableProblem],
                 synchronize: true,
             }),
-            typeorm_1.TypeOrmModule.forFeature([problem_entity_1.Problem, submission_entity_1.Submission]),
+            typeorm_1.TypeOrmModule.forFeature([problem_entity_1.Problem, submission_entity_1.Submission, available_problem_entity_1.AvailableProblem]),
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService, events_gateway_1.EventsGateway],

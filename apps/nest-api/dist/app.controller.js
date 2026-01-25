@@ -37,6 +37,12 @@ let AppController = class AppController {
     getSubmissions(studyId, problemId) {
         return this.appService.getSubmissions(studyId, problemId);
     }
+    getParticipants(studyId) {
+        return this.appService.getParticipants(studyId);
+    }
+    getStudyRoom(studyId) {
+        return this.appService.getStudyRoom(studyId);
+    }
     createProblem(studyId, body) {
         return this.appService.createProblem(studyId, body);
     }
@@ -83,6 +89,20 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], AppController.prototype, "getSubmissions", null);
+__decorate([
+    (0, common_1.Get)('study/:studyId/participants'),
+    __param(0, (0, common_1.Param)('studyId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "getParticipants", null);
+__decorate([
+    (0, common_1.Get)('study/:studyId'),
+    __param(0, (0, common_1.Param)('studyId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "getStudyRoom", null);
 __decorate([
     (0, common_1.Post)('study/:studyId/problems'),
     __param(0, (0, common_1.Param)('studyId')),
