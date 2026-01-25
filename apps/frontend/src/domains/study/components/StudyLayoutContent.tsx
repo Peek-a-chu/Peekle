@@ -39,10 +39,10 @@ export function StudyLayoutContent({
         <aside
           className={cn(
             'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card transition-all duration-300 ease-in-out',
-            isLeftPanelFolded ? 'w-0 border-r-0 overflow-hidden' : 'w-64',
+            isLeftPanelFolded ? 'w-0 border-r-0 overflow-hidden' : 'w-72',
           )}
         >
-          <div className="w-64 h-full">
+          <div className="w-72 h-full">
             {/* Inner container to maintain width during transition */}
             {leftPanel}
           </div>
@@ -88,6 +88,16 @@ export function StudyLayoutContent({
 
           {centerPanel}
         </main>
+
+        {/* Right Panel */}
+        <aside
+          className={cn(
+            'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card transition-all duration-300 ease-in-out',
+            isRightPanelFolded ? 'w-0 border-l-0 overflow-hidden' : 'w-80',
+          )}
+        >
+          <div className="w-80 h-full">{rightPanel}</div>
+        </aside>
       </div>
     </div>
   );
