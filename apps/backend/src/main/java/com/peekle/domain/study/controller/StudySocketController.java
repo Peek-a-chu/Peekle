@@ -1,7 +1,10 @@
 package com.peekle.domain.study.controller;
 
+import com.peekle.domain.study.dto.curriculum.ProblemStatusResponse;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
+import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
 import com.peekle.domain.study.dto.socket.request.*;
+import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.service.StudyRoomService;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
@@ -17,6 +20,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Controller
@@ -48,7 +52,7 @@ public class StudySocketController {
 
                 // 0. 검증: 해당 유저가 실제로 이 스터디의 멤버인지 확인
                 boolean isMember = studyMemberRepository.existsByStudyAndUser_Id(
-                                com.peekle.domain.study.entity.StudyRoom.builder().id(studyId).build(), userId);
+                                StudyRoom.builder().id(studyId).build(), userId);
 
                 if (!isMember) {
                         log.warn("Unauthorized OpenVidu access attempt: User {} is not a member of Study {}", userId,
@@ -79,16 +83,30 @@ public class StudySocketController {
                         String token = mediaService.createConnection(sessionId, userData);
                         log.info("Token Success: {}", token);
 
-                        // 해당 유저에게만 토큰 전송 (구독 경로:
-                        // /topic/studies/{studyId}/video-token/{userId})
+                        // 1. OpenVidu Token 전송
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
+
+                        // 2. 스터디 방 정보 전송 (ROOM_INFO) - 초기 로딩
+                        StudyRoomResponse roomInfo = studyRoomService
+                                        .getStudyRoom(userId, studyId);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/info/" + userId,
+                                        SocketResponse.of("ROOM_INFO", roomInfo));
+
+                        // 3. 오늘의 커리큘럼 전송 (CURRICULUM) - 초기 로딩
+                        List<ProblemStatusResponse> curriculum = studyCurriculumService
+                                        .getDailyProblems(userId, studyId, java.time.LocalDate.now());
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/curriculum/" + userId,
+                                        SocketResponse.of("CURRICULUM", curriculum));
+
                 } catch (Exception e) {
-                        log.error("OpenVidu Fail", e);
+                        log.error("Enter Init Fail", e);
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
-                                        SocketResponse.of("ERROR", "OV Error: " + e.getMessage()));
+                                        SocketResponse.of("ERROR", "Init Error: " + e.getMessage()));
                 }
 
                 // 3. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Online 처리)
