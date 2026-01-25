@@ -1,9 +1,12 @@
 package com.peekle.domain.study.dto.http.response;
 
 import com.peekle.domain.study.entity.StudyRoom;
+import com.peekle.domain.user.entity.User;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 
 @Getter
 public class StudyRoomResponse {
@@ -14,6 +17,7 @@ public class StudyRoomResponse {
     private final int rankingPoint;
     private final boolean isActive;
     private final LocalDateTime createdAt;
+    private final List<StudyMemberResponse> members;
 
     // Old constructor removed
     // Old from method removed
@@ -24,20 +28,18 @@ public class StudyRoomResponse {
         private final String nickname;
         private final String profileImage;
 
-        private OwnerInfo(com.peekle.domain.user.entity.User user) {
+        private OwnerInfo(User user) {
             this.id = user.getId();
             this.nickname = user.getNickname();
             this.profileImage = user.getProfileImgThumb();
         }
 
-        public static OwnerInfo from(com.peekle.domain.user.entity.User user) {
+        public static OwnerInfo from(User user) {
             return new OwnerInfo(user);
         }
     }
 
-    private final java.util.List<StudyMemberResponse> members;
-
-    private StudyRoomResponse(StudyRoom studyRoom, java.util.List<StudyMemberResponse> members) {
+    private StudyRoomResponse(StudyRoom studyRoom, List<StudyMemberResponse> members) {
         this.id = studyRoom.getId();
         this.title = studyRoom.getTitle();
         this.description = studyRoom.getDescription();
@@ -45,14 +47,14 @@ public class StudyRoomResponse {
         this.rankingPoint = studyRoom.getRankingPoint();
         this.isActive = studyRoom.isActive();
         this.createdAt = studyRoom.getCreatedAt();
-        this.members = members != null ? members : java.util.Collections.emptyList();
+        this.members = members != null ? members : Collections.emptyList();
     }
 
-    public static StudyRoomResponse from(StudyRoom studyRoom, java.util.List<StudyMemberResponse> members) {
+    public static StudyRoomResponse from(StudyRoom studyRoom, List<StudyMemberResponse> members) {
         return new StudyRoomResponse(studyRoom, members);
     }
 
     public static StudyRoomResponse from(StudyRoom studyRoom) {
-        return new StudyRoomResponse(studyRoom, java.util.Collections.emptyList());
+        return new StudyRoomResponse(studyRoom, Collections.emptyList());
     }
 }

@@ -18,7 +18,7 @@ public class RedisChatBufferService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Buffer chat message to Redis List (Global Buffer)
+     * 채팅 메시지를 Redis 리스트에 버퍼링 (글로벌 버퍼)
      */
     public void bufferChat(ChatMessageResponse chat) {
         try {
