@@ -115,7 +115,7 @@ export class AppService implements OnModuleInit {
       roomId: Number(studyId),
       roomTitle: "알고리즘 마스터 스터디",
       roomDescription: "매주 월/수/금 알고리즘 문제를 함께 풀어요!",
-      inviteCode: "ABC123",
+      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
     };
   }
 
