@@ -40,6 +40,7 @@ describe('CCProblemCard', () => {
     const hintButton = screen.getByRole('button', { name: /toggle hint/i });
     fireEvent.click(hintButton);
     expect(screen.getByText('BFS')).toBeInTheDocument();
+    expect(screen.getByText('Bronze 5')).toBeInTheDocument();
   });
 
   it('calls onOpenSubmission when view icon is clicked', () => {
