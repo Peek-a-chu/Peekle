@@ -9,15 +9,15 @@ import SidebarItem from './SidebarItem';
 const Sidebar = () => {
   const pathname = usePathname();
 
-    const navItems = [
-        { icon: Home, label: '메인', href: '/home' },
-        { icon: Users, label: '스터디 방', href: '/study' },
-        { icon: Gamepad2, label: '게임 방', href: '/game' },
-        { icon: BookOpen, label: '문제집', href: '/workbook' },
-        { icon: Trophy, label: '랭킹', href: '/ranking' },
-        { icon: Medal, label: '리그', href: '/league' },
-        { icon: Search, label: '검색', href: '/search' },
-    ];
+  const navItems = [
+    { icon: Home, label: '메인', href: '/home' },
+    { icon: Users, label: '스터디 방', href: '/study' },
+    { icon: Gamepad2, label: '게임 방', href: '/game' },
+    { icon: BookOpen, label: '문제집', href: '/workbook' },
+    { icon: Trophy, label: '랭킹', href: '/ranking' },
+    { icon: Medal, label: '리그', href: '/league' },
+    { icon: Search, label: '검색', href: '/search' },
+  ];
 
   const isItemActive = (href: string) => {
     if (href === '/home' && pathname === '/home') return true;
