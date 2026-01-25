@@ -1,11 +1,15 @@
 'use client';
 
+import { useRef, useEffect, useState } from 'react';
 import { type ReactNode } from 'react';
 import { useCenterPanel } from '@/domains/study/hooks/useCenterPanel';
 import { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid';
 import { CCControlBar as ControlBar } from '@/domains/study/components/CCControlBar';
 import { CCIDEPanel as IDEPanel } from '@/domains/study/components/CCIDEPanel';
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
+import { useRealtimeCode } from '@/domains/study/hooks/useRealtimeCode';
+import { useSocket } from '@/domains/study/hooks/useSocket';
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -47,8 +51,67 @@ export function CCCenterPanel({
     handleRefChat,
   } = useCenterPanel();
 
+  const realtimeCode = useRealtimeCode(viewingUser);
+  const roomId = useRoomStore((state) => state.roomId);
+  const currentUserId = useRoomStore((state) => state.currentUserId);
+  const socket = useSocket(roomId, currentUserId);
+
+  // Track my latest code to respond to pull requests
+  const myLatestCodeRef = useRef<string>('');
+  const [restoredCode, setRestoredCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!socket || !currentUserId) return;
+
+    const handleRequestCode = (data: { requesterId: string; targetUserId: number }) => {
+      // If someone is asking for MY code
+      if (data.targetUserId === currentUserId) {
+        // Send what I have
+        socket.emit('code-change', {
+          roomId: String(roomId),
+          code: myLatestCodeRef.current,
+        });
+      }
+    };
+
+    socket.on('request-code', handleRequestCode);
+
+    // [New] Restore my code if the server has it
+    const handleCodeRestore = (data: { code: string; language?: string }) => {
+      console.log('Restoring code...', data.code);
+      if (data.code) {
+        setRestoredCode(data.code);
+      }
+      if (data.language) {
+        console.log('Restoring language...', data.language);
+        setLanguage(data.language);
+      }
+    };
+    socket.on('code-restore', handleCodeRestore);
+
+    return () => {
+      socket.off('request-code', handleRequestCode);
+      socket.off('code-restore', handleCodeRestore);
+    };
+  }, [socket, currentUserId, roomId]);
+
+  const handleCodeChange = (code: string) => {
+    myLatestCodeRef.current = code;
+    if (socket && roomId) {
+      socket.emit('code-change', { roomId: String(roomId), code });
+    }
+  };
+
+  const handleLanguageChange = (lang: string) => {
+    setLanguage(lang);
+    if (socket && roomId) {
+      console.log('Emitting language-change:', lang);
+      socket.emit('language-change', { roomId: String(roomId), language: lang });
+    }
+  };
+
   return (
-    <div className={cn('flex h-full flex-col', className)}>
+    <div className={cn('flex h-full flex-col min-w-0 min-h-0', className)}>
       {/* Video Grid Header */}
       <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
         <span className="text-sm font-medium">화상 타일</span>
@@ -110,10 +173,13 @@ export function CCCenterPanel({
             {ideContent ?? (
               <IDEPanel
                 ref={leftPanelRef}
+                editorId="my-editor"
                 language={language}
-                onLanguageChange={setLanguage}
+                onLanguageChange={handleLanguageChange}
                 theme={theme}
                 hideToolbar // Pass this so it doesn't render double toolbar
+                onCodeChange={handleCodeChange}
+                restoredCode={restoredCode}
               />
             )}
           </div>
@@ -122,12 +188,13 @@ export function CCCenterPanel({
           {isViewingOther && (
             <div className="flex-1 min-w-0">
               <IDEPanel
+                editorId="other-editor"
                 readOnly
                 hideToolbar
-                initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : undefined}
+                initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
                 theme={theme} // Sync theme
                 borderColorClass={
-                  viewMode === 'SPLIT_SAVED' ? 'border-green-500' : 'border-yellow-400'
+                  viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
                 }
               />
             </div>
