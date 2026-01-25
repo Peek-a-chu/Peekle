@@ -41,14 +41,14 @@ public class WebSocketEventListener {
             userIdStr = connectAccessor.getFirstNativeHeader("X-User-Id");
         }
 
-        Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
-
         // 3. Try to get Study ID
         String studyIdStr = headerAccessor.getFirstNativeHeader("X-Study-Id");
         if (studyIdStr == null && connectAccessor != null) {
             studyIdStr = connectAccessor.getFirstNativeHeader("X-Study-Id");
         }
         Long studyId = (studyIdStr != null) ? Long.parseLong(studyIdStr) : null;
+
+        Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
 
         if (userId != null) {
             log.info("Received a new web socket connection. Session ID: {}, User ID: {}", sessionId, userId);
@@ -79,8 +79,12 @@ public class WebSocketEventListener {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = headerAccessor.getSessionId();
 
-        Object userIdObj = headerAccessor.getSessionAttributes().get("userId");
-        Object studyIdObj = headerAccessor.getSessionAttributes().get("studyId");
+        Object userIdObj = headerAccessor.getSessionAttributes() != null
+                ? headerAccessor.getSessionAttributes().get("userId")
+                : null;
+        Object studyIdObj = headerAccessor.getSessionAttributes() != null
+                ? headerAccessor.getSessionAttributes().get("studyId")
+                : null;
 
         if (userIdObj != null) {
             Long userId = (Long) userIdObj;
@@ -99,12 +103,6 @@ public class WebSocketEventListener {
                         com.peekle.global.socket.SocketResponse.of("LEAVE", userId));
 
                 // 3. IDE 관찰자 목록 정리 (Cleanup Watchers)
-                // 내가 보고 있던 사람들 목록을 가져와서, 나를 제거함
-                // Note: We need RedisIdeService here. But this is a Listener.
-                // We should inject RedisIdeService or use RedisTemplate directly.
-                // Since logic is in RedisIdeService, let's assume we can wire it or replicate
-                // logic.
-                // Simpler: Inject RedisIdeService in this class.
                 cleanUpWatchers(studyId, userId);
             }
         } else {

@@ -39,7 +39,9 @@ public enum ErrorCode {
     PROBLEM_ALREADY_ADDED(HttpStatus.CONFLICT, "CURRICULUM_001", "이미 커리큘럼에 등록된 문제입니다."),
     PROBLEM_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "CURRICULUM_002", "문제는 오늘 날짜로만 추가할 수 있습니다."),
     STUDY_PROBLEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CURRICULUM_003", "등록된 문제를 찾을 수 없습니다."),
-    SUBMISSION_EXISTS(HttpStatus.CONFLICT, "CURRICULUM_004", "이미 제출된 기록이 있어 문제를 삭제할 수 없습니다.");
+    SUBMISSION_EXISTS(HttpStatus.CONFLICT, "CURRICULUM_004", "이미 제출된 기록이 있어 문제를 삭제할 수 없습니다."),
+
+    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBMISSION_006", "제출 기록을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

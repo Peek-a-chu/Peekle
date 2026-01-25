@@ -32,34 +32,25 @@ public class CollaborationSocketController {
             return;
         }
 
-        // 1. Save to Redis (For persistence/refresh)
+        // 1. Redis에 저장 (영속성/새로고침 시 복원용)
         redisIdeService.saveCode(studyId, userId, request);
 
-        // 2. Publish to Redis Topic (Broadcasting to subscribers)
-        // Topic: topic/studies/rooms/{studyId}/ide/{userId}
+        // 2. Redis 토픽에 발행 (구독자들에게 브로드캐스팅)
+        // 토픽: topic/studies/rooms/{studyId}/ide/{userId}
         String topic = String.format(RedisKeyConst.TOPIC_IDE, studyId, userId);
 
-        // Create Payload
-        // Note: SenderName isn't in Request, but clients usually know who they are
-        // watching or we can fetch it.
-        // For performance, we might skip fetching User entity if nickname isn't
-        // strictly needed for the editor sync itself.
-        // But to be complete, let's just send what we have.
-        // If needed, we can fetch nickname from Redis session or DB.
+        // 응답 생성
+        // 참고: SenderName은 요청에 없지만 클라이언트는 보통 자신이 누구를 보고 있는지 알고 있음.
+        // 성능 최적화를 위해 매번 DB에서 유저 정보를 조회하는 것은 피함.
+        // 여기서는 간단히 받은 데이터를 그대로 전달함.
 
-        // Construct partial response or fetch full if needed.
-        // Let's rely on the service to get full response OR just forward the update
-        // content with ID.
-        // For efficiency, just forwarding might be enough, but let's stick to
-        // consistent IdeResponse structure.
-        // We will fetch senderName efficiently?
-        // RedisIdeService.getCode() fetches User from DB. Calling it every keystroke is
-        // heavy.
-        // Optimization: Just send the data. Client knows who they subbed to.
+        // Safe check for problemId
+        Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L;
 
         IdeResponse response = IdeResponse.builder()
                 .senderId(userId)
-                .senderName("Unknown") // Optimization: Skip DB lookup for high-frequency updates
+                .senderName("Unknown") // 성능 최적화: 빈번한 업데이트 시 DB 조회 생략
+                .problemId(problemId)
                 .filename(request.getFilename())
                 .code(request.getCode())
                 .lang(request.getLang())
@@ -68,7 +59,7 @@ public class CollaborationSocketController {
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("IDE", response));
     }
 
-    // Watch Event (Start/Stop watching someone)
+    // 관찰 시작/종료 이벤트 (Watch Event)
     @MessageMapping("/ide/watch")
     public void handleWatch(@Payload com.peekle.domain.study.dto.ide.IdeWatchRequest request,
             SimpMessageHeaderAccessor headerAccessor) {
@@ -81,19 +72,16 @@ public class CollaborationSocketController {
 
         Long targetId = request.getTargetUserId();
 
-        // 1. Update Redis State
+        // 1. Redis 상태 업데이트
         if ("START".equalsIgnoreCase(request.getAction())) {
             redisIdeService.addWatcher(studyId, targetId, viewerId);
         } else if ("STOP".equalsIgnoreCase(request.getAction())) {
             redisIdeService.removeWatcher(studyId, targetId, viewerId);
         }
 
-        // 2. Notify the Target User ("Someone is watching you!")
-        // Topic: topic/studies/rooms/{studyId}/ide/{targetId}/status
-        // Or simply reuse the personal topic if the client listens to it?
-        // Let's use a specific status topic or the existing ide ONE.
-        // Usually, the target user wants to know who is watching ME.
-        // So target subscribes to: /topic/.../ide/{myId}/watchers
+        // 2. 대상 유저에게 알림 ("누군가 당신을 보고 있습니다!")
+        // 토픽: topic/studies/rooms/{studyId}/ide/{targetId}/watchers
+        // 대상 유저는 "나를 보고 있는 사람들" 목록을 구독함.
 
         String topic = String.format("topic/studies/rooms/%d/ide/%d/watchers", studyId, targetId);
 

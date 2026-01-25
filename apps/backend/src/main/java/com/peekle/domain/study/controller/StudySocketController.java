@@ -33,30 +33,30 @@ public class StudySocketController {
         private final StudyRoomService studyRoomService;
         private final com.peekle.domain.study.repository.StudyMemberRepository studyMemberRepository;
         private final com.peekle.domain.study.service.StudyCurriculumService studyCurriculumService;
+        private final com.peekle.domain.study.service.RedisIdeService redisIdeService;
         private final MediaService mediaService;
         private final SimpMessagingTemplate messagingTemplate;
+        private final com.peekle.domain.study.service.StudyChatService studyChatService; // Injected
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
         public void enter(@Payload StudyEnterRequest request,
                         SimpMessageHeaderAccessor headerAccessor) {
-                // Session Attributes에서 userId 추출 (WebSocketEventListener에서 저장됨)
+                // Session Attributes에서 userId 추출
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
                 if (userId == null) {
-                        // 세션에 userId가 없으면 비정상 접근 (혹은 재연결 필요)
                         log.warn("Study Enter Failed: userId not found in session attributes.");
                         return;
                 }
 
                 Long studyId = request.getStudyId();
 
-                // 0. 검증: 해당 유저가 실제로 이 스터디의 멤버인지 확인
-                boolean isMember = studyMemberRepository.existsByStudyAndUser_Id(
+                // 0. 검증
+                boolean isUserMember = studyMemberRepository.existsByStudyAndUser_Id(
                                 StudyRoom.builder().id(studyId).build(), userId);
 
-                if (!isMember) {
-                        log.warn("Unauthorized OpenVidu access attempt: User {} is not a member of Study {}", userId,
-                                        studyId);
+                if (!isUserMember) {
+                        // ... (Error handling)
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("ERROR",
@@ -64,14 +64,14 @@ public class StudySocketController {
                         return;
                 }
 
-                // Session Attributes에 studyId, userId 저장 (Disconnect 핸들링 용)
+                // Session Attributes 저장
                 headerAccessor.getSessionAttributes().put("studyId", studyId);
                 headerAccessor.getSessionAttributes().put("userId", userId);
 
-                // 1. Redis Presence: Online User 추가
+                // 1. Redis Presence
                 redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
-                // 2. OpenVidu 토큰 발급 및 전송 (Private)
+                // 2. OpenVidu 및 초기화 (Bundled)
                 try {
                         log.info("Try OpenVidu: study_{}, user_{}", studyId, userId);
                         String sessionId = "study_" + studyId;
@@ -81,26 +81,36 @@ public class StudySocketController {
                         userData.put("userId", userId);
 
                         String token = mediaService.createConnection(sessionId, userData);
-                        log.info("Token Success: {}", token);
 
-                        // 1. OpenVidu Token 전송
+                        // 1. OpenVidu Token
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
 
-                        // 2. 스터디 방 정보 전송 (ROOM_INFO) - 초기 로딩
+                        // 2. Room Info
                         StudyRoomResponse roomInfo = studyRoomService
                                         .getStudyRoom(userId, studyId);
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/info/" + userId,
                                         SocketResponse.of("ROOM_INFO", roomInfo));
 
-                        // 3. 오늘의 커리큘럼 전송 (CURRICULUM) - 초기 로딩
+                        // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
                                         .getDailyProblems(userId, studyId, java.time.LocalDate.now());
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/curriculum/" + userId,
                                         SocketResponse.of("CURRICULUM", curriculum));
+
+                        // 4. IDE Restore
+                        for (ProblemStatusResponse problem : curriculum) {
+                                com.peekle.domain.study.dto.ide.IdeResponse savedCode = redisIdeService.getCode(studyId,
+                                                problem.getProblemId(), userId);
+                                if (savedCode != null) {
+                                        messagingTemplate.convertAndSend(
+                                                        "/topic/studies/" + studyId + "/ide/" + userId,
+                                                        SocketResponse.of("IDE", savedCode));
+                                }
+                        }
 
                 } catch (Exception e) {
                         log.error("Enter Init Fail", e);
@@ -109,7 +119,18 @@ public class StudySocketController {
                                         SocketResponse.of("ERROR", "Init Error: " + e.getMessage()));
                 }
 
-                // 3. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Online 처리)
+                // 5. [SYSTEM CHAT] 입장 메시지 전송 (초기화 여부 무관)
+                try {
+                        studyChatService.sendChat(studyId, userId,
+                                        com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                        .content("님이 스터디에 입장하셨습니다.")
+                                                        .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+                } catch (Exception e) {
+                        log.error("System Chat Error", e);
+                }
+
+                // 3. Pub/Sub (ENTER event)
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + studyId),
                                 SocketResponse.of("ENTER", userId));
@@ -136,13 +157,20 @@ public class StudySocketController {
         public void leave(@Payload StudyLeaveRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
-                // 1. Redis Presence: Online User 제거
+                // 1. Redis Presence
                 redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
 
-                // 2. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Offline 처리)
+                // 2. Pub/Sub (LEAVE)
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("LEAVE", userId));
+
+                // 3. [SYSTEM CHAT] 퇴장 메시지
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                .content("님이 퇴장하셨습니다.")
+                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .build());
         }
 
         // 스터디 영구 탈퇴 (Quit)
@@ -150,18 +178,28 @@ public class StudySocketController {
         public void quit(@Payload StudyQuitRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
-                // 1. DB에서 멤버 삭제
+                // [SYSTEM CHAT] 탈퇴 메시지 (멤버 삭제 전에 보내야 User 조회 가능)
+                try {
+                        studyChatService.sendChat(request.getStudyId(), userId,
+                                        com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                        .content("님이 스터디를 탈퇴하셨습니다.")
+                                                        .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+                } catch (Exception e) {
+                        /* 이미 삭제 등 에러 무시 */ }
+
+                // 1. DB 삭제
                 studyRoomService.leaveStudyRoom(userId, request.getStudyId());
 
-                // 2. Redis Presence: Online User 제거
+                // 2. Redis Presence
                 redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
 
-                // 3. 세션에서 studyId 제거 (Disconnect 시 중복 처리 방지)
+                // 3. 세션 정리
                 if (headerAccessor.getSessionAttributes() != null) {
                         headerAccessor.getSessionAttributes().remove("studyId");
                 }
 
-                // 4. Pub/Sub: 메시지 발행 (QUIT 타입 전송 -> 클라이언트가 해당 유저 목록에서 영구 제거)
+                // 4. Pub/Sub (QUIT)
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("QUIT", userId));
@@ -171,10 +209,18 @@ public class StudySocketController {
         @MessageMapping("/studies/kick")
         public void kickUser(@Payload StudyKickRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // [SYSTEM CHAT] 강퇴 메시지 (관리자가 보냄)
+                // "관리자님이 {target}님을 강퇴했습니다"
+                // -> Service에서 target 이름을 조회하기 복잡하므로 단순 알림
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                .content("님이 멤버를 강퇴했습니다.")
+                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
                 studyRoomService.kickMemberByUserId(userId, request.getStudyId(), request.getTargetUserId());
 
-                // 강퇴된 유저는 Online Users에서 바로 제거보다는 Disconnect 시점에 제거될 것임.
-                // 혹은 여기서 강제 제거
                 redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
                                 request.getTargetUserId().toString());
 
@@ -188,30 +234,32 @@ public class StudySocketController {
         public void deleteRoom(@Payload StudyDeleteRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
-                // 1. Service 호출 (DB Soft Delete & AOP Check)
+                // [SYSTEM CHAT] 방 삭제 메시지
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                .content("님이 스터디를 삭제했습니다.")
+                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
+                // 1. Service
                 studyRoomService.deleteStudyRoom(userId, request.getStudyId());
 
-                // 2. Broadcast (DELETE event)
-                // 클라이언트에서 이 이벤트를 받으면 메인 화면으로 이동
+                // 2. Broadcast
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("DELETE", "Room Deleted"));
 
-                // 3. (Optional) Redis Presence 전체 제거
                 redisTemplate.delete("study:" + request.getStudyId() + ":online_users");
         }
 
-        // 스터디 문제 관리 (WebSocket)
+        // 스터디 문제 관리
         @MessageMapping("/studies/problems")
         public void handleProblem(@Payload CurriculumSocketRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
                 Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
 
-                if (userId == null || studyId == null) {
-                        log.warn("Curriculum/handleProblem: userId or studyId is null in session. userId={}, studyId={}",
-                                        userId, studyId);
+                if (userId == null || studyId == null)
                         return;
-                }
 
                 try {
                         if ("ADD".equalsIgnoreCase(request.getAction())) {
@@ -223,15 +271,53 @@ public class StudySocketController {
 
                                 studyCurriculumService.addProblem(userId, studyId, addRequest);
 
+                                // [SYSTEM] 문제 추가 알림
+                                studyChatService.sendChat(studyId, userId,
+                                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                                .content("님이 커리큘럼을 추가했습니다: " + request.getProblemId())
+                                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                                .build());
+
                         } else if ("REMOVE".equalsIgnoreCase(request.getAction())) {
                                 studyCurriculumService.removeProblem(userId, studyId, request.getProblemId());
+
+                                // [SYSTEM] 문제 삭제 알림
+                                studyChatService.sendChat(studyId, userId,
+                                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                                .content("님이 커리큘럼을 삭제했습니다: " + request.getProblemId())
+                                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                                .build());
                         }
                 } catch (Exception e) {
                         log.error("Curriculum Socket Error: {}", e.getMessage());
-                        // Optional: Send error message to user via private topic
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/error/" + userId,
                                         SocketResponse.of("ERROR", e.getMessage()));
                 }
+        }
+
+        // 방장 권한 위임
+        @MessageMapping("/studies/delegate")
+        public void delegateLeader(@Payload StudyDelegateRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                studyRoomService.delegateLeader(userId, request.getStudyId(), request.getTargetUserId());
+
+                // [SYSTEM] 위임 알림
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                .content("님이 방장 권한을 위임했습니다.")
+                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
+                // Broadcast DELEGATE event
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                SocketResponse.of("DELEGATE", request.getTargetUserId()));
+
+                // Room Info Update
+                StudyRoomResponse roomInfo = studyRoomService.getStudyRoom(userId, request.getStudyId());
+                messagingTemplate.convertAndSend(
+                                "/topic/studies/" + request.getStudyId() + "/info/" + userId,
+                                SocketResponse.of("ROOM_INFO", roomInfo));
         }
 }
