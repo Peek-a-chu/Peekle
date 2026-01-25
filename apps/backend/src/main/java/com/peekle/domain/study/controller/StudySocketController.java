@@ -28,6 +28,7 @@ public class StudySocketController {
         private final RedisTemplate<String, Object> redisTemplate;
         private final StudyRoomService studyRoomService;
         private final com.peekle.domain.study.repository.StudyMemberRepository studyMemberRepository;
+        private final com.peekle.domain.study.service.StudyCurriculumService studyCurriculumService;
         private final MediaService mediaService;
         private final SimpMessagingTemplate messagingTemplate;
 
@@ -78,7 +79,8 @@ public class StudySocketController {
                         String token = mediaService.createConnection(sessionId, userData);
                         log.info("Token Success: {}", token);
 
-                        // 해당 유저에게만 토큰 전송 (구독 경로: /topic/studies/{studyId}/video-token/{userId})
+                        // 해당 유저에게만 토큰 전송 (구독 경로:
+                        // /topic/studies/{studyId}/video-token/{userId})
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
@@ -179,5 +181,39 @@ public class StudySocketController {
 
                 // 3. (Optional) Redis Presence 전체 제거
                 redisTemplate.delete("study:" + request.getStudyId() + ":online_users");
+        }
+
+        // 스터디 문제 관리 (WebSocket)
+        @MessageMapping("/studies/problems")
+        public void handleProblem(@Payload CurriculumSocketRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
+
+                if (userId == null || studyId == null) {
+                        log.warn("Curriculum/handleProblem: userId or studyId is null in session. userId={}, studyId={}",
+                                        userId, studyId);
+                        return;
+                }
+
+                try {
+                        if ("ADD".equalsIgnoreCase(request.getAction())) {
+                                com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest addRequest = com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest
+                                                .builder()
+                                                .problemId(request.getProblemId())
+                                                .problemDate(request.getProblemDate())
+                                                .build();
+
+                                studyCurriculumService.addProblem(userId, studyId, addRequest);
+
+                        } else if ("REMOVE".equalsIgnoreCase(request.getAction())) {
+                                studyCurriculumService.removeProblem(userId, studyId, request.getProblemId());
+                        }
+                } catch (Exception e) {
+                        log.error("Curriculum Socket Error: {}", e.getMessage());
+                        // Optional: Send error message to user via private topic
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/error/" + userId,
+                                        SocketResponse.of("ERROR", e.getMessage()));
+                }
         }
 }
