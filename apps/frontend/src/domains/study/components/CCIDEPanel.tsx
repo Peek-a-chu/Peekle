@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import { useParams } from 'next/navigation'; // Import useParams
 import { toast } from 'sonner';
 
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
@@ -89,7 +90,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // ----------------------------------------------------------------------
     const [internalLanguage, setInternalLanguage] = useState<string>('python');
     const [internalTheme, setInternalTheme] = useState<'light' | 'vs-dark'>('light');
-
+    const params = useParams();
+    const studyId = params.id as string;
     const language = propLanguage || internalLanguage;
     const theme = propTheme || internalTheme;
 
@@ -167,6 +169,33 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     useEffect(() => {
       readOnlyRef.current = readOnly;
     }, [readOnly]);
+
+    useEffect(() => {
+      if (propLanguage) {
+        // If switching language from prop, only reset code if it was default
+        // But for simplicity, we respect internal logic unless it's a forced change
+        // For shared state, parent logic controls this best.
+        // Here we just ensure we display correct code for the language if logic requires.
+        // But if `code` state is local, we need to be careful.
+        // Assuming parent handles code syncing if `propLanguage` is used.
+        // Actually, let's keep the simple logic: if lang changes and code matches default of old lang, update to new default.
+        setCode((prev) =>
+          prev === DEFAULT_CODE[internalLanguage as keyof typeof DEFAULT_CODE]
+            ? DEFAULT_CODE[propLanguage as keyof typeof DEFAULT_CODE]
+            : prev
+        );
+        setInternalLanguage(propLanguage);
+      }
+    }, [propLanguage]);
+
+    // Store listeners for cleanup
+    const listenersRef = useRef<{
+      preventClipboard: (e: Event) => void;
+      stopKeyPropagation: (e: Event) => void;
+      container: HTMLElement | null;
+    } | null>(null);
+
+
 
     useEffect(() => {
       return () => {
@@ -283,18 +312,28 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleSubmit = async () => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
-        try {
-          await navigator.clipboard.writeText(value);
-          window.open('https://www.acmicpc.net/submit', '_blank');
-        } catch (err) {
-          console.error('Failed to submit!', err);
-        }
+        // TODO: 문제번호 넣어주세용
+        const problemId = '1000';
+
+        // 확장 프로그램에 메시지 전송 (확장 프로그램이 수신 후 스토리지 저장 -> 페이지 이동 처리)
+        window.postMessage({
+          type: 'PEEKLE_SUBMIT_CODE',
+          payload: {
+            problemId,
+            code: value,
+            language: language, // 'python', 'java', 'cpp' 등
+            studyId: studyId // <--- Inject Study ID from params
+          }
+        }, '*');
+
+        toast.info('자동 제출을 시작합니다...');
       }
     };
 
     // ----------------------------------------------------------------------
     // Editor Mount
     // ----------------------------------------------------------------------
+
     const handleEditorDidMount: OnMount = (editor) => {
       editorRef.current = editor;
       if (onEditorMount) onEditorMount(editor);
