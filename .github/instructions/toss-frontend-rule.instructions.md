@@ -254,6 +254,8 @@ ROOT
 │
 ├── src
 │   ├── app
+│   │   ├── api              # [API] 백엔드 데이터 패칭 (fetch wrappers)
+│   │   │   └── gameApi.ts
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
 │   │   └── globals.css      # [Global CSS] Tailwind Directive (@tailwind base...) 포함
@@ -268,7 +270,8 @@ ROOT
 │   ├── domains              # [Features]
 │   │   ├── game
 │   │   │   ├── assets       #  game 도메인 전용 이미지/아이콘
-│   │   │   │   └── card-sprite.png
+│   │   │   ├── actions      # [Server Actions] 서버 액션 (mutations)
+│   │   │   │   └── gameActions.ts
 │   │   │   ├── components
 │   │   │   └── ...
 │   │   └── user
@@ -280,6 +283,18 @@ ROOT
 ├── postcss.config.js        # [Config] PostCSS 설정
 └── ...
 ```
+
+### API 및 Server Actions 구조 (Next.js 15)
+
+데이터 패칭(Fetching), 서버 액션(Mutation), 그리고 라우트 핸들러(Route Handler)의 역할을 명확히 분리합니다.
+
+- **`app/api/`**: 
+  - 백엔드 API와의 통신을 담당하는 **fetch Wrapper** 및 **Route Handler**를 위치시킵니다.
+
+- **`domains/{feature}/actions/`**:
+  - Next.js **Server Actions** (`'use server'`)를 포함합니다.
+  - **용도:** 데이터 **변경(Mutation)**, 폼 제출, 쿠키 조작, `revalidatePath` 등 Next.js 서버 기능 활용.
+  - **구조:** `userActions.ts`와 같이 파일명에 `Actions` 접미사를 붙입니다.
 
 ### Import 순서
 

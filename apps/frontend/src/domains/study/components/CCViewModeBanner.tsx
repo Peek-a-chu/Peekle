@@ -62,24 +62,3 @@ export function CCViewModeBanner({
     </div>
   );
 }
-
-export function ViewModeFooterBanner() {
-  const viewMode = useRoomStore((state) => state.viewMode);
-  const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
-
-  if (viewMode === 'ONLY_MINE') return null;
-
-  return (
-    <div className="flex items-center justify-center gap-2 bg-orange-100 py-2 text-sm text-orange-800">
-      <span>🟠</span>
-      <span>타인의 코드를 열람 중입니다. 내 타일을 클릭하면 내 코드로 돌아갑니다.</span>
-      <button
-        type="button"
-        onClick={resetToOnlyMine}
-        className="ml-2 rounded bg-orange-200 px-2 py-0.5 text-xs font-medium hover:bg-orange-300"
-      >
-        돌아가기
-      </button>
-    </div>
-  );
-}
