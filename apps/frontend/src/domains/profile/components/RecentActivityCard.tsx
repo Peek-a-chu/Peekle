@@ -1,4 +1,11 @@
-import { ActivityItem } from '../types';
+interface ActivityItem {
+    id: string;
+    type: 'solve' | 'study' | 'game';
+    title: string;
+    platform?: string;
+    timeAgo: string;
+    description?: string;
+}
 
 export function RecentActivityCard() {
     const activities: ActivityItem[] = [
