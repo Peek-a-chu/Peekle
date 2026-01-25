@@ -7,12 +7,16 @@ import com.peekle.domain.study.dto.http.response.StudyRoomCreateResponse;
 import com.peekle.domain.study.dto.http.response.StudyRoomListResponse;
 import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
 import com.peekle.domain.study.service.StudyRoomService;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
 
 @RestController
 @RequiredArgsConstructor
@@ -39,6 +43,22 @@ public class StudyRoomController {
             @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
 
         StudyRoomResponse response = studyRoomService.joinStudyRoom(userId, request);
+        return ApiResponse.success(response);
+    }
+
+    // 스터디 문제 제출 (가상의 submitStudyProblem 메서드 추가)
+    // 이 메서드는 요청에 따라 새로 추가된 것으로 가정합니다.
+    @PostMapping("/{studyId}/submit")
+    public ApiResponse<SubmissionResponse> submitStudyProblem(
+            @PathVariable Long studyId,
+            @RequestBody SubmissionRequest request, // Assuming SubmissionRequest DTO exists
+            Principal principal) {
+        System.out.println("[DEBUG] Received Study Specific Submission for Study: " + studyId);
+        System.out.println("[DEBUG] Request: " + request);
+
+        // Assuming studyRoomService has a submitStudyProblem method
+        // And SubmissionResponse DTO exists
+        SubmissionResponse response = studyRoomService.submitStudyProblem(studyId, request);
         return ApiResponse.success(response);
     }
 

@@ -165,9 +165,17 @@ async function checkForPendingSubmission() {
         const data = await chrome.storage.local.get(['pending_submission']);
         const task = data.pending_submission;
 
+        console.log("Peekle: Storage check result:", task);
+
         if (task && task.problemId === currentProblemId) {
+            console.log("Peekle: Found pending task, injecting...");
             // Clear the task so it doesn't run again on reload
-            await chrome.storage.local.remove('pending_submission');
+            // await chrome.storage.local.remove('pending_submission');
+
+            // Do NOT remove the task immediately. 
+            // We need to keep 'studyId' in pending_submission so that:
+            // 1. Typically the popup shows the correct status (Study Mode)
+            // 2. The background script knows where to send the submission (Study API)
 
             // Inject script to manipulate the page
             injectFillerScript(task.code, task.language);
@@ -178,68 +186,21 @@ async function checkForPendingSubmission() {
 }
 
 function injectFillerScript(code, language) {
+    console.log("Peekle: Injecting external script for auto-fill...");
+
     const script = document.createElement('script');
-    script.textContent = `
-    (function() {
-        console.log("Peekle: Auto-filling submission...");
-        
-        const targetLang = ${JSON.stringify(language)};
-        const targetCode = ${JSON.stringify(code)};
+    script.src = chrome.runtime.getURL('inject_script.js');
 
-        function attemptFill(retries) {
-            if (retries <= 0) {
-                console.error("Peekle: Failed to find editor elements.");
-                return;
-            }
+    // Pass data via dataset (URI encoded)
+    script.dataset.language = language;
+    script.dataset.code = encodeURIComponent(code);
 
-            // 1. Find CodeMirror instance
-            const cmEl = document.querySelector('.CodeMirror');
-            const cm = cmEl ? cmEl.CodeMirror : null;
-            
-            // 2. Find Language Select
-            const langSelect = document.getElementById('language');
+    script.onload = function () {
+        console.log("Peekle: Script injected and loaded.");
+        this.remove();
+    };
 
-            if (!cm || !langSelect) {
-                setTimeout(() => attemptFill(retries - 1), 500);
-                return;
-            }
-
-            // --- Set Language ---
-            let langVal = null;
-            // Iterate options to find matching text (e.g. "Java 11")
-            for(let opt of langSelect.options) {
-                if (opt.text.trim().includes(targetLang) || opt.text.trim() === targetLang) {
-                    langVal = opt.value;
-                    break;
-                }
-            }
-
-            if (langVal) {
-                langSelect.value = langVal;
-                
-                // Dispatch classic events
-                langSelect.dispatchEvent(new Event('change'));
-                
-                // Trigger Chosen.js update if available (jQuery is usually present on BOJ)
-                if (window.jQuery) {
-                    window.jQuery('#language').trigger('chosen:updated');
-                    window.jQuery('#language').trigger('change');
-                }
-            } else {
-                console.warn("Peekle: Language not found - " + targetLang);
-            }
-
-            // --- Set Code ---
-            cm.setValue(targetCode);
-            console.log("Peekle: Code filled.");
-        }
-
-        // Start attempting
-        attemptFill(10);
-    })();
-    `;
-    document.body.appendChild(script);
-    script.remove();
+    (document.head || document.documentElement).appendChild(script);
 }
 
 // Run the check
@@ -644,5 +605,29 @@ window.addEventListener('message', async (event) => {
         } catch (e) {
             console.error('[Peekle] Failed to access storage:', e);
         }
+    }
+
+    // Handle Auto-Submission Request from Frontend
+    if (event.data?.type === 'PEEKLE_SUBMIT_CODE') {
+        console.log('[Peekle Content] Received PEEKLE_SUBMIT_CODE:', event.data);
+        const { problemId, code, language, studyId } = event.data.payload;
+        if (!problemId || !code) {
+            console.error('[Peekle Content] Missing problemId or code');
+            return;
+        }
+
+        console.log(`[Peekle] Processing auto-submit for problem: ${problemId} ${studyId ? `(Study: ${studyId})` : ''}`);
+
+        // Send to background to save (bypasses direct storage permission issues on localhost)
+        chrome.runtime.sendMessage({
+            type: 'SAVE_PENDING_SUBMISSION',
+            payload: { problemId, code, language, studyId }
+        }, (response) => {
+            if (response && response.success) {
+                console.log('[Peekle] Storage saved via background, background will open tab.');
+            } else {
+                console.error('[Peekle] Failed to save via background:', chrome.runtime.lastError);
+            }
+        });
     }
 });

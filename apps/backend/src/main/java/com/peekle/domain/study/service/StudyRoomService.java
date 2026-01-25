@@ -13,6 +13,9 @@ import com.peekle.domain.study.entity.StudyMember;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
+import com.peekle.domain.submission.service.SubmissionService;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
@@ -41,6 +44,7 @@ public class StudyRoomService {
         private final InviteCodeService inviteCodeService;
         private final RedisTemplate<String, String> redisTemplate;
         private final UserRepository userRepository;
+        private final SubmissionService submissionService;
 
         // 스터디 방 생성 (초대코드 반환)
         @Transactional
@@ -286,4 +290,22 @@ public class StudyRoomService {
 
                 return StudyRoomResponse.from(studyRoom, memberResponses);
         }
+
+    @Transactional
+    public SubmissionResponse submitStudyProblem(Long studyId, SubmissionRequest request) {
+        System.out.println("[StudyRoomService] Processing study submission for studyId: " + studyId);
+
+        // 1. 일반 제출 처리 (검증 및 저장)
+        SubmissionResponse response = submissionService.saveGeneralSubmission(request);
+
+        if (response.isSuccess()) {
+            System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
+            // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
+            // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
+        } else {
+            System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
+        }
+
+        return response;
+    }
 }
