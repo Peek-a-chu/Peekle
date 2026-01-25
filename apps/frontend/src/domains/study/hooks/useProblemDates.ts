@@ -19,7 +19,7 @@ export function useProblemDates(studyId: number): UseProblemDatesResult {
     try {
       const dates = await fetchProblemDates(studyId);
       // Convert 'YYYY-MM-DD' strings to Date objects
-      const parsedDates = dates.map(dateStr => new Date(dateStr));
+      const parsedDates = dates.map((dateStr) => new Date(dateStr));
       setHistoryDates(parsedDates);
     } catch (err) {
       setError(err as Error);

@@ -6,21 +6,16 @@ import { useStudyRoomLogic } from '@/domains/study/hooks/useStudyRoomLogic';
 import { useStudyStore } from '@/domains/study/store/useStudyStore';
 
 export function StudyLayoutLeftPanel() {
-  const { 
-    problems, 
-    handleAddProblem, 
+  const {
+    problems,
+    handleAddProblem,
     handleSelectProblem,
     historyDates,
     submissions,
     fetchSubmissions,
   } = useStudyRoomLogic();
 
-  const { 
-    isLeftPanelFolded, 
-    toggleLeftPanel, 
-    selectedDate, 
-    setSelectedDate 
-  } = useStudyStore();
+  const { isLeftPanelFolded, toggleLeftPanel, selectedDate, setSelectedDate } = useStudyStore();
 
   return (
     <aside
@@ -41,7 +36,7 @@ export function StudyLayoutLeftPanel() {
           onToggleFold={toggleLeftPanel}
           isFolded={isLeftPanelFolded}
           submissions={submissions}
-          onFetchSubmissions={fetchSubmissions}
+          onFetchSubmissions={(problemId) => void fetchSubmissions(problemId)}
           historyDates={historyDates}
         />
       </div>

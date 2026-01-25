@@ -55,9 +55,7 @@ export interface RoomState {
 export interface RoomActions {
   // Room info actions
   setRoomInfo: (
-    info: Partial<
-      Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode'>
-    >,
+    info: Partial<Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode'>>,
   ) => void;
   setCurrentDate: (date: string) => void;
 
@@ -83,7 +81,7 @@ export interface RoomActions {
   setIsWhiteboardActive: (isActive: boolean) => void;
   setWhiteboardOpenedBy: (user: string | null) => void;
   setWhiteboardMessage: (message: string | null) => void;
-  
+
   // Test helper
   reset: () => void;
 }
@@ -126,9 +124,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
   setParticipants: (participants) => set({ participants }),
   updateParticipant: (id, updates) =>
     set((state) => ({
-      participants: state.participants.map((p) =>
-        p.id === id ? { ...p, ...updates } : p,
-      ),
+      participants: state.participants.map((p) => (p.id === id ? { ...p, ...updates } : p)),
     })),
   addParticipant: (participant) =>
     set((state) => ({ participants: [...state.participants, participant] })),
@@ -151,24 +147,25 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
 
 // Selectors
 export const selectSortedParticipants = (state: RoomState) => {
-    return [...state.participants].sort((a, b) => {
-        // Owner first
-        if (a.isOwner) return -1;
-        if (b.isOwner) return 1;
-        
-        // Then online
-        if (a.isOnline && !b.isOnline) return -1;
-        if (!a.isOnline && b.isOnline) return 1;
-        
-        // Alphabetical
-        return a.nickname.localeCompare(b.nickname);
-    });
+  return [...state.participants].sort((a, b) => {
+    // Owner first
+    if (a.isOwner) return -1;
+    if (b.isOwner) return 1;
+
+    // Then online
+    if (a.isOnline && !b.isOnline) return -1;
+    if (!a.isOnline && b.isOnline) return 1;
+
+    // Alphabetical
+    return a.nickname.localeCompare(b.nickname);
+  });
 };
 
-export const selectOnlineCount = (state: RoomState) => state.participants.filter(p => p.isOnline).length;
+export const selectOnlineCount = (state: RoomState) =>
+  state.participants.filter((p) => p.isOnline).length;
 
 export const selectIsOwner = (state: RoomState) => {
-    if (!state.currentUserId) return false;
-    const me = state.participants.find(p => p.id === state.currentUserId);
-    return me?.isOwner || false;
+  if (!state.currentUserId) return false;
+  const me = state.participants.find((p) => p.id === state.currentUserId);
+  return me?.isOwner || false;
 };
