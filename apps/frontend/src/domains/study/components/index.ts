@@ -10,9 +10,9 @@ export {
 export { CCRightPanel as RightPanel } from '@/domains/study/components/CCRightPanel';
 export { CCCenterPanel as CenterPanel } from '@/domains/study/components/CCCenterPanel';
 export { CCControlBar as ControlBar } from '@/domains/study/components/CCControlBar';
+export { CCViewModeBanner as ViewModeBanner } from '@/domains/study/components/CCViewModeBanner';
 export {
-  CCViewModeBanner as ViewModeBanner,
-  ViewModeFooterBanner,
-} from '@/domains/study/components/CCViewModeBanner';
-export { StudyLayoutContent, type StudyLayoutContentProps } from '@/domains/study/components/StudyLayoutContent';
+  StudyLayoutContent,
+  type StudyLayoutContentProps,
+} from '@/domains/study/components/StudyLayoutContent';
 export { StudyLayout } from '@/domains/study/layout';
