@@ -50,7 +50,7 @@ export function CCProblemListPanel({
   const [selectedSubmissionProblemId, setSelectedSubmissionProblemId] = useState<number | null>(
     null,
   );
-  
+
   const setViewMode = useRoomStore((state) => state.setViewMode);
   const setTargetSubmission = useRoomStore((state) => state.setTargetSubmission);
 
@@ -70,11 +70,13 @@ export function CCProblemListPanel({
     if (!submission) return;
 
     // Use selectedProblem from outer scope logic or find it here
-    const currentProblem = problems.find(p => p.id === selectedSubmissionProblemId);
-    
+    const currentProblem = problems.find((p) => p.id === selectedSubmissionProblemId);
+
     setTargetSubmission({
       id: submission.id,
-      problemTitle: currentProblem ? `${currentProblem.number}. ${currentProblem.title}` : 'Unknown Problem',
+      problemTitle: currentProblem
+        ? `${currentProblem.number}. ${currentProblem.title}`
+        : 'Unknown Problem',
       username: submission.username,
       language: submission.language,
       memory: submission.memory,
@@ -101,33 +103,30 @@ export function CCProblemListPanel({
 
   return (
     <div className={cn('flex h-full flex-col relative bg-card', className)}>
-      {/* Top Row: Fold Button */}
-      <div className="flex items-center px-4 py-2 shrink-0 border-b border-border">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground p-0 h-8 gap-1"
-          onClick={onToggleFold}
-        >
-          <ChevronLeft className="h-4 w-4" />
-          <span className="text-sm font-medium">접기</span>
-        </Button>
-      </div>
-
-      {/* Second Row: Date & Add Button */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-border">
+      {/* Top Row: Date, Add Button & Fold Button */}
+      <div className="flex items-center justify-between px-3 h-14 shrink-0 border-b border-border">
         <CCCalendarWidget
           selectedDate={selectedDate}
           isOpen={isCalendarOpen}
           onToggle={() => setIsCalendarOpen(!isCalendarOpen)}
         />
-        <Button
-          onClick={() => setAddProblemModalOpen(true)}
-          className="bg-pink-500 hover:bg-pink-600 text-white h-8 text-xs px-3 shadow-sm"
-        >
-          <Plus className="mr-1 h-3 w-3" />
-          문제 추가
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setAddProblemModalOpen(true)}
+            className="bg-pink-500 hover:bg-pink-600 text-white h-8 text-xs px-3 shadow-sm"
+          >
+            <Plus className="mr-1 h-3 w-3" />
+            문제 추가
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground p-0 h-8 gap-4"
+            onClick={onToggleFold}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Inline Calendar */}

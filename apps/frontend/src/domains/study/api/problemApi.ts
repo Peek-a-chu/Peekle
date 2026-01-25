@@ -7,7 +7,7 @@ export async function fetchSubmissions(studyId: number, problemId: number): Prom
   if (!res.ok) {
     throw new Error('Failed to fetch submissions');
   }
-  return res.json();
+  return res.json() as Promise<Submission[]>;
 }
 
 export async function fetchProblems(studyId: number, date: string): Promise<Problem[]> {
@@ -15,7 +15,7 @@ export async function fetchProblems(studyId: number, date: string): Promise<Prob
   if (!res.ok) {
     throw new Error('Failed to fetch problems');
   }
-  return res.json();
+  return res.json() as Promise<Problem[]>;
 }
 
 export async function fetchProblemDates(studyId: number): Promise<string[]> {
@@ -23,5 +23,5 @@ export async function fetchProblemDates(studyId: number): Promise<string[]> {
   if (!res.ok) {
     throw new Error('Failed to fetch problem dates');
   }
-  return res.json();
+  return res.json() as Promise<string[]>;
 }

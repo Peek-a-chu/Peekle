@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, X } from 'lucide-react';
+import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   type ViewMode,
@@ -73,8 +73,10 @@ export function CCIDEToolbar({
           <div
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium animate-in fade-in slide-in-from-left-2 duration-300',
-              isRealtime && 'bg-amber-100 text-amber-700',
-              isSaved && 'bg-green-100 text-green-700',
+              // Realtime: Pink Badge
+              isRealtime && 'bg-pink-100 text-pink-700',
+              // Saved: Blue/Indigo Badge (Green is usually for success, saved file feels more like Blue/Gray, but sticking to design request or standard)
+              isSaved && 'bg-indigo-100 text-indigo-700',
             )}
           >
             {isRealtime ? <Eye className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}

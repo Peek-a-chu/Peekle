@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
-import { X, Search, CheckCircle2, Package, User, Code2, Clock, HardDrive, FileCode2 } from 'lucide-react';
+import { X, Search, CheckCircle2, User, Clock, HardDrive, FileCode2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Submission } from '@/domains/study/types';
 import { BoxSearchIcon } from '@/assets/icons/BoxSearchIcon';
@@ -39,7 +38,7 @@ export function CCSubmissionViewerModal({
         <div className="flex items-start justify-between p-6 pb-2">
           <div className="flex items-start gap-4">
             <div className="h-12 w-12 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
-               <BoxSearchIcon className="h-6 w-6 text-green-600" />
+              <BoxSearchIcon className="h-6 w-6 text-green-600" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-foreground">풀이 보관함</h2>
@@ -49,35 +48,47 @@ export function CCSubmissionViewerModal({
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
             <X className="h-5 w-5" />
           </Button>
         </div>
 
         {/* Content Container */}
         <div className="p-6 pt-2 flex flex-col gap-6 flex-1 overflow-hidden">
-
           {/* Info Box */}
-            <div className="bg-background rounded-xl border border-border p-5 shadow-sm space-y-4">
+          <div className="bg-background rounded-xl border border-border p-5 shadow-sm space-y-4">
             {/* Top Info */}
             <div className="flex items-start gap-2.5">
-               <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-               <p className="text-sm text-foreground font-medium">
-                 제출하여 맞은 사람에 한해서 저장된 코드를 보여줍니다. (실시간 작성 코드 X)
-               </p>
+              <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-foreground font-medium">
+                제출하여 맞은 사람에 한해서 저장된 코드를 보여줍니다. (실시간 작성 코드 X)
+              </p>
             </div>
 
             {/* Guide Section */}
             <div className="pl-7 space-y-2">
               <p className="text-sm font-bold text-foreground">실시간 코드를 보고 싶다면?</p>
-              
+
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                 <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">방법 1</span>
-                 <span>상단 캠 영역의 참여자 타일을 선택하세요.</span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">
+                  방법 1
+                </span>
+                <span>상단 캠 영역의 참여자 타일을 선택하세요.</span>
               </div>
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                 <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">방법 2</span>
-                 <span className="leading-snug">참여자 타일을 찾기 어렵다면, 참여자 목록에서 온라인 참가자 프로필 우측 클릭 메뉴의 <span className="font-semibold text-pink-600">&apos;실시간 코드 확인&apos;</span> 버튼을 클릭해주세요.</span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">
+                  방법 2
+                </span>
+                <span className="leading-snug">
+                  참여자 타일을 찾기 어렵다면, 참여자 목록에서 온라인 참가자 프로필 우측 클릭 메뉴의{' '}
+                  <span className="font-semibold text-pink-600">&apos;실시간 코드 확인&apos;</span>{' '}
+                  버튼을 클릭해주세요.
+                </span>
               </div>
             </div>
           </div>
@@ -110,8 +121,8 @@ export function CCSubmissionViewerModal({
                   <div className="flex items-center gap-4">
                     {/* Avatar Placeholder */}
                     <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                        {/* Can use nice avatar images if available, using icon for now */}
-                       <User className="h-5 w-5 text-slate-400" />
+                      {/* Can use nice avatar images if available, using icon for now */}
+                      <User className="h-5 w-5 text-slate-400" />
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -122,16 +133,16 @@ export function CCSubmissionViewerModal({
                           {sub.language}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                         <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
-                           <HardDrive className="h-3 w-3" />
-                           <span>{(sub.memory / 1024).toFixed(1)}MB</span>
-                         </div>
-                         <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
-                           <Clock className="h-3 w-3" />
-                           <span>{sub.time}ms</span>
-                         </div>
+                        <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
+                          <HardDrive className="h-3 w-3" />
+                          <span>{(sub.memory / 1024).toFixed(1)}MB</span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
+                          <Clock className="h-3 w-3" />
+                          <span>{sub.time}ms</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -146,18 +157,18 @@ export function CCSubmissionViewerModal({
                 </div>
               ))
             ) : (
-                <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
-                    <Search className="h-8 w-8 opacity-20" />
-                    <p className="text-sm">검색 결과가 없습니다.</p>
-                </div>
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+                <Search className="h-8 w-8 opacity-20" />
+                <p className="text-sm">검색 결과가 없습니다.</p>
+              </div>
             )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="p-6 pt-2 flex justify-end">
-          <Button 
-            className="rounded-full px-6 bg-slate-800 hover:bg-slate-900 text-white font-medium" 
+          <Button
+            className="rounded-full px-6 bg-slate-800 hover:bg-slate-900 text-white font-medium"
             onClick={onClose}
           >
             닫기
