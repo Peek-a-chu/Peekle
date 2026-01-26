@@ -47,7 +47,7 @@ const UserProfileSection = () => {
           onClick={() => setIsOpen(!isOpen)}
           className="w-full flex items-center gap-3 group"
         >
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center overflow-hidden border border-white shrink-0 ml-2 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center overflow-hidden border-2 border-background shrink-0 ml-2 shadow-sm">
             {user.profileImage ? (
               <img
                 src={user.profileImage}
@@ -55,33 +55,33 @@ const UserProfileSection = () => {
                 className="w-full h-full object-cover rounded-full"
               />
             ) : (
-              <span className="text-white font-bold text-lg">
+              <span className="text-primary-foreground font-bold text-lg">
                 {user.nickname.charAt(0).toUpperCase()}
               </span>
             )}
           </div>
-          <span className="flex-1 font-semibold text-sm text-slate-800 truncate group-hover:text-slate-900 text-left">
+          <span className="flex-1 font-semibold text-sm text-foreground truncate group-hover:text-primary text-left transition-colors">
             {user.nickname}
           </span>
           <ChevronDown
-            className={`w-5 h-5 text-gray-400 shrink-0 mr-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-5 h-5 text-muted-foreground shrink-0 mr-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />
         </button>
 
         {/* 드롭다운 메뉴 */}
         {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-2 mx-2 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
+          <div className="absolute top-full left-0 right-0 mt-2 mx-2 bg-card rounded-xl shadow-lg border border-border py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
             <Link
               href="/profile/me"
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
             >
               <User className="w-4 h-4" />
               내정보
             </Link>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
             >
               <LogOut className="w-4 h-4" />
               로그아웃

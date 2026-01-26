@@ -54,11 +54,11 @@ export function GameModeCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all duration-200',
+        'group flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all duration-200',
         colors.border, // 테두리 항상 적용
         isSelected
-          ? colors.selectedBg // 선택됨: 진한 배경
-          : [colors.bg, colors.hoverBg], // 기본: 흰색 + 호버 시 연한 배경
+          ? [colors.selectedBg, 'text-zinc-700 dark:text-zinc-700'] // 선택됨: 진한 배경 + 회색 글자
+          : [colors.bg, colors.hoverBg, 'hover:text-zinc-700 dark:hover:text-zinc-700'], // 기본: 흰색 + 호버 시 연한 배경 + 회색 글자
       )}
     >
       <div
@@ -67,8 +67,22 @@ export function GameModeCard({
         <Icon className={cn('h-6 w-6', colors.icon)} />
       </div>
       <div className="text-center">
-        <h3 className="font-semibold text-foreground">{title}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        <h3
+          className={cn(
+            'font-semibold transition-colors',
+            isSelected ? 'text-zinc-700' : 'text-foreground group-hover:text-zinc-700',
+          )}
+        >
+          {title}
+        </h3>
+        <p
+          className={cn(
+            'mt-1 text-xs transition-colors',
+            isSelected ? 'text-zinc-600' : 'text-muted-foreground group-hover:text-zinc-600',
+          )}
+        >
+          {description}
+        </p>
       </div>
     </button>
   );

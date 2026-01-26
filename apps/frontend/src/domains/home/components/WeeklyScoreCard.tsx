@@ -41,22 +41,22 @@ const WeeklyScoreCard = () => {
             case 'league':
                 return <Award className="w-4 h-4 text-yellow-500" />;
             default:
-                return <Trophy className="w-4 h-4 text-gray-500" />;
+                return <Trophy className="w-4 h-4 text-muted-foreground" />;
         }
     };
 
     return (
-        <div className="bg-card border border-card-border rounded-2xl p-6 h-full transition-all duration-300">
+        <div className="bg-card border border-border rounded-2xl p-6 h-full transition-all duration-300">
             {/* 헤더 */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-primary" />
                     <div>
                         <h3 className="font-bold text-foreground">기간 별 점수 기록</h3>
-                        <p className="text-xs text-gray-500">획득한 점수를 확인해보세요</p>
+                        <p className="text-xs text-muted-foreground">획득한 점수를 확인해보세요</p>
                     </div>
                 </div>
-                <div className="w-6 h-6" /> {/* 헤더 균형을 위한 공간 */}
+                <div className="w-6 h-6" />
             </div>
 
             {/* 기간 표시 & 내비게이션 */}
@@ -64,18 +64,18 @@ const WeeklyScoreCard = () => {
                 <button
                     onClick={handlePrev}
                     disabled={!canGoPrev}
-                    className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-gray-100 cursor-pointer' : 'opacity-20 cursor-not-allowed'}`}
+                    className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-accent cursor-pointer' : 'opacity-20 cursor-not-allowed'}`}
                     title="이전 주"
                 >
-                    <ChevronLeft className="w-4 h-4 text-gray-400" />
+                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
                 </button>
 
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-800/50 px-3 py-1 rounded-full border border-gray-100 dark:border-zinc-700">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div className="flex items-center gap-2 bg-muted/50 px-3 py-1 rounded-full border border-border">
+                    <span className="text-sm font-medium text-foreground">
                         {data.dateRange}
                     </span>
                     <div className="relative group flex items-center">
-                        <Calendar className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary transition-colors cursor-pointer" />
+                        <Calendar className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors cursor-pointer" />
                         <input
                             type="date"
                             onChange={handleDateSelect}
@@ -88,16 +88,16 @@ const WeeklyScoreCard = () => {
                 <button
                     onClick={handleNext}
                     disabled={!canGoNext}
-                    className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-gray-100 cursor-pointer' : 'opacity-20 cursor-not-allowed'}`}
+                    className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-accent cursor-pointer' : 'opacity-20 cursor-not-allowed'}`}
                     title="다음 주"
                 >
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </button>
             </div>
 
             {/* 주간 총점 */}
-            <div className="bg-secondary/30 dark:bg-zinc-800 rounded-xl p-4 mb-4 text-center border border-secondary/20 shadow-sm transition-all duration-300">
-                <p className="text-xs text-secondary-foreground font-medium mb-1">주간 점수</p>
+            <div className="bg-secondary/50 rounded-xl p-4 mb-4 text-center border border-border shadow-sm transition-all duration-300">
+                <p className="text-xs text-muted-foreground font-medium mb-1">주간 점수</p>
                 <div className="flex items-center justify-center gap-1">
                     <p className="text-3xl font-black text-primary tracking-tight">
                         {data.totalScore.toLocaleString()}
@@ -112,18 +112,18 @@ const WeeklyScoreCard = () => {
                 {data.activities.map((activity, index) => (
                     <div
                         key={index}
-                        className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0"
+                        className="flex items-center justify-between py-2 border-b border-border last:border-b-0"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center">
                                 {getIcon(activity.icon)}
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-foreground">{activity.name}</p>
-                                <p className="text-xs text-gray-500">{activity.detail}</p>
+                                <p className="text-xs text-muted-foreground">{activity.detail}</p>
                             </div>
                         </div>
-                        <span className="text-sm font-bold text-success">+{activity.score}점</span>
+                        <span className="text-sm font-bold text-emerald-500">+{activity.score}점</span>
                     </div>
                 ))}
             </div>

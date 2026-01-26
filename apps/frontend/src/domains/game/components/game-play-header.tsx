@@ -34,7 +34,7 @@ export function GamePlayHeader({
             <div className="flex items-center gap-4">
                 <h1 className="text-lg font-semibold text-foreground">{title}</h1>
                 <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-pink-500/10 px-3 py-1 text-xs font-medium text-pink-500">
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                         {teamLabel}
                     </span>
                     <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -59,9 +59,9 @@ export function GamePlayHeader({
             )}
 
             {/* 우측: 타이머 */}
-            <div className="flex items-center gap-2 rounded-lg bg-pink-500/10 px-4 py-2">
-                <Clock className="h-4 w-4 text-pink-500" />
-                <span className="text-lg font-bold text-pink-500 tabular-nums">
+            <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2">
+                <Clock className="h-4 w-4 text-primary" />
+                <span className="text-lg font-bold text-primary tabular-nums">
                     {formattedTime}
                 </span>
             </div>

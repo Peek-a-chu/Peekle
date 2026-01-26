@@ -88,7 +88,7 @@ export function CCProfileView({ user, isMe }: Props) {
 
   return (
     <div className="max-w-5xl p-6 md:p-10 space-y-8 min-h-screen">
-      <div className="p-6 border border-gray-100 rounded-xl bg-white">
+      <div className="p-6 border border-card-border rounded-xl bg-card">
         {/* 1. Header Section */}
         <CCProfileHeader user={user} isMe={isMe} />
 
@@ -106,7 +106,7 @@ export function CCProfileView({ user, isMe }: Props) {
               key={tab}
               onClick={() => setActiveTab(tab as TabKey)}
               className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
-                ? 'bg-white text-foreground shadow-sm ring-1 ring-black/5'
+                ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
                 : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
@@ -119,7 +119,7 @@ export function CCProfileView({ user, isMe }: Props) {
       {/* 5. Content Area */}
       {activeTab === TABS.OVERVIEW && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="border border-card-border rounded-2xl bg-white overflow-hidden">
+          <div className="border border-card-border rounded-2xl bg-card overflow-hidden">
             {/* 활동 스트릭 */}
             <ActivityStreak onDateSelect={setSelectedDate} />
 
