@@ -10,10 +10,11 @@ import { CCRightPanel as RightPanel } from './CCRightPanel';
 import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
+import type { Problem } from '@/domains/study/types';
 import { fetchStudyParticipants, fetchStudyRoom } from '@/app/api/studyApi';
 import { formatDate } from '@/lib/utils';
 
-export function CCStudyRoomClient() {
+export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
   const router = useRouter();
   const studyId = Number(params.id) || 0;
@@ -29,7 +30,10 @@ export function CCStudyRoomClient() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
-  const [selectedProblemId, setSelectedProblemId] = useState<number | undefined>(undefined);
+
+  // Global state for selected problem
+  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
+  const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
 
   // API Hooks
   const { problems, addProblem, removeProblem } = useProblems(studyId, selectedDate);
@@ -50,39 +54,43 @@ export function CCStudyRoomClient() {
     setCurrentUserId(1);
   }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId]);
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     router.push('/study');
   };
 
-  const handleAddProblem = async (title: string, number: number, tags?: string[]) => {
+  const handleAddProblem = async (
+    title: string,
+    number: number,
+    tags?: string[],
+  ): Promise<void> => {
     await addProblem(title, number, tags);
     console.log('Add problem clicked in header');
   };
 
-  const handleInvite = () => {
+  const handleInvite = (): void => {
     setInviteModalOpen(true);
     console.log('Invite clicked');
   };
 
-  const handleSettings = () => {
+  const handleSettings = (): void => {
     setSettingsOpen(true);
     console.log('Settings clicked');
   };
 
-  const handleWhiteboardClick = () => {
+  const handleWhiteboardClick = (): void => {
     console.log('Whiteboard clicked');
   };
 
-  const handleSelectProblem = (problemId: number) => {
-    setSelectedProblemId(problemId);
+  const handleSelectProblem = (problem: Problem): void => {
+    setSelectedProblem(problem.id, problem.title);
   };
 
-  const handleDateChange = (date: Date) => {
+  const handleDateChange = (date: Date): void => {
     setSelectedDate(date);
     console.log('Date selected:', date);
   };
 
-  const handleToggleLeftPanel = () => {
+  const handleToggleLeftPanel = (): void => {
     setIsLeftPanelFolded(!isLeftPanelFolded);
   };
 
@@ -106,7 +114,7 @@ export function CCStudyRoomClient() {
           onAddProblem={addProblem}
           onRemoveProblem={removeProblem}
           onSelectProblem={handleSelectProblem}
-          selectedProblemId={selectedProblemId}
+          selectedProblemId={selectedProblemId ?? undefined}
           onToggleFold={handleToggleLeftPanel}
           isFolded={isLeftPanelFolded}
           submissions={submissions}
