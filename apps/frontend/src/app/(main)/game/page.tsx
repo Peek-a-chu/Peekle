@@ -5,7 +5,7 @@ import { PasswordModal } from '@/domains/game/components/password-modal';
 import { useGamePageLogic } from '@/domains/game/hooks/useGamePageLogic';
 import { GameLayoutHeader, GameLayoutFilter, GameLayoutContent } from '@/domains/game/layout';
 
-export default function GamesPage() {
+export default function GamesPage(): React.ReactNode {
   const {
     selectedMode,
     selectedTeamType,

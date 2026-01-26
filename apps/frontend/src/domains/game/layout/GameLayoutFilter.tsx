@@ -64,7 +64,7 @@ export function GameLayoutFilter({
 
       {/* 필터 탭 */}
       <section className="mb-6">
-        <Tabs value={statusFilter} onValueChange={(v) => onStatusChange(v as StatusFilter)}>
+        <Tabs value={statusFilter} onValueChange={(v: string) => onStatusChange(v as StatusFilter)}>
           <TabsList className="bg-muted/50 p-1 border border-border">
             <TabsTrigger
               value="ALL"

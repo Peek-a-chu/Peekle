@@ -57,7 +57,7 @@ export function GameCreationStepMode({
           <Switch
             id="private"
             checked={formData.isPrivate}
-            onCheckedChange={(checked) => onUpdateForm('isPrivate', checked)}
+            onCheckedChange={(checked: boolean) => onUpdateForm('isPrivate', checked)}
           />
         </div>
         {formData.isPrivate && (

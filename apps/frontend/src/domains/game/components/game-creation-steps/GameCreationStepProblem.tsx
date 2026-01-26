@@ -27,7 +27,7 @@ export function GameCreationStepProblem({
     <div className="space-y-6 pt-6">
       <Tabs
         value={formData.problemSource}
-        onValueChange={(v) => onUpdateForm('problemSource', v as ProblemSource)}
+        onValueChange={(v: string) => onUpdateForm('problemSource', v as ProblemSource)}
       >
         <TabsList className="grid w-full grid-cols-2 p-1 bg-muted rounded-lg border-2 border-muted">
           <TabsTrigger

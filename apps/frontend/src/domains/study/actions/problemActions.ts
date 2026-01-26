@@ -1,8 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export async function addProblemAction(
   studyId: number,
@@ -22,7 +20,7 @@ export async function addProblemAction(
   // Since we are using client-side fetching via React Query / useEffect,
   // we might still rely on the client to refetch, but this action
   // provides the server-side mutation capability.
-  revalidatePath(`/study/${studyId}`);
+  // revalidatePath(`/study/${studyId}`);
 }
 
 export async function deleteProblemAction(studyId: number, problemId: number): Promise<void> {
@@ -34,5 +32,5 @@ export async function deleteProblemAction(studyId: number, problemId: number): P
     throw new Error('Failed to delete problem');
   }
 
-  revalidatePath(`/study/${studyId}`);
+  // revalidatePath(`/study/${studyId}`);
 }

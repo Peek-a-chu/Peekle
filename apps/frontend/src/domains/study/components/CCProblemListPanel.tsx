@@ -17,7 +17,7 @@ export type { Problem } from '@/domains/study/types';
 export interface CCProblemListPanelProps {
   problems?: Problem[];
   selectedProblemId?: number;
-  onSelectProblem?: (problemId: number) => void;
+  onSelectProblem?: (problem: Problem) => void;
   className?: string;
   onToggleFold: () => void;
   isFolded: boolean;
@@ -158,7 +158,7 @@ export function CCProblemListPanel({
                     url: `https://www.acmicpc.net/problem/${problem.number}`,
                   }}
                   isSelected={selectedProblemId === problem.id}
-                  onSelect={() => onSelectProblem?.(problem.id)}
+                  onSelect={() => onSelectProblem?.(problem)}
                   onOpenSubmission={handleOpenSubmission}
                 />
               </li>

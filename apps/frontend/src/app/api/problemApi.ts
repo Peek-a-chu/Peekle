@@ -1,6 +1,6 @@
 import { Problem, Submission } from '@/domains/study/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export async function fetchSubmissions(studyId: number, problemId: number): Promise<Submission[]> {
   const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/problems/${problemId}/submissions`);

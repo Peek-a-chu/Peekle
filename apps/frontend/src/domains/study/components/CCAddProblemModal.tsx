@@ -21,7 +21,12 @@ interface CCAddProblemModalProps {
   onRemove: (problemId: number) => Promise<void>;
 }
 
-export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddProblemModalProps) {
+export function CCAddProblemModal({
+  isOpen,
+  onClose,
+  onAdd,
+  onRemove,
+}: CCAddProblemModalProps): React.ReactNode {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +41,7 @@ export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddPro
       return;
     }
 
-    const search = async () => {
+    const search = async (): Promise<void> => {
       setIsLoading(true);
       try {
         const data = await searchExternalProblems(debouncedQuery);
@@ -53,7 +58,7 @@ export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddPro
 
   if (!isOpen) return null;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!selectedProblem) return;
 
     // [Validation] If trying to delete a problem that has submissions
