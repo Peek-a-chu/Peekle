@@ -53,7 +53,7 @@ const ThemeSection = () => {
             {/* 메인 컬러 */}
             <section>
                 <h4 className="text-sm font-bold text-foreground mb-6">메인 컬러</h4>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-4 sm:grid-cols-4 gap-y-8 gap-x-4 p-1.5">
                     {colors.map((color) => (
                         <div key={color.name} className="flex flex-col items-center gap-3">
                             <button
@@ -71,7 +71,7 @@ const ThemeSection = () => {
                             </button>
                             <span
                                 className={cn(
-                                    'text-[11px] font-bold transition-colors',
+                                    'text-[11px] font-bold transition-colors whitespace-nowrap',
                                     accentColor === color.name
                                         ? 'text-foreground'
                                         : 'text-muted-foreground',
@@ -111,7 +111,7 @@ const ThemeSection = () => {
                         </div>
                         <span
                             className={cn(
-                                'text-[11px] font-bold transition-colors',
+                                'text-[11px] font-bold transition-colors whitespace-nowrap',
                                 accentColor === 'custom' ? 'text-foreground' : 'text-muted-foreground',
                             )}
                         >

@@ -19,14 +19,14 @@ const SettingsModal = () => {
         <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
             <DialogOverlay className="bg-black/40 backdrop-blur-sm z-[100]" />
             <DialogContent
-                className="max-w-2xl w-[90vw] p-0 overflow-hidden border border-border shadow-2xl z-[101] bg-card rounded-2xl"
+                className="max-w-2xl w-[95vw] sm:w-[90vw] p-0 overflow-hidden border border-border shadow-2xl z-[101] bg-card rounded-2xl animate-in zoom-in-95 duration-200"
             >
-                <div className="flex h-[550px]">
+                <div className="flex flex-col sm:flex-row h-[600px] sm:h-[550px]">
                     {/* 좌측 사이드바 (내비게이션) */}
-                    <aside className="w-1/3 bg-muted border-r border-border p-6 flex flex-col gap-6">
-                        <h2 className="text-xl font-black text-foreground tracking-tight">설정</h2>
+                    <aside className="w-full sm:w-64 bg-muted border-b sm:border-b-0 sm:border-r border-border p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 shrink-0">
+                        <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight px-2 sm:px-0">설정</h2>
 
-                        <nav className="flex flex-col gap-1.5">
+                        <nav className="flex sm:flex-col gap-1.5 overflow-x-auto sm:overflow-x-visible no-scrollbar pb-2 sm:pb-0 px-2 sm:px-0">
                             {tabs.map((tab) => {
                                 const Icon = tab.icon;
                                 const isActive = activeTab === tab.id;
@@ -49,7 +49,7 @@ const SettingsModal = () => {
                             })}
                         </nav>
 
-                        <div className="mt-auto pt-4 border-t border-border/50">
+                        <div className="hidden sm:block mt-auto pt-4 border-t border-border/50">
                             <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest opacity-40">
                                 System Version 1.0.0
                             </p>
@@ -57,7 +57,7 @@ const SettingsModal = () => {
                     </aside>
 
                     {/* 우측 컨텐츠 영역 */}
-                    <main className="flex-1 p-8 relative flex flex-col min-w-0 bg-card">
+                    <main className="flex-1 p-4 sm:p-8 relative flex flex-col min-w-0 bg-card overflow-hidden">
                         {/* 활성 탭 컨텐츠 */}
                         <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
                             {activeTab === 'theme' ? <ThemeSection /> : <DeviceSection />}
