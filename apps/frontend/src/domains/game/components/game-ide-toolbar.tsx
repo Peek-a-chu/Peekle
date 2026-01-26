@@ -59,7 +59,7 @@ export function GameIDEToolbar({
                 <Button
                     size="sm"
                     onClick={onSubmit}
-                    className="gap-1 bg-[#EDF2F8] text-foreground hover:bg-[#DFE7F0]"
+                    className="gap-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50"
                     title="제출하기"
                 >
                     <Send className="h-3 w-3" />
