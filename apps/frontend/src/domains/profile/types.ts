@@ -8,6 +8,7 @@ export interface UserProfile {
   streakCurrent: number;
   streakMax: number;
   avatarUrl?: string;
+  solvedCount: number;
 }
 
 export interface SubmissionHistory {
@@ -24,3 +25,5 @@ export interface SubmissionHistory {
   sourceDetail?: string; // 스터디명 or 게임유형(팀전/개인전)
   code?: string; // 상세 보기 시 보여줄 코드
 }
+
+export type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH';

@@ -27,6 +27,7 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll() // H2 Console 허용
                         .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API 허용
                         .requestMatchers("/api/dev/users/**").permitAll()
+                        .requestMatchers("/api/users/me/**").permitAll() // Extension token endpoints
                         .requestMatchers("/ws-stomp/**").permitAll() // WebSocket 연결 허용
                         .requestMatchers("/v3/api-docs/**",
                                 "/swagger-ui/**",

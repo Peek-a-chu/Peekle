@@ -32,8 +32,11 @@ public class UserController {
     }
 
     @GetMapping("/me/profile")
-    public ApiResponse<UserProfileResponse> getUserProfile(@RequestHeader("X-Peekle-Token") String token) {
-        UserProfileResponse response = userService.getUserProfileByToken(token);
+    public ApiResponse<UserProfileResponse> getUserProfile(@RequestHeader(value = "X-Peekle-Token", required = false) String token) {
+        // TODO: Get actual logged-in user ID from SecurityContext
+        // me일 때 임시로 userid가 1인 걸로 하자
+        Long currentUserId = 1L;
+        UserProfileResponse response = userService.getUserProfile(currentUserId);
         return ApiResponse.success(response);
     }
 
