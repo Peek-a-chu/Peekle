@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { hexToHsl } from '@/lib/utils';
 
 export type ThemeMode = 'light' | 'dark';
 export type AccentColor = 'blue' | 'skyblue' | 'orange' | 'pink' | 'green' | 'lime' | 'custom';
@@ -13,63 +14,69 @@ interface ThemeState {
     setCustomColor: (hex: string) => void;
 }
 
-const hexToHsl = (hex: string): string => {
-    let r = 0, g = 0, b = 0;
-    if (hex.length === 4) {
-        r = parseInt(hex[1] + hex[1], 16);
-        g = parseInt(hex[2] + hex[2], 16);
-        b = parseInt(hex[3] + hex[3], 16);
-    } else if (hex.length === 7) {
-        r = parseInt(hex.substring(1, 3), 16);
-        g = parseInt(hex.substring(3, 5), 16);
-        b = parseInt(hex.substring(5, 7), 16);
-    }
 
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h = 0, s, l = (max + min) / 2;
+const disableTransitions = () => {
+    const css = document.createElement('style');
+    css.appendChild(
+        document.createTextNode(
+            `* {
+       -webkit-transition: none !important;
+       -moz-transition: none !important;
+       -ms-transition: none !important;
+       -o-transition: none !important;
+       transition: none !important;
+    }`,
+        ),
+    );
+    document.head.appendChild(css);
 
-    if (max === min) {
-        h = s = 0;
-    } else {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-            case g: h = (b - r) / d + 2; break;
-            case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-    }
-
-    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+    return () => {
+        // Force reflow
+        (() => window.getComputedStyle(document.body).opacity)();
+        // Remove the style tag
+        document.head.removeChild(css);
+    };
 };
 
-const ACCENT_COLORS: Record<Exclude<AccentColor, 'custom'>, string> = {
-    blue: '221 83% 53%',
-    skyblue: '180 100% 35%',
-    orange: '32 95% 50%',
-    pink: '327 73% 60%',
-    green: '132 36% 31%',
-    lime: '132 65% 58%', // 부드러운 연두색
-};
+export interface AccentColorPreset {
+    name: Exclude<AccentColor, 'custom'>;
+    label: string;
+    hsl: string;
+}
 
-const ACCENT_SECONDARY: Record<Exclude<AccentColor, 'custom'>, string> = {
-    blue: '221 83% 95%',
-    skyblue: '180 100% 95%',
-    orange: '32 95% 95%',
-    pink: '327 73% 96%',
-    green: '132 36% 95%',
-    lime: '132 65% 95%',
-};
+export const ACCENT_COLOR_PRESETS: AccentColorPreset[] = [
+    { name: 'blue', label: '블루', hsl: '221 83% 53%' },
+    { name: 'skyblue', label: '스카이블루', hsl: '180 100% 35%' },
+    { name: 'orange', label: '오렌지', hsl: '32 95% 50%' },
+    { name: 'pink', label: '핑크', hsl: '327 73% 60%' },
+    { name: 'green', label: '그린', hsl: '132 36% 31%' },
+    { name: 'lime', label: '라임', hsl: '132 65% 58%' },
+];
 
-const ACCENT_SECONDARY_FOREGROUND: Record<Exclude<AccentColor, 'custom'>, string> = {
-    blue: '221 83% 25%',
-    skyblue: '180 100% 25%',
-    orange: '32 95% 25%',
-    pink: '327 73% 25%',
-    green: '132 36% 25%',
-    lime: '132 65% 25%',
+export const ACCENT_COLORS: Record<Exclude<AccentColor, 'custom'>, string> =
+    ACCENT_COLOR_PRESETS.reduce(
+        (acc, preset) => ({ ...acc, [preset.name]: preset.hsl }),
+        {} as Record<Exclude<AccentColor, 'custom'>, string>,
+    );
+
+export const ACCENT_SECONDARY: Record<Exclude<AccentColor, 'custom'>, string> =
+    ACCENT_COLOR_PRESETS.reduce((acc, preset) => {
+        const [h, s] = preset.hsl.split(' ');
+        // 핑크 등 특정 컬러의 세컨더리 최적화 (기존 로직 유지)
+        const l = preset.name === 'pink' ? '96%' : '95%';
+        return { ...acc, [preset.name]: `${h} ${s} ${l}` };
+    }, {} as Record<Exclude<AccentColor, 'custom'>, string>);
+
+export const ACCENT_SECONDARY_FOREGROUND: Record<Exclude<AccentColor, 'custom'>, string> =
+    ACCENT_COLOR_PRESETS.reduce((acc, preset) => {
+        const [h, s] = preset.hsl.split(' ');
+        return { ...acc, [preset.name]: `${h} ${s} 25%` };
+    }, {} as Record<Exclude<AccentColor, 'custom'>, string>);
+
+const applyThemeVariables = (root: HTMLElement, variables: { primary: string; secondary: string; foreground: string }) => {
+    root.style.setProperty('--primary', variables.primary);
+    root.style.setProperty('--secondary', variables.secondary);
+    root.style.setProperty('--secondary-foreground', variables.foreground);
 };
 
 export const useThemeStore = create<ThemeState>()(
@@ -77,9 +84,10 @@ export const useThemeStore = create<ThemeState>()(
         (set, get) => ({
             mode: 'light',
             accentColor: 'pink',
-            customColor: '#326b3d', // 기본 초록색 HEX
+            customColor: '#E24EA0',
 
             setMode: (mode) => {
+                const cleanup = typeof window !== 'undefined' ? disableTransitions() : null;
                 set({ mode });
                 if (typeof window !== 'undefined') {
                     const root = window.document.documentElement;
@@ -88,36 +96,47 @@ export const useThemeStore = create<ThemeState>()(
                     } else {
                         root.classList.remove('dark');
                     }
+                    cleanup?.();
                 }
             },
 
             setAccentColor: (accentColor) => {
+                const cleanup = typeof window !== 'undefined' ? disableTransitions() : null;
                 set({ accentColor });
                 if (typeof window !== 'undefined') {
                     const root = window.document.documentElement;
                     if (accentColor === 'custom') {
                         const hsl = hexToHsl(get().customColor);
-                        const [h, s, l] = hsl.split(' ');
-                        root.style.setProperty('--primary', hsl);
-                        root.style.setProperty('--secondary', `${h} ${s} 95%`);
-                        root.style.setProperty('--secondary-foreground', `${h} ${s} 25%`);
+                        const [h, s] = hsl.split(' ');
+                        applyThemeVariables(root, {
+                            primary: hsl,
+                            secondary: `${h} ${s} 95%`,
+                            foreground: `${h} ${s} 25%`,
+                        });
                     } else {
-                        root.style.setProperty('--primary', ACCENT_COLORS[accentColor]);
-                        root.style.setProperty('--secondary', ACCENT_SECONDARY[accentColor]);
-                        root.style.setProperty('--secondary-foreground', ACCENT_SECONDARY_FOREGROUND[accentColor]);
+                        applyThemeVariables(root, {
+                            primary: ACCENT_COLORS[accentColor],
+                            secondary: ACCENT_SECONDARY[accentColor],
+                            foreground: ACCENT_SECONDARY_FOREGROUND[accentColor],
+                        });
                     }
+                    cleanup?.();
                 }
             },
 
             setCustomColor: (customColor) => {
+                const cleanup = typeof window !== 'undefined' ? disableTransitions() : null;
                 set({ customColor, accentColor: 'custom' });
                 if (typeof window !== 'undefined') {
                     const root = window.document.documentElement;
                     const hsl = hexToHsl(customColor);
-                    const [h, s, l] = hsl.split(' ');
-                    root.style.setProperty('--primary', hsl);
-                    root.style.setProperty('--secondary', `${h} ${s} 95%`);
-                    root.style.setProperty('--secondary-foreground', `${h} ${s} 25%`);
+                    const [h, s] = hsl.split(' ');
+                    applyThemeVariables(root, {
+                        primary: hsl,
+                        secondary: `${h} ${s} 95%`,
+                        foreground: `${h} ${s} 25%`,
+                    });
+                    cleanup?.();
                 }
             },
         }),

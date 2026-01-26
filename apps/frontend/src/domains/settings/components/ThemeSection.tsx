@@ -1,21 +1,12 @@
 'use client';
 
 import { Sun, Moon, Check } from 'lucide-react';
-import { useThemeStore, AccentColor } from '../hooks/useThemeStore';
+import { useThemeStore, ACCENT_COLOR_PRESETS } from '../hooks/useThemeStore';
 import { cn } from '@/lib/utils';
 
 const ThemeSection = () => {
     const { mode, accentColor, customColor, setMode, setAccentColor, setCustomColor } =
         useThemeStore();
-
-    const colors: { name: AccentColor; label: string; class: string }[] = [
-        { name: 'blue', label: '블루', class: 'bg-[hsl(221,83%,53%)]' },
-        { name: 'skyblue', label: '스카이블루', class: 'bg-[hsl(180,100%,35%)]' },
-        { name: 'orange', label: '앰버', class: 'bg-[hsl(32,95%,50%)]' },
-        { name: 'pink', label: '핑크', class: 'bg-[hsl(327,73%,60%)]' },
-        { name: 'green', label: '그린', class: 'bg-[hsl(132,36%,31%)]' },
-        { name: 'lime', label: '라임', class: 'bg-[hsl(132,93%,58%)]' },
-    ];
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -54,16 +45,16 @@ const ThemeSection = () => {
             <section>
                 <h4 className="text-sm font-bold text-foreground mb-6">메인 컬러</h4>
                 <div className="grid grid-cols-4 sm:grid-cols-4 gap-y-8 gap-x-4 p-1.5">
-                    {colors.map((color) => (
+                    {ACCENT_COLOR_PRESETS.map((color) => (
                         <div key={color.name} className="flex flex-col items-center gap-3">
                             <button
                                 onClick={() => setAccentColor(color.name)}
                                 className={cn(
                                     'w-12 h-12 rounded-full relative transition-all hover:scale-110 active:scale-95',
-                                    color.class,
                                     accentColor === color.name &&
                                     'ring-2 ring-offset-2 ring-primary scale-110 shadow-md dark:ring-offset-zinc-950',
                                 )}
+                                style={{ backgroundColor: `hsl(${color.hsl})` }}
                             >
                                 {accentColor === color.name && (
                                     <Check size={24} className="text-white absolute inset-0 m-auto" />
