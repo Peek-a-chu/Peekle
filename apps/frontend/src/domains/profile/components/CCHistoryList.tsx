@@ -31,7 +31,7 @@ export function CCHistoryList({ initialHistory }: Props) {
           ←
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">풀이 히스토리</h1>
+          <h1 className="text-2xl font-bold text-gray-900">풀이 내역 조회</h1>
           <p className="text-gray-500 text-sm">내가 푼 문제들의 기록을 확인하세요</p>
         </div>
       </div>
@@ -101,13 +101,12 @@ export function CCHistoryList({ initialHistory }: Props) {
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold text-white
-                                    ${
-                                      item.tier.includes('Bronze')
-                                        ? 'bg-amber-700'
-                                        : item.tier.includes('Silver')
-                                          ? 'bg-slate-400'
-                                          : 'bg-yellow-500' // Gold etc
-                                    }`}
+                                    ${item.tier.includes('Bronze')
+                          ? 'bg-amber-700'
+                          : item.tier.includes('Silver')
+                            ? 'bg-slate-400'
+                            : 'bg-yellow-500' // Gold etc
+                        }`}
                     >
                       {item.tier}
                     </span>

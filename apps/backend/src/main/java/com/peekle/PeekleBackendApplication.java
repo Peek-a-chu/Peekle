@@ -19,6 +19,13 @@ public class PeekleBackendApplication {
     public static void main(String[] args) {
         // 1. 환경변수 또는 시스템 프로퍼티에서 우선 탐색, 없으면 기본 경로들 확인
         String customDir = System.getProperty("dotenv.dir", System.getenv("DOTENV_DIR"));
+        // IPv4 강제 사용 (IPv6 NAT64 연결 문제 해결)
+        System.setProperty("java.net.preferIPv4Stack", "true");
+
+        // Load .env file (Try current directory first, then assumes running from root
+        // -> apps/backend)
+        String[] searchPaths = { "./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend" };
+        boolean loaded = false;
 
         if (customDir != null) {
             loadDotenv(customDir);

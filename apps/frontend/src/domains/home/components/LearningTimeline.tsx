@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import Link from 'next/link';
+import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { useTimeline } from '../hooks/useDashboardData';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
     selectedDate: string | null;
+    showHistoryLink?: boolean;
 }
 
-const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
+const LearningTimeline = ({ selectedDate, showHistoryLink = false }: LearningTimelineProps) => {
     const { data } = useTimeline(selectedDate || '');
     const [expanded, setExpanded] = useState(false);
 
@@ -24,18 +26,28 @@ const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
     };
 
     return (
-        <div className="bg-card border border-card-border rounded-2xl p-6">
+        <div className="w-full bg-card p-6">
             {/* 헤더 */}
-            <div className="flex items-center gap-2 mb-4">
-                <Clock className="w-5 h-5 text-primary" />
-                <div>
-                    <h3 className="font-bold text-foreground">
-                        {selectedDate ? `${formatDate(selectedDate)} 학습 타임라인` : '학습 타임라인'}
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                        총 {data.length}개 문제
-                    </p>
+            <div className="flex w-full items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-primary" />
+                    <div>
+                        <h3 className="font-bold text-foreground">
+                            {selectedDate ? `${formatDate(selectedDate)} 학습 타임라인` : '학습 타임라인'}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                            총 {data.length}개 문제
+                        </p>
+                    </div>
+
                 </div>
+
+                {showHistoryLink && (
+                    <Link href="/profile/me/history" className="ml-auto text-gray-400 hover:text-primary transition-colors p-1 rounded-full hover:bg-gray-100 flex items-center gap-1">
+                        <span className="text-xs font-medium">풀이 내역 조회</span>
+                        <ChevronRight className="w-5 h-5" />
+                    </Link>
+                )}
             </div>
 
             {/* 타임라인 목록 */}

@@ -37,6 +37,7 @@ public class StudySocketController {
         private final MediaService mediaService;
         private final SimpMessagingTemplate messagingTemplate;
         private final com.peekle.domain.study.service.StudyChatService studyChatService; // Injected
+        private final com.peekle.domain.study.service.WhiteboardService whiteboardService; // Injected
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
@@ -110,6 +111,13 @@ public class StudySocketController {
                                                         "/topic/studies/" + studyId + "/ide/" + userId,
                                                         SocketResponse.of("IDE", savedCode));
                                 }
+                        }
+
+                        // 5. Whiteboard Restore (화이트보드 상태 동기화)
+                        try {
+                                whiteboardService.getWhiteboardState(studyId, userId);
+                        } catch (Exception e) {
+                                log.error("Whiteboard Restore Failed", e);
                         }
 
                 } catch (Exception e) {

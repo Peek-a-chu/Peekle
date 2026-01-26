@@ -67,7 +67,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
     };
 
     return (
-        <div className="bg-card border border-card-border rounded-2xl p-5">
+        <div className="bg-card  p-5">
             {/* 헤더 */}
             <div className="flex flex-col gap-4 mb-6">
                 {/* 1행: 제목 */}
@@ -105,6 +105,16 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
             {/* 히트맵 */}
             <div className="overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden">
                 <div className="flex gap-1 min-w-max">
+                    {/* 요일 라벨 */}
+                    <div className="flex flex-col gap-1 mr-1">
+                        <span className="mb-1 h-3" /> {/* 월 라벨 높이 맞춤용 스페이서 */}
+                        <div className="grid grid-rows-7 gap-px text-[10px] text-gray-400">
+                            {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                                <div key={day} className="h-2.5 flex items-center">{day}</div>
+                            ))}
+                        </div>
+                    </div>
+
                     {Object.entries(monthlyData).map(([monthKey, days]) => (
                         <div key={monthKey} className="flex flex-col gap-1">
                             <span className="text-[10px] text-gray-400 mb-1 h-3">
