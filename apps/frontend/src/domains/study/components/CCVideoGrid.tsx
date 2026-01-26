@@ -14,6 +14,7 @@ interface CCVideoGridProps {
 export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) {
   const participants = useRoomStore((state) => state.participants);
   const currentUserId = useRoomStore((state) => state.currentUserId);
+  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const viewRealtimeCode = useRoomStore((state) => state.viewRealtimeCode);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
@@ -32,6 +33,9 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   }, [participants, currentUserId]);
 
   const handleTileClick = (participantId: number) => {
+    // If no problem is selected, ignore clicks (except maybe to ensure we are in a safe state, but basically disable interaction)
+    if (!selectedProblemId) return;
+
     if (participantId === currentUserId) {
       // Clicking on self returns to "only mine" view
       resetToOnlyMine();
