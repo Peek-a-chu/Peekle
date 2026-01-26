@@ -4,6 +4,8 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { X } from 'lucide-react';
+import { signup as signupApi } from '@/app/api/authApi';
+import { checkNickname as checkNicknameApi } from '@/app/api/userApi';
 
 interface NicknameValidation {
   status: 'idle' | 'checking' | 'valid' | 'invalid';
@@ -59,12 +61,7 @@ function SignupForm() {
     setValidation({ status: 'checking', message: '확인 중...' });
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      const response = await fetch(
-        `${backendUrl}/api/users/check-nickname?nickname=${encodeURIComponent(value)}`,
-        { credentials: 'include' }
-      );
-      const data = await response.json();
+      const data = await checkNicknameApi(value);
 
       if (data.success && data.data) {
         setValidation({
@@ -90,6 +87,12 @@ function SignupForm() {
     e.preventDefault();
     setError('');
 
+    if (!token) {
+      setError('인증 정보가 없습니다. 다시 로그인해주세요.');
+      router.push('/login');
+      return;
+    }
+
     if (!nickname.trim()) {
       setError('닉네임을 입력해주세요.');
       return;
@@ -103,22 +106,10 @@ function SignupForm() {
     setIsSubmitting(true);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      const response = await fetch(`${backendUrl}/api/auth/signup`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          nickname: nickname.trim(),
-          bojId: bojId.trim() || null,
-        }),
-      });
-
-      const data = await response.json();
+      const data = await signupApi(token, nickname, bojId);
 
       if (data.success) {
-        router.push('/home-test');
+        router.push('/home');
       } else {
         setError(data.error?.message || '회원가입에 실패했습니다.');
       }
