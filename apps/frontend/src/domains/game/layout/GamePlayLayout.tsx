@@ -9,9 +9,15 @@ import { GameProblemListPanel } from '@/domains/game/components/game-problem-lis
 import { GamePlayCenterPanel } from '@/domains/game/components/game-play-center-panel'
 import { ChatPanel } from '@/domains/game/components/chat-panel'
 import { GameControlBar } from '@/domains/game/components/game-control-bar'
-import { GamePlayState, GameProblem, ChatMessage, GamePlayParticipant } from '@/domains/game/mocks/mock-data'
+import {
+    GamePlayState,
+    GameProblem,
+    GamePlayParticipant,
+    ChatMessage
+} from '@/domains/game/mocks/mock-data'
 
 interface GamePlayLayoutProps {
+    className?: string
     gameState: GamePlayState
     problems: GameProblem[]
     selectedProblemId: string | null
@@ -21,15 +27,15 @@ interface GamePlayLayoutProps {
     language: string
     onCodeChange: (code: string) => void
     onLanguageChange: (language: string) => void
-    onSubmit: () => void
+    onSubmit: () => Promise<void>
     messages: ChatMessage[]
     participants: GamePlayParticipant[]
     currentUserId: string
     onSendMessage: (content: string) => void
-    className?: string
 }
 
 export function GamePlayLayout({
+    className,
     gameState,
     problems,
     selectedProblemId,
@@ -44,7 +50,6 @@ export function GamePlayLayout({
     participants,
     currentUserId,
     onSendMessage,
-    className,
 }: GamePlayLayoutProps) {
     const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false)
     const [isRightPanelFolded, setIsRightPanelFolded] = useState(false)
