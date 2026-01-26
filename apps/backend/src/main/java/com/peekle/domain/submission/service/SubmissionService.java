@@ -1,26 +1,27 @@
 package com.peekle.domain.submission.service;
 
+import com.peekle.domain.league.service.LeagueService;
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
+import com.peekle.domain.submission.dto.SubmissionLogResponse;
 import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.domain.submission.entity.SubmissionLog;
 import com.peekle.domain.submission.enums.SourceType;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-
-import com.peekle.domain.league.service.LeagueService;
-import com.peekle.global.util.SolvedAcLevelUtil;
-
-import com.peekle.domain.submission.dto.SubmissionResponse;
-import com.peekle.global.exception.BusinessException;
-import com.peekle.global.exception.ErrorCode;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -149,5 +150,42 @@ public class SubmissionService {
         } catch (Exception e) {
             return LocalDateTime.now();
         }
+    }
+
+    /**
+     * 특정 스터디, 특정 문제의 성공한 제출 목록 조회 (유저별 최신 1개)
+     */
+    @Transactional(readOnly = true)
+    public List<SubmissionLogResponse> getStudyProblemSubmissions(
+            Long studyId, Long problemId) {
+        // DB 최적화 조회 (유저별 최신 1개만 가져옴)
+        List<SubmissionLog> logs = submissionLogRepository.findLatestLogsPerUser(studyId, problemId);
+
+        List<SubmissionLogResponse> result = new ArrayList<>();
+        for (SubmissionLog log : logs) {
+            result.add(SubmissionLogResponse.from(log));
+        }
+
+        return result;
+    }
+
+    /**
+     * 특정 제출 내역 상세 조회 (코드 포함)
+     */
+    @Transactional(readOnly = true)
+    public SubmissionResponse getSubmissionDetail(Long submissionId) {
+        SubmissionLog log = submissionLogRepository.findById(submissionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBMISSION_NOT_FOUND));
+
+        return SubmissionResponse.builder()
+                .success(true)
+                .submissionId(log.getId())
+                .code(log.getCode()) // 코드 포함
+                .language(log.getLanguage())
+                .memory(log.getMemory())
+                .executionTime(log.getExecutionTime())
+                .submittedAt(log.getSubmittedAt().toString())
+                .message("Detail retrieved")
+                .build();
     }
 }

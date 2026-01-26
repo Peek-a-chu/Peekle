@@ -28,9 +28,12 @@ public class RedisIdeService {
      * 사용자 코드를 Redis Hash에 저장
      */
     public void saveCode(Long studyId, Long userId, IdeRequest request) {
-        String key = String.format(RedisKeyConst.IDE_KEY, studyId, userId);
+        // Safe check for problemId
+        Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L; // 0L for default or unknown
+        String key = String.format(RedisKeyConst.IDE_KEY, studyId, problemId, userId);
 
         Map<String, String> data = new HashMap<>();
+        data.put("problemId", problemId.toString());
         data.put("filename", request.getFilename());
         data.put("code", request.getCode());
         data.put("lang", request.getLang());
@@ -44,8 +47,8 @@ public class RedisIdeService {
     /**
      * Redis에서 사용자 코드 스냅샷 조회
      */
-    public IdeResponse getCode(Long studyId, Long userId) {
-        String key = String.format(RedisKeyConst.IDE_KEY, studyId, userId);
+    public IdeResponse getCode(Long studyId, Long problemId, Long userId) {
+        String key = String.format(RedisKeyConst.IDE_KEY, studyId, problemId, userId);
         Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
 
         if (entries.isEmpty()) {
@@ -59,6 +62,7 @@ public class RedisIdeService {
         return IdeResponse.builder()
                 .senderId(userId)
                 .senderName(user.getNickname())
+                .problemId(problemId)
                 .filename((String) entries.getOrDefault("filename", "Untitled"))
                 .code((String) entries.getOrDefault("code", ""))
                 .lang((String) entries.getOrDefault("lang", "text"))

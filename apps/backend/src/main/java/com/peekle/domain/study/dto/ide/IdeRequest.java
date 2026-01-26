@@ -8,6 +8,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 public class IdeRequest {
+    private Long problemId; // Problem-specific code
     private String filename; // e.g. "Main.java"
     private String code; // Source code content
     private String lang; // e.g. "java", "python"
