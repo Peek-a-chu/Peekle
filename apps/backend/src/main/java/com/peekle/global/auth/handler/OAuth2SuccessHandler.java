@@ -57,7 +57,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             addCookie(response, "access_token", accessToken, (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000));
             addCookie(response, "refresh_token", refreshToken, (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000));
 
-            response.sendRedirect(frontendUrl + "/home-test");
+            response.sendRedirect(frontendUrl + "/home");
         } else {
             String tempToken = jwtTokenProvider.createTempSignupToken(socialId, provider, nickname, profileImage);
             response.sendRedirect(frontendUrl + "/signup?token=" + tempToken);

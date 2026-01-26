@@ -67,7 +67,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
     };
 
     return (
-        <div className="bg-card border border-border rounded-2xl p-5 transition-colors duration-300">
+        <div className="p-6 transition-colors duration-300">
             {/* 헤더 */}
             <div className="flex flex-col gap-4 mb-6">
                 {/* 1행: 제목 */}

@@ -1,20 +1,14 @@
-'use client';
-
 import { useState, useEffect, useRef } from 'react';
-import { UserProfile } from '../types';
-import { useExtensionCheck } from '@/hooks/useExtensionCheck';
+import { Puzzle } from 'lucide-react';
+import { ExtensionStatus, UserProfile } from '../types';
 
 interface Props {
   user: UserProfile;
-}
-
-type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH';
-
-interface ValidateResponse {
-  success?: boolean;
-  data?: {
-    valid?: boolean;
-  };
+  isInstalled: boolean;
+  extensionToken: string | null;
+  checkInstallation: () => void;
+  status: ExtensionStatus;
+  isLoading: boolean;
 }
 
 interface TokenResponse {
@@ -24,63 +18,37 @@ interface TokenResponse {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function ExtensionGuide({ user: _user }: Props) {
-  const [status, setStatus] = useState<ExtensionStatus>('NOT_INSTALLED');
-  const [isLoading, setIsLoading] = useState(true);
+export function CCExtensionGuide({
+  user: _user,
+  checkInstallation,
+  extensionToken,
+  status,
+  isLoading,
+}: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
-  // 커스텀 훅 사용
-  const { isInstalled, extensionToken, checkInstallation } = useExtensionCheck();
+  // 폴링을 위한 로컬 상태는 유지 (설치 감지용)
   const [isPolling, setIsPolling] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. 설치 및 연동 감지 시 상태 업데이트
-  useEffect(() => {
-    const verifyToken = async (token: string) => {
-      try {
-        const res = await fetch('/api/extension/validate', {
-          headers: { 'X-Peekle-Token': token },
-        });
-        const json = (await res.json()) as ValidateResponse;
-        if (json.data?.valid) {
-          setStatus('LINKED');
-        } else {
-          setStatus('MISMATCH');
-        }
-      } catch (e) {
-        console.error(e);
-        setStatus('MISMATCH');
-      }
-      setIsPolling(false);
-      setIsLoading(false);
-    };
+  // 1. 상태 계산 로직 제거 -> 부모 컴포넌트(CCProfileView)에서 담당
 
-    if (extensionToken) {
-      // 토큰이 있으면 유효성 검증
-      void verifyToken(extensionToken);
-    } else if (isInstalled) {
-      // 설치는 됐는데 토큰이 없음 -> 연동 필요
-      setStatus('INSTALLED');
+  // 2. 폴링 로직 (버튼 클릭 시 시작)
+  useEffect(() => {
+    if (isPolling && status === 'NOT_INSTALLED') {
+      pollingRef.current = setInterval(() => {
+        console.log('Extensions Detection: Pinging...');
+        checkInstallation();
+      }, 3000);
+    } else if (status !== 'NOT_INSTALLED') {
       setIsPolling(false);
-      setIsLoading(false);
-    } else {
-      // 미설치
-      // useExtensionCheck may be async or slow to detect, so we might want a timeout or rely on default
-      // But for now, if hook says not installed, we assume not installed.
-      // Wait, isInstalled is false by default. It might flip to true later.
-      // So we shouldn't set isLoading false immediately if we expect a delay.
-      // But we don't know if it will ever flip.
-      // Let's set a small timeout to avoid flash of NOT_INSTALLED if detection is fast?
-      // Or just set false. Users complained about empty screen (loading).
-      // So showing 'Checking...' is better than showing 'Not Installed' immediately if it is actually installed.
-      // But useExtensionCheck usually updates state.
-      // Lets just set isLoading(false) here.
-      setStatus('NOT_INSTALLED');
-      setIsLoading(false);
     }
-  }, [isInstalled, extensionToken]);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [isPolling, status, checkInstallation]);
 
   // 2. 폴링 로직 (버튼 클릭 시 시작)
   useEffect(() => {
@@ -115,7 +83,7 @@ export function ExtensionGuide({ user: _user }: Props) {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/extension/token', {
+      const res = await fetch('/api/users/me/extension-token', {
         method: 'POST',
         body: JSON.stringify({ regenerate }),
       });
@@ -134,7 +102,7 @@ export function ExtensionGuide({ user: _user }: Props) {
         alert(regenerate ? '토큰이 재발급되었습니다.' : '계정 연동이 완료되었습니다!');
         // 상태 갱신을 위해 다시 체크
         checkInstallation();
-        if (!regenerate) setStatus('LINKED'); // 임시 UI 반영
+        // 부모 컴포넌트가 checkInstallation 호출 -> 상태 업데이트 -> props 변경됨
       } else {
         alert('토큰 발급 실패');
       }
@@ -180,39 +148,37 @@ export function ExtensionGuide({ user: _user }: Props) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="border border-card-border rounded-2xl bg-white overflow-hidden p-5">
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <span>🧩</span> 백준 확장 프로그램
-        </h2>
-        <p className="text-gray-500 text-sm mt-1">
+      <div className="mb-6">
+        <h3 className="font-bold text-foreground flex items-center gap-2">
+          <Puzzle className="w-5 h-5 text-primary" /> 백준 확장 프로그램
+        </h3>
+        <p className="text-xs text-gray-500 mt-1">
           문제 제출 기능을 사용하려면 확장 프로그램을 설치하고 연동해주세요.
         </p>
       </div>
 
       {/* Status Banner */}
       <div
-        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${
-          status === 'LINKED'
-            ? 'bg-green-50 border border-green-100'
-            : status === 'MISMATCH'
-              ? 'bg-orange-50 border border-orange-100'
-              : status === 'INSTALLED'
-                ? 'bg-blue-50 border border-blue-100'
-                : 'bg-gray-100 border border-gray-200'
-        }`}
+        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${status === 'LINKED'
+          ? 'bg-green-50 border border-green-100'
+          : status === 'MISMATCH'
+            ? 'bg-orange-50 border border-orange-100'
+            : status === 'INSTALLED'
+              ? 'bg-blue-50 border border-blue-100'
+              : 'bg-gray-100 border border-gray-200'
+          }`}
       >
         <div
-          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-            status === 'LINKED'
-              ? 'text-green-600'
-              : status === 'MISMATCH'
-                ? 'text-orange-600'
-                : status === 'INSTALLED'
-                  ? 'text-blue-600'
-                  : 'text-gray-500'
-          }`}
+          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${status === 'LINKED'
+            ? 'text-green-600'
+            : status === 'MISMATCH'
+              ? 'text-orange-600'
+              : status === 'INSTALLED'
+                ? 'text-blue-600'
+                : 'text-gray-500'
+            }`}
         >
           {status === 'LINKED'
             ? '✅'
@@ -224,15 +190,14 @@ export function ExtensionGuide({ user: _user }: Props) {
         </div>
         <div>
           <h3
-            className={`font-bold text-sm ${
-              status === 'LINKED'
-                ? 'text-green-900'
-                : status === 'MISMATCH'
-                  ? 'text-orange-900'
-                  : status === 'INSTALLED'
-                    ? 'text-blue-900'
-                    : 'text-gray-900'
-            }`}
+            className={`font-bold text-sm ${status === 'LINKED'
+              ? 'text-green-900'
+              : status === 'MISMATCH'
+                ? 'text-orange-900'
+                : status === 'INSTALLED'
+                  ? 'text-blue-900'
+                  : 'text-gray-900'
+              }`}
           >
             {status === 'LINKED'
               ? '연동 완료'
@@ -243,15 +208,14 @@ export function ExtensionGuide({ user: _user }: Props) {
                   : '확장 프로그램이 설치되지 않았습니다'}
           </h3>
           <p
-            className={`text-sm mt-1 ${
-              status === 'LINKED'
-                ? 'text-green-700'
-                : status === 'MISMATCH'
-                  ? 'text-orange-700'
-                  : status === 'INSTALLED'
-                    ? 'text-blue-700'
-                    : 'text-gray-600'
-            }`}
+            className={`text-sm mt-1 ${status === 'LINKED'
+              ? 'text-green-700'
+              : status === 'MISMATCH'
+                ? 'text-orange-700'
+                : status === 'INSTALLED'
+                  ? 'text-blue-700'
+                  : 'text-gray-600'
+              }`}
           >
             {status === 'LINKED'
               ? '모든 기능이 정상 동작 중입니다.'
@@ -271,21 +235,19 @@ export function ExtensionGuide({ user: _user }: Props) {
             {/* Vertical Line */}
             {idx !== steps.length - 1 && (
               <div
-                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${
-                  s.isDone ? 'bg-green-500' : 'bg-gray-200'
-                }`}
+                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${s.isDone ? 'bg-green-500' : 'bg-gray-200'
+                  }`}
               ></div>
             )}
 
             {/* Step Circle */}
             <div
-              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
-                s.isDone
-                  ? 'bg-green-500 text-white'
-                  : s.isActive
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-400'
-              }`}
+              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${s.isDone
+                ? 'bg-green-500 text-white'
+                : s.isActive
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-400'
+                }`}
             >
               {s.isDone ? '✓' : s.step}
             </div>

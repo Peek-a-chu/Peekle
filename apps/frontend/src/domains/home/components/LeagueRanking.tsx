@@ -119,7 +119,7 @@ const LeagueRanking = () => {
                                 </div>
 
                                 {/* 점수 */}
-                                <span className={`text-xs font-bold ml-1 ${member.isMe ? 'text-primary' : 'text-gray-500'}`}>
+                                <span className={`text-xs font-bold ml-1 ${member.isMe ? 'text-primary' : 'text-muted-foreground'}`}>
                                     {member.score.toLocaleString()}
                                 </span>
                             </div>

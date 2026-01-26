@@ -1,6 +1,11 @@
+'use client';
+
+import { useState } from 'react'; // Added in case, though not strictly used in the slice I see, but good practice if hooks are used later. Actually better not to add unused imports.
+// Just adding 'use client' at top.
+
 export type ActivityType = 'STUDY' | 'GAME' | 'SOLO';
 
-export interface DailyActivity {
+export interface CCDailyActivity {
   id: string;
   problemTitle: string;
   problemId: number;
@@ -12,7 +17,7 @@ export interface DailyActivity {
 }
 
 // Mock Data Generator
-const MOCK_ACTIVITIES: DailyActivity[] = [
+const MOCK_ACTIVITIES: CCDailyActivity[] = [
   {
     id: '1',
     problemTitle: 'A+B',
@@ -44,10 +49,10 @@ const MOCK_ACTIVITIES: DailyActivity[] = [
 
 interface Props {
   date: Date;
-  activities?: DailyActivity[];
+  activities?: CCDailyActivity[];
 }
 
-export function DailyActivityList({ date, activities = MOCK_ACTIVITIES }: Props) {
+export function CCDailyActivityList({ date, activities = MOCK_ACTIVITIES }: Props) {
   const dateStr = date.toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -80,9 +85,8 @@ export function DailyActivityList({ date, activities = MOCK_ACTIVITIES }: Props)
               <div className="flex items-center gap-4">
                 {/* Status Icon */}
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${
-                    activity.isSuccess ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'
-                  }`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${activity.isSuccess ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'
+                    }`}
                 >
                   {activity.isSuccess ? '✓' : '✗'}
                 </div>

@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (isAuthRoute && accessToken) {
-    const homeUrl = new URL('/', request.url);
+    const homeUrl = new URL('/home', request.url);
     return NextResponse.redirect(homeUrl);
   }
 

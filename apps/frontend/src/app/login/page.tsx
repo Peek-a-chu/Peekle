@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { X } from 'lucide-react';
+import { getOAuthLoginUrl } from '@/app/api/authApi';
 
 export default function LoginPage() {
-  const handleLogin = (provider: string) => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-    window.location.href = `${backendUrl}/oauth2/authorization/${provider}`;
+  const handleLogin = (provider: 'kakao' | 'naver' | 'google') => {
+    window.location.href = getOAuthLoginUrl(provider);
   };
 
   return (

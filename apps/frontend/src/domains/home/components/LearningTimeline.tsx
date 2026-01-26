@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import Link from 'next/link';
+import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { useTimeline } from '../hooks/useDashboardData';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
     selectedDate: string | null;
+    showHistoryLink?: boolean;
 }
 
-const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
+const LearningTimeline = ({ selectedDate, showHistoryLink = false }: LearningTimelineProps) => {
     const { data } = useTimeline(selectedDate || '');
     const [expanded, setExpanded] = useState(false);
 
@@ -24,7 +26,7 @@ const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
     };
 
     return (
-        <div className="bg-card border border-border rounded-2xl p-6 transition-colors duration-300">
+        <div className="p-6 transition-colors duration-300">
             {/* 헤더 */}
             <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-5 h-5 text-primary" />
@@ -36,6 +38,13 @@ const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
                         총 {data.length}개 문제
                     </p>
                 </div>
+
+                {showHistoryLink && (
+                    <Link href="/profile/me/history" className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1">
+                        <span className="text-xs font-medium">풀이 내역 조회</span>
+                        <ChevronRight className="w-5 h-5" />
+                    </Link>
+                )}
             </div>
 
             {/* 타임라인 목록 */}

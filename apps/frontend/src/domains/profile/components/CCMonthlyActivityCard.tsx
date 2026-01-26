@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   selectedDate?: Date;
   onDateSelect: (date: Date) => void;
 }
 
-export function MonthlyActivityCard({ onDateSelect }: Props) {
+export function CCMonthlyActivityCard({ onDateSelect }: Props) {
   // Mock Data: Contribution Graph like structure
   // This is a simplified version. In real app, calculate exact dates.
   const weeks = 20; // Show last 20 weeks roughly
@@ -25,7 +25,19 @@ export function MonthlyActivityCard({ onDateSelect }: Props) {
     return grid;
   };
 
-  const [gridData] = useState(generateGrid());
+  const generateEmptyGrid = () => {
+    const grid = [];
+    for (let w = 0; w < weeks; w++) {
+      grid.push(new Array(days).fill(0));
+    }
+    return grid;
+  };
+
+  const [gridData, setGridData] = useState(generateEmptyGrid());
+
+  useEffect(() => {
+    setGridData(generateGrid());
+  }, []);
 
   const getColorClass = (level: number) => {
     switch (level) {
@@ -94,7 +106,6 @@ export function MonthlyActivityCard({ onDateSelect }: Props) {
         <div className="w-2.5 h-2.5 bg-green-600 rounded-sm"></div>
         <span>More</span>
       </div>
-      메인페이지 그리면 할게용
     </div>
   );
 }
