@@ -21,13 +21,13 @@ export default function HomePage() {
                     <div className="space-y-6 order-1 xl:order-1 min-w-0">
                         {/* 리그 변화 추이 */}
                         <LeagueProgressChart />
+                        <div className="border border-card-border rounded-2xl bg-white overflow-hidden">
+                            {/* 활동 스트릭 */}
+                            <ActivityStreak onDateSelect={setSelectedDate} />
 
-                        {/* 활동 스트릭 */}
-                        <ActivityStreak onDateSelect={setSelectedDate} />
-
-                        {/* 학습 타임라인 */}
-                        <LearningTimeline selectedDate={selectedDate} />
-
+                            {/* 학습 타임라인 */}
+                            <LearningTimeline selectedDate={selectedDate} showHistoryLink={true} />
+                        </div>
                         {/* AI 추천 & 주간 점수 */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <AIRecommendation />
