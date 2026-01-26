@@ -708,3 +708,456 @@ export function getMockGameRoomDetail(roomId: string): GameRoomDetail | null {
     id: roomId,
   };
 }
+
+// ==========================================
+// 게임 플레이 화면용 Mock 데이터
+// ==========================================
+
+// 게임 문제 인터페이스
+export interface GameProblem {
+  id: string
+  problemNumber: string  // 예: '#1753'
+  title: string
+  status: 'SOLVED' | 'UNSOLVED'  // 내 풀이 상태
+  solvedBy?: { id: string; nickname: string; team?: Team }[]  // 성공한 참여자 목록
+}
+
+// 게임 플레이 참여자
+export interface GamePlayParticipant extends Participant {
+  score?: number  // 현재 점수
+  solvedCount?: number  // 푼 문제 수
+}
+
+// 게임 플레이 상태
+export interface GamePlayState {
+  roomId: string
+  title: string
+  mode: GameMode
+  teamType: TeamType
+  timeLimit: number  // 총 시간 (초)
+  remainingTime: number  // 남은 시간 (초)
+  problems: GameProblem[]
+  scores?: { RED: number; BLUE: number }  // 팀전일 경우
+  participants: GamePlayParticipant[]
+}
+
+// 공통 문제 목록
+const commonProblems: GameProblem[] = [
+  {
+    id: 'p1',
+    problemNumber: '#1753',
+    title: '최단경로',
+    status: 'SOLVED',
+    solvedBy: [
+      { id: 'user1', nickname: 'CodeNinja' },
+    ],
+  },
+  {
+    id: 'p2',
+    problemNumber: '#2580',
+    title: '스도쿠',
+    status: 'UNSOLVED',
+    solvedBy: [],
+  },
+  {
+    id: 'p3',
+    problemNumber: '#1149',
+    title: 'RGB거리',
+    status: 'UNSOLVED',
+    solvedBy: [],
+  },
+]
+
+// Mock 게임 플레이 상태 (4가지 게임 모드별)
+export const mockGamePlayStates: Record<string, GamePlayState> = {
+  // 1. 개인전 스피드
+  '1': {
+    roomId: '1',
+    title: '골드 스피드쉽',
+    mode: 'SPEED_RACE',
+    teamType: 'INDIVIDUAL',
+    timeLimit: 1800,
+    remainingTime: 1770,
+    problems: commonProblems,
+    participants: [
+      {
+        id: 'user1',
+        nickname: 'CodeNinja',
+        profileImg: '/avatars/default.png',
+        isHost: true,
+        status: 'READY',
+        tier: 'gold3',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user2',
+        nickname: 'PS마스터',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold5',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user3',
+        nickname: '알고리즘왕',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'silver1',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user4',
+        nickname: 'PSiM',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold1',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user5',
+        nickname: 'Coder5',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'platinum5',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user6',
+        nickname: 'Coder6',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'diamond5',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user7',
+        nickname: 'Coder7',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold2',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user8',
+        nickname: 'Coder8',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'silver3',
+        score: 0,
+        solvedCount: 0,
+      },
+    ],
+  },
+  // 2. 개인전 시간제한
+  '2': {
+    roomId: '2',
+    title: '실버 타임어택',
+    mode: 'TIME_ATTACK',
+    teamType: 'INDIVIDUAL',
+    timeLimit: 2700,
+    remainingTime: 831,
+    problems: [
+      {
+        id: 'p1',
+        problemNumber: '#1753',
+        title: '최단경로',
+        status: 'SOLVED',
+        solvedBy: [
+          { id: 'user1', nickname: 'CodeNinja' },
+          { id: 'user2', nickname: 'PS마스터' },
+          { id: 'user3', nickname: '백준킹' },
+        ],
+      },
+      {
+        id: 'p2',
+        problemNumber: '#2580',
+        title: '스도쿠',
+        status: 'UNSOLVED',
+        solvedBy: [
+          { id: 'user2', nickname: 'PS마스터' },
+        ],
+      },
+      {
+        id: 'p3',
+        problemNumber: '#1149',
+        title: 'RGB거리',
+        status: 'UNSOLVED',
+        solvedBy: [],
+      },
+    ],
+    participants: [
+      {
+        id: 'user1',
+        nickname: 'CodeNinja',
+        profileImg: '/avatars/default.png',
+        isHost: true,
+        status: 'READY',
+        tier: 'silver2',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user2',
+        nickname: 'PS마스터',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'silver3',
+        score: 200,
+        solvedCount: 2,
+      },
+      {
+        id: 'user3',
+        nickname: '백준킹',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'silver1',
+        score: 100,
+        solvedCount: 1,
+      },
+    ],
+  },
+  // 3. 팀전 스피드
+  '3': {
+    roomId: '3',
+    title: '팀전 스피드배틀',
+    mode: 'SPEED_RACE',
+    teamType: 'TEAM',
+    timeLimit: 1200,
+    remainingTime: 831,
+    scores: { RED: 2, BLUE: 1 },
+    problems: [
+      {
+        id: 'p1',
+        problemNumber: '#2040',
+        title: '스도쿠',
+        status: 'SOLVED',
+        solvedBy: [
+          { id: 'user3', nickname: '해론다이', team: 'RED' },
+        ],
+      },
+      {
+        id: 'p2',
+        problemNumber: '#1753',
+        title: '최단경로',
+        status: 'UNSOLVED',
+        solvedBy: [],
+      },
+      {
+        id: 'p3',
+        problemNumber: '#1149',
+        title: 'RGB거리',
+        status: 'UNSOLVED',
+        solvedBy: [],
+      },
+    ],
+    participants: [
+      // Red Team
+      {
+        id: 'user3',
+        nickname: '해론다이',
+        profileImg: '/avatars/default.png',
+        isHost: true,
+        status: 'READY',
+        tier: 'gold3',
+        team: 'RED',
+        score: 200,
+        solvedCount: 2,
+      },
+      {
+        id: 'user4',
+        nickname: 'RedPlayer1',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold5',
+        team: 'RED',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user9',
+        nickname: 'RedPlayer2',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold4',
+        team: 'RED',
+        score: 0,
+        solvedCount: 0,
+      },
+      // Blue Team
+      {
+        id: 'user6',
+        nickname: 'BlueLeader',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold2',
+        team: 'BLUE',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user7',
+        nickname: 'BluePlayer1',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold4',
+        team: 'BLUE',
+        score: 0,
+        solvedCount: 0,
+      },
+      {
+        id: 'user8',
+        nickname: 'BluePlayer2',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold3',
+        team: 'BLUE',
+        score: 0,
+        solvedCount: 0,
+      },
+    ],
+  },
+  // 4. 팀전 시간제한
+  '4': {
+    roomId: '4',
+    title: '팀전 타임어택',
+    mode: 'TIME_ATTACK',
+    teamType: 'TEAM',
+    timeLimit: 2700,
+    remainingTime: 1778,
+    scores: { RED: 3, BLUE: 2 },
+    problems: [
+      {
+        id: 'p1',
+        problemNumber: '#2040',
+        title: '스도쿠',
+        status: 'SOLVED',
+        solvedBy: [
+          { id: 'user3', nickname: '해론다이', team: 'RED' },
+          { id: 'user6', nickname: 'BlueLeader', team: 'BLUE' },
+        ],
+      },
+      {
+        id: 'p2',
+        problemNumber: '#1753',
+        title: '최단경로',
+        status: 'UNSOLVED',
+        solvedBy: [
+          { id: 'user4', nickname: 'RedPlayer1', team: 'RED' },
+        ],
+      },
+      {
+        id: 'p3',
+        problemNumber: '#1149',
+        title: 'RGB거리',
+        status: 'UNSOLVED',
+        solvedBy: [],
+      },
+    ],
+    participants: [
+      // Red Team
+      {
+        id: 'user3',
+        nickname: '해론다이',
+        profileImg: '/avatars/default.png',
+        isHost: true,
+        status: 'READY',
+        tier: 'gold3',
+        team: 'RED',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user4',
+        nickname: 'RedPlayer1',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold5',
+        team: 'RED',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user5',
+        nickname: 'RedPlayer2',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold4',
+        team: 'RED',
+        score: 100,
+        solvedCount: 1,
+      },
+      // Blue Team
+      {
+        id: 'user6',
+        nickname: 'BlueLeader',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold2',
+        team: 'BLUE',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user7',
+        nickname: 'BluePlayer1',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold4',
+        team: 'BLUE',
+        score: 100,
+        solvedCount: 1,
+      },
+      {
+        id: 'user8',
+        nickname: 'BluePlayer2',
+        profileImg: '/avatars/default.png',
+        isHost: false,
+        status: 'READY',
+        tier: 'gold3',
+        team: 'BLUE',
+        score: 100,
+        solvedCount: 1,
+      },
+    ],
+  },
+}
+
+// 방 ID로 게임 플레이 상태 조회
+export function getMockGamePlayState(roomId: string): GamePlayState | null {
+  if (!roomId) return null
+
+  if (mockGamePlayStates[roomId]) {
+    return mockGamePlayStates[roomId]
+  }
+
+  // 기본 데이터 반환 (개인전 스피드)
+  return {
+    ...mockGamePlayStates['1'],
+    roomId,
+  }
+}
