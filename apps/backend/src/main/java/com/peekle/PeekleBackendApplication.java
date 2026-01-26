@@ -14,6 +14,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class PeekleBackendApplication {
 
     public static void main(String[] args) {
+        // IPv4 강제 사용 (IPv6 NAT64 연결 문제 해결)
+        System.setProperty("java.net.preferIPv4Stack", "true");
+
         // Load .env file (Try current directory first, then assumes running from root
         // -> apps/backend)
         String[] searchPaths = { "./", "./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend" };
