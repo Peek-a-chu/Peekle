@@ -27,7 +27,6 @@ import java.util.List;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
         private final CustomOAuth2UserService customOAuth2UserService;
         private final OAuth2SuccessHandler oAuth2SuccessHandler;
         private final OAuth2FailureHandler oAuth2FailureHandler;
@@ -38,44 +37,57 @@ public class SecurityConfig {
         @Value("${app.frontend-url}")
         private String frontendUrl;
 
+
+
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-                http
-                                .csrf(AbstractHttpConfigurer::disable)
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/api/auth/**").permitAll()
-                                                .requestMatchers("/api/users/check-nickname").permitAll()
-                                                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                                                .requestMatchers("/api/submissions/**").permitAll()
-                                                .requestMatchers("/api/problems/sync").permitAll()
-                                                .requestMatchers("/h2-console/**").permitAll()
-                                                .requestMatchers("/api/studies/**").permitAll()
-                                                .requestMatchers("/api/dev/users/**").permitAll()
-                                                .requestMatchers("/ws-stomp/**").permitAll()
-                                                .requestMatchers("/v3/api-docs/**",
-                                                                "/swagger-ui/**",
-                                                                "/swagger-ui.html")
-                                                .permitAll()
-                                                .requestMatchers("/springwolf/**").permitAll()
-                                                .anyRequest().authenticated())
-                                .oauth2Login(oauth2 -> oauth2
-                                                .authorizationEndpoint(auth -> auth
-                                                                .authorizationRequestRepository(
-                                                                                cookieAuthorizationRequestRepository))
-                                                .tokenEndpoint(token -> token
-                                                                .accessTokenResponseClient(accessTokenResponseClient))
-                                                .userInfoEndpoint(userInfo -> userInfo
-                                                                .userService(customOAuth2UserService))
-                                                .successHandler(oAuth2SuccessHandler)
-                                                .failureHandler(oAuth2FailureHandler))
-                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                                .headers(headers -> headers.frameOptions(frame -> frame.disable()));
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeHttpRequests(auth -> auth
+                // Auth / OAuth2
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/users/check-nickname").permitAll()
+                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
-                return http.build();
+                // Extension / APIs
+                .requestMatchers("/api/submissions/**").permitAll()
+                .requestMatchers("/api/problems/sync").permitAll()      // 내부 Key 검증
+                .requestMatchers("/api/users/me/**").permitAll()        // Extension token endpoints
+
+                // Dev / Test
+                .requestMatchers("/api/studies/**").permitAll()          // [TEST] 스터디 API
+                .requestMatchers("/api/dev/users/**").permitAll()
+
+                // WebSocket
+                .requestMatchers("/ws-stomp/**").permitAll()
+
+                // Tools
+                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/springwolf/**").permitAll()
+
+                // Default
+                .anyRequest().authenticated()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                .authorizationEndpoint(auth -> auth
+                        .authorizationRequestRepository(cookieAuthorizationRequestRepository))
+                .tokenEndpoint(token -> token
+                        .accessTokenResponseClient(accessTokenResponseClient))
+                .userInfoEndpoint(userInfo -> userInfo
+                        .userService(customOAuth2UserService))
+                .successHandler(oAuth2SuccessHandler)
+                .failureHandler(oAuth2FailureHandler)
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console iframe 허용
+
+        return http.build();
         }
+
 
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {

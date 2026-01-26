@@ -1,4 +1,4 @@
-export function ExtensionBanner() {
+export function CCExtensionBanner() {
   return (
     <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-5 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-4">

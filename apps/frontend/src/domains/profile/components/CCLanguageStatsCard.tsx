@@ -1,4 +1,4 @@
-export function LanguageStatsCard() {
+export function CCLanguageStatsCard() {
   const languages = [
     { name: 'Python', percentage: 65, color: 'bg-blue-500' },
     { name: 'JavaScript', percentage: 25, color: 'bg-yellow-400' }, // 디자인에선 다 파란색 계열이지만 구분 위함

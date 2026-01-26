@@ -5,7 +5,7 @@ interface Props {
   isMe: boolean;
 }
 
-export function ProfileHeader({ user, isMe }: Props) {
+export function CCProfileHeader({ user, isMe }: Props) {
   const isExtensionLinked = !!user.bojId;
 
   return (
@@ -54,7 +54,7 @@ export function ProfileHeader({ user, isMe }: Props) {
         )}
         {isMe && (
           <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition shadow-sm">
-            설정
+            프로필 수정
           </button>
         )}
       </div>
