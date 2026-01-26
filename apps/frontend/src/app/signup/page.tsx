@@ -118,7 +118,7 @@ function SignupForm() {
       const data = await response.json();
 
       if (data.success) {
-        router.push('/home-test');
+        router.push('/home');
       } else {
         setError(data.error?.message || '회원가입에 실패했습니다.');
       }
