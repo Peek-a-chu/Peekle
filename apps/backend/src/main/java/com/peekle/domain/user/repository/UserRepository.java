@@ -8,6 +8,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByNickname(String nickname);
 
+    Optional<User> findBySocialIdAndProvider(String socialId, String provider);
+
     // 랭킹 계산용: 내 점수보다 높은 사람 수 (같은 그룹 내)
     long countByLeagueGroupIdAndLeaguePointGreaterThan(Long leagueGroupId, int leaguePoint);
     //TODO: 리그 만들면 그룹 랭킹으로 해야해용

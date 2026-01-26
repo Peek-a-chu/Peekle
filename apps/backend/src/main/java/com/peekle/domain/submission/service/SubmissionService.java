@@ -21,9 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -160,20 +158,14 @@ public class SubmissionService {
     @Transactional(readOnly = true)
     public List<SubmissionLogResponse> getStudyProblemSubmissions(
             Long studyId, Long problemId) {
-        // 모든 제출 내역 조회 (최신순)
-        List<SubmissionLog> logs = submissionLogRepository
-                .findAllByRoomIdAndProblemIdOrderBySubmittedAtDesc(studyId, problemId);
+        // DB 최적화 조회 (유저별 최신 1개만 가져옴)
+        List<SubmissionLog> logs = submissionLogRepository.findLatestLogsPerUser(studyId, problemId);
 
-        // 유저별 중복 제거 (첫 번째로 나온 것이 최신)
-        Set<Long> processedUserIds = new HashSet<>();
         List<SubmissionLogResponse> result = new ArrayList<>();
-
         for (SubmissionLog log : logs) {
-            if (!processedUserIds.contains(log.getUser().getId())) {
-                processedUserIds.add(log.getUser().getId());
-                result.add(SubmissionLogResponse.from(log));
-            }
+            result.add(SubmissionLogResponse.from(log));
         }
+
         return result;
     }
 
