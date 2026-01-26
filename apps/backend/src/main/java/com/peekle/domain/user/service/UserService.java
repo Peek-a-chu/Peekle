@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -83,5 +85,19 @@ public class UserService {
     public User getUserByExtensionToken(String token) {
         return userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+    }
+
+    public Map<String, Object> getUserInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Map<String, Object> info = new HashMap<>();
+        info.put("id", user.getId());
+        info.put("nickname", user.getNickname());
+        info.put("profileImg", user.getProfileImg());
+        info.put("bojId", user.getBojId());
+        info.put("league", user.getLeague().name());
+        info.put("leaguePoint", user.getLeaguePoint());
+        return info;
     }
 }

@@ -41,7 +41,12 @@ public enum ErrorCode {
     STUDY_PROBLEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CURRICULUM_003", "등록된 문제를 찾을 수 없습니다."),
     SUBMISSION_EXISTS(HttpStatus.CONFLICT, "CURRICULUM_004", "이미 제출된 기록이 있어 문제를 삭제할 수 없습니다."),
 
-    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBMISSION_006", "제출 기록을 찾을 수 없습니다.");
+    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBMISSION_006", "제출 기록을 찾을 수 없습니다."),
+
+    // Whiteboard
+    WHITEBOARD_ALREADY_ACTIVE(HttpStatus.CONFLICT, "WHITEBOARD_001", "이미 활성화된 화이트보드가 있습니다."),
+    WHITEBOARD_NOT_FOUND(HttpStatus.NOT_FOUND, "WHITEBOARD_002", "활성화된 화이트보드를 찾을 수 없습니다."),
+    WHITEBOARD_PERMISSION_DENIED(HttpStatus.FORBIDDEN, "WHITEBOARD_003", "화이트보드 제어 권한이 없습니다.");
 
     private final HttpStatus status;
     private final String code;
