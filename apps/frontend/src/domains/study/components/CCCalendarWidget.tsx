@@ -54,19 +54,36 @@ interface CCInlineCalendarProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   className?: string;
+  historyDates?: Date[];
 }
 
-export function CCInlineCalendar({ selectedDate, onSelectDate, className }: CCInlineCalendarProps) {
+export function CCInlineCalendar({
+  selectedDate,
+  onSelectDate,
+  className,
+  historyDates = [],
+}: CCInlineCalendarProps) {
   const today = startOfToday();
 
   return (
-    <div className={cn('border-b border-border bg-card px-3 py-3 shrink-0', className)}>
+    <div className={cn('border-b border-border bg-card px-3 py-3 shrink-0 relative', className)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute right-5 top-4 z-10 h-7 px-2 text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-accent rounded-md"
+        onClick={() => onSelectDate(today)}
+      >
+        오늘로 이동
+      </Button>
       <DayPicker
         mode="single"
         selected={selectedDate}
         onSelect={(date) => date && onSelectDate(date)}
         locale={ko}
         disabled={(date) => isAfter(date, today)}
+        modifiers={{
+          hasHistory: historyDates,
+        }}
         showOutsideDays
         className="w-full"
         classNames={{
@@ -81,7 +98,8 @@ export function CCInlineCalendar({ selectedDate, onSelectDate, className }: CCIn
             'h-7 w-7 bg-transparent p-0 hover:bg-accent rounded-md inline-flex items-center justify-center transition-colors',
           month_grid: 'w-full border-collapse',
           weekdays: 'flex w-full justify-between mb-1',
-          weekday: 'text-muted-foreground font-medium text-xs w-8 h-8 flex items-center justify-center',
+          weekday:
+            'text-muted-foreground font-medium text-xs w-8 h-8 flex items-center justify-center',
           week: 'flex w-full justify-between',
           day: 'h-8 w-8 text-center text-sm p-0',
           day_button:
@@ -91,6 +109,10 @@ export function CCInlineCalendar({ selectedDate, onSelectDate, className }: CCIn
           outside: 'text-muted-foreground/40',
           disabled: 'text-muted-foreground/30 cursor-not-allowed hover:bg-transparent',
           hidden: 'invisible',
+        }}
+        modifiersClassNames={{
+          hasHistory:
+            'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:bg-pink-500 after:rounded-full',
         }}
         components={{
           Chevron: ({ orientation }) =>

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 
 export default function LoginPage() {
@@ -21,7 +20,6 @@ export default function LoginPage() {
               <X className="w-5 h-5" />
             </button>
           </Link>
-
           {/* --- 헤더 --- */}
           <div className="text-center space-y-6">
             <div className="space-y-2">

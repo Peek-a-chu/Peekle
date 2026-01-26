@@ -9,6 +9,7 @@ import lombok.Getter;
 public class StudyMemberResponse {
     private Long userId;
     private String nickname;
+    private String profileImage;
     private StudyMember.StudyRole role;
     private boolean isOnline;
 
@@ -16,6 +17,7 @@ public class StudyMemberResponse {
         return StudyMemberResponse.builder()
                 .userId(member.getUser().getId())
                 .nickname(member.getUser().getNickname())
+                .profileImage(member.getUser().getProfileImgThumb())
                 .role(member.getRole())
                 .isOnline(isOnline)
                 .build();

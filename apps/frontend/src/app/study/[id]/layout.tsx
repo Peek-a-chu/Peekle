@@ -10,7 +10,7 @@ import {
 
 interface StudyLayoutProps {
   children: ReactNode;
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function StudyLayout({ children }: StudyLayoutProps) {

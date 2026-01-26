@@ -12,4 +12,17 @@ public class RedisKeyConst {
 
     // Write-Behind Buffer (List)
     public static final String CHAT_BUFFER = "chat:buffer";
+
+    // IDE Code (Hash: study:{studyId}:problem:{problemId}:ide:{userId})
+    public static final String IDE_KEY = "study:%d:problem:%d:ide:%d";
+
+    // IDE Topic (Pub/Sub)
+    public static final String TOPIC_IDE = "topic/studies/rooms/%d/ide/%d";
+
+    // IDE Watchers (Set: study:{studyId}:ide:{targetUserId}:watchers)
+    // Who is watching targetUserId? -> Set of viewerUserIds
+    public static final String IDE_WATCHERS = "study:%d:ide:%d:watchers";
+
+    // Curriculum Topic (Pub/Sub)
+    public static final String TOPIC_CURRICULUM = "topic/studies/rooms/%d/problems";
 }

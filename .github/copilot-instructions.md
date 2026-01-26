@@ -218,7 +218,7 @@ All APIs return standardized format:
 
 ### Route Layout Rules
 - **Standard pages** (`/home`, `/profile`): Show LNB (Left Navigation Bar)
-- **Immersive rooms** (`/study/[id]`, `/games/[id]`): Hide LNB, show back button top-left
+- **Immersive rooms** (`/study/[id]`, `/game/[id]`): Hide LNB, show back button top-left
 
 ### Desktop-First Policy
 - Primary target: Desktop browsers (PC-optimized UI)

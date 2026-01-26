@@ -53,6 +53,7 @@ public class StudyChatLog {
     public enum ChatType {
         TALK,
         CODE,
-        SYSTEM
+        SYSTEM,
+        SUBMISSION // Code Submission Share
     }
 }

@@ -12,6 +12,8 @@ describe('StudyLayout', () => {
         rightPanel={<div data-testid="right">Right</div>}
         isLeftPanelFolded={false}
         onUnfoldLeftPanel={vi.fn()}
+        isRightPanelFolded={false}
+        onUnfoldRightPanel={vi.fn()}
       />,
     );
     expect(screen.getByTestId('header')).toBeInTheDocument();
@@ -33,6 +35,8 @@ describe('StudyLayout', () => {
         rightPanel={<div>Right</div>}
         isLeftPanelFolded={true}
         onUnfoldLeftPanel={vi.fn()}
+        isRightPanelFolded={false}
+        onUnfoldRightPanel={vi.fn()}
       />,
     );
 

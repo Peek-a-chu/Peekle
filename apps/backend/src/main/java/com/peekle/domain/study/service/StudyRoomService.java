@@ -13,6 +13,9 @@ import com.peekle.domain.study.entity.StudyMember;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
+import com.peekle.domain.submission.service.SubmissionService;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
@@ -41,9 +44,9 @@ public class StudyRoomService {
         private final InviteCodeService inviteCodeService;
         private final RedisTemplate<String, String> redisTemplate;
         private final UserRepository userRepository;
+        private final SubmissionService submissionService;
 
         // 스터디 방 생성 (초대코드 반환)
-
         @Transactional
         public StudyRoomCreateResponse createStudyRoom(Long userId, StudyRoomCreateRequest request) {
                 User user = userRepository.findById(userId)
@@ -93,14 +96,12 @@ public class StudyRoomService {
                 List<StudyMember> members = studyMemberRepository.findAllByStudyIdIn(studyRoomIds);
 
                 // 4. 스터디 방 별로 멤버 그룹화
-
                 Map<Long, List<StudyMember>> membersByStudyId = members.stream()
                                 .collect(Collectors.groupingBy(m -> m.getStudy().getId()));
 
                 // 5. Response DTO 변환
                 List<StudyRoomListResponse> content = studyRooms.getContent().stream()
                                 .map(studyRoom -> {
-                                        //
                                         List<StudyMember> studyMembers = membersByStudyId.getOrDefault(
                                                         studyRoom.getId(),
                                                         Collections.emptyList());
@@ -111,14 +112,12 @@ public class StudyRoomService {
                                                         .limit(3)
                                                         .map(m -> "https://api.dicebear.com/7.x/avataaars/svg?seed="
                                                                         + m.getUser().getId()) // 예시용 더미 이미지
-                                                                                               // 서비스 사용
                                                         .toList();
 
                                         return StudyRoomListResponse.of(studyRoom, memberCount, profileImages);
                                 }).toList();
 
                 return new PageImpl<>(content, pageable, studyRooms.getTotalElements());
-
         }
 
         // 스터디 방 상세 조회
@@ -133,7 +132,7 @@ public class StudyRoomService {
                 }
 
                 // 멤버가 아니라면 접근 거부
-                throw new BusinessException(ErrorCode.UNAUTHORIZED);
+                throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
 
         // 스터디 방 가입 (초대코드 사용)
@@ -181,9 +180,7 @@ public class StudyRoomService {
 
                 // 2. 멤버 여부 확인 (방에 참여한 사람만 초대 코드를 만들 수 있음)
                 if (!studyMemberRepository.existsByStudyAndUser_Id(studyRoom, userId)) {
-                        // TODO: 권한 관련 에러 코드가 없다면 추가 필요. 현재는 적절한게 없으면 UNAUTHORIZED 혹은 FORBIDDEN 의미의 에러
-                        // 일단은 BusinessException(ErrorCode.UNAUTHORIZED) 사용 혹은 새 에러 코드 추가
-                        throw new BusinessException(ErrorCode.UNAUTHORIZED);
+                        throw new BusinessException(ErrorCode.ACCESS_DENIED);
                 }
 
                 // 3. 초대 코드 생성 및 Redis 저장
@@ -235,7 +232,7 @@ public class StudyRoomService {
                                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
                 StudyMember member = studyMemberRepository.findByStudyAndUser_Id(studyRoom, userId)
-                                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+                                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED));
 
                 studyMemberRepository.delete(member);
         }
@@ -248,7 +245,7 @@ public class StudyRoomService {
                                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
                 StudyMember targetMember = studyMemberRepository.findByStudyAndUser_Id(studyRoom, targetUserId)
-                                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND)); // 해당 스터디에 없는 유저
+                                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
                 studyMemberRepository.delete(targetMember);
         }
@@ -260,9 +257,9 @@ public class StudyRoomService {
                 StudyRoom studyRoom = studyRoomRepository.findById(studyId)
                                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
-                // 1. 현재 방장(userId) 조회 -> 이미 @CheckStudyOwner로 검증됨, 하지만 Role 변경을 위해 조회 필요
+                // 1. 현재 방장(userId) 조회
                 StudyMember currentOwner = studyMemberRepository.findByStudyAndUser_Id(studyRoom, userId)
-                                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+                                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED));
 
                 // 2. 대상 멤버 조회
                 StudyMember targetMember = studyMemberRepository.findByStudyAndUser_Id(studyRoom, targetUserId)
@@ -270,6 +267,9 @@ public class StudyRoomService {
 
                 currentOwner.updateRole(StudyMember.StudyRole.MEMBER);
                 targetMember.updateRole(StudyMember.StudyRole.OWNER);
+
+                // 3. 스터디 방 Owner 필드 업데이트 (Response DTO용)
+                studyRoom.delegateOwner(targetMember.getUser());
         }
 
         private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom) {
@@ -292,5 +292,23 @@ public class StudyRoomService {
                                 .collect(Collectors.toList());
 
                 return StudyRoomResponse.from(studyRoom, memberResponses);
+        }
+
+        @Transactional
+        public SubmissionResponse submitStudyProblem(Long studyId, SubmissionRequest request) {
+                System.out.println("[StudyRoomService] Processing study submission for studyId: " + studyId);
+
+                // 1. 일반 제출 처리 (검증 및 저장)
+                SubmissionResponse response = submissionService.saveGeneralSubmission(request);
+
+                if (response.isSuccess()) {
+                        System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
+                        // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
+                        // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
+                } else {
+                        System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
+                }
+
+                return response;
         }
 }

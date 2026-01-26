@@ -11,6 +11,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_001", "서버 내부 오류가 발생했습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_002", "입력값이 올바르지 않습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "COMMON_003", "허용되지 않은 HTTP 메서드입니다."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "COMMON_004", "접근 권한이 없습니다."),
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_001", "사용자를 찾을 수 없습니다."),
@@ -32,7 +33,15 @@ public enum ErrorCode {
     CODE_LENGTH_MISMATCH(HttpStatus.BAD_REQUEST, "SUBMISSION_003", "코드 길이가 일치하지 않습니다."),
     BAEKJOON_CONNECTION_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "SUBMISSION_004", "백준 사이트 접속에 실패했습니다."),
     USER_VERIFICATION_FAILED(HttpStatus.UNAUTHORIZED, "SUBMISSION_005", "사용자 검증에 실패했습니다."),
-    ALREADY_PARTICIPATING_IN_OTHER_STUDY(HttpStatus.CONFLICT, "STUDY_004", "이미 다른 스터디에 참여 중입니다.");
+    ALREADY_PARTICIPATING_IN_OTHER_STUDY(HttpStatus.CONFLICT, "STUDY_004", "이미 다른 스터디에 참여 중입니다."),
+
+    // Curriculum
+    PROBLEM_ALREADY_ADDED(HttpStatus.CONFLICT, "CURRICULUM_001", "이미 커리큘럼에 등록된 문제입니다."),
+    PROBLEM_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "CURRICULUM_002", "문제는 오늘 날짜로만 추가할 수 있습니다."),
+    STUDY_PROBLEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CURRICULUM_003", "등록된 문제를 찾을 수 없습니다."),
+    SUBMISSION_EXISTS(HttpStatus.CONFLICT, "CURRICULUM_004", "이미 제출된 기록이 있어 문제를 삭제할 수 없습니다."),
+
+    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBMISSION_006", "제출 기록을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

@@ -16,7 +16,17 @@ describe('StudyHeader', () => {
         roomTitle: 'Test Title',
         currentDate: '2026-01-21',
         currentUserId: 1,
-        participants: [{ id: 1, isOwner: true } as any],
+        participants: [
+          {
+            id: 1,
+            isOwner: true,
+            odUid: '1',
+            nickname: 'test',
+            isMuted: false,
+            isVideoOff: false,
+            isOnline: true,
+          },
+        ],
       });
     });
   });
@@ -67,7 +77,17 @@ describe('StudyHeader', () => {
     // As non-owner
     act(() => {
       useRoomStore.setState({
-        participants: [{ id: 1, isOwner: false } as any],
+        participants: [
+          {
+            id: 1,
+            isOwner: false,
+            odUid: '1',
+            nickname: 'test',
+            isMuted: false,
+            isVideoOff: false,
+            isOnline: true,
+          },
+        ],
       });
     });
 

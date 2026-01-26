@@ -9,6 +9,8 @@ import com.peekle.domain.study.repository.StudyChatRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -30,9 +32,9 @@ public class ChatPersistenceService {
     public void saveChatToDB(Long studyId, Long userId, ChatMessageRequest request) {
         try {
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
             StudyRoom studyRoom = studyRoomRepository.findById(studyId)
-                    .orElseThrow(() -> new IllegalArgumentException("Study not found: " + studyId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
             StudyChatLog parent = null;
             if (request.getParentId() != null) {
@@ -53,8 +55,9 @@ public class ChatPersistenceService {
                     .metadata(metadataJson)
                     .build();
 
-            studyChatRepository.save(chatLog);
-        } catch (Exception e) {
+     
+
+    } catch (Exception e) {
             log.error("Failed to save chat to DB asynchronously", e);
         }
     }
