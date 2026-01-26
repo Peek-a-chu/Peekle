@@ -1,17 +1,27 @@
 # GitLab CI/CD Configuration for Peekle
-# Jenkins가 주 CI/CD 도구이지만, GitLab CI를 통한 간단한 검증도 가능
+# SSH를 통한 EC2 자동 배포
 
 stages:
   - lint
   - build
+  - deploy
 
-# Frontend 린트 및 빌드는 Jenkins Jenkinsfile에서 처리
-# 이 파일은 GitLab 내장 CI를 사용하려는 경우에만 활성화
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+# ===========================================
+# Frontend Pipeline
+# ===========================================
 
 frontend-lint:
   stage: lint
   image: node:20-alpine
   only:
+    refs:
+      - master
+      - main
+      - merge_requests
     changes:
       - apps/frontend/**/*
   before_script:
@@ -23,6 +33,7 @@ frontend-lint:
     - pnpm run format:check
     - pnpm run type-check
   cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
     paths:
       - apps/frontend/node_modules/
 
@@ -30,6 +41,9 @@ frontend-build:
   stage: build
   image: node:20-alpine
   only:
+    refs:
+      - master
+      - main
     changes:
       - apps/frontend/**/*
   before_script:
@@ -41,7 +55,170 @@ frontend-build:
   artifacts:
     paths:
       - apps/frontend/.next
-    expire_in: 7 days
+    expire_in: 1 day
   cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
     paths:
       - apps/frontend/node_modules/
+
+# ===========================================
+# Backend Pipeline
+# ===========================================
+
+backend-lint:
+  stage: lint
+  image: node:20-alpine
+  only:
+    refs:
+      - master
+      - main
+      - merge_requests
+    changes:
+      - apps/nest-api/**/*
+  before_script:
+    - cd apps/nest-api
+    - npm ci
+  script:
+    - npm run lint
+  cache:
+    key: backend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - apps/nest-api/node_modules/
+
+backend-build:
+  stage: build
+  image: node:20-alpine
+  only:
+    refs:
+      - master
+      - main
+    changes:
+      - apps/nest-api/**/*
+  before_script:
+    - cd apps/nest-api
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - apps/nest-api/dist
+    expire_in: 1 day
+  cache:
+    key: backend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - apps/nest-api/node_modules/
+
+# ===========================================
+# Deploy to EC2 via SSH
+# ===========================================
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  only:
+    refs:
+      - master
+      - main
+  before_script:
+    # Install SSH client
+    - apk add --no-cache openssh-client
+    # Setup SSH key (base64 decoded)
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    # Add EC2 host to known hosts
+    - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+        set -e
+
+        echo "=== Deploying Peekle to Production ==="
+
+        # Navigate to project directory
+        cd /home/$EC2_USER/peekle
+
+        # Pull latest code
+        echo "Pulling latest code..."
+        git fetch origin master
+        git reset --hard origin/master
+
+        # Create .env file if not exists
+        if [ ! -f docker/.env ]; then
+          echo "Creating .env file..."
+          cp docker/.env.example docker/.env
+        fi
+
+        # Navigate to docker directory
+        cd docker
+
+        # Build and deploy with Docker Compose
+        echo "Building Docker images..."
+        docker compose -f docker-compose.prod.yml build --no-cache
+
+        echo "Stopping old containers..."
+        docker compose -f docker-compose.prod.yml down
+
+        echo "Starting new containers..."
+        docker compose -f docker-compose.prod.yml up -d
+
+        # Clean up old images
+        echo "Cleaning up old images..."
+        docker image prune -f
+
+        # Health check
+        echo "Waiting for services to be healthy..."
+        sleep 10
+
+        # Check if containers are running
+        docker compose -f docker-compose.prod.yml ps
+
+        echo "=== Deployment Complete ==="
+      ENDSSH
+  environment:
+    name: production
+    url: https://$DOMAIN_NAME
+  when: manual
+
+# ===========================================
+# Deploy Script (Alternative: Using Docker Registry)
+# ===========================================
+
+.deploy-with-registry:
+  stage: deploy
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  only:
+    refs:
+      - master
+      - main
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+    # Login to GitLab Container Registry
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    # Build and push Frontend image
+    - docker build -t $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE/frontend:latest ./apps/frontend
+    - docker push $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE/frontend:latest
+    # Build and push Backend image
+    - docker build -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE/backend:latest ./apps/nest-api
+    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE/backend:latest
+    # Deploy to EC2
+    - |
+      ssh $EC2_USER@$EC2_HOST << ENDSSH
+        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+        cd /home/$EC2_USER/peekle/docker
+        docker compose -f docker-compose.prod.yml pull
+        docker compose -f docker-compose.prod.yml up -d
+        docker image prune -f
+      ENDSSH
+  when: manual
