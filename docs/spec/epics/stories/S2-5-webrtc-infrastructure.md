@@ -47,7 +47,7 @@ external-ip=YOUR_PUBLIC_IP_HERE/YOUR_PRIVATE_IP_HERE
 relay-ip=YOUR_PRIVATE_IP_HERE
 
 # TURN 서버 도메인
-realm=peekle.com
+realm=i14a408.p.ssafy.io
 
 # 로그 설정
 log-file=/var/log/turnserver.log
@@ -198,7 +198,7 @@ turnutils_uclient -v \
 docker exec -it peekle-coturn tail -f /var/log/turnserver.log
 
 # 정상 작동 시 보이는 로그 예시:
-# session 001000000000000001: realm <peekle.com> user <peekle>: incoming packet ALLOCATE processed, success
+# session 001000000000000001: realm <i14a408.p.ssafy.io> user <peekle>: incoming packet ALLOCATE processed, success
 # session 001000000000000001: new permission installed
 ```
 
@@ -616,7 +616,7 @@ OPENVIDU_SECRET=$(openssl rand -base64 32)
 ```bash
 # Let's Encrypt 인증서 자동 발급 (도메인 필요)
 CERTIFICATE_TYPE=letsencrypt
-LETSENCRYPT_EMAIL=admin@peekle.com
+LETSENCRYPT_EMAIL=admin@i14a408.p.ssafy.io
 ```
 
 ### 3. IP 화이트리스트 (선택사항)

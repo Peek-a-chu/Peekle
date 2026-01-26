@@ -30,46 +30,41 @@
 
 ### S2-2. 프로젝트 초기 설정 (Backend)
 🧾User Story
-
 백엔드 개발자로서, 필요한 의존성으로 Spring Boot 프로젝트를 설정하고 싶다.
-
 API 구축을 시작할 수 있어야 하기 때문이다.
 
 ✅ Acceptance Criteria
-
  Spring Boot 3.4.x 애플리케이션이 성공적으로 실행되어야 한다.
-
  `docker compose up` 실행 시 Redis 컨테이너가 정상 작동해야 한다.
-
- 외부 서버에서 제공되는 MySQL 데이터베이스 연결이 성공해야 한다.
-
+ 외부 서버(Azure MySQL)에서 제공되는 MySQL 데이터베이스 연결이 성공해야 한다.
  전역 에러 처리 및 공통 DTO 패턴이 수립되어야 한다.
 
 **🛠 Implementation Tasks**
-[ ] Spring Initializr로 프로젝트 생성 (Web, JPA, Lombok, Validation)
-[ ] `docker compose.yml` 작성 (Redis)
-[ ] GlobalExceptionHandler 구현
-[ ] `ApiResponse` 공통 DTO 클래스 작성
+[x] Spring Initializr로 프로젝트 생성 (Web, JPA, Lombok, Validation)
+[x] `docker compose.yml` 작성 (Redis)
+[x] GlobalExceptionHandler 구현
+[x] `ApiResponse` 공통 DTO 클래스 작성
 
-### S2-3. Jenkins CI/CD 설정 (DevOps)
+### S2-3. GitLab CI/CD 및 EC2 자동 배포 설정 (DevOps)
 🧾User Story
-
-DevOps 엔지니어로서, Jenkins를 배포하고 GitLab 저장소에 연결하고 싶다.
-
-코드 푸시가 자동으로 빌드 및 테스트를 트리거하게 하기 위함이다.
+DevOps 엔지니어로서, GitLab CI/CD를 통해 EC2에 자동 배포하고 싶다.
+코드 푸시가 자동으로 빌드, 테스트 및 배포를 트리거하게 하기 위함이다.
 
 ✅ Acceptance Criteria
-
- Jenkins 서버에 접근 가능해야 한다.
-
- GitLab 저장소로부터 Push 이벤트를 정상적으로 수신해야 한다.
-
- `Jenkinsfile` 파이프라인이 Frontend/Backend에 대해 Build 및 Test 단계를 실행해야 한다.
+ GitLab CI/CD 파이프라인이 정상 작동해야 한다.
+ master 브랜치 푸시 시 자동으로 린트 및 빌드가 실행되어야 한다.
+ SSH를 통해 EC2 인스턴스에 Docker 컨테이너로 배포되어야 한다.
+ Nginx 리버스 프록시를 통해 Frontend/Backend가 서비스되어야 한다.
 
 **🛠 Implementation Tasks**
-[ ] 외부 Jenkins 서버 접속 확인 및 연결
-[ ] Jenkins GitLab 플러그인 및 Credential 설정
-[ ] `Jenkinsfile` 작성 (Stage: Checkout -> Build -> Test)
+[x] Frontend Dockerfile 작성 (Multi-stage build)
+[x] Backend Dockerfile 작성 (Spring Boot)
+[x] docker-compose.prod.yml 작성 (Nginx, Frontend, Backend, Redis, OpenVidu, Coturn)
+[x] Nginx 설정 파일 및 Dockerfile 작성 (SSL 자동 생성 로직 포함)
+[x] `.gitlab-ci.yml` 작성 (lint -> build -> deploy stages)
+[x] GitLab CI/CD Variables 설정 (SSH_PRIVATE_KEY, EC2_HOST, EC2_USER)
+[ ] EC2 인스턴스 초기 설정 (Docker, Git 설치)
+[x] 컨테이너 기반 SSL 인증서 자동 발급 및 적용 로직 구현 (i14a408.p.ssafy.io)
 
 ### S2-4. MatterMost 알림 봇 (DevOps)
 🧾User Story
