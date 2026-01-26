@@ -82,8 +82,13 @@ export function CCIDEToolbar({
             {isRealtime ? <Eye className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
             <span>
               {isRealtime
-                ? `${viewingUser?.nickname}의 코드 열람 중`
-                : `${targetSubmission?.username}의 저장된 코드`}
+                ? `${viewingUser?.nickname}의 코드 실시간 열람 중`
+                : `${targetSubmission?.username}${
+                    targetSubmission?.username === 'PS러버' ||
+                    targetSubmission?.username === 'CodeNinja'
+                      ? ' (Bot)'
+                      : ''
+                  }의 저장된 코드 열람 중`}
             </span>
             {isSaved && targetSubmission && (
               <span className="text-xs opacity-75">({targetSubmission.problemTitle})</span>
@@ -103,16 +108,16 @@ export function CCIDEToolbar({
           <Copy className="h-4 w-4" />
         </Button>
 
-        {/* Standard Tools (Hidden when Viewing Other if desired, or conditionally shown) */}
+        {/* Code Reference - Always available if enabled */}
+        {showChatRef && (
+          <Button variant="ghost" size="icon" onClick={onRefChat} title="코드 참조 (채팅)">
+            <MessageSquare className="h-4 w-4" />
+          </Button>
+        )}
+
+        {/* Standard Tools (Hidden when Viewing Other) */}
         {!isViewingOther && (
           <>
-            {/* Code Reference */}
-            {showChatRef && (
-              <Button variant="ghost" size="icon" onClick={onRefChat} title="코드 참조 (채팅)">
-                <MessageSquare className="h-4 w-4" />
-              </Button>
-            )}
-
             {/* Submit */}
             {showSubmit && (
               <Button
