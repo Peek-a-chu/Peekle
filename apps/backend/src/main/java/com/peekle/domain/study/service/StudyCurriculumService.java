@@ -15,8 +15,11 @@ import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
+import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,9 +87,9 @@ public class StudyCurriculumService {
                 .isSolvedByMe(false)
                 .build();
 
-        String topic = String.format(com.peekle.global.redis.RedisKeyConst.TOPIC_CURRICULUM, studyId);
-        redisPublisher.publish(new org.springframework.data.redis.listener.ChannelTopic(topic),
-                com.peekle.global.socket.SocketResponse.of("ADD", responseData));
+        String topic = String.format(RedisKeyConst.TOPIC_CURRICULUM, studyId);
+        redisPublisher.publish(new ChannelTopic(topic),
+                SocketResponse.of("ADD", responseData));
     }
 
     /**
@@ -134,9 +137,9 @@ public class StudyCurriculumService {
                 .problemId(deletedProblemId)
                 .build();
 
-        String topic = String.format(com.peekle.global.redis.RedisKeyConst.TOPIC_CURRICULUM, studyId);
-        redisPublisher.publish(new org.springframework.data.redis.listener.ChannelTopic(topic),
-                com.peekle.global.socket.SocketResponse.of("REMOVE", responseData));
+        String topic = String.format(RedisKeyConst.TOPIC_CURRICULUM, studyId);
+        redisPublisher.publish(new ChannelTopic(topic),
+                SocketResponse.of("REMOVE", responseData));
     }
 
     /**

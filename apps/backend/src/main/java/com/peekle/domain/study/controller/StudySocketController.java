@@ -1,11 +1,16 @@
 package com.peekle.domain.study.controller;
 
+import com.peekle.domain.study.dto.chat.ChatMessageRequest;
 import com.peekle.domain.study.dto.curriculum.ProblemStatusResponse;
+import com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
 import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
+import com.peekle.domain.study.dto.ide.IdeResponse;
 import com.peekle.domain.study.dto.socket.request.*;
+import com.peekle.domain.study.entity.StudyChatLog;
 import com.peekle.domain.study.entity.StudyRoom;
-import com.peekle.domain.study.service.StudyRoomService;
+import com.peekle.domain.study.repository.StudyMemberRepository;
+import com.peekle.domain.study.service.*;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -31,13 +36,13 @@ public class StudySocketController {
         private final RedisPublisher redisPublisher;
         private final RedisTemplate<String, Object> redisTemplate;
         private final StudyRoomService studyRoomService;
-        private final com.peekle.domain.study.repository.StudyMemberRepository studyMemberRepository;
-        private final com.peekle.domain.study.service.StudyCurriculumService studyCurriculumService;
-        private final com.peekle.domain.study.service.RedisIdeService redisIdeService;
+        private final StudyMemberRepository studyMemberRepository;
+        private final StudyCurriculumService studyCurriculumService;
+        private final RedisIdeService redisIdeService;
         private final MediaService mediaService;
         private final SimpMessagingTemplate messagingTemplate;
-        private final com.peekle.domain.study.service.StudyChatService studyChatService; // Injected
-        private final com.peekle.domain.study.service.WhiteboardService whiteboardService; // Injected
+        private final StudyChatService studyChatService; // Injected
+        private final WhiteboardService whiteboardService; // Injected
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
@@ -104,7 +109,7 @@ public class StudySocketController {
 
                         // 4. IDE Restore
                         for (ProblemStatusResponse problem : curriculum) {
-                                com.peekle.domain.study.dto.ide.IdeResponse savedCode = redisIdeService.getCode(studyId,
+                                IdeResponse savedCode = redisIdeService.getCode(studyId,
                                                 problem.getProblemId(), userId);
                                 if (savedCode != null) {
                                         messagingTemplate.convertAndSend(
@@ -130,9 +135,9 @@ public class StudySocketController {
                 // 5. [SYSTEM CHAT] 입장 메시지 전송 (초기화 여부 무관)
                 try {
                         studyChatService.sendChat(studyId, userId,
-                                        com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                        ChatMessageRequest.builder()
                                                         .content("님이 스터디에 입장하셨습니다.")
-                                                        .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
                                                         .build());
                 } catch (Exception e) {
                         log.error("System Chat Error", e);
@@ -175,9 +180,9 @@ public class StudySocketController {
 
                 // 3. [SYSTEM CHAT] 퇴장 메시지
                 studyChatService.sendChat(request.getStudyId(), userId,
-                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                ChatMessageRequest.builder()
                                                 .content("님이 퇴장하셨습니다.")
-                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
         }
 
@@ -189,9 +194,9 @@ public class StudySocketController {
                 // [SYSTEM CHAT] 탈퇴 메시지 (멤버 삭제 전에 보내야 User 조회 가능)
                 try {
                         studyChatService.sendChat(request.getStudyId(), userId,
-                                        com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                        ChatMessageRequest.builder()
                                                         .content("님이 스터디를 탈퇴하셨습니다.")
-                                                        .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
                                                         .build());
                 } catch (Exception e) {
                         /* 이미 삭제 등 에러 무시 */ }
@@ -222,9 +227,9 @@ public class StudySocketController {
                 // "관리자님이 {target}님을 강퇴했습니다"
                 // -> Service에서 target 이름을 조회하기 복잡하므로 단순 알림
                 studyChatService.sendChat(request.getStudyId(), userId,
-                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                ChatMessageRequest.builder()
                                                 .content("님이 멤버를 강퇴했습니다.")
-                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
 
                 studyRoomService.kickMemberByUserId(userId, request.getStudyId(), request.getTargetUserId());
@@ -244,9 +249,9 @@ public class StudySocketController {
 
                 // [SYSTEM CHAT] 방 삭제 메시지
                 studyChatService.sendChat(request.getStudyId(), userId,
-                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                ChatMessageRequest.builder()
                                                 .content("님이 스터디를 삭제했습니다.")
-                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
 
                 // 1. Service
@@ -271,7 +276,7 @@ public class StudySocketController {
 
                 try {
                         if ("ADD".equalsIgnoreCase(request.getAction())) {
-                                com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest addRequest = com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest
+                                StudyProblemAddRequest addRequest = StudyProblemAddRequest
                                                 .builder()
                                                 .problemId(request.getProblemId())
                                                 .problemDate(request.getProblemDate())
@@ -281,9 +286,9 @@ public class StudySocketController {
 
                                 // [SYSTEM] 문제 추가 알림
                                 studyChatService.sendChat(studyId, userId,
-                                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                ChatMessageRequest.builder()
                                                                 .content("님이 커리큘럼을 추가했습니다: " + request.getProblemId())
-                                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                                .type(StudyChatLog.ChatType.SYSTEM)
                                                                 .build());
 
                         } else if ("REMOVE".equalsIgnoreCase(request.getAction())) {
@@ -291,9 +296,9 @@ public class StudySocketController {
 
                                 // [SYSTEM] 문제 삭제 알림
                                 studyChatService.sendChat(studyId, userId,
-                                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                                ChatMessageRequest.builder()
                                                                 .content("님이 커리큘럼을 삭제했습니다: " + request.getProblemId())
-                                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                                .type(StudyChatLog.ChatType.SYSTEM)
                                                                 .build());
                         }
                 } catch (Exception e) {
@@ -312,9 +317,9 @@ public class StudySocketController {
 
                 // [SYSTEM] 위임 알림
                 studyChatService.sendChat(request.getStudyId(), userId,
-                                com.peekle.domain.study.dto.chat.ChatMessageRequest.builder()
+                                ChatMessageRequest.builder()
                                                 .content("님이 방장 권한을 위임했습니다.")
-                                                .type(com.peekle.domain.study.entity.StudyChatLog.ChatType.SYSTEM)
+                                                .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
 
                 // Broadcast DELEGATE event
