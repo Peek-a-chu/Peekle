@@ -70,14 +70,14 @@ export function GameWaitingRoomLayout({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-foreground">{room.title}</h1>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs dark:text-zinc-900">
                 {teamLabels[room.teamType]}
               </Badge>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs text-primary border-primary/30">
                 {modeLabels[room.mode]}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground font-medium">
               ⏱️ {room.timeLimit}분 · 📝 {room.problemCount}문제 · 👥 {room.maxPlayers}명
             </p>
           </div>

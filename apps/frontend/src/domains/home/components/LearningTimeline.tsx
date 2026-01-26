@@ -24,7 +24,7 @@ const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
     };
 
     return (
-        <div className="bg-card border border-card-border rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6 transition-colors duration-300">
             {/* 헤더 */}
             <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-5 h-5 text-primary" />
@@ -32,20 +32,20 @@ const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
                     <h3 className="font-bold text-foreground">
                         {selectedDate ? `${formatDate(selectedDate)} 학습 타임라인` : '학습 타임라인'}
                     </h3>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                         총 {data.length}개 문제
                     </p>
                 </div>
             </div>
 
             {/* 타임라인 목록 */}
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border">
                 {displayedItems.length > 0 ? (
                     displayedItems.map((item, index) => (
                         <TimelineItem key={`${item.problemId}-${index}`} data={item} />
                     ))
                 ) : (
-                    <p className="text-center text-gray-400 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                         {selectedDate ? '해당 날짜에 풀이한 문제가 없습니다.' : '날짜를 선택해주세요.'}
                     </p>
                 )}
@@ -55,7 +55,7 @@ const LearningTimeline = ({ selectedDate }: LearningTimelineProps) => {
             {hasMore && (
                 <button
                     onClick={() => setExpanded(!expanded)}
-                    className="flex items-center justify-center gap-1 w-full mt-4 py-2 text-sm text-gray-500 hover:text-primary transition-colors"
+                    className="flex items-center justify-center gap-1 w-full mt-4 py-2 text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                     {expanded ? (
                         <>

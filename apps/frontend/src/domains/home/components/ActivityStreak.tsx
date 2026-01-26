@@ -43,7 +43,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
 
     // 색상 계산 (문제 풀이 수에 따라)
     const getColor = (count: number) => {
-        if (count === 0) return 'bg-gray-100';
+        if (count === 0) return 'bg-muted';
         if (count <= 2) return 'bg-secondary';
         if (count <= 4) return 'bg-primary/50';
         return 'bg-primary';
@@ -67,7 +67,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
     };
 
     return (
-        <div className="bg-card border border-card-border rounded-2xl p-5">
+        <div className="bg-card border border-border rounded-2xl p-5 transition-colors duration-300">
             {/* 헤더 */}
             <div className="flex flex-col gap-4 mb-6">
                 {/* 1행: 제목 */}
@@ -81,7 +81,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                     {/* 총 문제 수 */}
                     <div className="flex items-baseline gap-1">
                         <span className="text-2xl font-bold text-primary">{totalProblems.toLocaleString()}</span>
-                        <span className="text-sm text-gray-500">문제</span>
+                        <span className="text-sm text-muted-foreground">문제</span>
                     </div>
 
                     {/* 년도 선택 (드롭다운) */}
@@ -89,7 +89,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                         <select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(Number(e.target.value))}
-                            className="appearance-none bg-secondary/30 border border-secondary/20 text-gray-500 text-sm font-medium py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-secondary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                            className="appearance-none bg-muted/30 border border-border text-muted-foreground text-sm font-medium py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                         >
                             {AVAILABLE_YEARS.map((year) => (
                                 <option key={year} value={year}>
@@ -97,7 +97,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                                 </option>
                             ))}
                         </select>
-                        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                     </div>
                 </div>
             </div>
@@ -107,7 +107,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                 <div className="flex gap-1 min-w-max">
                     {Object.entries(monthlyData).map(([monthKey, days]) => (
                         <div key={monthKey} className="flex flex-col gap-1">
-                            <span className="text-[10px] text-gray-400 mb-1 h-3">
+                            <span className="text-[10px] text-muted-foreground/70 mb-1 h-3">
                                 {formatMonth(monthKey)}
                             </span>
                             <div className="grid grid-rows-7 grid-flow-col gap-px">
@@ -115,9 +115,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                                     <button
                                         key={day.date}
                                         onClick={() => handleDateClick(day.date)}
-                                        className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count)} ${selectedDate === day.date
+                                        className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${selectedDate === day.date
                                             ? 'ring-1 ring-primary ring-offset-1'
-                                            : 'hover:ring-1 hover:ring-gray-300'
+                                            : 'hover:ring-1 hover:ring-border'
                                             }`}
                                         title={`${day.date}: ${day.count}문제`}
                                     />
@@ -129,10 +129,10 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
             </div>
 
             {/* 범례 */}
-            <div className="flex items-center justify-end gap-2 mt-4 text-xs text-gray-500">
+            <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
                 <span>적음</span>
                 <div className="flex gap-0.5">
-                    <div className="w-3 h-3 rounded-sm bg-gray-100" />
+                    <div className="w-3 h-3 rounded-sm bg-muted" />
                     <div className="w-3 h-3 rounded-sm bg-secondary" />
                     <div className="w-3 h-3 rounded-sm bg-primary/50" />
                     <div className="w-3 h-3 rounded-sm bg-primary" />

@@ -68,19 +68,19 @@ export function GameLayoutFilter({
           <TabsList className="bg-muted/50 p-1 border border-border">
             <TabsTrigger
               value="ALL"
-              className="data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
             >
               전체
             </TabsTrigger>
             <TabsTrigger
               value="WAITING"
-              className="data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
             >
               대기 중
             </TabsTrigger>
             <TabsTrigger
               value="PLAYING"
-              className="data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
             >
               진행 중
             </TabsTrigger>

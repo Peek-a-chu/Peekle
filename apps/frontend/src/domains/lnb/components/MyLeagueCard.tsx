@@ -23,25 +23,25 @@ const MyLeagueCard = () => {
   };
 
   const statusMap = {
-    promotion: { label: '승급예정', color: 'text-emerald-500 bg-emerald-100' },
-    maintenance: { label: '유지', color: 'text-gray-500 bg-gray-100' },
-    demotion: { label: '강등위기', color: 'text-red-500 bg-red-100' },
+    promotion: { label: '승급예정', color: 'text-success bg-success/10' },
+    maintenance: { label: '유지', color: 'text-muted-foreground bg-muted' },
+    demotion: { label: '강등위기', color: 'text-destructive bg-destructive/10' },
   };
 
   const currentStatus = statusMap[leagueInfo.status];
 
   return (
     <Link href="/league" className="block w-full">
-      <div className="relative flex items-center gap-3 px-4 py-6 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-all duration-200 shadow-sm">
+      <div className="relative flex items-center gap-3 px-4 py-6 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 transition-all duration-200 shadow-sm">
         {/* 메달 아이콘 */}
-        <div className="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center shrink-0 shadow-inner">
-          <Medal className="w-4 h-4 text-amber-600 fill-amber-500" />
+        <div className="w-9 h-9 rounded-full bg-amber-200 dark:bg-amber-900/30 flex items-center justify-center shrink-0 shadow-inner">
+          <Medal className="w-4 h-4 text-amber-600 dark:text-amber-500 fill-amber-500/50" />
         </div>
 
         {/* 왼쪽: 티어 이름 + 점수 */}
         <div className="flex flex-col flex-1">
-          <span className="text-base font-bold text-slate-800">{leagueInfo.tierName}</span>
-          <span className="text-sm text-slate-500 font-medium">{leagueInfo.score}점</span>
+          <span className="text-base font-bold text-foreground">{leagueInfo.tierName}</span>
+          <span className="text-sm text-muted-foreground font-medium">{leagueInfo.score}점</span>
         </div>
 
         {/* 오른쪽: 승급예정 + 순위 */}
@@ -54,7 +54,7 @@ const MyLeagueCard = () => {
           >
             {currentStatus.label}
           </span>
-          <span className="text-[11px] text-slate-400 mt-0.5">
+          <span className="text-[11px] text-muted-foreground/60 mt-0.5 font-medium">
             {leagueInfo.rank}/{leagueInfo.totalPlayers}위
           </span>
         </div>
