@@ -117,6 +117,7 @@ export function GamePlayCenterPanel({
                 {/* 에디터 */}
                 <div className="flex-1 w-full" style={{ minHeight: '300px' }}>
                     <CCIDEPanel
+                        key={`${selectedProblemUrl}-${language}`} // 문제 또는 언어가 바뀌면 IDE 리셋
                         ref={idePanelRef}
                         initialCode={code}
                         language={language}
@@ -124,6 +125,7 @@ export function GamePlayCenterPanel({
                         hideToolbar
                         onLanguageChange={onLanguageChange}
                         onThemeChange={setTheme}
+                        onCodeChange={onCodeChange} // 코드 변경 시 상위 컴포넌트(problemCodes)에 저장
                     />
                 </div>
             </div>

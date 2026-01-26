@@ -11,14 +11,17 @@ import {
 } from '@/domains/game/mocks/mock-data'
 import { useGameTimer } from './useGameTimer'
 
-// 문제별 코드 상태
+// 문제별 코드 상태 (언어별로 저장)
 interface ProblemCodeState {
     [problemId: string]: {
-        code: string
-        language: string
+        lastLanguage: string
+        codes: {
+            [language: string]: string
+        }
     }
 }
 
+// ... (UseGamePlayRoomReturn Interface는 그대로 유지) ...
 interface UseGamePlayRoomReturn {
     // 게임 상태
     gameState: GamePlayState | null
@@ -69,15 +72,13 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
     // 게임 상태 로드
     useEffect(() => {
         setIsLoading(true)
-        // Mock 데이터 로드 (실제로는 API 호출)
+        // Mock 데이터 로드
         const state = getMockGamePlayState(roomId)
         if (state) {
             setGameState(state)
-            // 첫 번째 문제 선택
             if (state.problems.length > 0) {
                 setSelectedProblemId(state.problems[0].id)
             }
-            // Mock: 테스트를 위해 접속 시 항상 방장 권한을 갖도록 설정
             const host = state.participants.find(p => p.isHost)
             if (host) {
                 setCurrentUserId(host.id)
@@ -87,7 +88,7 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
         setIsLoading(false)
     }, [roomId])
 
-    // 타이머 설정
+    // ... (타이머 관련 코드는 그대로 유지되어야 하므로 아래에서 계속) ...
     const isSpeedRace = gameState?.mode === 'SPEED_RACE'
     const timerInitialTime = isSpeedRace ? 0 : (gameState?.remainingTime ?? 1800)
 
@@ -103,37 +104,50 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
     // 선택된 문제
     const selectedProblem = gameState?.problems.find((p) => p.id === selectedProblemId) ?? null
 
-    // 현재 코드
-    const currentCode = problemCodes[selectedProblemId ?? '']?.code ?? DEFAULT_CODE[currentLanguage]
+    // 현재 코드 (문제별 + 언어별 저장된 코드 혹은 기본값)
+    const currentCode = problemCodes[selectedProblemId ?? '']?.codes[currentLanguage] ?? DEFAULT_CODE[currentLanguage]
 
     // 문제 선택
     const selectProblem = useCallback((problemId: string) => {
         setSelectedProblemId(problemId)
-    }, [])
+        // 해당 문제의 마지막 사용 언어로 복원
+        const lastLang = problemCodes[problemId]?.lastLanguage ?? 'python'
+        setCurrentLanguage(lastLang)
+    }, [problemCodes])
 
-    // 코드 설정
+    // 코드 설정 (문제별 + 언어별 저장)
     const setCode = useCallback((code: string) => {
         if (!selectedProblemId) return
-        setProblemCodes((prev) => ({
-            ...prev,
-            [selectedProblemId]: {
-                code,
-                language: currentLanguage,
-            },
-        }))
+        setProblemCodes((prev) => {
+            const problemState = prev[selectedProblemId] || { lastLanguage: currentLanguage, codes: {} }
+            return {
+                ...prev,
+                [selectedProblemId]: {
+                    ...problemState,
+                    lastLanguage: currentLanguage,
+                    codes: {
+                        ...problemState.codes,
+                        [currentLanguage]: code
+                    }
+                }
+            }
+        })
     }, [selectedProblemId, currentLanguage])
 
     // 언어 설정
     const setLanguage = useCallback((language: string) => {
         setCurrentLanguage(language)
         if (selectedProblemId) {
-            setProblemCodes((prev) => ({
-                ...prev,
-                [selectedProblemId]: {
-                    code: prev[selectedProblemId]?.code ?? DEFAULT_CODE[language],
-                    language,
-                },
-            }))
+            setProblemCodes((prev) => {
+                const problemState = prev[selectedProblemId] || { lastLanguage: language, codes: {} }
+                return {
+                    ...prev,
+                    [selectedProblemId]: {
+                        ...problemState,
+                        lastLanguage: language
+                    }
+                }
+            })
         }
     }, [selectedProblemId])
 
