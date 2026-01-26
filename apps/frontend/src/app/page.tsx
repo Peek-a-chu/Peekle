@@ -1,8 +1,41 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
+import { getMe } from '@/app/api/userApi';
 
 export default function Home() {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const data = await getMe();
+        if (data.success && data.data) {
+          router.replace('/home');
+          return;
+        }
+      } catch {
+        // 로그인 안 됨 - 랜딩 페이지 표시
+      }
+      setIsChecking(false);
+    };
+
+    checkAuth();
+  }, [router]);
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     // 1. 전체 배경: config의 background (#F7F8FC)
     <div className="min-h-screen bg-background font-sans selection:bg-secondary selection:text-primary flex flex-col">
