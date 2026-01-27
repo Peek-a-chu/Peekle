@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Trophy, Settings2, Clock } from 'lucide-react';
 import LeagueIcon, { LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { useLeagueRanking, useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
-
 import LeagueRuleModal from './LeagueRuleModal';
 
 // UTC 기준 매주 화요일 21:00 (한국시간 수요일 06:00) 계산

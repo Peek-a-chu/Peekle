@@ -9,7 +9,7 @@ export default function LeaguePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8 items-start">
 
                     {/* 왼쪽: 내 상태 카드 (Sticky Removed) */}
-                    <div className="space-y-6">
+                    <div className="space-y-6">x
                         <CCLeagueMyStatus />
                     </div>
 

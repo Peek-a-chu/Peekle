@@ -193,6 +193,7 @@ erDiagram
 | `result` | VARCHAR(20) | | 승급(PROMOTED)/강등(DEMOTED) 여부 |
 | `season_week` | INT | | 시즌 주차 (YYYYWW) |
 | `closed_at` | DATETIME | | 시즌 종료일 |
+| `is_viewed` | BOOLEAN | Default FALSE | 결과 확인 여부 (모달 노출용) |
 
 **`daily_solved_counts`** (스트릭)
 | 컬럼 | 타입 | 설명 |

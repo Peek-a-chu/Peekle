@@ -5,22 +5,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import LeagueIcon, { LEAGUE_NAMES, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { useLeagueRanking } from '../hooks/useDashboardData';
-import { LEAGUE_RULES } from '../mocks/dashboardMocks';
+
 
 const LeagueRanking = () => {
     const { data } = useLeagueRanking();
 
     // 현재 리그의 승급/강등 규칙 가져오기
-    const rules = LEAGUE_RULES[data.myLeague];
-    const totalMembers = data.members.length;
-
-    // 승급 라인 인덱스 (이 등수 아래에 선을 그음) -> 1등부터 N등까지 승급
-    const promotionIndex = rules.promote - 1;
-
-    // 강등 라인 인덱스 (이 등수 위에 선을 그음) -> 하위 N명 강등
-    // 예: 10명 중 3명 강등 -> 7등(index 6)까지 생존, 8등(index 7)부터 강등
-    // 즉 index 6과 7 사이에 선을 그어야 함 -> index 6 아래에 그음
-    const demotionIndex = (totalMembers - rules.demote) - 1;
+    const rules = data.rule;
 
     return (
         <div className="bg-card border border-border rounded-2xl p-3 shadow-sm h-full flex flex-col transition-colors duration-300">
@@ -82,67 +73,77 @@ const LeagueRanking = () => {
             {/* 순위 목록 (스크롤) */}
             <div className="flex-1 pr-1 -mr-1">
                 <div className="space-y-0.5 relative">
-                    {data.members.map((member, index) => (
-                        <div key={member.rank}>
-                            <div
-                                className={`flex items-center py-1.5 px-2 rounded-lg transition-all ${member.isMe
-                                    ? 'bg-secondary/50 border border-primary/30'
-                                    : 'hover:bg-muted/50 border border-transparent'
-                                    }`}
-                            >
-                                {/* 순위 & 메달 */}
-                                <div className="w-6 flex justify-center shrink-0">
-                                    <span className={`text-xs font-medium ${member.isMe ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
-                                        {member.rank}
-                                    </span>
-                                </div>
+                    {data.members.map((member, index) => {
+                        // 다음 멤버의 상태를 확인하여 구분선 그리기
+                        const nextMember = data.members[index + 1];
+                        const showPromoteDivider = member.status === 'PROMOTE' && nextMember?.status !== 'PROMOTE';
+                        // STAY에서 DEMOTE로 넘어갈 때 구분선
+                        const showDemoteDivider = member.status === 'STAY' && nextMember?.status === 'DEMOTE';
+                        // 혹은 PROMOTE에서 바로 DEMOTE로 넘어갈 수도 있음 (인원 적을 때)
+                        const showDemoteDivider2 = member.status === 'PROMOTE' && nextMember?.status === 'DEMOTE';
 
-                                {/* 아바타 & 이름 */}
-                                <div className="flex-1 flex items-center gap-2 ml-2 overflow-hidden">
-                                    <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 border ${member.isMe ? 'border-primary/30' : 'border-border'}`}>
-                                        {member.avatar ? (
-                                            <Image
-                                                src={member.avatar}
-                                                alt={member.name}
-                                                width={24}
-                                                height={24}
-                                                className="object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-muted" />
-                                        )}
+                        return (
+                            <div key={member.rank}>
+                                <div
+                                    className={`flex items-center py-1.5 px-2 rounded-lg transition-all ${member.me
+                                        ? 'bg-secondary/50 border border-primary/30'
+                                        : 'hover:bg-muted/50 border border-transparent'
+                                        }`}
+                                >
+                                    {/* 순위 & 메달 */}
+                                    <div className="w-6 flex justify-center shrink-0">
+                                        <span className={`text-xs font-medium ${member.me ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
+                                            {member.rank}
+                                        </span>
                                     </div>
-                                    <span className={`text-xs font-medium truncate ${member.isMe ? 'text-primary font-bold' : 'text-foreground'}`}>
-                                        {member.name}
-                                        {member.isMe && <span className="text-primary text-[10px] font-normal ml-1">(나)</span>}
+
+                                    {/* 아바타 & 이름 */}
+                                    <div className="flex-1 flex items-center gap-2 ml-2 overflow-hidden">
+                                        <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 border ${member.me ? 'border-primary/30' : 'border-border'}`}>
+                                            {member.avatar || member.profileImgThumb ? (
+                                                <Image
+                                                    src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
+                                                    alt={member.name}
+                                                    width={24}
+                                                    height={24}
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-muted" />
+                                            )}
+                                        </div>
+                                        <span className={`text-xs font-medium truncate ${member.me ? 'text-primary font-bold' : 'text-foreground'}`}>
+                                            {member.name}
+                                            {member.me && <span className="text-primary text-[10px] font-normal ml-1">(나)</span>}
+                                        </span>
+                                    </div>
+
+                                    {/* 점수 */}
+                                    <span className={`text-xs font-bold ml-1 ${member.me ? 'text-primary' : 'text-muted-foreground'}`}>
+                                        {member.score.toLocaleString()}
                                     </span>
                                 </div>
 
-                                {/* 점수 */}
-                                <span className={`text-xs font-bold ml-1 ${member.isMe ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {member.score.toLocaleString()}
-                                </span>
+                                {/* 승급 구분선 */}
+                                {showPromoteDivider && (
+                                    <div className="flex items-center gap-2 my-2">
+                                        <div className="h-[1px] flex-1 bg-green-200 dark:bg-green-900/50"></div>
+                                        <span className="text-[10px] text-green-500 font-medium">승급</span>
+                                        <div className="h-[1px] flex-1 bg-green-200 dark:bg-green-900/50"></div>
+                                    </div>
+                                )}
+
+                                {/* 강등 구분선 */}
+                                {(showDemoteDivider || showDemoteDivider2) && (
+                                    <div className="flex items-center gap-2 my-2">
+                                        <div className="h-[1px] flex-1 bg-red-200 dark:bg-red-900/50"></div>
+                                        <span className="text-[10px] text-red-500 font-medium">강등</span>
+                                        <div className="h-[1px] flex-1 bg-red-200 dark:bg-red-900/50"></div>
+                                    </div>
+                                )}
                             </div>
-
-                            {/* 승급 구분선 */}
-                            {rules.promote > 0 && index === promotionIndex && (
-                                <div className="flex items-center gap-2 my-2">
-                                    <div className="h-[1px] flex-1 bg-green-200 dark:bg-green-900/50"></div>
-                                    <span className="text-[10px] text-green-500 font-medium">승급</span>
-                                    <div className="h-[1px] flex-1 bg-green-200 dark:bg-green-900/50"></div>
-                                </div>
-                            )}
-
-                            {/* 강등 구분선 */}
-                            {rules.demote > 0 && index === demotionIndex && (
-                                <div className="flex items-center gap-2 my-2">
-                                    <div className="h-[1px] flex-1 bg-red-200 dark:bg-red-900/50"></div>
-                                    <span className="text-[10px] text-red-500 font-medium">강등</span>
-                                    <div className="h-[1px] flex-1 bg-red-200 dark:bg-red-900/50"></div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         </div>
