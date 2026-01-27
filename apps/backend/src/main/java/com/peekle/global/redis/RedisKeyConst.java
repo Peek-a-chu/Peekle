@@ -25,4 +25,20 @@ public class RedisKeyConst {
 
     // Curriculum Topic (Pub/Sub)
     public static final String TOPIC_CURRICULUM = "topic/studies/rooms/%d/problems";
+
+    // Whiteboard Config (Hash)
+    // study:{studyId}:whiteboard:config -> isActive, ownerId, status
+    public static final String WHITEBOARD_CONFIG = "study:%d:whiteboard:config";
+
+    // Whiteboard History (List)
+    // study:{studyId}:whiteboard:history
+    public static final String WHITEBOARD_HISTORY = "study:%d:whiteboard:history";
+
+    // Whiteboard Topic (Pub/Sub - Broadcast)
+    // /topic/studies/rooms/{studyId}/whiteboard
+    public static final String TOPIC_WHITEBOARD = "topic/studies/rooms/%d/whiteboard";
+
+    // Whiteboard Private Topic (Pub/Sub - 1:1 Sync)
+    // /topic/studies/rooms/{studyId}/whiteboard/{userId}
+    public static final String TOPIC_WHITEBOARD_USER = "topic/studies/rooms/%d/whiteboard/%d";
 }
