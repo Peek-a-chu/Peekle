@@ -6,6 +6,7 @@ import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.redis.RedisKeyConst;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -25,21 +26,10 @@ public class WhiteboardService {
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
-    // 키 생성 헬퍼 메서드 (중복 코드 방지)
-    // 화이트보드 상태값
-    private String getHistoryKey(Long studyId) {
-        return "study:" + studyId + ":whiteboard:history";
-    }
-
-    // 잠금 상태, 방장 정보, 활성화 여부
-    private String getConfigKey(Long studyId) {
-        return "study:" + studyId + ":whiteboard:config";
-    }
-
     // 화이트보드 시작
     public void startWhiteboard(Long studyId, Long userId) {
 
-        String key = getConfigKey(studyId);
+        String key = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
 
         // 이미 화이트보드가 켜져있는지 확인 필요
         Object activeValue = redisTemplate.opsForHash().get(key, "isActive");
@@ -57,24 +47,27 @@ public class WhiteboardService {
         config.put("status", "UNLOCKED"); // 잠금 해제
 
         redisTemplate.opsForHash().putAll(key, config);
-
         redisTemplate.expire(key, Duration.ofHours(24)); // TTL 설정
 
-        String nickName = userRepository.findById(userId).map(User::getNickname).orElse("Unknown");
+        String nickName = getUserNickname(userId);
+
 
         WhiteboardResponse startMessage = WhiteboardResponse.builder()
-                .type("START")
+                .action("START") // Client가 이 이벤트를 받으면 "시작되었습니다" 토스트 띄움
                 .senderId(userId)
                 .senderName(nickName)
                 .data("Session Started")
+                .timestamp(LocalDateTime.now())
                 .build();
-        messagingTemplate.convertAndSend("/topic/studies/rooms/" + studyId + "/whiteboard", startMessage);
+
+        String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
+        messagingTemplate.convertAndSend(topic, startMessage);
     }
 
     // 화이트보드 종료
     public void stopWhiteboard(Long studyId, Long userId){
-        String configKey = getConfigKey(studyId);
-        String historyKey = getHistoryKey(studyId);
+        String configKey = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
+        String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 권한 확인(주인장만 끌수있음 -> 화이트보드를 킨 사람)
         Object ownerId = redisTemplate.opsForHash().get(configKey, "ownerId");
@@ -85,20 +78,23 @@ public class WhiteboardService {
         // 데이터 지우기
         redisTemplate.delete(List.of(configKey, historyKey));
 
+
         // 종료 메시지
         WhiteboardResponse closeMessage = WhiteboardResponse.builder()
-                .type("CLOSE")
+                .action("CLOSE") // Client는 이 이벤트 받으면 캔버스 비활성화/닫기 처리
+                .senderId(userId)
                 .data("Session Closed by Leader")
+                .timestamp(LocalDateTime.now())
                 .build();
 
-        messagingTemplate.convertAndSend("/topic/studies/rooms/" + studyId + "/whiteboard", closeMessage);
-
+        String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
+        messagingTemplate.convertAndSend(topic, closeMessage);
     }
 
     // 초기 화이트보드 상태값 확인
     public void getWhiteboardState(Long studyId, Long userId) {
-        String configKey = getConfigKey(studyId);
-        String historyKey = getHistoryKey(studyId);
+        String configKey = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
+        String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // Reids 정보 조회
         Map<Object, Object> config = redisTemplate.opsForHash().entries(configKey);
@@ -118,45 +114,49 @@ public class WhiteboardService {
         }
 
         // 응답값
-        WhiteboardResponse sync = WhiteboardResponse.builder()
-                .type("SYNC")
+        WhiteboardResponse syncMessage = WhiteboardResponse.builder()
+                .action("SYNC")
                 .data(stateData)
                 .timestamp(LocalDateTime.now())
                 .build();
 
-        messagingTemplate.convertAndSend(
-                "/topic/studies/rooms/" + studyId + "/whiteboard/" + userId,
-                sync);
+        String userTopic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD_USER, studyId, userId);
+        messagingTemplate.convertAndSend(userTopic, syncMessage);
     }
 
-    public void saveDrawEvent(Long studyId, WhiteboardRequest request) {
-        String configKey = getConfigKey(studyId);
+    public void saveDrawEvent(Long studyId, Long userId, WhiteboardRequest request) {
+        String configKey = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
+        String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 활성화 상태 확인
         Object isActive = redisTemplate.opsForHash().get(configKey, "isActive");
-
         if(isActive == null || !isActive.toString().equals("true")) {
             throw new BusinessException(ErrorCode.WHITEBOARD_NOT_FOUND);
         }
 
         // Redis List 데이터 저장
-        String historyKey = getHistoryKey(studyId);
+        String nickName = getUserNickname(userId);
 
-        redisTemplate.opsForList().rightPush(historyKey, request.getData());
+        WhiteboardResponse response = WhiteboardResponse.from(request, userId, nickName);
 
-        redisTemplate.expire(historyKey, Duration.ofHours(24));
+        // 1. request.getData()만 저장하면 안 됨! -> response 객체 통째로 저장해야 함 (그래야 나중에 action, objectId를 알 수 있음)
+        // 2. "CURSOR" (마우스 이동) 이벤트는 저장하지 않음 (DB 부하 방지, 실시간성만 중요)
+        if (!"CURSOR".equals(request.getAction())) {
+            redisTemplate.opsForList().rightPush(historyKey, response);
+            redisTemplate.expire(historyKey, Duration.ofHours(24));
+        }
 
         // 실시간 알림 전파
-        messagingTemplate.convertAndSend("/topic/studies/rooms/" + studyId + "/whiteboard", request);
+        String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
+        messagingTemplate.convertAndSend(topic, response);
     }
 
     public void clearWhiteboard(Long studyId, Long userId) {
-        String configKey = getConfigKey(studyId);
-        String historyKey = getHistoryKey(studyId);
+        String configKey = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
+        String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 활성화 여부 확인
         Object isActive = redisTemplate.opsForHash().get(configKey, "isActive");
-
         if (isActive == null || !isActive.toString().equals("true")) {
             throw new BusinessException(ErrorCode.WHITEBOARD_NOT_FOUND);
         }
@@ -169,12 +169,24 @@ public class WhiteboardService {
 
         redisTemplate.delete(historyKey);
 
+        String nickName = getUserNickname(userId);
+
         WhiteboardResponse clearMessage = WhiteboardResponse.builder()
-                .type("CLEAR")
-                .data(null)
+                .action("CLEAR") // Client는 이걸 받으면 canvas.clear() 실행
+                .senderId(userId)
+                .senderName(nickName)
+                .timestamp(LocalDateTime.now())
                 .build();
 
-        messagingTemplate.convertAndSend("/topic/studies/rooms/" + studyId + "/whiteboard", clearMessage);
+        String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
+        messagingTemplate.convertAndSend(topic, clearMessage);
 
+    }
+
+    // 유저 닉네임 조회 헬퍼
+    private String getUserNickname(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getNickname)
+                .orElse("Unknown");
     }
 }
