@@ -3,7 +3,7 @@
 import { TrendingUp, TrendingDown, GripHorizontal, Minus } from 'lucide-react';
 import Image from 'next/image';
 import { useLeagueRanking } from '@/domains/home/hooks/useDashboardData';
-import { LEAGUE_RULES, LeagueRankingMember, calculateLeagueCutoffs } from '@/domains/home/mocks/dashboardMocks';
+import { LeagueRankingMember } from '@/domains/league/types';
 import { LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { format, startOfWeek, addDays } from 'date-fns';
 
@@ -50,22 +50,20 @@ const getLeaguePeriodString = () => {
 };
 
 const CCLeagueRankingList = () => {
-    const { data } = useLeagueRanking();
+    const { data, isLoading } = useLeagueRanking();
 
-    // 현재 리그 규칙 및 인원별 커트라인 계산
-    const rules = LEAGUE_RULES[data.myLeague];
-    const totalMembers = data.members.length;
+    if (isLoading) {
+        return <div className="text-center py-10 text-muted-foreground text-sm">리그 정보를 불러오는 중입니다...</div>;
+    }
 
-    // 유동적인 커트라인 계산 (백분율 기반)
-    const { promoteCount, demoteCount } = calculateLeagueCutoffs(totalMembers, rules);
+    if (!data.members || data.members.length === 0) {
+        return <div className="text-center py-10 text-muted-foreground text-sm">리그 멤버 정보가 없습니다.</div>;
+    }
 
-    // 섹션 나누기
-    const promotionZone = data.members.slice(0, promoteCount);
-    // 유지 구간: [promoteCount ~ total - demoteCount]
-    const demotionStartIndex = totalMembers - demoteCount;
-    // demoteCount가 0일 수도 있으므로 slice 주의
-    const maintenanceZone = data.members.slice(promoteCount, demotionStartIndex);
-    const demotionZone = data.members.slice(demotionStartIndex);
+    // 그룹 나누기 (Backend에서 status 필드로 구분됨)
+    const promotionZone = data.members.filter(m => m.status === 'PROMOTE');
+    const maintenanceZone = data.members.filter(m => m.status === 'STAY');
+    const demotionZone = data.members.filter(m => m.status === 'DEMOTE');
 
     return (
         <div className="h-full flex flex-col">
@@ -86,7 +84,7 @@ const CCLeagueRankingList = () => {
                 {promotionZone.length > 0 && (
                     <RankingSection
                         title="승급 구간"
-                        subtitle={`상위 ${promoteCount}명`}
+                        subtitle={`상위권`}
                         icon={<TrendingUp className="w-3 h-3 text-green-500" />}
                         members={promotionZone}
                         type="promotion"
@@ -100,7 +98,7 @@ const CCLeagueRankingList = () => {
                 {maintenanceZone.length > 0 && (
                     <RankingSection
                         title="유지 구간"
-                        subtitle={`${maintenanceZone.length}명`}
+                        subtitle={`중위권`}
                         icon={<GripHorizontal className="w-3 h-3 text-gray-400" />}
                         members={maintenanceZone}
                         type="maintenance"
@@ -114,7 +112,7 @@ const CCLeagueRankingList = () => {
                 {demotionZone.length > 0 && (
                     <RankingSection
                         title="강등 구간"
-                        subtitle={`하위 ${demoteCount}명`}
+                        subtitle={`하위권`}
                         icon={<TrendingDown className="w-3 h-3 text-red-500" />}
                         members={demotionZone}
                         type="demotion"
@@ -163,40 +161,40 @@ const RankingSection = ({ title, subtitle, icon, members, type }: RankingSection
             </div>
 
             {/* 리스트 아이템 */}
-            <div className="space-y-1">
+            <div className="space-y-0.5">
                 {members.map((member) => (
                     <div
                         key={member.rank}
                         className={`
-                            relative flex items-center py-2 px-2 rounded-md transition-all border group
-                            ${getMyRowStyle(member.isMe || false)}
-                            ${!member.isMe ? 'bg-background/50' : ''} 
+                            relative flex items-center py-1 px-2 rounded-md transition-all border group
+                            ${getMyRowStyle(member.me || false)}
+                            ${!member.me ? 'bg-background/50' : ''} 
                         `}
                     >
                         {/* 1. 랭크 */}
-                        <div className="w-8 flex items-center gap-0.5 shrink-0">
-                            <span className={`text-xs font-bold tabular-nums ${member.isMe ? 'text-primary' : 'text-muted-foreground'}`}>
+                        <div className="w-6 flex items-center gap-0.5 shrink-0">
+                            <span className={`text-[11px] font-bold tabular-nums ${member.me ? 'text-primary' : 'text-muted-foreground'}`}>
                                 {member.rank}
                             </span>
                         </div>
 
                         {/* 2. 아바타 */}
-                        <div className="shrink-0 mr-2.5">
-                            <div className={`w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center border ${member.isMe ? 'border-primary/30' : 'border-border'}`}>
-                                {member.avatar ? (
+                        <div className="shrink-0 mr-2">
+                            <div className={`w-5 h-5 rounded-full overflow-hidden bg-muted flex items-center justify-center border ${member.me ? 'border-primary/30' : 'border-border'}`}>
+                                {member.avatar || member.profileImgThumb ? (
                                     <Image
-                                        src={member.avatar}
+                                        src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
                                         alt={member.name}
-                                        width={24}
-                                        height={24}
-                                        className="object-cover"
+                                        width={20}
+                                        height={20}
+                                        className="w-full h-full object-cover"
                                         onError={(e) => {
                                             const target = e.target as HTMLImageElement;
                                             target.style.display = 'none';
                                         }}
                                     />
                                 ) : null}
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase absolute">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase absolute">
                                     {member.name.substring(0, 1)}
                                 </span>
                             </div>
@@ -204,17 +202,17 @@ const RankingSection = ({ title, subtitle, icon, members, type }: RankingSection
 
                         {/* 3. 닉네임 */}
                         <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                            <span className={`text-xs truncate ${member.isMe ? 'text-foreground font-bold' : 'text-foreground/90'}`}>
+                            <span className={`text-xs truncate ${member.me ? 'text-foreground font-bold' : 'text-foreground/90'}`}>
                                 {member.name}
                             </span>
-                            {member.isMe && (
+                            {member.me && (
                                 <span className="shrink-0 w-1 h-1 rounded-full bg-primary" />
                             )}
                         </div>
 
                         {/* 4. 점수 */}
-                        <div className="shrink-0 w-16 text-right">
-                            <span className={`text-xs font-bold tabular-nums tracking-tight ${member.isMe ? 'text-primary' : 'text-muted-foreground'}`}>
+                        <div className="shrink-0 w-12 text-right">
+                            <span className={`text-[11px] font-bold tabular-nums tracking-tight ${member.me ? 'text-primary' : 'text-muted-foreground'}`}>
                                 {member.score.toLocaleString()}
                             </span>
                         </div>

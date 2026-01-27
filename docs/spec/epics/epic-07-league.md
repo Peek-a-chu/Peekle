@@ -39,7 +39,13 @@
 
  **결과 확인**: 수요일 06:00 이후 접속한 유저에게 지난 주 리그 결과 모달을 띄우기 위해 `league_history.is_viewed` 필드를 확인한다.
 
-**🛠 Implementation Tasks**
+ **소규모 그룹 예외 처리**:
+   *   **1명 이하**: 변동 없음 (승급/강등 X).
+   *   **2명 이상**: 최소 1명은 반드시 '유지' 상태가 되도록 보장한다.
+       *   승급 인원 = MIN(CEIL(전체*P), 전체-1)
+       *   강등 인원 = MIN(CEIL(전체*D), 전체-승급-1)
+
+ **🛠 Implementation Tasks**
 [ ] Spring Batch Job 설정 및 @Transactional 기반 승급/강등 로직
 [ ] [Redis] 리그별 사용자 수집 및 10명 단위 그룹 재분배 구현
 [ ] [DB] `league_history.is_viewed` 필드 추가 및 조회/갱신 로직 구현

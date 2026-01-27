@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Trophy, Settings2, Clock } from 'lucide-react';
 import LeagueIcon, { LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { useLeagueRanking, useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
-import { LEAGUE_RULES, calculateLeagueCutoffs } from '@/domains/home/mocks/dashboardMocks';
 import LeagueRuleModal from './LeagueRuleModal';
 
 // UTC 기준 매주 화요일 21:00 (한국시간 수요일 06:00) 계산
@@ -123,35 +122,56 @@ const CCLeagueMyStatus = () => {
     const targetDate = forceTargetDate ? new Date(forceTargetDate) : getNextTuesday2100UTC();
     // ---------------------------
 
-    // 계산 로직
-    const rules = LEAGUE_RULES[rankingData.myLeague];
+    // 계산 로직 (Backend Status 기반)
+    // 전체 인원
     const totalMembers = rankingData.members.length;
 
-    // 인원 기반 승급/강등 컷 계산 ( helper function 사용 )
-    const { promoteCount, demoteCount } = calculateLeagueCutoffs(totalMembers, rules);
+    // 1. 상태별 멤버 그룹핑
+    const promoMembers = rankingData.members.filter(m => m.status === 'PROMOTE');
+    const stayMembers = rankingData.members.filter(m => m.status === 'STAY');
+    // const demoteMembers = rankingData.members.filter(m => m.status === 'DEMOTE');
 
     // 승급/강등 상태 메시지
     let statusMessage = "";
     let statusDetail = "";
 
-    if (myRank <= promoteCount) {
+    // 내 상태 파악
+    const myStatusMember = rankingData.members.find(m => m.me);
+    const myCurrentStatus = myStatusMember?.status || 'STAY'; // Default fallback
+
+    if (myCurrentStatus === 'PROMOTE') {
         statusMessage = "승급 안정권";
         statusDetail = "승급 구간에 속해있습니다!";
-    } else if (myRank > totalMembers - demoteCount) {
+    } else if (myCurrentStatus === 'DEMOTE') {
         statusMessage = "강등 위험";
-        // 유지 구간 마지막 등수 = totalMembers - demoteCount
-        // 그 점수
-        const maintenanceLastRankIndex = totalMembers - demoteCount - 1;
-        const maintenanceLastScore = rankingData.members[maintenanceLastRankIndex]?.score || 0;
-        const gap = maintenanceLastScore - myScore + 1;
-        statusDetail = `유지 구간까지 ${gap}점`;
+        // 유지하기 위해 필요한 점수 = (유지권 꼴등 점수) - 내점수 + 1
+        // 유지권 꼴등 = stayMembers의 마지막. 만약 stay가 없다면? (전원 강등/승급?) -> promote의 꼴등?
+        // 보통 demote에 있다는 건 위쪽에 stay나 promote가 있다는 뜻.
+        // 가장 낮은 점수의 '생존자'를 찾음.
+        const lowestSurvivor = [...promoMembers, ...stayMembers].sort((a, b) => a.score - b.score)[0];
+
+        if (lowestSurvivor) {
+            const gap = lowestSurvivor.score - myScore + 1;
+            statusDetail = `유지 구간까지 ${gap}점`;
+        } else {
+            statusDetail = "강등 확정적"; // 생존자가 없음 (드문 케이스)
+        }
     } else {
+        // STAY
         statusMessage = "리그 유지 중";
-        // 승급 구간 마지막 등수 = promoteCount
-        const promoLastRankIndex = promoteCount - 1;
-        const promoLastScore = rankingData.members[promoLastRankIndex]?.score || 0;
-        const gap = promoLastScore - myScore + 1;
-        statusDetail = `승급 구간까지 ${gap}점`;
+        // 승급하기 위해 필요한 점수 = (승급권 꼴등 점수) - 내점수 + 1
+        // 승급권 꼴등 = promoMembers의 마지막.
+        // promoMembers는 보통 score 내림차순 정렬되어 있음.
+        const lowestPromoter = promoMembers[promoMembers.length - 1]; // 꼴등
+
+        if (lowestPromoter) {
+            const gap = lowestPromoter.score - myScore + 1;
+            statusDetail = `승급 구간까지 ${gap}점`;
+        } else {
+            // 승급자는 없는데 나는 유지중 -> 1등이거나, 승급 T/O가 없음(Ruby?)
+            // 일단 '승급 도전' 등으로 표시
+            statusDetail = "상위권 도약 도전!";
+        }
     }
 
     return (
@@ -163,7 +183,11 @@ const CCLeagueMyStatus = () => {
                     <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-600 to-yellow-400">
                         리그
                     </h2>
-                    <LeagueRuleModal />
+                    <LeagueRuleModal
+                        myLeague={rankingData.myLeague}
+                        myPercentile={rankingData.myPercentile}
+                        leagueStats={rankingData.leagueStats}
+                    />
                 </div>
                 {/* Dev Toggle */}
                 <button onClick={() => setShowDev(!showDev)} className="text-muted-foreground/30 hover:text-muted-foreground">
@@ -281,10 +305,6 @@ const CCLeagueMyStatus = () => {
                         <div className="flex items-center gap-2 text-right">
                             <span className="font-bold text-sm text-foreground">
                                 {rankingData.maxLeague ? LEAGUE_NAMES[rankingData.maxLeague] : '-'}
-                            </span>
-                            <span className="text-border">|</span>
-                            <span className="font-bold text-sm text-foreground">
-                                {rankingData.maxScore ? `${rankingData.maxScore}점` : '-'}
                             </span>
                         </div>
                     </div>
