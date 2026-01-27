@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'http://localhost:3001/study';
+const SOCKET_URL = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8080') + '/study';
 
 let socketInstance: Socket | null = null;
 
-export function getSocket(userId: string | number) {
+export function getSocket(userId: string | number): Socket {
   if (socketInstance) {
     // Check if connecting with different user
     const currentQueryUserId = (socketInstance.io.opts.query as Record<string, string>)?.userId;
@@ -24,7 +24,7 @@ export function getSocket(userId: string | number) {
   return socketInstance;
 }
 
-export function useSocket(roomId: number | null, userId: number | null) {
+export function useSocket(roomId: number | null, userId: number | null): Socket | null {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
@@ -33,10 +33,10 @@ export function useSocket(roomId: number | null, userId: number | null) {
     const s = getSocket(userId);
     setSocket(s);
 
-    function onConnect() {
+    const onConnect = (): void => {
       console.log('Socket connected');
       s.emit('join-room', { roomId: String(roomId), userId: String(userId) });
-    }
+    };
 
     if (s.connected) {
       onConnect();
