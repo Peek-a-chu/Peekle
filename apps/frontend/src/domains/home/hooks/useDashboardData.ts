@@ -1,17 +1,19 @@
+import { useState, useEffect } from 'react';
 import {
     MOCK_LEAGUE_PROGRESS,
     MOCK_ACTIVITY_STREAK,
     MOCK_TIMELINE,
     MOCK_AI_RECOMMENDATIONS,
     MOCK_WEEKLY_SCORES,
-    MOCK_LEAGUE_RANKING,
     LeagueProgressData,
     ActivityStreakData,
     TimelineItemData,
     AIRecommendationData,
     WeeklyScoreData,
-    LeagueRankingData,
 } from '../mocks/dashboardMocks';
+import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
+import { LeagueRankingData } from '@/domains/league/types';
+import { getLeagueStatus, getLeagueRules, LeagueRulesMap } from '@/app/api/leagueApi';
 
 // 리그 변화 추이 데이터
 export const useLeagueProgress = (): { data: LeagueProgressData[]; isLoading: boolean } => {
@@ -49,6 +51,42 @@ export const useWeeklyScore = (date?: string): { data: WeeklyScoreData; isLoadin
 
 // 리그 순위 데이터
 export const useLeagueRanking = (): { data: LeagueRankingData; isLoading: boolean } => {
-    // TODO: API 연동 시 fetch/useSWR로 변경
-    return { data: MOCK_LEAGUE_RANKING, isLoading: false };
+    const [data, setData] = useState<LeagueRankingData>(DEFAULT_LEAGUE_RANKING);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const result = await getLeagueStatus();
+                if (result) {
+                    setData(result);
+                }
+            } catch (error) {
+                console.error("Failed to fetch league ranking:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    return { data, isLoading };
+};
+
+// 전체 리그 규칙 데이터 (Modal용)
+export const useLeagueRules = (): { data: LeagueRulesMap | null; isLoading: boolean } => {
+    const [data, setData] = useState<LeagueRulesMap | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const result = await getLeagueRules();
+            if (result) setData(result);
+            setIsLoading(false);
+        };
+        fetchData();
+    }, []);
+
+    return { data, isLoading };
 };
