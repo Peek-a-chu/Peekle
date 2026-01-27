@@ -42,7 +42,10 @@ function SignupForm() {
 
     // 토큰 유효성만 확인 (카카오 정보는 사용하지 않음)
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(atob(token.split('.')[1])) as {
+        provider?: string;
+        sub?: string;
+      };
       if (!payload.provider || !payload.sub) {
         router.push('/login');
       }
@@ -77,7 +80,7 @@ function SignupForm() {
   // 디바운스된 닉네임 체크
   useEffect(() => {
     const timer = setTimeout(() => {
-      checkNickname(nickname);
+      void checkNickname(nickname);
     }, 300);
 
     return () => clearTimeout(timer);
@@ -164,7 +167,7 @@ function SignupForm() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 닉네임 <span className="text-red-400">*</span>
@@ -200,9 +203,7 @@ function SignupForm() {
               />
             </div>
 
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
-            )}
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
             <button
               type="submit"

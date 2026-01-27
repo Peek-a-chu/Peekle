@@ -12,7 +12,7 @@ export interface ApiResponse<T> {
 export async function signup(
   token: string,
   nickname: string,
-  bojId?: string | null
+  bojId?: string | null,
 ): Promise<ApiResponse<null>> {
   const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
     method: 'POST',

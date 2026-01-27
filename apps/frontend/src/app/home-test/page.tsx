@@ -12,6 +12,11 @@ interface UserInfo {
   leaguePoint: number;
 }
 
+interface ApiResponse {
+  success: boolean;
+  data: UserInfo | null;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -26,7 +31,7 @@ export default function HomePage() {
           credentials: 'include',
         });
 
-        const data = await response.json();
+        const data = (await response.json()) as ApiResponse;
 
         if (data.success && data.data) {
           setUser(data.data);
@@ -46,7 +51,7 @@ export default function HomePage() {
       }
     };
 
-    fetchUser();
+    void fetchUser();
   }, [router]);
 
   const handleLogout = async () => {
@@ -88,29 +93,35 @@ export default function HomePage() {
             <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
               테스트 홈 페이지
             </h1>
-            <p className="text-slate-500 text-[15px]">
-              (다른 팀원이 나중에 home 구현 예정)
-            </p>
+            <p className="text-slate-500 text-[15px]">(다른 팀원이 나중에 home 구현 예정)</p>
           </div>
 
           {user && (
             <div className="space-y-3 bg-slate-50 rounded-xl p-4">
               <h2 className="font-semibold text-slate-700 mb-2">로그인된 유저 정보</h2>
               <div className="text-sm space-y-1">
-                <p><span className="text-slate-500">ID:</span> {user.id}</p>
-                <p><span className="text-slate-500">닉네임:</span> {user.nickname}</p>
-                <p><span className="text-slate-500">백준 ID:</span> {user.bojId || '(미등록)'}</p>
-                <p><span className="text-slate-500">리그:</span> {user.league}</p>
-                <p><span className="text-slate-500">리그 포인트:</span> {user.leaguePoint}</p>
+                <p>
+                  <span className="text-slate-500">ID:</span> {user.id}
+                </p>
+                <p>
+                  <span className="text-slate-500">닉네임:</span> {user.nickname}
+                </p>
+                <p>
+                  <span className="text-slate-500">백준 ID:</span> {user.bojId || '(미등록)'}
+                </p>
+                <p>
+                  <span className="text-slate-500">리그:</span> {user.league}
+                </p>
+                <p>
+                  <span className="text-slate-500">리그 포인트:</span> {user.leaguePoint}
+                </p>
               </div>
-              <p className="text-xs text-slate-400 mt-2">
-                * 콘솔(F12)에서도 유저 정보 확인 가능
-              </p>
+              <p className="text-xs text-slate-400 mt-2">* 콘솔(F12)에서도 유저 정보 확인 가능</p>
             </div>
           )}
 
           <button
-            onClick={handleLogout}
+            onClick={() => void handleLogout()}
             className="w-full h-[52px] bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all duration-200 hover:shadow-lg"
           >
             로그아웃 테스트

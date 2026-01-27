@@ -1,5 +1,19 @@
 import { UserProfile } from '../types';
 
+interface ProfileApiResponse {
+  data: {
+    id: number;
+    nickname: string;
+    bojId: string | null;
+    leagueName: string;
+    score: number;
+    streakCurrent: number;
+    streakMax: number;
+    profileImage: string | null;
+    solvedCount: number;
+  };
+}
+
 // Mock Data
 const MOCK_ME: UserProfile = {
   id: '1',
@@ -38,8 +52,8 @@ export async function getMyProfile(): Promise<UserProfile> {
       },
       next: { revalidate: 0 },
     });
-    const json = await res.json();
-    const data = json.data;
+    const json = (await res.json()) as ProfileApiResponse;
+    const { data } = json;
 
     return {
       id: String(data.id),

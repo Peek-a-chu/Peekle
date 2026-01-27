@@ -65,10 +65,7 @@ const UserProfileSection = () => {
         <ChevronDown className="w-5 h-5 text-gray-400 shrink-0 mr-4" />
       </Link>
       <div className="relative mb-6" ref={dropdownRef}>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center gap-3 group"
-        >
+        <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center overflow-hidden border-2 border-background shrink-0 ml-2 shadow-sm">
             {user.profileImage ? (
               <img
@@ -102,7 +99,7 @@ const UserProfileSection = () => {
               내정보
             </Link>
             <button
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
             >
               <LogOut className="w-4 h-4" />

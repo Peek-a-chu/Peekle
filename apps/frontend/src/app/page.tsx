@@ -25,7 +25,7 @@ export default function Home() {
       setIsChecking(false);
     };
 
-    checkAuth();
+    void checkAuth();
   }, [router]);
 
   if (isChecking) {

@@ -8,7 +8,7 @@ interface ApiResponse<T> {
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
   const url = `${BACKEND_URL}${path}`;
 
@@ -38,13 +38,17 @@ export async function apiFetch<T>(
           ...options.headers,
         },
       });
-      return retryResponse.json();
+      return retryResponse.json() as Promise<ApiResponse<T>>;
     } else {
       // Refresh도 실패 -> 로그인 페이지로
       window.location.href = '/login';
-      return { success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Session expired' } };
+      return {
+        success: false,
+        data: null,
+        error: { code: 'UNAUTHORIZED', message: 'Session expired' },
+      };
     }
   }
 
-  return response.json();
+  return response.json() as Promise<ApiResponse<T>>;
 }

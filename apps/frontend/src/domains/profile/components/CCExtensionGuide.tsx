@@ -18,13 +18,7 @@ interface TokenResponse {
   };
 }
 
-export function CCExtensionGuide({
-  user: _user,
-  checkInstallation,
-  extensionToken,
-  status,
-  isLoading,
-}: Props) {
+export function CCExtensionGuide({ checkInstallation, extensionToken, status, isLoading }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
@@ -161,24 +155,26 @@ export function CCExtensionGuide({
 
       {/* Status Banner */}
       <div
-        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${status === 'LINKED'
-          ? 'bg-green-50 border border-green-100'
-          : status === 'MISMATCH'
-            ? 'bg-orange-50 border border-orange-100'
-            : status === 'INSTALLED'
-              ? 'bg-blue-50 border border-blue-100'
-              : 'bg-gray-100 border border-gray-200'
-          }`}
+        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${
+          status === 'LINKED'
+            ? 'bg-green-50 border border-green-100'
+            : status === 'MISMATCH'
+              ? 'bg-orange-50 border border-orange-100'
+              : status === 'INSTALLED'
+                ? 'bg-blue-50 border border-blue-100'
+                : 'bg-gray-100 border border-gray-200'
+        }`}
       >
         <div
-          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${status === 'LINKED'
-            ? 'text-green-600'
-            : status === 'MISMATCH'
-              ? 'text-orange-600'
-              : status === 'INSTALLED'
-                ? 'text-blue-600'
-                : 'text-gray-500'
-            }`}
+          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+            status === 'LINKED'
+              ? 'text-green-600'
+              : status === 'MISMATCH'
+                ? 'text-orange-600'
+                : status === 'INSTALLED'
+                  ? 'text-blue-600'
+                  : 'text-gray-500'
+          }`}
         >
           {status === 'LINKED'
             ? '✅'
@@ -190,14 +186,15 @@ export function CCExtensionGuide({
         </div>
         <div>
           <h3
-            className={`font-bold text-sm ${status === 'LINKED'
-              ? 'text-green-900'
-              : status === 'MISMATCH'
-                ? 'text-orange-900'
-                : status === 'INSTALLED'
-                  ? 'text-blue-900'
-                  : 'text-gray-900'
-              }`}
+            className={`font-bold text-sm ${
+              status === 'LINKED'
+                ? 'text-green-900'
+                : status === 'MISMATCH'
+                  ? 'text-orange-900'
+                  : status === 'INSTALLED'
+                    ? 'text-blue-900'
+                    : 'text-gray-900'
+            }`}
           >
             {status === 'LINKED'
               ? '연동 완료'
@@ -208,14 +205,15 @@ export function CCExtensionGuide({
                   : '확장 프로그램이 설치되지 않았습니다'}
           </h3>
           <p
-            className={`text-sm mt-1 ${status === 'LINKED'
-              ? 'text-green-700'
-              : status === 'MISMATCH'
-                ? 'text-orange-700'
-                : status === 'INSTALLED'
-                  ? 'text-blue-700'
-                  : 'text-gray-600'
-              }`}
+            className={`text-sm mt-1 ${
+              status === 'LINKED'
+                ? 'text-green-700'
+                : status === 'MISMATCH'
+                  ? 'text-orange-700'
+                  : status === 'INSTALLED'
+                    ? 'text-blue-700'
+                    : 'text-gray-600'
+            }`}
           >
             {status === 'LINKED'
               ? '모든 기능이 정상 동작 중입니다.'
@@ -235,19 +233,21 @@ export function CCExtensionGuide({
             {/* Vertical Line */}
             {idx !== steps.length - 1 && (
               <div
-                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${s.isDone ? 'bg-green-500' : 'bg-gray-200'
-                  }`}
+                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${
+                  s.isDone ? 'bg-green-500' : 'bg-gray-200'
+                }`}
               ></div>
             )}
 
             {/* Step Circle */}
             <div
-              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${s.isDone
-                ? 'bg-green-500 text-white'
-                : s.isActive
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-400'
-                }`}
+              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
+                s.isDone
+                  ? 'bg-green-500 text-white'
+                  : s.isActive
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-400'
+              }`}
             >
               {s.isDone ? '✓' : s.step}
             </div>

@@ -19,13 +19,19 @@ const SidebarItem = ({ icon: Icon, label, href, isActive, onClick }: SidebarItem
         size={20}
         className={cn(
           'transition-colors',
-          isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground',
+          isActive
+            ? 'text-primary-foreground'
+            : 'text-muted-foreground group-hover:text-foreground',
         )}
       />
-      <span className={cn(
-        'transition-colors',
-        isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'
-      )}>
+      <span
+        className={cn(
+          'transition-colors',
+          isActive
+            ? 'text-primary-foreground'
+            : 'text-muted-foreground group-hover:text-foreground',
+        )}
+      >
         {label}
       </span>
     </>
