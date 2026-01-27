@@ -4,16 +4,16 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // CORS configuration for Next.js frontend (default port 3000)
+  // CORS configuration for local development
   app.enableCors({
-    origin: ['http://localhost:3000'],
+    origin: true,
     credentials: true,
   });
 
   // Set global prefix to handle /api requests
   app.setGlobalPrefix('api');
 
-  await app.listen(3001); // Run NestJS on 3001 to avoid conflict with NextJS
+  await app.listen(8080, '0.0.0.0'); // Listen on all interfaces
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

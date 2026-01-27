@@ -8,6 +8,7 @@ import {
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { randomUUID } from "crypto";
 
 @WebSocketGateway({
   cors: {
@@ -20,8 +21,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private mockTypingIntervals = new Map<string, NodeJS.Timeout>();
-  // Store session per user: "roomId:userId" -> { code, language }
+  // Store session per user per problem: "roomId:userId:problemId" -> { code, language }
   private sessionStore = new Map<string, { code: string; language?: string }>();
+  // Track current problem per user: "roomId:userId" -> problemId
+  private userProblemStore = new Map<string, number>();
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
@@ -57,10 +60,26 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage("chat-message")
   handleMessage(
-    @MessageBody() data: { roomId: string; message: string; sender: string },
+    @MessageBody()
+    data: {
+      id?: string;
+      roomId: string;
+      message: string;
+      senderId: number;
+      senderName: string;
+      type: "TALK" | "CODE" | "SYSTEM";
+      parentMessage?: any;
+      metadata?: any;
+    },
     @ConnectedSocket() client: Socket,
   ) {
-    this.server.to(data.roomId).emit("chat-message", data);
+    const enrichedData = {
+      ...data,
+      id: data.id || randomUUID(),
+      content: data.message, // Map message from frontend to content for common use
+      createdAt: new Date().toISOString(),
+    };
+    this.server.to(data.roomId).emit("chat-message", enrichedData);
   }
 
   @SubscribeMessage("request-code")
@@ -157,16 +176,22 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage("code-change")
   handleCodeChange(
-    @MessageBody() data: { roomId: string; code: string },
+    @MessageBody() data: { roomId: string; code: string; problemId?: number },
     @ConnectedSocket() client: Socket,
   ) {
     const userId = client.handshake.query.userId;
 
-    // [Persistence] Save code to store
+    // [Persistence] Save code to store (per problem)
     if (userId) {
-      const key = `${data.roomId}:${userId}`;
-      const currentSession = this.sessionStore.get(key) || { code: "" };
-      this.sessionStore.set(key, { ...currentSession, code: data.code });
+      const userKey = `${data.roomId}:${userId}`;
+      // Use provided problemId or get from user's current selection
+      const problemId = data.problemId || this.userProblemStore.get(userKey);
+
+      if (problemId) {
+        const sessionKey = `${data.roomId}:${userId}:${problemId}`;
+        const currentSession = this.sessionStore.get(sessionKey) || { code: "" };
+        this.sessionStore.set(sessionKey, { ...currentSession, code: data.code });
+      }
     }
 
     // console.log(`Code update from ${userId}`);
@@ -177,25 +202,75 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage("language-change")
   handleLanguageChange(
-    @MessageBody() data: { roomId: string; language: string },
+    @MessageBody() data: { roomId: string; language: string; problemId?: number },
     @ConnectedSocket() client: Socket,
   ) {
     const userId = client.handshake.query.userId;
     console.log(`Language update from ${userId}: ${data.language}`);
 
-    // [Persistence] Save language to store
+    // [Persistence] Save language to store (per problem)
     if (userId) {
-      const key = `${data.roomId}:${userId}`;
-      const currentSession = this.sessionStore.get(key) || { code: "" };
-      this.sessionStore.set(key, {
-        ...currentSession,
-        language: data.language,
-      });
+      const userKey = `${data.roomId}:${userId}`;
+      const problemId = data.problemId || this.userProblemStore.get(userKey);
+
+      if (problemId) {
+        const sessionKey = `${data.roomId}:${userId}:${problemId}`;
+        const currentSession = this.sessionStore.get(sessionKey) || { code: "" };
+        this.sessionStore.set(sessionKey, {
+          ...currentSession,
+          language: data.language,
+        });
+      }
     }
 
     client.to(data.roomId).emit("language-update", {
       userId: Number(userId),
       language: data.language,
     });
+  }
+
+  @SubscribeMessage("select-problem")
+  handleSelectProblem(
+    @MessageBody() data: { roomId: string; problemId: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = client.handshake.query.userId;
+    if (!userId) return;
+
+    const userKey = `${data.roomId}:${userId}`;
+    const previousProblemId = this.userProblemStore.get(userKey);
+
+    // Update current problem for user
+    this.userProblemStore.set(userKey, data.problemId);
+
+    console.log(`User ${userId} selected problem ${data.problemId} (prev: ${previousProblemId})`);
+
+    // Try to restore code for the selected problem
+    const sessionKey = `${data.roomId}:${userId}:${data.problemId}`;
+    const session = this.sessionStore.get(sessionKey);
+
+    if (session) {
+      console.log(`Restoring code for problem ${data.problemId}`, session);
+      client.emit("code-restore", {
+        code: session.code,
+        language: session.language,
+        problemId: data.problemId,
+      });
+    } else {
+      // No stored code for this problem - signal to use default
+      client.emit("code-restore", {
+        code: null,
+        language: null,
+        problemId: data.problemId,
+      });
+    }
+
+    return { event: "select-problem", success: true, problemId: data.problemId };
+  }
+
+  // Allow external services to broadcast problem updates
+  public notifyProblemUpdate(studyId: string) {
+    console.log(`Notifying problem update for room ${studyId}`);
+    this.server.to(studyId).emit("problem-updated");
   }
 }

@@ -4,7 +4,7 @@ This is a test API server for Peekle, built with NestJS.
 It provides HTTP endpoints and WebSocket gateway for WebRTC signaling testing.
 
 ## Port
-- Runs on **3001** (to avoid conflict with Next.js on 3000)
+- Runs on **8080** (to avoid conflict with Next.js on 3000)
 
 ## Features
 - **HTTP**: `GET /` (Hello World), `GET /study/rooms` (Mock data)
@@ -33,7 +33,7 @@ pnpm turbo dev --filter nest-apinpx turbo dev --filter nest-api
 ```javascript
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3001/study');
+const socket = io('http://localhost:8080/study');
 
 socket.emit('join-room', { roomId: '1', userId: 'user1' });
 
