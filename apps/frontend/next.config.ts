@@ -15,6 +15,15 @@ const nextConfig: NextConfig = {
   experimental: {
     reactCompiler: true,
   },
+  webpack: (config) => {
+    config.externals.push({
+      canvas: 'commonjs canvas',
+      jsdom: 'commonjs jsdom',
+      bufferutil: 'commonjs bufferutil',
+      'utf-8-validate': 'commonjs utf-8-validate',
+    });
+    return config;
+  },
 };
 
 export default nextConfig;
