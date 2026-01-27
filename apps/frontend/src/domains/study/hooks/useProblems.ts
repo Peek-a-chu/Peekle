@@ -3,6 +3,8 @@ import { Problem } from '../types';
 import { fetchProblems } from '@/app/api/problemApi';
 import { addProblemAction, deleteProblemAction } from '../actions/problemActions';
 import { format } from 'date-fns';
+import { useSocket } from './useSocket';
+import { useRoomStore } from './useRoomStore';
 
 interface UseProblemsResult {
   problems: Problem[];
@@ -17,6 +19,9 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  const currentUserId = useRoomStore((state) => state.currentUserId);
+  const socket = useSocket(studyId, currentUserId);
 
   const loadProblems = useCallback(async () => {
     setIsLoading(true);
@@ -36,10 +41,28 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
     void loadProblems();
   }, [loadProblems]);
 
+  // [Realtime] Listen for problem updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleProblemUpdate = (): void => {
+      console.log('Realtime problem update received');
+      void loadProblems();
+    };
+
+    socket.on('problem-updated', handleProblemUpdate);
+
+    return () => {
+      socket.off('problem-updated', handleProblemUpdate);
+    };
+  }, [socket, loadProblems]);
+
   const addProblem = async (title: string, number: number, tags?: string[]): Promise<void> => {
     // Calling Server Action from Client Component
     await addProblemAction(studyId, { title, number, tags });
-    await loadProblems(); // Refresh the list
+    // await loadProblems(); // Removed manual refresh, relying on socket now (or keeping as backup)
+    // Actually, keeping manual refresh as backup is good UX in case socket fails or lags
+    await loadProblems();
   };
 
   const removeProblem = async (problemId: number): Promise<void> => {
