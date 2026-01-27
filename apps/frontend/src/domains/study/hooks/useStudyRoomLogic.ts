@@ -7,7 +7,7 @@ import { useStudyLayout } from './useStudyLayout';
 import { useProblems } from './useProblems';
 import { useProblemDates } from './useProblemDates';
 import { useSubmissions } from './useSubmissions';
-import { fetchStudyParticipants, fetchStudyRoom } from '@/app/api/studyApi';
+import { fetchStudyParticipants, fetchStudyRoom } from '@/api/studyApi';
 import { formatDate } from '@/lib/utils';
 
 export function useStudyRoomLogic() {
@@ -53,7 +53,12 @@ export function useStudyRoomLogic() {
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
     fetchStudyRoom(Number(studyId))
-      .then(setRoomInfo)
+      .then((room) => {
+        setRoomInfo({
+          roomId: room.id,
+          roomTitle: room.title,
+        });
+      })
       .catch((err) => console.error('Failed to fetch room info:', err));
 
     setCurrentDate(formatDate(new Date()));
@@ -80,7 +85,7 @@ export function useStudyRoomLogic() {
   };
 
   const handleSelectProblem = (problem: Problem) => {
-    setSelectedProblem(problem.id, problem.title);
+    setSelectedProblem(problem.problemId, problem.title);
     console.log('Selected problem:', problem.title);
   };
 

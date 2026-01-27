@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { getOAuthLoginUrl } from '@/app/api/authApi';
+import { getOAuthLoginUrl } from '@/api/authApi';
 
 export default function LoginPage() {
   const handleLogin = (provider: 'kakao' | 'naver' | 'google') => {

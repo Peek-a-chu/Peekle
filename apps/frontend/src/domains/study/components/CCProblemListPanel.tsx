@@ -73,12 +73,12 @@ export function CCProblemListPanel({
     const currentProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
 
     setTargetSubmission({
-      id: submission.submissionId,
+      id: submission.submissionId!,
       problemTitle: currentProblem
         ? `${currentProblem.problemId}. ${currentProblem.title}`
         : 'Unknown Problem',
       username: submission.nickname || 'Unknown',
-      language: submission.language,
+      language: submission.language || 'plaintext',
       memory: submission.memory || 0,
       executionTime: submission.executionTime || 0,
       code: submission.code || '// No code available',

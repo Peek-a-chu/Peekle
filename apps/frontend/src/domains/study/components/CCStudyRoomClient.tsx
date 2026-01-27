@@ -11,7 +11,7 @@ import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 import type { DailyProblem as Problem } from '@/domains/study/types';
-import { fetchStudyParticipants, fetchStudyRoom } from '@/app/api/studyApi';
+import { fetchStudyParticipants, fetchStudyRoom } from '@/api/studyApi';
 import { formatDate } from '@/lib/utils';
 
 export function CCStudyRoomClient(): React.ReactNode {
@@ -42,13 +42,30 @@ export function CCStudyRoomClient(): React.ReactNode {
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
     fetchStudyRoom(studyId)
-      .then(setRoomInfo)
+      .then((data) =>
+        setRoomInfo({
+          roomId: data.id,
+          roomTitle: data.title,
+        }),
+      )
       .catch((err) => console.error('Failed to fetch room info:', err));
 
     setCurrentDate(formatDate(new Date()));
 
     fetchStudyParticipants(studyId)
-      .then(setParticipants)
+      .then((participants) =>
+        setParticipants(
+          participants.map((p) => ({
+            id: p.userId,
+            odUid: '', // Not available from static list
+            nickname: p.nickname,
+            isOwner: p.isOwner ?? false,
+            isMuted: p.isMuted ?? false,
+            isVideoOff: p.isVideoOff ?? false,
+            isOnline: p.isOnline ?? false,
+          })),
+        ),
+      )
       .catch((err) => console.error('Failed to fetch participants:', err));
 
     setCurrentUserId(1);

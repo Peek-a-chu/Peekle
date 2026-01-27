@@ -1,4 +1,4 @@
-export type ChatType = 'TALK' | 'CODE' | 'SYSTEM';
+export type ChatType = 'TALK' | 'CODE' | 'SYSTEM' | 'ENTER' | 'LEAVE';
 
 export interface ChatMessage {
   id?: string; // UUID or timestamp based ID

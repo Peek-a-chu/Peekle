@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
-import { getMe } from '@/app/api/userApi';
+import { getMe } from '@/api/userApi';
 
 export default function Home() {
   const router = useRouter();

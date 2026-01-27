@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';
 import { ChatMessage, ChatType } from '../types/chat';
-import { fetchStudyChats } from '@/app/api/studyApi';
+import { fetchStudyChats } from '@/api/studyApi';
 
 export function useStudyChat(roomId: number) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -21,9 +21,14 @@ export function useStudyChat(roomId: number) {
         .then((history) => {
           setMessages(
             history.map((msg) => ({
-              ...msg,
-              id: msg.id || `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              roomId: roomId, // Ensure roomId is set
+              id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              roomId: roomId,
+              senderId: 0, // Mock or infer
+              senderName: msg.senderName,
+              content: msg.content,
+              type: msg.type,
+              createdAt: new Date().toISOString(), // Mock
+              parentMessage: undefined
             })),
           );
         })
@@ -31,29 +36,35 @@ export function useStudyChat(roomId: number) {
     }
   }, [roomId]);
 
+  // STOMP Subscription
   useEffect(() => {
     if (!socket) return;
+    
+    // Spec Topic: /topic/studies/rooms/{id}/chat
+    const subscription = socket.subscribe(`/topic/studies/rooms/${roomId}/chat`, (message) => {
+      try {
+        const body = JSON.parse(message.body);
+        const chatData = body.data || body; // Handle SocketResponse<Chat> wrapper
 
-    const handleMessage = (message: Partial<ChatMessage>): void => {
-      // Align payload from backend
-      const alignedMessage: ChatMessage = {
-        id: message.id || crypto.randomUUID(),
-        roomId: Number(message.roomId || roomId),
-        senderId: Number(message.senderId || 0),
-        senderName: message.senderName || 'Unknown',
-        content: message.content || '',
-        type: message.type || 'TALK',
-        parentMessage: message.parentMessage,
-        metadata: message.metadata,
-        createdAt: message.createdAt || new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, alignedMessage]);
-    };
-
-    socket.on('chat-message', handleMessage);
+        const alignedMessage: ChatMessage = {
+          id: chatData.id || crypto.randomUUID(),
+          roomId: roomId,
+          senderId: Number(chatData.senderId || 0),
+          senderName: chatData.senderName || 'Unknown',
+          content: chatData.content || '',
+          type: (chatData.type as ChatType) || 'TALK',
+          parentMessage: chatData.parentMessage || undefined,
+          metadata: chatData.metadata,
+          createdAt: chatData.createdAt || new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, alignedMessage]);
+      } catch (e) {
+        console.error('Failed to parse chat message', e);
+      }
+    });
 
     return () => {
-      socket.off('chat-message', handleMessage);
+      subscription.unsubscribe();
     };
   }, [socket, roomId]);
 
@@ -62,27 +73,17 @@ export function useStudyChat(roomId: number) {
       if (!socket || !currentUserId) return;
 
       const payload = {
-        id: crypto.randomUUID(),
-        roomId: String(roomId),
-        senderId: currentUserId,
-        senderName,
-        message: content,
-        type: 'TALK' as ChatType,
-        parentMessage: replyingTo
-          ? {
-              id: replyingTo.id,
-              senderId: replyingTo.senderId,
-              senderName: replyingTo.senderName,
-              content: replyingTo.content,
-              type: replyingTo.type,
-            }
-          : undefined,
-        createdAt: new Date().toISOString(),
+        studyId: roomId,
+        content: content,
+        parentId: replyingTo?.id
       };
 
-      socket.emit('chat-message', payload);
+      socket.publish({
+        destination: '/pub/studies/chat',
+        body: JSON.stringify(payload)
+      });
     },
-    [socket, roomId, currentUserId, senderName, replyingTo],
+    [socket, roomId, currentUserId, replyingTo],
   );
 
   const sendCodeShare = useCallback(
@@ -95,36 +96,27 @@ export function useStudyChat(roomId: number) {
       isRealtime?: boolean,
     ): void => {
       if (!socket || !currentUserId) return;
-
+      
+      const formattedContent = `[CODE:${language}] ${description}\nRef: ${ownerName || 'Unknown'} - ${problemTitle || 'Unknown'}\n${code}`;
       const payload = {
-        id: crypto.randomUUID(),
-        roomId: String(roomId),
-        senderId: currentUserId,
-        senderName,
-        message: description,
-        type: 'CODE' as ChatType,
-        parentMessage: replyingTo
-          ? {
-              id: replyingTo.id,
-              senderId: replyingTo.senderId,
-              senderName: replyingTo.senderName,
-              content: replyingTo.content,
-              type: replyingTo.type,
-            }
-          : undefined,
+        studyId: roomId,
+        content: formattedContent,
+        parentId: replyingTo?.id,
+        // Optional: if backend accepts metadata separately
         metadata: {
-          code,
-          language,
-          ownerName,
-          problemTitle,
-          isRealtime,
-        },
-        createdAt: new Date().toISOString(),
+            code,
+            language,
+            problemTitle,
+            ownerName
+        }
       };
 
-      socket.emit('chat-message', payload);
+      socket.publish({
+        destination: '/pub/studies/chat',
+        body: JSON.stringify(payload)
+      });
     },
-    [socket, roomId, currentUserId, senderName, replyingTo],
+    [socket, roomId, currentUserId, replyingTo],
   );
 
   return {

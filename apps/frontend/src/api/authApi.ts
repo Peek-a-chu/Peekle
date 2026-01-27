@@ -14,9 +14,8 @@ export async function signup(
   nickname: string,
   bojId?: string | null,
 ): Promise<ApiResponse<null>> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+  const res = await fetch(`/api/auth/signup`, {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       token,
@@ -28,17 +27,15 @@ export async function signup(
 }
 
 export async function logout(): Promise<ApiResponse<null>> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+  const res = await fetch(`/api/auth/logout`, {
     method: 'POST',
-    credentials: 'include',
   });
   return res.json() as Promise<ApiResponse<null>>;
 }
 
 export async function refresh(): Promise<ApiResponse<null>> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+  const res = await fetch(`/api/auth/refresh`, {
     method: 'POST',
-    credentials: 'include',
   });
   return res.json() as Promise<ApiResponse<null>>;
 }

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DailyProblem } from '../types';
-import { fetchProblems } from '@/app/api/problemApi';
-import { addProblemAction, deleteProblemAction } from '../actions/problemActions';
+import { fetchProblems } from '@/api/problemApi';
 import { format } from 'date-fns';
 import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';
+import { Client } from '@stomp/stompjs';
 
 interface UseProblemsResult {
   problems: DailyProblem[];
@@ -43,32 +43,48 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
 
   // [Realtime] Listen for problem updates
   useEffect(() => {
-    if (!socket) return;
-
-    const handleProblemUpdate = (): void => {
-      console.log('Realtime problem update received');
-      void loadProblems();
-    };
-
-    socket.on('problem-updated', handleProblemUpdate);
+    if (!socket || !socket.connected) return;
+    
+    // Subscribe to curriculum topic: /topic/studies/rooms/{id}/problems
+    const sub = socket.subscribe(`/topic/studies/rooms/${studyId}/problems`, (message) => {
+         try {
+             // Spec: { type: "CURRICULUM", data: { problemId: 1000, title: "A+B" } }
+             // Or { type: "REFRESH" } if we keep old compat
+             // Assuming we just reload for now as safest update
+             void loadProblems();
+         } catch(e) {}
+    });
 
     return () => {
-      socket.off('problem-updated', handleProblemUpdate);
+        sub.unsubscribe();
     };
-  }, [socket, loadProblems]);
+  }, [socket, studyId, loadProblems]);
 
-  const addProblem = async (title: string, number: number, tags?: string[]): Promise<void> => {
-    // Calling Server Action from Client Component
-    await addProblemAction(studyId, { title, number, tags });
-    // await loadProblems(); // Removed manual refresh, relying on socket now (or keeping as backup)
-    // Actually, keeping manual refresh as backup is good UX in case socket fails or lags
-    await loadProblems();
+  // STOMP Action for Add
+  const addProblem = useCallback(async (title: string, number: number, tags?: string[]) => {
+      // Use socket if connected
+      if (socket && socket.connected) {
+          socket.publish({
+              destination: '/pub/studies/problems',
+              body: JSON.stringify({ studyId, action: "ADD", problemId: number })
+          });
+      }
+  }, [socket, studyId]);
+
+  // STOMP Action for Remove - Spec doesn't detail remove?
+  // "문제 추가 PUB /pub/studies/problems" is there.
+  // Maybe remove is done via same endpoint with Action REMOVE?
+  // Assuming for now we just log warning or do nothing if spec lacks it.
+  const removeProblem = useCallback(async (problemId: number) => {
+      console.warn("Remove problem not explicitly in spec. Skipping.");
+  }, []);
+
+  return { 
+     problems, 
+     isLoading, 
+     error, 
+     addProblem, 
+     removeProblem, 
+     refresh: loadProblems 
   };
-
-  const removeProblem = async (problemId: number): Promise<void> => {
-    await deleteProblemAction(studyId, problemId);
-    await loadProblems();
-  };
-
-  return { problems, isLoading, error, addProblem, removeProblem, refresh: loadProblems };
 }

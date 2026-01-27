@@ -41,6 +41,9 @@ export interface RoomState {
   // Participants
   participants: Participant[];
   currentUserId: number | null; // My ID
+  videoToken: string | null;
+  watchers: string[]; // Nicknames of people watching me
+  watcherCount: number;
 
   // Modals
   isInviteModalOpen: boolean;
@@ -96,10 +99,12 @@ export interface RoomActions {
 
   // Participant actions
   setParticipants: (participants: Participant[]) => void;
+  setVideoToken: (token: string) => void;
   updateParticipant: (id: number, updates: Partial<Participant>) => void;
   addParticipant: (participant: Participant) => void;
   removeParticipant: (id: number) => void;
   setCurrentUserId: (id: number) => void;
+  setWatchers: (count: number, names: string[]) => void;
 
   // Modal actions
   setInviteModalOpen: (isOpen: boolean) => void;
@@ -154,6 +159,9 @@ const initialState: RoomState = {
 
   participants: [],
   currentUserId: null,
+  videoToken: null,
+  watchers: [],
+  watcherCount: 0,
 
   isInviteModalOpen: false,
   isSettingsOpen: false,
@@ -199,6 +207,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
     set({ viewMode: 'ONLY_MINE', viewingUser: null, targetSubmission: null }),
 
   setParticipants: (participants): void => set({ participants }),
+  setVideoToken: (token): void => set({ videoToken: token }),
   updateParticipant: (id, updates): void =>
     set((state) => ({
       participants: state.participants.map((p) => (p.id === id ? { ...p, ...updates } : p)),
@@ -210,6 +219,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
       participants: state.participants.filter((p) => p.id !== id),
     })),
   setCurrentUserId: (id): void => set({ currentUserId: id }),
+  setWatchers: (count, names): void => set({ watcherCount: count, watchers: names }),
 
   setInviteModalOpen: (isOpen): void => set({ isInviteModalOpen: isOpen }),
   setSettingsOpen: (isOpen): void => set({ isSettingsOpen: isOpen }),

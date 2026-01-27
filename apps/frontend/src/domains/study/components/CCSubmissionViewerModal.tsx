@@ -149,8 +149,9 @@ export function CCSubmissionViewerModal({
                   </div>
 
                   <Button
-                    className="h-9 px-4 rounded-full border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 hover:border-pink-300 shadow-sm transition-all text-sm font-medium group-hover:bg-pink-500 group-hover:text-white group-hover:border-pink-500"
-                    onClick={() => onViewCode(sub.submissionId)}
+                    className="h-9 px-4 rounded-full border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 hover:border-pink-300 shadow-sm transition-all text-sm font-medium group-hover:bg-pink-500 group-hover:text-white group-hover:border-pink-500 disabled:opacity-50"
+                    disabled={!sub.submissionId}
+                    onClick={() => sub.submissionId && onViewCode(sub.submissionId)}
                   >
                     <FileCode2 className="h-4 w-4 mr-1.5" />
                     코드 확인하기

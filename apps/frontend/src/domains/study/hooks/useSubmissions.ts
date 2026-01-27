@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Submission } from '../types';
-import { fetchSubmissions } from '@/app/api/problemApi';
+import { fetchSubmissions } from '@/api/problemApi';
 
 interface UseSubmissionsResult {
   submissions: Submission[];

@@ -6,14 +6,21 @@ export interface Problem {
 }
 
 export interface Submission {
-  submissionId: number; // Changed from id to submissionId per spec
-  code: string;
-  language: string;
+  submissionId?: number; // Optional because success user list doesn't have it
+  code?: string;
+  language?: string;
   // Additional fields from spec (Success User List)
   userId?: number;
   nickname?: string;
   memory?: number;
   executionTime?: number;
+}
+
+export interface SubmissionSuccessUser {
+    userId: number;
+    nickname: string;
+    memory: number;
+    executionTime: number;
 }
 
 export interface DailyProblem {

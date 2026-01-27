@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Search, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { searchExternalProblems, ExternalProblem } from '@/app/api/problemApi';
+import { searchExternalProblems, ExternalProblem } from '@/api/problemApi';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from 'sonner';
 

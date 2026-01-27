@@ -73,7 +73,7 @@ describe('WhiteboardCanvas', () => {
     expect(mouseMoveCall).toBeDefined();
     
     // Simulate event
-    const handler = mouseMoveCall[1];
+    const handler = mouseMoveCall![1];
     handler({ e: {} }); // Mock event object
     
     // Check if callback fired

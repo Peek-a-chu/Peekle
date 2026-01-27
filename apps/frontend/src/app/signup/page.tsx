@@ -4,8 +4,8 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { signup as signupApi } from '@/app/api/authApi';
-import { checkNickname as checkNicknameApi } from '@/app/api/userApi';
+import { signup as signupApi } from '@/api/authApi';
+import { checkNickname as checkNicknameApi } from '@/api/userApi';
 
 interface NicknameValidation {
   status: 'idle' | 'checking' | 'valid' | 'invalid';

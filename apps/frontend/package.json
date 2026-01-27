@@ -40,7 +40,6 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
     "server-only": "^0.0.1",
-    "socket.io-client": "^4.8.3",
     "sockjs-client": "^1.6.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.6.0",

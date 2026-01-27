@@ -12,36 +12,41 @@ export function useRealtimeCode(viewingUser: Participant | null) {
   const socket = useSocket(roomId, currentUserId);
 
   useEffect(() => {
-    if (!socket || !viewingUser) {
+    if (!socket || !viewingUser || !roomId) {
       setCode('');
       setLanguage('python');
       return;
     }
 
-    // [New] Request code when starting to view someone
-    socket.emit('request-code', {
-      roomId: String(roomId),
-      targetUserId: viewingUser.id,
+    // Subscribe to the target user's IDE topic
+    // Topic: /topic/studies/rooms/{id}/ide/{userId}
+    const topic = `/topic/studies/rooms/${roomId}/ide/${viewingUser.id}`;
+    
+    // Also, we might want to request an initial snapshot?
+    // Spec table mentioned: /pub/ide/request-snapshot
+    // Verify if we need to request it. The user might not be broadcasting if they haven't typed.
+    // Ideally we subscribe first.
+    
+    const subscription = socket.subscribe(topic, (message) => {
+      try {
+        const body = JSON.parse(message.body);
+        // Payload: { type: "IDE", data: { problemId, code } } (Broadcasted by SocketService)
+        if (body.type === 'IDE' && body.data) {
+           setCode(body.data.code);
+           // language? The payload in SocketService only had code/problemId. 
+           // If language is missing in backend broadcast, we can't update it. 
+           // But let's check input of broadcast: it takes `data.code`.
+        }
+      } catch (e) {
+        console.error('Error parsing IDE message', e);
+      }
     });
 
-    const handleCodeUpdate = (data: { userId: number; code: string }): void => {
-      if (data.userId === viewingUser.id) {
-        setCode(data.code);
-      }
-    };
-
-    const handleLanguageUpdate = (data: { userId: number; language: string }): void => {
-      if (data.userId === viewingUser.id) {
-        setLanguage(data.language);
-      }
-    };
-
-    socket.on('code-update', handleCodeUpdate);
-    socket.on('language-update', handleLanguageUpdate);
+    // Request snapshot logic (Optional, based on spec availability)
+    // socket.publish({ destination: '/pub/ide/request-snapshot', body: JSON.stringify({ ... }) })
 
     return () => {
-      socket.off('code-update', handleCodeUpdate);
-      socket.off('language-update', handleLanguageUpdate);
+      subscription.unsubscribe();
     };
   }, [socket, viewingUser, roomId]);
 

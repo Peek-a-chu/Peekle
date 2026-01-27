@@ -67,109 +67,18 @@ export function CCCenterPanel({
   const previousProblemIdRef = useRef<number | null>(null);
 
   // [Problem Selection] Save current code before switching, then request new problem's code
-  useEffect(() => {
-    if (!socket || !roomId || !selectedProblemId) return;
-
-    // Skip if same problem
-    if (previousProblemIdRef.current === selectedProblemId) return;
-
-    // [IMPORTANT] 이전 문제가 있었다면, 전환 전에 현재 코드를 저장
-    if (previousProblemIdRef.current !== null && myLatestCodeRef.current) {
-      console.log(
-        `[CCCenterPanel] Saving code for problem ${previousProblemIdRef.current} before switching`,
-      );
-      socket.emit('code-change', {
-        roomId: String(roomId),
-        code: myLatestCodeRef.current,
-        problemId: previousProblemIdRef.current,
-      });
-      // 언어도 함께 저장
-      socket.emit('language-change', {
-        roomId: String(roomId),
-        language: language,
-        problemId: previousProblemIdRef.current,
-      });
-    }
-
-    console.log(`[CCCenterPanel] Selecting problem ${selectedProblemId}`);
-    socket.emit('select-problem', {
-      roomId: String(roomId),
-      problemId: selectedProblemId,
-    });
-
-    previousProblemIdRef.current = selectedProblemId;
-  }, [socket, roomId, selectedProblemId, language]);
-
-  useEffect(() => {
-    if (!socket || !currentUserId) return;
-
-    const handleRequestCode = (data: { requesterId: string; targetUserId: number }) => {
-      // If someone is asking for MY code
-      if (data.targetUserId === currentUserId) {
-        // Send what I have
-        socket.emit('code-change', {
-          roomId: String(roomId),
-          code: myLatestCodeRef.current,
-        });
-        // Send my language too
-        socket.emit('language-change', {
-          roomId: String(roomId),
-          language: language,
-        });
-      }
-    };
-
-    socket.on('request-code', handleRequestCode);
-
-    // [New] Restore my code if the server has it
-    const handleCodeRestore = (data: {
-      code: string | null;
-      language?: string | null;
-      problemId?: number;
-    }) => {
-      console.log('[CCCenterPanel] code-restore received:', data);
-
-      // Increment version to ensure CCIDEPanel useEffect triggers even with same code
-      setRestoreVersion((v) => v + 1);
-
-      if (data.code) {
-        // Restore saved code for this problem
-        setRestoredCode(data.code);
-        if (data.language) {
-          console.log('Restoring language...', data.language);
-          setLanguage(data.language);
-        }
-      } else {
-        // No saved code - reset to default (signal with empty string triggers default in IDE)
-        console.log('[CCCenterPanel] No saved code for problem, using default');
-        setRestoredCode(''); // Empty string signals IDE to use default
-      }
-    };
-    socket.on('code-restore', handleCodeRestore);
-
-    return () => {
-      socket.off('request-code', handleRequestCode);
-      socket.off('code-restore', handleCodeRestore);
-    };
-  }, [socket, currentUserId, roomId, language, setLanguage]);
-
   const handleCodeChange = (code: string): void => {
     myLatestCodeRef.current = code;
     if (socket && roomId && selectedProblemId) {
-      socket.emit('code-change', { roomId: String(roomId), code, problemId: selectedProblemId });
+      socket.publish({
+        destination: '/pub/ide/update',
+        body: JSON.stringify({ problemId: selectedProblemId, code })
+      });
     }
   };
 
   const handleLanguageChange = (lang: string): void => {
     setLanguage(lang);
-    if (socket && roomId && selectedProblemId) {
-      console.log('Emitting language-change:', lang);
-      socket.emit('language-change', {
-        roomId: String(roomId),
-        language: lang,
-        problemId: selectedProblemId,
-      });
-    }
   };
 
   return (

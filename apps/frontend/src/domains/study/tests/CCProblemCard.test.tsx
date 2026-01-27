@@ -4,17 +4,11 @@ import { CCProblemCard } from '@/domains/study/components/CCProblemCard';
 import { Problem } from '@/domains/study/types';
 
 describe('CCProblemCard', () => {
-  const mockProblem: Problem = {
-    id: 1,
-    number: 1001,
+  const mockProblem = {
+    problemId: 1001,
     title: 'Test Problem',
-    source: 'BOJ',
-    status: 'completed',
-    tags: ['BFS', 'DFS'],
-    participantCount: 2,
-    totalParticipants: 4,
-    url: 'https://example.com/1',
-    tier: 1,
+    tier: 'Bronze 5',
+    solvedMemberCount: 2,
   };
 
   const defaultProps = {
@@ -48,6 +42,6 @@ describe('CCProblemCard', () => {
     render(<CCProblemCard {...defaultProps} />);
     const viewButton = screen.getByRole('button', { name: /view submissions/i });
     fireEvent.click(viewButton);
-    expect(defaultProps.onOpenSubmission).toHaveBeenCalledWith(mockProblem.id);
+    expect(defaultProps.onOpenSubmission).toHaveBeenCalledWith(mockProblem.problemId);
   });
 });

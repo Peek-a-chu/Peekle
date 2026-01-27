@@ -16,8 +16,7 @@ export interface ApiResponse<T> {
 
 export async function checkNickname(nickname: string): Promise<ApiResponse<CheckNicknameResponse>> {
   const res = await fetch(
-    `${API_BASE_URL}/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`,
-    { credentials: 'include' },
+    `/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`,
   );
   return res.json() as Promise<ApiResponse<CheckNicknameResponse>>;
 }
@@ -29,8 +28,6 @@ export interface UserInfo {
 }
 
 export async function getMe(): Promise<ApiResponse<UserInfo>> {
-  const res = await fetch(`${API_BASE_URL}/api/users/me`, {
-    credentials: 'include',
-  });
+  const res = await fetch(`/api/users/me`);
   return res.json() as Promise<ApiResponse<UserInfo>>;
 }
