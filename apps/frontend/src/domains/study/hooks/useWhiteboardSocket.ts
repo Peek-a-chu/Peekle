@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Client, IMessage } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import { useEffect, useCallback, useRef } from 'react';
+import { IMessage } from '@stomp/stompjs';
 import { toast } from 'sonner';
 import { useRoomStore } from './useRoomStore';
-
-const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080') + '/ws-stomp';
+import { useSocketContext } from '@/domains/study/context/SocketContext';
 
 export interface WhiteboardMessage {
   action: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'START' | 'CLOSE' | 'CLEAR' | 'SYNC' | 'CURSOR';
@@ -15,26 +13,24 @@ export interface WhiteboardMessage {
 }
 
 export function useWhiteboardSocket(roomId: string, onMessageReceived?: (msg: WhiteboardMessage) => void) {
-  const clientRef = useRef<Client | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const { client, connected } = useSocketContext();
   const { setWhiteboardOverlayOpen } = useRoomStore();
   
-  // Connect function
-  useEffect(() => {
-    if (!roomId) return;
+  // Ref to hold the subscription
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
-    const client = new Client({
-      // We use SockJS, so we don't set brokerURL directly usually, or we use webSocketFactory
-      webSocketFactory: () => new SockJS(SOCKET_URL),
-      debug: (str) => {
-        // console.log('STOMP: ' + str);
-      },
-      onConnect: () => {
-        setIsConnected(true);
-        
-        // Subscribe to whiteboard topic
-        client.subscribe(`/topic/studies/rooms/${roomId}/whiteboard`, (message: IMessage) => {
-          try {
+  // Subscribe handling
+  useEffect(() => {
+    if (!client || !connected || !roomId) return;
+
+    // Unsubscribe if exists (though usually roomId doesn't change often)
+    if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+    }
+
+    const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
+    const sub = client.subscribe(topic, (message: IMessage) => {
+        try {
             const body = JSON.parse(message.body) as WhiteboardMessage;
             
             // Global Toast Logic
@@ -51,38 +47,29 @@ export function useWhiteboardSocket(roomId: string, onMessageReceived?: (msg: Wh
             if (onMessageReceived) {
               onMessageReceived(body);
             }
-          } catch (err) {
+        } catch (err) {
             console.error('Failed to parse whiteboard message', err);
-          }
-        });
-      },
-      onStompError: (frame) => {
-        console.error('Broker reported error: ' + frame.headers['message']);
-        console.error('Additional details: ' + frame.body);
-      },
-      onDisconnect: () => {
-        setIsConnected(false);
-      }
+        }
     });
-
-    client.activate();
-    clientRef.current = client;
+    
+    subscriptionRef.current = sub;
 
     return () => {
-      if (clientRef.current) {
-        clientRef.current.deactivate();
-      }
+        if (subscriptionRef.current) {
+            subscriptionRef.current.unsubscribe();
+            subscriptionRef.current = null;
+        }
     };
-  }, [roomId, setWhiteboardOverlayOpen, onMessageReceived]);
+  }, [client, connected, roomId, setWhiteboardOverlayOpen, onMessageReceived]); // onMessageReceived should be memoized by caller usually
 
   const sendMessage = useCallback((payload: WhiteboardMessage) => {
-    if (clientRef.current && clientRef.current.connected) {
-      clientRef.current.publish({
+    if (client && connected) {
+      client.publish({
         destination: '/pub/studies/whiteboard/message',
         body: JSON.stringify(payload),
       });
     }
-  }, []);
+  }, [client, connected]);
 
-  return { isConnected, sendMessage };
+  return { isConnected: connected, sendMessage };
 }

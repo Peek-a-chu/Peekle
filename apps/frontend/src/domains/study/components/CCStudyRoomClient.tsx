@@ -13,18 +13,68 @@ import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 import type { DailyProblem as Problem } from '@/domains/study/types';
 import { fetchStudyParticipants, fetchStudyRoom } from '@/api/studyApi';
 import { formatDate } from '@/lib/utils';
+// import { WhiteboardOverlay } from '@/domains/study/components/whiteboard/WhiteboardOverlay';
+import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
+import dynamic from 'next/dynamic';
 
-export function CCStudyRoomClient(): React.ReactNode {
-  const params = useParams();
+import { SocketProvider } from '@/domains/study/context/SocketContext';
+
+const WhiteboardOverlay = dynamic(
+  () =>
+    import('@/domains/study/components/whiteboard/WhiteboardOverlay').then(
+      (mod) => mod.WhiteboardOverlay,
+    ),
+  { ssr: false },
+);
+
+// Inner component with main logic
+function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
-  const studyId = Number(params.id) || 0;
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
+  // Ensure we set roomId immediately to store if possible
+  // Although useEffect below does it, React render might happen before useEffect runs?
+  // No, but children (StudyChatPanel) uses useRoomStore(state => state.roomId).
+  // If we don't set it, it defaults to 0.
+  // Let's set it in a LayoutEffect or Initializer if possible, but useEffect is standard.
+  // The fix in CCStudyRoomClient.tsx (adding immediate set in useEffect) should help, 
+  // but better to pass studyId as prop to StudyChatPanel via context or props if possible.
+  // However, StudyChatPanel reads from Store.
+  
+  // We can also initialize store with props?
+  useEffect(() => {
+     if(studyId) setRoomInfo({ roomId: studyId, roomTitle: '' });
+  }, [studyId, setRoomInfo]);
+
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
   const setParticipants = useRoomStore((state) => state.setParticipants);
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
+
+  // Whiteboard State
+  const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
+  const setWhiteboardOpenedBy = useRoomStore((state) => state.setWhiteboardOpenedBy);
+  const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
+  const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
+
+  // Whiteboard Socket Logic
+  const { sendMessage } = useWhiteboardSocket(String(studyId), (msg) => {
+    if (msg.action === 'START') {
+      setIsWhiteboardActive(true);
+      setWhiteboardOpenedBy(msg.senderName || 'Anonymous');
+    }
+    if (msg.action === 'CLOSE') {
+      setIsWhiteboardActive(false);
+      setWhiteboardOverlayOpen(false);
+    }
+    if (msg.action === 'SYNC') {
+      if (msg.data && msg.data.isActive) {
+        setIsWhiteboardActive(true);
+        // Note: msg.data.ownerId might be available
+      }
+    }
+  });
 
   // Local state for layout
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -41,6 +91,11 @@ export function CCStudyRoomClient(): React.ReactNode {
 
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
+    // Ensure roomId is set in store immediately when studyId is available
+    if (studyId) {
+        setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
+    }
+
     fetchStudyRoom(studyId)
       .then((data) =>
         setRoomInfo({
@@ -95,7 +150,11 @@ export function CCStudyRoomClient(): React.ReactNode {
   };
 
   const handleWhiteboardClick = (): void => {
-    console.log('Whiteboard clicked');
+    if (isWhiteboardActive) {
+      setWhiteboardOverlayOpen(true);
+    } else {
+      sendMessage({ action: 'START' });
+    }
   };
 
   const handleSelectProblem = (problem: Problem): void => {
@@ -112,38 +171,64 @@ export function CCStudyRoomClient(): React.ReactNode {
   };
 
   return (
-    <StudyLayoutContent
-      header={
-        <StudyHeader
-          onBack={handleBack}
-          onAddProblem={handleAddProblem}
-          onInvite={handleInvite}
-          onSettings={handleSettings}
-          selectedDate={selectedDate}
-          onDateChange={handleDateChange}
-        />
-      }
-      leftPanel={
-        <ProblemListPanel
-          problems={problems}
-          selectedDate={selectedDate}
-          onDateChange={handleDateChange}
-          onAddProblem={addProblem}
-          onRemoveProblem={removeProblem}
-          onSelectProblem={handleSelectProblem}
-          selectedProblemId={selectedProblemId ?? undefined}
-          onToggleFold={handleToggleLeftPanel}
-          isFolded={isLeftPanelFolded}
-          submissions={submissions}
-          onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
-        />
-      }
-      centerPanel={<CenterPanel onWhiteboardClick={handleWhiteboardClick} />}
-      rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
-      isLeftPanelFolded={isLeftPanelFolded}
-      onUnfoldLeftPanel={handleToggleLeftPanel}
-      isRightPanelFolded={isRightPanelFolded}
-      onUnfoldRightPanel={() => setIsRightPanelFolded(false)}
-    />
+    <>
+      <StudyLayoutContent
+        header={
+          <StudyHeader
+            onBack={handleBack}
+            onAddProblem={handleAddProblem}
+            onInvite={handleInvite}
+            onSettings={handleSettings}
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
+          />
+        }
+        leftPanel={
+          <ProblemListPanel
+            problems={problems}
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
+            onAddProblem={addProblem}
+            onRemoveProblem={removeProblem}
+            onSelectProblem={handleSelectProblem}
+            selectedProblemId={selectedProblemId ?? undefined}
+            onToggleFold={handleToggleLeftPanel}
+            isFolded={isLeftPanelFolded}
+            submissions={submissions}
+            onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
+          />
+        }
+        centerPanel={
+          <CenterPanel
+            onWhiteboardClick={handleWhiteboardClick}
+            onWhiteboardToggle={handleWhiteboardClick}
+          />
+        }
+        rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
+        isLeftPanelFolded={isLeftPanelFolded}
+        onUnfoldLeftPanel={handleToggleLeftPanel}
+        isRightPanelFolded={isRightPanelFolded}
+        onUnfoldRightPanel={() => setIsRightPanelFolded(false)}
+      />
+      <WhiteboardOverlay />
+    </>
   );
 }
+
+// Wrapper to provide SocketContext
+export function CCStudyRoomClient(): React.ReactNode {
+  const params = useParams();
+  const studyId = Number(params.id) || 0;
+  const currentUserId = useRoomStore((state) => state.currentUserId);
+
+  // Wait for userId to be initialized if you want to delay connection?
+  // But we want to render the content immediately.
+  // SocketProvider will handle connection updates when currentUserId changes.
+  
+  return (
+    <SocketProvider roomId={studyId} userId={currentUserId}>
+      <StudyRoomContent studyId={studyId} />
+    </SocketProvider>
+  );
+}
+

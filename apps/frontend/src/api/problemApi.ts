@@ -11,7 +11,15 @@ export async function fetchSubmissions(studyId: number, problemId: number): Prom
 
 // 2. Daily Problems
 export async function fetchProblems(studyId: number, date: string): Promise<DailyProblem[]> {
-  const res = await fetch(`/api/studies/${studyId}/curriculum/daily?date=${date}`);
+  // Add timestamp to prevent caching
+  const timestamp = new Date().getTime();
+  const res = await fetch(`/api/studies/${studyId}/curriculum/daily?date=${date}&_t=${timestamp}`, {
+    cache: 'no-store',
+    headers: {
+      'Pragma': 'no-cache',
+      'Cache-Control': 'no-cache'
+    }
+  });
   return handleResponse<DailyProblem[]>(res);
 }
 

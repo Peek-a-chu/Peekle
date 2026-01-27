@@ -74,6 +74,7 @@ export function CCAddProblemModal({
       if (selectedProblem.isRegistered && selectedProblem.registeredId) {
         await onRemove(selectedProblem.registeredId);
       } else {
+        console.log(`[Adding Problem] ${selectedProblem.title} (#${selectedProblem.number})`);
         await onAdd(selectedProblem.title, selectedProblem.number, selectedProblem.tags);
       }
       setQuery('');
@@ -85,6 +86,8 @@ export function CCAddProblemModal({
       toast.error('작업 수행 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
+      // Don't close to allow adding more? Or close?
+      // onClose(); -> Spec says we might search again.
     }
   };
 

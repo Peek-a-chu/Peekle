@@ -5,7 +5,7 @@ import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
 
 export function StudyChatPanel() {
-  const roomId = useRoomStore((state) => state.roomId);
+  const roomId = useRoomStore((state) => state.roomId); // Revert variable name
   const pendingCodeShare = useRoomStore((state) => state.pendingCodeShare);
   const setPendingCodeShare = useRoomStore((state) => state.setPendingCodeShare);
 

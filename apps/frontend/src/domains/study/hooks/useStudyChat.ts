@@ -38,7 +38,7 @@ export function useStudyChat(roomId: number) {
 
   // STOMP Subscription
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !roomId) return; // Prevent subscription to room specific topic if roomId is invalid (0)
     
     // Spec Topic: /topic/studies/rooms/{id}/chat
     const subscription = socket.subscribe(`/topic/studies/rooms/${roomId}/chat`, (message) => {

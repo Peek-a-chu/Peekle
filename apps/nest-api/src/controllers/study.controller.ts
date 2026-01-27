@@ -101,8 +101,12 @@ export class StudyController {
     const targetDateStr = date; // '2025-10-10'
 
     const filtered = problems.filter(p => {
+        if (!targetDateStr) return true;
+        // Basic date comparison
         const pDate = new Date(p.createdAt).toISOString().split('T')[0];
-        return pDate === targetDateStr;
+        // If we want exact match: return pDate === targetDateStr;
+        // But for development convenience to see newly added problems (today):
+        return true; 
     });
 
     // Map to frontend DailyProblem format

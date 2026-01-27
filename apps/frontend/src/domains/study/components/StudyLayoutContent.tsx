@@ -29,7 +29,7 @@ export function StudyLayoutContent({
   className,
 }: StudyLayoutContentProps) {
   return (
-    <div className={cn('flex h-full flex-col', className)}>
+    <div className={cn('flex h-screen flex-col bg-background', className)}>
       {/* Header */}
       {header && <header className="shrink-0 border-b border-border">{header}</header>}
 

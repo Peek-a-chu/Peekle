@@ -1,8 +1,19 @@
 import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import { Connection } from "sockjs";
+import { StudyProblem } from "../entities/study-problem.entity";
+import { AvailableProblem } from "../entities/available-problem.entity";
 
 @Injectable()
 export class SocketService {
+  constructor(
+      @InjectRepository(StudyProblem)
+      private studyProblemRepo: Repository<StudyProblem>,
+      @InjectRepository(AvailableProblem)
+      private availableProblemRepo: Repository<AvailableProblem>
+  ) {}
+
   // Store session per user: connectionId -> { userId, roomId, conn }
   private clients = new Map<string, { conn: Connection; userId?: string; roomId?: string }>();
   
@@ -224,17 +235,77 @@ export class SocketService {
       else if (destination === "/pub/studies/problems") {
           // { action: "ADD", problemId }
           const client = this.clients.get(conn.id);
-          const roomId = client?.roomId;
+          const roomIdStr = client?.roomId;
           
-          if(roomId) {
-              const topic = `/topic/studies/rooms/${roomId}/problems`;
-              this.broadcastToRoom(roomId, topic, {
-                  type: "CURRICULUM",
-                  data: {
-                      problemId: data.problemId,
-                      title: "Added Problem " + data.problemId
-                  }
-              });
+          if(roomIdStr) {
+              const roomId = Number(roomIdStr);
+              const action = data.action || ""; 
+              
+              (async () => {
+                if (action === "ADD") {
+                    const existingProblem = await this.availableProblemRepo.findOne({ where: { number: data.problemId } });
+                    
+                    let problemToAdd = existingProblem;
+                    if (!existingProblem) {
+                        // Create Mock Problem if not exists in DB
+                        problemToAdd = this.availableProblemRepo.create({
+                            number: data.problemId,
+                            title: `Mock Problem ${data.problemId}`,
+                            source: 'BOJ',
+                            tier: 10
+                        });
+                        await this.availableProblemRepo.save(problemToAdd);
+                    }
+                    
+                    if (problemToAdd) {
+                        // Check if already in study
+                        const alreadyInStudy = await this.studyProblemRepo.findOne({
+                            where: { studyId: roomId, problem: { id: problemToAdd.id } }
+                        });
+
+                        if (!alreadyInStudy) {
+                            const sp = this.studyProblemRepo.create({
+                                studyId: roomId,
+                                problem: problemToAdd
+                            });
+                            await this.studyProblemRepo.save(sp);
+                        }
+
+                        // Always broadcast success for UI responsiveness even if duplicate
+                        const topic = `/topic/studies/rooms/${roomIdStr}/problems`;
+                        this.broadcastToRoom(roomIdStr, topic, {
+                            type: "CURRICULUM",
+                            data: {
+                                problemId: data.problemId,
+                                title: problemToAdd.title,
+                                action: "ADD"
+                            }
+                        });
+                    }
+                } else if (action === "REMOVE") {
+                     // Find StudyProblem by number and studyId
+                     // Note: StudyProblem is linked to AvailableProblem.
+                     // We need to find the StudyProblem that links to this AvailableProblem ID
+                     const problems = await this.studyProblemRepo.find({ 
+                         where: { studyId: roomId },
+                         relations: ['problem'] 
+                     });
+
+                     const target = problems.find(p => p.problem.number === Number(data.problemId));
+                     if (target) {
+                         await this.studyProblemRepo.remove(target);
+                         
+                         const topic = `/topic/studies/rooms/${roomIdStr}/problems`;
+                         this.broadcastToRoom(roomIdStr, topic, {
+                            type: "CURRICULUM",
+                            data: {
+                                problemId: data.problemId,
+                                action: "REMOVE"
+                            }
+                         });
+                     }
+                }
+              })();
           }
       }
 

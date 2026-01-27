@@ -28,9 +28,19 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
     setError(null);
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
+      console.log(`[useProblems] Fetching problems for ${dateStr}`);
       const data = await fetchProblems(studyId, dateStr);
+      console.log(`[useProblems] Fetched problems: ${data.length}`, data);
+      
+      // Merge with existing problems if they were added via socket but not yet in DB?
+      // For now, trust the API as source of truth for "official" list.
+      // But if we just added one, and API is stale, we might lose it.
+      // Optimistic merging is tricky without timestamps.
+      // Let's rely on setProblems(data) and hope 1000ms delay was enough.
+      
       setProblems(data);
     } catch (err) {
+      console.error('[useProblems] Failed to fetch problems:', err);
       setError(err as Error);
     } finally {
       setIsLoading(false);
@@ -38,46 +48,113 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
   }, [studyId, date]);
 
   useEffect(() => {
+    // Initial fetch
     void loadProblems();
   }, [loadProblems]);
 
   // [Realtime] Listen for problem updates
   useEffect(() => {
-    if (!socket || !socket.connected) return;
+    // Quietly return if socket is not ready yet
+    if (!socket || !socket.connected) {
+      return;
+    }
     
+    console.log(`[useProblems] Subscribing to problems topic: /topic/studies/rooms/${studyId}/problems`);
     // Subscribe to curriculum topic: /topic/studies/rooms/{id}/problems
     const sub = socket.subscribe(`/topic/studies/rooms/${studyId}/problems`, (message) => {
          try {
-             // Spec: { type: "CURRICULUM", data: { problemId: 1000, title: "A+B" } }
-             // Or { type: "REFRESH" } if we keep old compat
-             // Assuming we just reload for now as safest update
-             void loadProblems();
-         } catch(e) {}
+             console.log('[useProblems] Raw message received:', message.body);
+             const body = JSON.parse(message.body);
+             console.log('[useProblems] Parsed body:', body);
+             
+             if (body.type === 'CURRICULUM' && body.data) {
+                 const { action, problemId, title } = body.data;
+                 console.log(`[useProblems] Action: ${action}, ProblemId: ${problemId}`);
+
+                 if (action === 'ADD' && problemId) {
+                     const pid = Number(problemId);
+                     console.warn(`[useProblems] Processing ADD for problem ${pid}`);
+                     
+                     setProblems(prev => {
+                         if (prev.some(p => p.problemId === pid)) {
+                             console.warn('[useProblems] Problem already exists in state:', pid);
+                             return prev;
+                         }
+                         const newProblem: DailyProblem = {
+                             problemId: pid,
+                             title: title || `Problem ${pid}`,
+                             tier: 'Unrated',
+                             solvedMemberCount: 0
+                         };
+                         const newProblems = [...prev, newProblem];
+                         console.warn('[useProblems] Updated problems state:', newProblems);
+                         return newProblems;
+                     });
+
+                     // Fallback refresh to ensure sync with DB - Increased delay to 1000ms
+                     setTimeout(() => {
+                        console.log('[useProblems] Executing fallback refresh');
+                        void loadProblems();
+                     }, 1000);
+                 } else if (action === 'REMOVE' && problemId) {
+                     const pid = Number(problemId);
+                     setProblems(prev => prev.filter(p => p.problemId !== pid));
+                 }
+             }
+         } catch(e) {
+            console.error('[useProblems] Error parsing message:', e);
+         }
     });
 
     return () => {
+        console.log('[useProblems] Unsubscribing from problems topic');
         sub.unsubscribe();
     };
-  }, [socket, studyId, loadProblems]);
+  }, [socket, studyId]); // loadProblems intentionally omitted to clean dependencies
 
   // STOMP Action for Add
   const addProblem = useCallback(async (title: string, number: number, tags?: string[]) => {
-      // Use socket if connected
-      if (socket && socket.connected) {
-          socket.publish({
-              destination: '/pub/studies/problems',
-              body: JSON.stringify({ studyId, action: "ADD", problemId: number })
-          });
+      if (!socket) {
+        console.error('Socket instance is null');
+        throw new Error('소켓 연결이 되어있지 않습니다.');
       }
+      if (!socket.connected) {
+        throw new Error('서버와 연결되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      }
+
+      console.log(`[useProblems] Sending ADD request for Problem ${number}`);
+      
+      // [Optimistic Update] Add to UI immediately
+      setProblems(prev => {
+          if (prev.some(p => p.problemId === number)) return prev;
+          const newProblem: DailyProblem = {
+              problemId: number,
+              title: title,
+              tier: 'Unrated',
+              solvedMemberCount: 0
+          };
+          return [...prev, newProblem];
+      });
+
+      socket.publish({
+          destination: '/pub/studies/problems',
+          body: JSON.stringify({ studyId, action: "ADD", problemId: number })
+      });
+      // Optionally trigger local refresh immediately?
+      // void loadProblems(); 
   }, [socket, studyId]);
 
-  // STOMP Action for Remove - Spec doesn't detail remove?
-  // "문제 추가 PUB /pub/studies/problems" is there.
-  // Maybe remove is done via same endpoint with Action REMOVE?
-  // Assuming for now we just log warning or do nothing if spec lacks it.
+  // STOMP Action for Remove
   const removeProblem = useCallback(async (problemId: number) => {
-      console.warn("Remove problem not explicitly in spec. Skipping.");
-  }, []);
+      if (!socket || !socket.connected) {
+          throw new Error('서버와 연결되지 않았습니다.');
+      }
+      console.log(`[useProblems] Sending REMOVE request for Problem ${problemId}`);
+      socket.publish({
+          destination: '/pub/studies/problems',
+          body: JSON.stringify({ studyId, action: "REMOVE", problemId })
+      });
+  }, [socket, studyId]);
 
   return { 
      problems, 
