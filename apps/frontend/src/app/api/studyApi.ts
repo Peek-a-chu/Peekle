@@ -21,7 +21,7 @@ export interface RoomInfo {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export async function fetchStudyParticipants(studyId: number): Promise<Participant[]> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/participants`);
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/participants`);
   if (!res.ok) {
     throw new Error('Failed to fetch participants');
   }
@@ -29,7 +29,7 @@ export async function fetchStudyParticipants(studyId: number): Promise<Participa
 }
 
 export async function fetchStudyRoom(studyId: number): Promise<RoomInfo> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}`);
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}`);
   if (!res.ok) {
     throw new Error('Failed to fetch study room info');
   }
@@ -49,7 +49,7 @@ interface Page<T> {
 }
 
 export async function fetchStudyChats(studyId: number): Promise<ChatMessage[]> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/chats`);
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/chats`);
   if (!res.ok) {
     throw new Error('Failed to fetch chat history');
   }

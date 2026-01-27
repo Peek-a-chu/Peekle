@@ -6,7 +6,7 @@ export async function addProblemAction(
   studyId: number,
   problemData: { title: string; number: number; tags?: string[] },
 ): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/problems`, {
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/problems`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(problemData),
@@ -24,7 +24,7 @@ export async function addProblemAction(
 }
 
 export async function deleteProblemAction(studyId: number, problemId: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/problems/${problemId}`, {
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/problems/${problemId}`, {
     method: 'DELETE',
   });
 

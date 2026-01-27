@@ -3,7 +3,7 @@ import { Problem, Submission } from '@/domains/study/types';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export async function fetchSubmissions(studyId: number, problemId: number): Promise<Submission[]> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/problems/${problemId}/submissions`);
+  const res = await fetch(`${API_BASE_URL}/api/submissions/study/${studyId}/problem/${problemId}`);
   if (!res.ok) {
     throw new Error('Failed to fetch submissions');
   }
@@ -11,7 +11,7 @@ export async function fetchSubmissions(studyId: number, problemId: number): Prom
 }
 
 export async function fetchProblems(studyId: number, date: string): Promise<Problem[]> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/problems?date=${date}`);
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/curriculum/daily?date=${date}`);
   if (!res.ok) {
     throw new Error('Failed to fetch problems');
   }
@@ -33,7 +33,7 @@ export async function searchExternalProblems(query: string): Promise<ExternalPro
 }
 
 export async function deleteProblem(studyId: number, problemId: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/study/${studyId}/problems/${problemId}`, {
+  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/problems/${problemId}`, {
     method: 'DELETE',
   });
   if (!res.ok) {
