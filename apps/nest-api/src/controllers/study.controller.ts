@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Param, Query, Body, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, NotFoundException, Delete } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { StudyProblem } from '../entities/study-problem.entity';
 import { Submission } from '../entities/submission.entity';
 import { AvailableProblem } from '../entities/available-problem.entity';
+import { randomBytes } from 'crypto';
 
 @Controller('api/studies')
 export class StudyController {
@@ -16,16 +17,82 @@ export class StudyController {
     private availableProblemRepo: Repository<AvailableProblem>,
   ) {}
 
+  // A. Study Room Management
+
+  @Post()
+  async createStudy(@Body() body: { title: string }) {
+    // Mock creation
+    return { inviteCode: randomBytes(4).toString('hex').toUpperCase() };
+  }
+
+  @Post('join')
+  async joinStudy(@Body() body: { inviteCode: string }) {
+    // Mock join response
+    // In real app, find study by invite code
+    return {
+      id: 1,
+      title: 'Java Algo',
+      ownerId: 1, // Mock Owner
+      members: [
+        { userId: 1, nickname: 'DevUser' },
+        { userId: 2, nickname: 'Participant2' }
+      ]
+    };
+  }
+
+  @Post(':id/invite')
+  async generateInviteCode(@Param('id') id: number) {
+    return { inviteCode: 'NEW' + randomBytes(3).toString('hex').toUpperCase() };
+  }
+
+  @Get('my')
+  async getMyStudies(
+    @Query('page') page = 0,
+    @Query('keyword') keyword = '',
+  ) {
+    // Mock List
+    return {
+      content: [
+        { id: 1, title: 'Java Algo', memberCount: 3 },
+        { id: 2, title: 'Python Study', memberCount: 5 }
+      ],
+      totalPages: 1
+    };
+  }
+
+  @Get(':id')
+  async getStudyDetail(@Param('id') id: number) {
+    // Mock Detail
+    return {
+      id: Number(id),
+      title: 'Java Algo',
+      members: [
+        { userId: 1, nickname: 'DevUser' },
+        { userId: 2, nickname: 'GuestUser' }
+      ]
+    };
+  }
+
+  // B. Chat API
+
+  @Get(':id/chats')
+  async getChats(@Param('id') id: number, @Query('page') page = 0) {
+    // Mock Chat History
+    return {
+      content: [
+        { senderName: 'DevUser', content: 'Hello World', type: 'TALK' },
+        { senderName: 'System', content: 'Welcome', type: 'ENTER' }
+      ]
+    };
+  }
+
+  // C. Curriculum
+
   @Get(':studyId/curriculum/daily')
   async getDailyProblems(
     @Param('studyId') studyId: number,
     @Query('date') date: string,
   ) {
-    // SQLite stores dates as strings or we need to be careful with comparison.
-    // The seed saves as Date object but TypeOrm + SQLite might save as string like '2025-01-27 00:00:00.000'
-    // Let's try to match by string prefix or date range.
-    
-    // Simple approach: Fetch all for study, filter by js date
     const problems = await this.studyProblemRepo.find({
       where: { studyId },
       relations: ['problem'],
@@ -103,25 +170,11 @@ export class StudyController {
 
     return {
         success: true,
-        message: 'Submitted successfully'
+        submissionId: submission.id, // submission.id is available after save
+        earnedPoints: 10
     };
   }
 
-  @Get(':studyId')
-  async getStudyDetail(@Param('studyId') studyId: number) {
-      // Mock data
-      return {
-          id: studyId,
-          title: `Study Group ${studyId}`,
-          members: [
-              { userId: 1, nickname: '알고마스터' },
-              { userId: 2, nickname: 'CodeNinja' },
-              { userId: 3, nickname: 'PS러버' },
-              { userId: 4, nickname: '백준킹' }
-          ]
-      };
-  }
-  
   // Helper
   private getTierName(level: number): string {
     if (!level || level === 0) return 'Unrated';

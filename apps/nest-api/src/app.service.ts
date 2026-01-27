@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, Raw, Like } from "typeorm";
 import { Submission } from "./entities/submission.entity";
 import { AvailableProblem } from "./entities/available-problem.entity";
-import { EventsGateway } from "./sockets/events.gateway";
+import { SocketService } from "./sockets/socket.service";
 import { StudyProblem } from "./entities/study-problem.entity";
 import { StudyProblemParticipant } from "./entities/study-problem-participant.entity";
 
@@ -18,7 +18,7 @@ export class AppService implements OnModuleInit {
     private studyProblemRepository: Repository<StudyProblem>,
     @InjectRepository(StudyProblemParticipant)
     private studyProblemParticipantRepository: Repository<StudyProblemParticipant>,
-    private eventsGateway: EventsGateway,
+    private socketService: SocketService,
   ) {}
 
   getHello(): string {
@@ -256,7 +256,7 @@ export class AppService implements OnModuleInit {
     });
     const saved = await this.studyProblemRepository.save(studyProblem);
 
-    this.eventsGateway.notifyProblemUpdate(studyId);
+    this.socketService.notifyProblemUpdate(studyId);
 
     return {
       id: saved.id,
@@ -337,7 +337,7 @@ export class AppService implements OnModuleInit {
     }
 
     const result = await this.studyProblemRepository.delete(problemId);
-    this.eventsGateway.notifyProblemUpdate(studyId);
+    this.socketService.notifyProblemUpdate(studyId);
     return result;
   }
 

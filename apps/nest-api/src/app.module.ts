@@ -6,7 +6,7 @@ import { AppService } from './app.service';
 import { StudyController } from './controllers/study.controller';
 import { SubmissionController } from './controllers/submission.controller';
 import { ResponseInterceptor } from './common/response.interceptor';
-import { EventsGateway } from './sockets/events.gateway';
+import { SocketService } from './sockets/socket.service';
 import { Submission } from './entities/submission.entity';
 import { AvailableProblem } from './entities/available-problem.entity';
 import { StudyProblem } from './entities/study-problem.entity';
@@ -25,7 +25,7 @@ import { StudyProblemParticipant } from './entities/study-problem-participant.en
   controllers: [AppController, StudyController, SubmissionController],
   providers: [
     AppService, 
-    EventsGateway,
+    SocketService,
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,

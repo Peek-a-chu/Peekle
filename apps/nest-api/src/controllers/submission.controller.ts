@@ -61,13 +61,13 @@ export class SubmissionController {
 
     // 3. Map to response
     return allSubmissions.map(sub => ({
-        submissionId: sub.id,
-        code: sub.code,
-        language: sub.language,
+        submissionId: sub.id, // Needed for detail view
         userId: sub.userId,
-        nickname: sub.username,
+        nickname: sub.username || "Unknown",
         memory: sub.memory,
         executionTime: sub.time,
+        language: sub.language || 'unknown',
+        solvedAt: sub.submittedAt || new Date().toISOString()
     }));
   }
 
