@@ -51,6 +51,7 @@ export interface RoomState {
   isWhiteboardActive: boolean;
   whiteboardOpenedBy: string | null;
   whiteboardMessage: string | null;
+  isWhiteboardOverlayOpen: boolean;
 
   // Problem State
   selectedProblemId: number | null;
@@ -109,6 +110,7 @@ export interface RoomActions {
   setIsWhiteboardActive: (isActive: boolean) => void;
   setWhiteboardOpenedBy: (user: string | null) => void;
   setWhiteboardMessage: (message: string | null) => void;
+  setWhiteboardOverlayOpen: (isOpen: boolean) => void;
 
   // Problem Actions
   setSelectedProblemId: (id: number | null) => void;
@@ -160,6 +162,7 @@ const initialState: RoomState = {
   isWhiteboardActive: false,
   whiteboardOpenedBy: null,
   whiteboardMessage: null,
+  isWhiteboardOverlayOpen: false,
 
   selectedProblemId: null,
   selectedProblemTitle: null,
@@ -215,6 +218,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
   setIsWhiteboardActive: (isActive): void => set({ isWhiteboardActive: isActive }),
   setWhiteboardOpenedBy: (user): void => set({ whiteboardOpenedBy: user }),
   setWhiteboardMessage: (message): void => set({ whiteboardMessage: message }),
+  setWhiteboardOverlayOpen: (isOpen): void => set({ isWhiteboardOverlayOpen: isOpen }),
 
   setSelectedProblemId: (id): void => set({ selectedProblemId: id }),
   setSelectedProblemTitle: (title): void => set({ selectedProblemTitle: title }),
