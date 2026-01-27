@@ -12,6 +12,12 @@ interface CCWhiteboardTileProps {
 export function CCWhiteboardTile({ onClick, className }: CCWhiteboardTileProps) {
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const whiteboardOpenedBy = useRoomStore((state) => state.whiteboardOpenedBy);
+  const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
+
+  const handleClick = () => {
+    setWhiteboardOverlayOpen(true);
+    onClick?.();
+  };
 
   if (!isWhiteboardActive) return null;
 
@@ -19,10 +25,10 @@ export function CCWhiteboardTile({ onClick, className }: CCWhiteboardTileProps) 
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          onClick?.();
+          handleClick();
         }
       }}
       className={cn(
