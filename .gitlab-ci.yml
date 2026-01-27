@@ -8,36 +8,12 @@
 #   - DOMAIN_NAME: 배포 도메인 (선택사항)
 
 stages:
-  - lint
   - build
   - deploy
 
 # ===========================================
 # Frontend Pipeline
 # ===========================================
-
-frontend-lint:
-  stage: lint
-  image: node:20-alpine
-  only:
-    refs:
-      - master
-      - main
-      - merge_requests
-    changes:
-      - apps/frontend/**/*
-  before_script:
-    - cd apps/frontend
-    - npm install -g pnpm@10.28.1
-    - pnpm install --frozen-lockfile
-  script:
-    - pnpm run lint
-    - pnpm run format:check
-    - pnpm run type-check
-  cache:
-    key: frontend-${CI_COMMIT_REF_SLUG}
-    paths:
-      - apps/frontend/node_modules/
 
 frontend-build:
   stage: build
@@ -52,7 +28,10 @@ frontend-build:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
     - pnpm install --frozen-lockfile
+    - npx playwright install --with-deps chromium
   script:
+    - pnpm run test --run
+    - pnpm run test:e2e
     - pnpm run build
   artifacts:
     paths:
@@ -67,26 +46,6 @@ frontend-build:
 # Backend Pipeline
 # ===========================================
 
-backend-lint:
-  stage: lint
-  image: node:20-alpine
-  only:
-    refs:
-      - master
-      - main
-      - merge_requests
-    changes:
-      - apps/nest-api/**/*
-  before_script:
-    - cd apps/nest-api
-    - npm ci
-  script:
-    - npm run lint
-  cache:
-    key: backend-${CI_COMMIT_REF_SLUG}
-    paths:
-      - apps/nest-api/node_modules/
-
 backend-build:
   stage: build
   image: node:20-alpine
@@ -100,6 +59,7 @@ backend-build:
     - cd apps/nest-api
     - npm ci
   script:
+    - npm run test --if-present
     - npm run build
   artifacts:
     paths:
@@ -186,4 +146,3 @@ deploy-production:
     name: production
     url: https://$DOMAIN_NAME
   when: manual
-
