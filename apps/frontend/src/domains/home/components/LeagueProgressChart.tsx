@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingUp, Calendar } from 'lucide-react';
 import Image from 'next/image';
@@ -62,6 +62,11 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 
 const LeagueProgressChart = () => {
   const { data: allData } = useLeagueProgress();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 현재 보이는 시작 인덱스 (마지막 10주부터 시작)
   const [startIndex, setStartIndex] = useState(Math.max(0, allData.length - VISIBLE_WEEKS));
@@ -217,43 +222,45 @@ const LeagueProgressChart = () => {
         </div>
 
         {/* 차트 */}
-        <div className="flex-1 h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={visibleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorLeague" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="date"
-                tickFormatter={formatXAxis}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12, fill: 'currentColor', className: 'text-muted-foreground' }}
-              />
-              <YAxis
-                domain={[yMin, yMax]}
-                ticks={ticks}
-                axisLine={false}
-                tickLine={false}
-                tick={false}
-                width={0}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="leagueIndex"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorLeague)"
-                dot={false}
-                activeDot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 6 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        <div className="flex-1 h-[200px] min-w-0">
+          {mounted && (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <AreaChart data={visibleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorLeague" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={formatXAxis}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: 'currentColor', className: 'text-muted-foreground' }}
+                />
+                <YAxis
+                  domain={[yMin, yMax]}
+                  ticks={ticks}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={false}
+                  width={0}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="leagueIndex"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorLeague)"
+                  dot={false}
+                  activeDot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 6 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
