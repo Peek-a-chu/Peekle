@@ -13,8 +13,8 @@ public class RedisKeyConst {
     // Write-Behind Buffer (List)
     public static final String CHAT_BUFFER = "chat:buffer";
 
-    // IDE Code (Hash: study:{studyId}:ide:{userId})
-    public static final String IDE_KEY = "study:%d:ide:%d";
+    // IDE Code (Hash: study:{studyId}:problem:{problemId}:ide:{userId})
+    public static final String IDE_KEY = "study:%d:problem:%d:ide:%d";
 
     // IDE Topic (Pub/Sub)
     public static final String TOPIC_IDE = "topic/studies/rooms/%d/ide/%d";
@@ -25,4 +25,20 @@ public class RedisKeyConst {
 
     // Curriculum Topic (Pub/Sub)
     public static final String TOPIC_CURRICULUM = "topic/studies/rooms/%d/problems";
+
+    // Whiteboard Config (Hash)
+    // study:{studyId}:whiteboard:config -> isActive, ownerId, status
+    public static final String WHITEBOARD_CONFIG = "study:%d:whiteboard:config";
+
+    // Whiteboard History (List)
+    // study:{studyId}:whiteboard:history
+    public static final String WHITEBOARD_HISTORY = "study:%d:whiteboard:history";
+
+    // Whiteboard Topic (Pub/Sub - Broadcast)
+    // /topic/studies/rooms/{studyId}/whiteboard
+    public static final String TOPIC_WHITEBOARD = "topic/studies/rooms/%d/whiteboard";
+
+    // Whiteboard Private Topic (Pub/Sub - 1:1 Sync)
+    // /topic/studies/rooms/{studyId}/whiteboard/{userId}
+    public static final String TOPIC_WHITEBOARD_USER = "topic/studies/rooms/%d/whiteboard/%d";
 }

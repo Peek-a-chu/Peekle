@@ -1,13 +1,22 @@
 package com.peekle.domain.study.socket;
 
+import com.peekle.global.redis.RedisKeyConst;
+import com.peekle.global.redis.RedisPublisher;
+import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -15,7 +24,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 public class WebSocketEventListener {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final com.peekle.global.redis.RedisPublisher redisPublisher;
+    private final RedisPublisher redisPublisher;
 
     // 연결 연결 시 (SUBSCRIBEFrame이 아니라 최초 socket 연결 handshake 완료 시점, 혹은 CONNECTED)
     // 여기서 userId와 sessionId 매핑을 저장
@@ -31,8 +40,8 @@ public class WebSocketEventListener {
         // 1. Prepare to access nested CONNECT message if needed
         StompHeaderAccessor connectAccessor = null;
         Object connectMessageObj = headerAccessor.getHeader("simpConnectMessage");
-        if (connectMessageObj instanceof org.springframework.messaging.Message) {
-            connectAccessor = StompHeaderAccessor.wrap((org.springframework.messaging.Message<?>) connectMessageObj);
+        if (connectMessageObj instanceof Message) {
+            connectAccessor = StompHeaderAccessor.wrap((Message<?>) connectMessageObj);
         }
 
         // 2. Try to get User ID
@@ -41,8 +50,6 @@ public class WebSocketEventListener {
             userIdStr = connectAccessor.getFirstNativeHeader("X-User-Id");
         }
 
-        Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
-
         // 3. Try to get Study ID
         String studyIdStr = headerAccessor.getFirstNativeHeader("X-Study-Id");
         if (studyIdStr == null && connectAccessor != null) {
@@ -50,12 +57,14 @@ public class WebSocketEventListener {
         }
         Long studyId = (studyIdStr != null) ? Long.parseLong(studyIdStr) : null;
 
+        Long userId = (userIdStr != null) ? Long.parseLong(userIdStr) : null;
+
         if (userId != null) {
             log.info("Received a new web socket connection. Session ID: {}, User ID: {}", sessionId, userId);
             redisTemplate.opsForValue().set("user:" + userId + ":session", sessionId);
 
             // 3. Fix NPE: Get mutable session attributes from whichever accessor has them
-            java.util.Map<String, Object> attributes = headerAccessor.getSessionAttributes();
+            Map<String, Object> attributes = headerAccessor.getSessionAttributes();
             if (attributes == null && connectAccessor != null) {
                 attributes = connectAccessor.getSessionAttributes();
             }
@@ -79,8 +88,12 @@ public class WebSocketEventListener {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = headerAccessor.getSessionId();
 
-        Object userIdObj = headerAccessor.getSessionAttributes().get("userId");
-        Object studyIdObj = headerAccessor.getSessionAttributes().get("studyId");
+        Object userIdObj = headerAccessor.getSessionAttributes() != null
+                ? headerAccessor.getSessionAttributes().get("userId")
+                : null;
+        Object studyIdObj = headerAccessor.getSessionAttributes() != null
+                ? headerAccessor.getSessionAttributes().get("studyId")
+                : null;
 
         if (userIdObj != null) {
             Long userId = (Long) userIdObj;
@@ -95,16 +108,10 @@ public class WebSocketEventListener {
                 redisTemplate.opsForSet().remove("study:" + studyId + ":online_users", userId.toString());
 
                 redisPublisher.publish(
-                        new org.springframework.data.redis.listener.ChannelTopic("topic/studies/rooms/" + studyId),
-                        com.peekle.global.socket.SocketResponse.of("LEAVE", userId));
+                        new ChannelTopic("topic/studies/rooms/" + studyId),
+                        SocketResponse.of("LEAVE", userId));
 
                 // 3. IDE 관찰자 목록 정리 (Cleanup Watchers)
-                // 내가 보고 있던 사람들 목록을 가져와서, 나를 제거함
-                // Note: We need RedisIdeService here. But this is a Listener.
-                // We should inject RedisIdeService or use RedisTemplate directly.
-                // Since logic is in RedisIdeService, let's assume we can wire it or replicate
-                // logic.
-                // Simpler: Inject RedisIdeService in this class.
                 cleanUpWatchers(studyId, userId);
             }
         } else {
@@ -122,12 +129,12 @@ public class WebSocketEventListener {
         // 4. DEL user:{viewerId}:watching:{studyId}
 
         String viewerKey = "user:" + viewerId + ":watching:" + studyId;
-        java.util.Set<Object> targets = redisTemplate.opsForSet().members(viewerKey);
+        Set<Object> targets = redisTemplate.opsForSet().members(viewerKey);
 
         if (targets != null) {
             for (Object targetObj : targets) {
                 String targetIdStr = targetObj.toString();
-                String targetWatcherKey = String.format(com.peekle.global.redis.RedisKeyConst.IDE_WATCHERS, studyId,
+                String targetWatcherKey = String.format(RedisKeyConst.IDE_WATCHERS, studyId,
                         Long.parseLong(targetIdStr));
 
                 redisTemplate.opsForSet().remove(targetWatcherKey, viewerId.toString());
@@ -141,14 +148,14 @@ public class WebSocketEventListener {
                 Long size = redisTemplate.opsForSet().size(targetWatcherKey);
 
                 String topic = String.format("topic/studies/rooms/%d/ide/%s/watchers", studyId, targetIdStr);
-                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                Map<String, Object> data = new HashMap<>();
                 data.put("count", size);
                 // We don't send full list on disconnect to save bandwidth, or maybe just count
                 // is enough.
 
                 redisPublisher.publish(
-                        new org.springframework.data.redis.listener.ChannelTopic(topic),
-                        com.peekle.global.socket.SocketResponse.of("WATCH_UPDATE", data));
+                        new ChannelTopic(topic),
+                        SocketResponse.of("WATCH_UPDATE", data));
             }
             redisTemplate.delete(viewerKey);
         }

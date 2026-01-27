@@ -21,76 +21,46 @@ const config: Config = {
         sans: ['Pretendard Variable', 'Pretendard', 'sans-serif'],
       },
       colors: {
-        border: '#F7E8F0', // 전역 테두리
-        input: '#F7E8F0', // Input 컴포넌트 테두리
-        ring: '#E24EA0', // 포커스 링
-
-        // 사이트 배경 및 글자
-        background: '#F7F8FC', // 사이트 전체 배경
-        foreground: '#111827', // 기본 글자 색상
-
-        // 메인 컬러 (Primary)
+        border: 'hsl(var(--border) / <alpha-value>)',
+        input: 'hsl(var(--input) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
+        background: 'hsl(var(--background) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
         primary: {
-          DEFAULT: '#E24EA0',
-          foreground: '#FFFFFF',
-          hover: '#D93A95',
-          active: '#C92F86',
+          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
         },
-
-        // 보조 컬러 (Secondary)
         secondary: {
-          DEFAULT: '#FCE7F3',
-          foreground: '#E24EA0',
-          hover: '#F9D1E3',
-          active: '#F6BAD2',
+          DEFAULT: 'hsl(var(--secondary) / <alpha-value>)',
+          foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)',
         },
-
-        // 카드 1
-        card: {
-          DEFAULT: '#FFFFFF',
-          foreground: '#111827',
-          border: '#F7E8F0',
-        },
-
-        // 카드 2
-        muted: {
-          DEFAULT: '#FAFAFF',
-          foreground: '#111827',
-          border: '#F7E8F0',
-        },
-
-        // 상태 컬러 (성공/경고/위험)
-        // --- 성공 (Success) ---
-        success: {
-          DEFAULT: '#16A34A',
-          foreground: '#111827',
-
-          light: {
-            DEFAULT: '#DCFCE7',
-            foreground: '#6B7280',
-          },
-        },
-
-        // --- 경고 (Warning) ---
-        warning: {
-          DEFAULT: '#F59E0B',
-          foreground: '#111827',
-
-          light: {
-            DEFAULT: '#FEF3C7',
-            foreground: '#92400E',
-          },
-        },
-
-        // --- 위험 (Destructive) ---
         destructive: {
-          DEFAULT: '#EF4444',
-          foreground: '#FFFFFF',
-
-          light: {
-            DEFAULT: '#FEE2E2',
-            foreground: '#991B1B',
-          },
+          DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
+          foreground: 'hsl(var(--muted-foreground) / <alpha-value>)',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+          foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover) / <alpha-value>)',
+          foreground: 'hsl(var(--popover-foreground) / <alpha-value>)',
+        },
+        card: {
+          DEFAULT: 'hsl(var(--card) / <alpha-value>)',
+          foreground: 'hsl(var(--card-foreground) / <alpha-value>)',
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success) / <alpha-value>)',
+          foreground: 'hsl(var(--success-foreground) / <alpha-value>)',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning) / <alpha-value>)',
+          foreground: 'hsl(var(--warning-foreground) / <alpha-value>)',
         },
       },
 

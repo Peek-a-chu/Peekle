@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 @EnableAsync
 @EnableScheduling
 @EnableJpaAuditing
@@ -20,13 +23,20 @@ public class PeekleBackendApplication {
     public static void main(String[] args) {
         // 1. 환경변수 또는 시스템 프로퍼티에서 우선 탐색, 없으면 기본 경로들 확인
         String customDir = System.getProperty("dotenv.dir", System.getenv("DOTENV_DIR"));
+        // IPv4 강제 사용 (IPv6 NAT64 연결 문제 해결)
+        System.setProperty("java.net.preferIPv4Stack", "true");
+
+        // Load .env file (Try current directory first, then assumes running from root
+        // -> apps/backend)
+        String[] searchPaths = { "./apps/backend", "\\\\wsl.localhost\\Ubuntu\\home\\ssafy\\peekle\\apps\\backend" };
+        boolean loaded = false;
 
         if (customDir != null) {
             loadDotenv(customDir);
         } else {
             // 기본 탐색 순서: 현재 디렉토리(Docker/IDE 실행용) -> 모노레포 하위 디렉토리
             if (!loadDotenv("./apps/backend")) {
-                loadDotenv("./");
+                loadDotenv(".");
             }
         }
 
@@ -39,7 +49,7 @@ public class PeekleBackendApplication {
      */
     private static boolean loadDotenv(String directory) {
         try {
-                    // .env 파일 존재 여부 명시적 확인
+            // .env 파일 존재 여부 명시적 확인
             if (!Files.exists(Paths.get(directory, ".env"))) {
                 return false;
             }

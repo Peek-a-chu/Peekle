@@ -1,5 +1,6 @@
 package com.peekle.domain.user.service;
 
+import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.dto.UserProfileResponse;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
@@ -9,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -16,6 +19,7 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class UserService {
     private final UserRepository userRepository;
+    private final SubmissionLogRepository submissionLogRepository;
 
     @Transactional
     public String generateExtensionToken(Long userId, boolean forceRegenerate) {
@@ -48,25 +52,52 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserProfileResponse getUserProfileByToken(String token) {
-        // 1. 토큰으로 사용자 조회 (실패 시 BusinessException 발생)
         User user = userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+        return getUserProfile(user.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getUserProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // 2. 랭킹 계산 (동일 그룹 내 혹은 전체)
-        // 여기서는 예시로 전체 랭킹을 계산합니다.
         long rank = userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
 
-        // 3. DTO 반환 (Enum인 LeagueTier는 .name()으로 전달)
+        // 3. 필드 데이터 조회
+        long solvedCount = submissionLogRepository.countByUserId(user.getId());
+
+        // 4. DTO 반환
         return UserProfileResponse.builder()
+                .id(user.getId())
                 .nickname(user.getNickname())
+                .bojId(user.getBojId())
                 .leagueName(user.getLeague().name())
                 .score((long) user.getLeaguePoint())
                 .rank((int) rank)
                 .profileImage(user.getProfileImgThumb())
+                .streakCurrent(user.getStreakCurrent())
+                .streakMax(user.getStreakMax())
+                .solvedCount(solvedCount)
                 .build();
     }
     public User getUserByExtensionToken(String token) {
         return userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+    }
+
+    public Map<String, Object> getUserInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Map<String, Object> info = new HashMap<>();
+        info.put("id", user.getId());
+        info.put("nickname", user.getNickname());
+        info.put("profileImg", user.getProfileImg());
+        info.put("bojId", user.getBojId());
+        info.put("league", user.getLeague().name());
+        info.put("leaguePoint", user.getLeaguePoint());
+        return info;
     }
 }

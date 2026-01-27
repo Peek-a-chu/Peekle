@@ -55,4 +55,8 @@ public class StudyRoom {
     public void deactivate() {
         this.isActive = false;
     }
+
+    public void delegateOwner(User newOwner) {
+        this.owner = newOwner;
+    }
 }

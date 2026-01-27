@@ -12,25 +12,18 @@ import java.time.LocalDate;
 @ToString
 public class ProblemStatusResponse {
 
-    @com.fasterxml.jackson.annotation.JsonProperty("problemId")
     private Long problemId;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("title")
     private String title;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("tier")
     private String tier;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("assignedDate")
     private LocalDate assignedDate;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("solvedMemberCount")
     private int solvedMemberCount;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("totalMemberCount")
     private int totalMemberCount;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("isSolvedByMe")
     private boolean isSolvedByMe;
 
     // Optional: List of solved members (nicknames)

@@ -267,6 +267,9 @@ public class StudyRoomService {
 
                 currentOwner.updateRole(StudyMember.StudyRole.MEMBER);
                 targetMember.updateRole(StudyMember.StudyRole.OWNER);
+
+                // 3. 스터디 방 Owner 필드 업데이트 (Response DTO용)
+                studyRoom.delegateOwner(targetMember.getUser());
         }
 
         private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom) {
@@ -291,21 +294,21 @@ public class StudyRoomService {
                 return StudyRoomResponse.from(studyRoom, memberResponses);
         }
 
-    @Transactional
-    public SubmissionResponse submitStudyProblem(Long studyId, SubmissionRequest request) {
-        System.out.println("[StudyRoomService] Processing study submission for studyId: " + studyId);
+        @Transactional
+        public SubmissionResponse submitStudyProblem(Long studyId, SubmissionRequest request) {
+                System.out.println("[StudyRoomService] Processing study submission for studyId: " + studyId);
 
-        // 1. 일반 제출 처리 (검증 및 저장)
-        SubmissionResponse response = submissionService.saveGeneralSubmission(request);
+                // 1. 일반 제출 처리 (검증 및 저장)
+                SubmissionResponse response = submissionService.saveGeneralSubmission(request);
 
-        if (response.isSuccess()) {
-            System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
-            // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
-            // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
-        } else {
-            System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
+                if (response.isSuccess()) {
+                        System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
+                        // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
+                        // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
+                } else {
+                        System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
+                }
+
+                return response;
         }
-
-        return response;
-    }
 }
