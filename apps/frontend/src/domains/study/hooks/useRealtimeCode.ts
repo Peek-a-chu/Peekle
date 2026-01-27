@@ -4,6 +4,7 @@ import { useSocket } from './useSocket';
 
 export function useRealtimeCode(viewingUser: Participant | null) {
   const [code, setCode] = useState<string>('');
+  const [language, setLanguage] = useState<string>('python'); // Default
   const roomId = useRoomStore((state) => state.roomId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
 
@@ -13,6 +14,7 @@ export function useRealtimeCode(viewingUser: Participant | null) {
   useEffect(() => {
     if (!socket || !viewingUser) {
       setCode('');
+      setLanguage('python');
       return;
     }
 
@@ -22,18 +24,26 @@ export function useRealtimeCode(viewingUser: Participant | null) {
       targetUserId: viewingUser.id,
     });
 
-    const handleCodeUpdate = (data: { userId: number; code: string }) => {
+    const handleCodeUpdate = (data: { userId: number; code: string }): void => {
       if (data.userId === viewingUser.id) {
         setCode(data.code);
       }
     };
 
+    const handleLanguageUpdate = (data: { userId: number; language: string }): void => {
+      if (data.userId === viewingUser.id) {
+        setLanguage(data.language);
+      }
+    };
+
     socket.on('code-update', handleCodeUpdate);
+    socket.on('language-update', handleLanguageUpdate);
 
     return () => {
       socket.off('code-update', handleCodeUpdate);
+      socket.off('language-update', handleLanguageUpdate);
     };
-  }, [socket, viewingUser?.id, roomId]);
+  }, [socket, viewingUser, roomId]);
 
-  return code;
+  return { code, language };
 }
