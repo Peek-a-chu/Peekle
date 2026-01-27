@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Problem } from '../types';
+import { DailyProblem } from '../types';
 import { fetchProblems } from '@/app/api/problemApi';
 import { addProblemAction, deleteProblemAction } from '../actions/problemActions';
 import { format } from 'date-fns';
@@ -7,7 +7,7 @@ import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';
 
 interface UseProblemsResult {
-  problems: Problem[];
+  problems: DailyProblem[];
   isLoading: boolean;
   error: Error | null;
   addProblem: (title: string, number: number, tags?: string[]) => Promise<void>;
@@ -16,7 +16,7 @@ interface UseProblemsResult {
 }
 
 export function useProblems(studyId: number, date: Date): UseProblemsResult {
-  const [problems, setProblems] = useState<Problem[]>([]);
+  const [problems, setProblems] = useState<DailyProblem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 

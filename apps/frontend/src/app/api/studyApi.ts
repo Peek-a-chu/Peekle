@@ -1,72 +1,76 @@
-import { ChatMessage } from '@/domains/study/types/chat';
+import { ChatMessageResponse, StudyRoomDetail, StudyMember } from '@/domains/study/types';
+import { handleResponse } from '@/lib/api';
 
-export interface Participant {
-  id: number;
-  odUid: string;
-  nickname: string;
-  isOwner: boolean;
-  isMuted: boolean;
-  isVideoOff: boolean;
-  isOnline: boolean;
-  lastSpeakingAt?: number;
+// Re-export specific types if needed by legacy code, or alias them
+export interface Participant extends StudyMember {
+  // Extending StudyMember to keep compatibility with UI components that might expect these
+  // Default values will be used if API doesn't provide them
+  isOwner?: boolean;
+  isMuted?: boolean;
+  isVideoOff?: boolean;
+  isOnline?: boolean;
 }
 
-export interface RoomInfo {
-  roomId: number;
-  roomTitle: string;
-  roomDescription: string;
-  inviteCode: string;
-}
+export type RoomInfo = StudyRoomDetail;
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
+// 1. Study Detail (Get Members from here)
 export async function fetchStudyParticipants(studyId: number): Promise<Participant[]> {
-  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/participants`);
-  if (!res.ok) {
-    throw new Error('Failed to fetch participants');
-  }
-  return res.json() as Promise<Participant[]>;
+  // Spec: GET /api/studies/{id} returns members list inside
+  const room = await fetchStudyRoom(studyId);
+  return room.members.map(m => ({
+    ...m,
+    isOwner: false, // Not provided in spec
+    isMuted: false,
+    isVideoOff: false,
+    isOnline: true,
+  }));
 }
 
 export async function fetchStudyRoom(studyId: number): Promise<RoomInfo> {
   const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}`);
-  if (!res.ok) {
-    throw new Error('Failed to fetch study room info');
-  }
-  return res.json() as Promise<RoomInfo>;
+  return handleResponse<StudyRoomDetail>(res);
 }
 
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-}
-
-interface Page<T> {
-  content: T[];
-  totalPages: number;
-  totalElements: number;
-}
-
-export async function fetchStudyChats(studyId: number): Promise<ChatMessage[]> {
+// 2. Chat History
+export async function fetchStudyChats(studyId: number): Promise<ChatMessageResponse[]> {
   const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/chats`);
-  if (!res.ok) {
-    throw new Error('Failed to fetch chat history');
-  }
+  // Spec: Response is { "content": [ ... ] }
+  const data = await handleResponse<{ content: ChatMessageResponse[] }>(res);
+  return data.content || [];
+}
 
-  const json = (await res.json()) as
-    | ApiResponse<Page<ChatMessage>>
-    | ChatMessage[]
-    | Page<ChatMessage>;
+// 3. Study List (My Studies)
+export async function fetchMyStudies(page = 0, keyword = ''): Promise<{ content: any[], totalPages: number }> {
+  const res = await fetch(`${API_BASE_URL}/api/studies?page=${page}&keyword=${encodeURIComponent(keyword)}`);
+  return handleResponse<{ content: any[], totalPages: number }>(res);
+}
 
-  if ('data' in json && json.data && 'content' in json.data) {
-    return json.data.content;
-  }
-  if ('content' in json && Array.isArray(json.content)) {
-    return json.content;
-  }
-  if (Array.isArray(json)) {
-    return json;
-  }
-  return [];
+// 4. Create Study
+export async function createStudy(title: string): Promise<{ inviteCode: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/studies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse<{ inviteCode: string }>(res);
+}
+
+// 5. Join Study
+export async function joinStudy(inviteCode: string): Promise<StudyRoomDetail & { ownerId?: number }> {
+    const res = await fetch(`${API_BASE_URL}/api/studies/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteCode }),
+    });
+    return handleResponse<StudyRoomDetail & { ownerId?: number }>(res);
+}
+
+// 6. Generate Invite Code
+export async function generateInviteCode(studyId: number): Promise<{ inviteCode: string }> {
+    const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/invite`, {
+        method: 'POST',
+    });
+    return handleResponse<{ inviteCode: string }>(res);
 }

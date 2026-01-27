@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { cn, getBojTierName, getBojTierColorClass } from '@/lib/utils';
 import { ExternalLink, Users, Lightbulb, CheckCircle2 } from 'lucide-react';
-import { Problem } from '@/domains/study/types';
+import { DailyProblem as Problem } from '@/domains/study/types';
 import { Button } from '@/components/ui/button';
-import { BoxSearchIcon } from '@/assets/icons/BoxSearchIcon';
+import { Box } from 'lucide-react';
 
 interface CCProblemCardProps {
   problem: Problem;
@@ -23,6 +23,9 @@ export function CCProblemCard({
   className,
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
+
+  // Construct URL
+  const problemUrl = `https://www.acmicpc.net/problem/${problem.problemId}`;
 
   return (
     <div
@@ -65,11 +68,11 @@ export function CCProblemCard({
         <div className="flex items-start justify-between w-full">
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground text-sm line-clamp-1">
-              {problem.number}. {problem.title}
+              {problem.problemId}. {problem.title}
             </span>
-            {problem.url && (
+            {problemUrl && (
               <a
-                href={problem.url}
+                href={problemUrl}
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -81,63 +84,38 @@ export function CCProblemCard({
           </div>
         </div>
 
-        {/* Tier & Tags Row - Shown only when showHint is true */}
+        {/* Tier Row */}
         {showHint && (
           <div className="flex flex-col gap-1.5 mt-0.5">
-            {problem.tier !== undefined && (
               <div className="flex items-center gap-1">
-                <span className={cn('text-[10px] font-bold', getBojTierColorClass(problem.tier))}>
-                  {getBojTierName(problem.tier)}
+                <span className={cn('text-[10px] font-bold text-muted-foreground')}>
+                  {problem.tier}
                 </span>
               </div>
-            )}
-            {problem.tags && problem.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {problem.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
 
       {/* Action Row */}
       <div className="flex items-center justify-between mt-2">
-        {/* View Submission Button */}
         <Button
           variant="ghost"
           size="sm"
           className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenSubmission?.(problem.id);
+            onOpenSubmission?.(problem.problemId);
           }}
           aria-label="view submissions"
         >
-          <BoxSearchIcon className="h-4 w-4" />
+          <Box className="h-4 w-4" />
         </Button>
 
         <div className="flex items-center gap-3">
-          {problem.status === 'completed' ? (
-            <div className="flex items-center gap-1 text-xs font-medium text-green-600">
-              <CheckCircle2 className="h-3 w-3" />
-              <span>풀이 완료</span>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground hidden group-hover:block">진행 중</div>
-          )}
-
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
-            {/* AC implies removing total count if I follow 'remove denominator' strictly, but visual shows 2/4. I'll stick to 2/4 for now as per wireframe text. */}
             <span>
-              {problem.participantCount}/{problem.totalParticipants || 4}
+              {problem.solvedMemberCount}명 해결
             </span>
           </div>
         </div>

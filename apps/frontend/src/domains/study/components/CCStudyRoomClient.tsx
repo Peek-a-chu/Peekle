@@ -10,7 +10,7 @@ import { CCRightPanel as RightPanel } from './CCRightPanel';
 import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
-import type { Problem } from '@/domains/study/types';
+import type { DailyProblem as Problem } from '@/domains/study/types';
 import { fetchStudyParticipants, fetchStudyRoom } from '@/app/api/studyApi';
 import { formatDate } from '@/lib/utils';
 
@@ -82,7 +82,7 @@ export function CCStudyRoomClient(): React.ReactNode {
   };
 
   const handleSelectProblem = (problem: Problem): void => {
-    setSelectedProblem(problem.id, problem.title);
+    setSelectedProblem(problem.problemId, problem.title);
   };
 
   const handleDateChange = (date: Date): void => {

@@ -1,24 +1,58 @@
 export interface Problem {
-  id: number;
-  number: number;
+  problemId: number;     // Changed from id to problemId per spec
   title: string;
-  source: string;
-  status: 'not_started' | 'in_progress' | 'completed';
-  tags?: string[];
-  participantCount?: number;
-  totalParticipants?: number;
-  url?: string;
-  tier?: number; // Added for hint
+  tier: string;         // Changed from number to string per spec (e.g. "Bronze 5")
+  solvedMemberCount?: number;
 }
 
 export interface Submission {
-  id: number;
-  userId: number;
-  username: string;
+  submissionId: number; // Changed from id to submissionId per spec
+  code: string;
   language: string;
-  memory: number; // KB
-  time: number; // ms
-  status: 'success' | 'fail';
-  submittedAt: string;
-  code?: string;
+  // Additional fields from spec (Success User List)
+  userId?: number;
+  nickname?: string;
+  memory?: number;
+  executionTime?: number;
+}
+
+export interface DailyProblem {
+  problemId: number;
+  title: string;
+  tier: string;
+  solvedMemberCount: number;
+}
+
+export interface StudyMember {
+  userId: number;
+  nickname: string;
+}
+
+export interface StudyRoomDetail {
+  id: number;
+  title: string;
+  members: StudyMember[];
+}
+
+export interface StudyListContent {
+  id: number;
+  title: string;
+  memberCount: number;
+}
+
+export interface StudyListResponse {
+  content: StudyListContent[];
+  totalPages: number;
+}
+
+export interface ChatMessageResponse {
+  senderName: string;
+  content: string;
+  type: 'TALK' | 'ENTER' | 'LEAVE'; // Add other types if needed
+}
+
+export interface SubmissionResult {
+  success: boolean;
+  submissionId: number;
+  earnedPoints: number;
 }
