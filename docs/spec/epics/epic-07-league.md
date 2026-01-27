@@ -39,10 +39,17 @@
 
  Redis ZSet을 활용하여 조회를 최적화하고, `max_league` 정보를 포함한다.
 
-**🛠 Implementation Tasks**
-[ ] `LeagueService` 랭킹 조회 로직 구현
-[ ] Redis 캐싱 전략(Look-aside) 적용
-[ ] User Entity `max_league` 필드 추가 및 갱신 로직 (승급 시 체크)
+ **소규모 그룹 예외 처리**:
+   *   **1명 이하**: 변동 없음 (승급/강등 X).
+   *   **2명 이상**: 최소 1명은 반드시 '유지' 상태가 되도록 보장한다.
+       *   승급 인원 = MIN(CEIL(전체*P), 전체-1)
+       *   강등 인원 = MIN(CEIL(전체*D), 전체-승급-1)
+
+ **🛠 Implementation Tasks**
+[ ] Spring Batch Job 설정 및 @Transactional 기반 승급/강등 로직
+[ ] [Redis] 리그별 사용자 수집 및 10명 단위 그룹 재분배 구현
+[ ] [DB] `league_history.is_viewed` 필드 추가 및 조회/갱신 로직 구현
+[ ] 주간 점수 초기화 및 히스토리 저장
 
 ### S10-3. 티어 분포 그래프 (Frontend)
 🧾User Story
