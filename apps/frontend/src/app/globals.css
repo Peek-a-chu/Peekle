@@ -106,6 +106,29 @@ div[class*='monaco-editor-overlaymessage'],
   }
 }
 
+.monaco-editor-overlaymessage {
+  display: none !important;
+  display: none;
+}
+
+/* 설정 모달용 커스텀 스크롤바 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
 @layer components {
   /* Common Markdown Styles */
   .markdown-prose {
@@ -184,27 +207,4 @@ div[class*='monaco-editor-overlaymessage'],
   .markdown-prose-invert pre {
     @apply bg-black/20 border border-white/10;
   }
-}
-
-.monaco-editor-overlaymessage {
-  display: none !important;
-  display: none;
-}
-
-/* 설정 모달용 커스텀 스크롤바 */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.2);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
 }
