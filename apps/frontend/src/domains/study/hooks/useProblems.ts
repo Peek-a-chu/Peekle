@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
 import { DailyProblem } from '../types';
-import { fetchProblems } from '@/api/problemApi';
+import { fetchProblems } from '../api/problemApi';
 import { format } from 'date-fns';
 import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';

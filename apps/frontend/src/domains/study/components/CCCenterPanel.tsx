@@ -7,6 +7,7 @@ import { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid
 import { CCControlBar as ControlBar } from '@/domains/study/components/CCControlBar';
 import { CCIDEPanel as IDEPanel } from '@/domains/study/components/CCIDEPanel';
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
+import { WhiteboardPanel } from '@/domains/study/components/whiteboard/WhiteboardOverlay';
 import { useRealtimeCode } from '@/domains/study/hooks/useRealtimeCode';
 import { useSocket } from '@/domains/study/hooks/useSocket';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
@@ -58,7 +59,11 @@ export function CCCenterPanel({
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
+
+  // Show right panel when viewing other's code OR whiteboard is open
+  const showRightPanel = isViewingOther || isWhiteboardOverlayOpen;
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -188,7 +193,7 @@ export function CCCenterPanel({
         <div className="flex min-h-0 flex-1 min-w-0 relative">
           {/* Left IDE Panel (My Code) */}
           <div
-            className={cn('flex-1 min-w-0 relative', isViewingOther && 'border-r border-border')}
+            className={cn('flex-1 min-w-0 relative', showRightPanel && 'border-r border-border')}
           >
             {ideContent ?? (
               <IDEPanel
@@ -205,7 +210,7 @@ export function CCCenterPanel({
             )}
 
             {/* [New] Overlay if no problem is selected and not viewing other */}
-            {!selectedProblemTitle && !isViewingOther && (
+            {!selectedProblemTitle && !isViewingOther && !isWhiteboardOverlayOpen && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
                 <Lock className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium text-muted-foreground">
@@ -215,23 +220,27 @@ export function CCCenterPanel({
             )}
           </div>
 
-          {/* Right IDE Panel (Other's Code - Read Only) */}
-          {isViewingOther && (
+          {/* Right Panel: Whiteboard OR Other's Code */}
+          {showRightPanel && (
             <div className="flex-1 min-w-0">
-              <IDEPanel
-                key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
-                editorId="other-editor"
-                readOnly
-                hideToolbar
-                initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
-                language={
-                  viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
-                }
-                theme={theme} // Sync theme
-                borderColorClass={
-                  viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
-                }
-              />
+              {isWhiteboardOverlayOpen ? (
+                <WhiteboardPanel className="border-l-2 border-rose-400" />
+              ) : (
+                <IDEPanel
+                  key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
+                  editorId="other-editor"
+                  readOnly
+                  hideToolbar
+                  initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
+                  language={
+                    viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
+                  }
+                  theme={theme} // Sync theme
+                  borderColorClass={
+                    viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
+                  }
+                />
+              )}
             </div>
           )}
         </div>

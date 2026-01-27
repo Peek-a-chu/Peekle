@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Submission } from '../entities/submission.entity';
 import { StudyProblem } from '../entities/study-problem.entity';
 
-@Controller('api/submissions')
+@Controller('submissions')
 export class SubmissionController {
   constructor(
     @InjectRepository(Submission)

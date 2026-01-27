@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { fabric } from 'fabric';
+import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
 
 export interface WhiteboardCanvasRef {
   add: (objData: any) => void;
   modify: (objData: any) => void;
   remove: (objectId: string) => void;
   clear: () => void;
-  updateCursor: (senderId: string | number, x: number, y: number, name?: string) => void;
-  removeCursor: (senderId: string | number) => void;
 }
 
 interface WhiteboardCanvasProps {
@@ -19,7 +16,6 @@ interface WhiteboardCanvasProps {
   onObjectAdded?: (obj: any) => void;
   onObjectModified?: (obj: any) => void;
   onObjectRemoved?: (objectId: string) => void;
-  onCursorMove?: (x: number, y: number) => void;
 }
 
 export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
@@ -31,13 +27,13 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       onObjectAdded,
       onObjectModified,
       onObjectRemoved,
-      onCursorMove,
     },
     ref,
   ) => {
     const canvasEl = useRef<HTMLCanvasElement>(null);
-    const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
-    const cursorsRef = useRef<Map<string | number, fabric.Object>>(new Map());
+    const fabricCanvasRef = useRef<any>(null);
+    const fabricRef = useRef<any>(null);
+    const [isFabricLoaded, setIsFabricLoaded] = useState(false);
 
     // Helper to ensure ID
     const ensureId = (obj: any) => {
@@ -49,7 +45,8 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
     useImperativeHandle(ref, () => ({
       add: (objData: any) => {
-        if (!fabricCanvasRef.current) return;
+        if (!fabricCanvasRef.current || !fabricRef.current) return;
+        const fabric = fabricRef.current;
         // Deserialize and add
         // Note: fabric.util.enlivenObjects usually async
         fabric.util.enlivenObjects(
@@ -86,122 +83,100 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       clear: () => {
         fabricCanvasRef.current?.clear();
       },
-      updateCursor: (senderId: string | number, x: number, y: number, name?: string) => {
-        if (!fabricCanvasRef.current) return;
-        const canvas = fabricCanvasRef.current;
-        let cursor = cursorsRef.current.get(senderId);
-
-        if (!cursor) {
-          // Create new cursor
-          const color = '#' + Math.floor(Math.random() * 16777215).toString(16); // Random color for now
-          cursor = new fabric.Circle({
-            left: x,
-            top: y,
-            radius: 5,
-            fill: color,
-            originX: 'center',
-            originY: 'center',
-            selectable: false,
-            evented: false,
-            excludeFromExport: true, // Don't save this in JSON
-          });
-          // Optionally add a label
-          if (name) {
-            // Fabric group logic would be better for complex cursors, but Circle is simple
-          }
-
-          canvas.add(cursor);
-          cursorsRef.current.set(senderId, cursor);
-        } else {
-          cursor.set({ left: x, top: y });
-          cursor.setCoords();
-        }
-        canvas.requestRenderAll();
-      },
-      removeCursor: (senderId: string | number) => {
-        if (!fabricCanvasRef.current) return;
-        const cursor = cursorsRef.current.get(senderId);
-        if (cursor) {
-          fabricCanvasRef.current.remove(cursor);
-          cursorsRef.current.delete(senderId);
-          fabricCanvasRef.current.requestRenderAll();
-        }
-      },
     }));
 
     useEffect(() => {
       if (!canvasEl.current) return;
 
-      // Initialize fabric canvas
-      const canvas = new fabric.Canvas(canvasEl.current, {
-        width,
-        height,
-        backgroundColor: '#ffffff',
-      });
+      let canvas: any;
 
-      fabricCanvasRef.current = canvas;
+      const initFabric = async () => {
+        try {
+          const mod = await import('fabric');
+          fabricRef.current = mod.fabric;
+          const fabric = mod.fabric;
 
-      // Core Event Listeners
-      canvas.on('path:created', (e: any) => {
-        if (e.path) {
-          ensureId(e.path);
-          onObjectAdded?.(e.path);
+          // Initialize fabric canvas
+          canvas = new fabric.Canvas(canvasEl.current, {
+            width,
+            height,
+            backgroundColor: '#ffffff',
+          });
+
+          fabricCanvasRef.current = canvas;
+
+          // Core Event Listeners
+          canvas.on('path:created', (e: any) => {
+            if (e.path) {
+              ensureId(e.path);
+              onObjectAdded?.(e.path);
+            }
+          });
+
+          canvas.on('object:modified', (e: any) => {
+            if (e.target) {
+              onObjectModified?.(e.target);
+            }
+          });
+
+          // Initial State
+          canvas.isDrawingMode = activeTool === 'pen';
+
+          setIsFabricLoaded(true);
+        } catch (err) {
+          console.error('Failed to load fabric', err);
         }
-      });
+      };
 
-      canvas.on('object:modified', (e) => {
-        if (e.target) {
-          onObjectModified?.(e.target);
-        }
-      });
-
-      canvas.on('mouse:move', (e) => {
-        if (onCursorMove) {
-          const pointer = canvas.getPointer(e.e);
-          onCursorMove(pointer.x, pointer.y);
-        }
-      });
-
-      // Initial State
-      canvas.isDrawingMode = activeTool === 'pen';
+      initFabric();
 
       // Cleanup
       return () => {
-        canvas.dispose();
+        if (canvas) {
+          canvas.dispose();
+        }
         fabricCanvasRef.current = null;
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [width, height]);
 
     // Updates when tool changes
-    const mouseDownHandlerRef = useRef<((opt: fabric.IEvent) => void) | null>(null);
+    const mouseDownHandlerRef = useRef<((opt: any) => void) | null>(null);
 
     useEffect(() => {
-      if (!fabricCanvasRef.current) return;
+      if (!fabricCanvasRef.current || !fabricRef.current || !isFabricLoaded) return;
       const canvas = fabricCanvasRef.current;
+      const fabric = fabricRef.current;
 
-      canvas.isDrawingMode = activeTool === 'pen';
-
-      // Cleanup previous event listener
+      // Cleanup previous event listener first
       if (mouseDownHandlerRef.current) {
         canvas.off('mouse:down', mouseDownHandlerRef.current);
         mouseDownHandlerRef.current = null;
       }
 
-      // Set cursor defaults
+      // Reset canvas state
+      canvas.isDrawingMode = false;
+      canvas.selection = true;
       canvas.defaultCursor = 'default';
       canvas.hoverCursor = 'move';
 
-      let handler: ((opt: fabric.IEvent) => void) | null = null;
+      // Deselect all objects when switching tools
+      canvas.discardActiveObject();
 
-      if (activeTool === 'eraser') {
-        canvas.defaultCursor = 'cell';
-        canvas.hoverCursor = 'cell';
-        canvas.isDrawingMode = false;
+      let handler: ((opt: any) => void) | null = null;
+
+      if (activeTool === 'pen') {
+        canvas.isDrawingMode = true;
+        canvas.freeDrawingBrush.width = 3;
+        canvas.freeDrawingBrush.color = '#000000';
+      } else if (activeTool === 'eraser') {
+        canvas.defaultCursor = 'crosshair';
+        canvas.hoverCursor = 'crosshair';
         canvas.selection = false;
 
         handler = (opt) => {
           if (opt.target) {
-            const targetId = (opt.target as any).id;
+            const targetId = opt.target.id;
             canvas.remove(opt.target);
             canvas.requestRenderAll();
             if (targetId) onObjectRemoved?.(targetId);
@@ -209,6 +184,8 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
         };
       } else if (activeTool === 'shape') {
         canvas.selection = false;
+        canvas.defaultCursor = 'crosshair';
+
         handler = (opt) => {
           if (opt.target) return;
           const pointer = canvas.getPointer(opt.e);
@@ -216,45 +193,38 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
             left: pointer.x,
             top: pointer.y,
             fill: 'transparent',
-            stroke: 'black',
+            stroke: '#000000',
             strokeWidth: 2,
             width: 100,
             height: 100,
           });
-          (rect as any).id = crypto.randomUUID();
+          rect.id = crypto.randomUUID();
           canvas.add(rect);
           canvas.setActiveObject(rect);
+          canvas.requestRenderAll();
           onObjectAdded?.(rect);
         };
       } else if (activeTool === 'text') {
         canvas.selection = false;
+        canvas.defaultCursor = 'text';
+
         handler = (opt) => {
           if (opt.target) return;
           const pointer = canvas.getPointer(opt.e);
-          const text = new fabric.IText('Type here', {
+          const text = new fabric.IText('텍스트 입력', {
             left: pointer.x,
             top: pointer.y,
             fontFamily: 'Arial',
             fill: '#333333',
             fontSize: 20,
           });
-          (text as any).id = crypto.randomUUID();
+          text.id = crypto.randomUUID();
           canvas.add(text);
           canvas.setActiveObject(text);
           text.enterEditing();
-          onObjectAdded?.(text); // Might need to fire on editing exit? Per spec.
-          // Spec says: text:editing:exited for ADDED or MODIFIED.
-          // But for consistency let's fire ADDED now.
+          canvas.requestRenderAll();
+          onObjectAdded?.(text);
         };
-
-        // We should listen to text:editing:exited separately if we want to capture the content change.
-        // But 'object:modified' handles geometry changes. Content change is specific to text.
-        // Let's add that listener globally or here.
-        // For global consistency, let's just rely on object:modified (which fires on scale/rotate)
-        // AND 'text:changed' or 'text:editing:exited'.
-      } else {
-        // Pen or Default
-        canvas.selection = true;
       }
 
       if (handler) {
@@ -263,7 +233,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       }
 
       canvas.requestRenderAll();
-    }, [activeTool, onObjectAdded, onObjectRemoved]);
+    }, [activeTool, onObjectAdded, onObjectRemoved, isFabricLoaded]);
 
     // Special listener for Text editing exit to trigger modification update
     useEffect(() => {
@@ -278,7 +248,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       return () => {
         canvas.off('text:editing:exited', textHandler);
       };
-    }, [onObjectModified]);
+    }, [onObjectModified, isFabricLoaded]);
 
     return (
       <div className="relative border border-gray-200 shadow-sm">

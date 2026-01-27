@@ -16,9 +16,32 @@ export class SocketService {
 
   // Store session per user: connectionId -> { userId, roomId, conn }
   private clients = new Map<string, { conn: Connection; userId?: string; roomId?: string }>();
-  
+
   // RoomId -> Set<ConnectionId>
   private rooms = new Map<string, Set<string>>();
+
+  // Whiteboard state storage per room
+  // RoomId -> { isActive: boolean, ownerId: string, objects: Map<objectId, objectData>, history: Array }
+  private whiteboardState = new Map<string, {
+    isActive: boolean;
+    ownerId: string | null;
+    ownerName: string | null;
+    objects: Map<string, any>;
+    history: Array<{ action: string; objectId?: string; data?: any }>;
+  }>();
+
+  private getOrCreateWhiteboardState(roomId: string) {
+    if (!this.whiteboardState.has(roomId)) {
+      this.whiteboardState.set(roomId, {
+        isActive: false,
+        ownerId: null,
+        ownerName: null,
+        objects: new Map(),
+        history: [],
+      });
+    }
+    return this.whiteboardState.get(roomId)!;
+  }
 
   handleConnection(conn: Connection) {
     console.log(`STOMP Client connected: ${conn.id}`);
@@ -68,14 +91,25 @@ export class SocketService {
             this.sendFrame(conn, "CONNECTED", { version: "1.2" });
             break;
         case "SUBSCRIBE":
-             // In this simple mock, we track subscription mainly for logging
-             // We assume room logic is driven by explicit /pub/studies/enter actions or derived from destination
+             // Track subscription and send sync data for whiteboard
              if (headers.destination && headers.destination.startsWith("/topic/studies/rooms/")) {
                 const afterVal = headers.destination.split("/topic/studies/rooms/")[1];
-                const roomId = afterVal.split("/")[0];
-                if(roomId) {
-                     // Auto-join room concept if needed, or just allow listening
-                     // For 'enter' logic, we wait for SEND /pub/studies/enter
+                const parts = afterVal.split("/");
+                const roomId = parts[0];
+
+                if (roomId) {
+                    // Auto-join room if not already joined
+                    const client = this.clients.get(conn.id);
+                    if (client && !client.roomId) {
+                        this.joinRoom(conn.id, roomId, client.userId || "0");
+                    }
+
+                    // If subscribing to whiteboard topic, send current state
+                    if (headers.destination.endsWith("/whiteboard")) {
+                        setTimeout(() => {
+                            this.sendWhiteboardSync(conn, roomId);
+                        }, 100); // Small delay to ensure subscription is registered
+                    }
                 }
              }
              break;
@@ -312,22 +346,122 @@ export class SocketService {
       // E. Whiteboard
       else if (destination === "/pub/studies/whiteboard/message") {
           // { action, objectId, data }
-          // Broadcast to /topic/studies/rooms/{id}/whiteboard
-           const client = this.clients.get(conn.id);
-           const roomId = client?.roomId;
-           const userId = client?.userId;
-           
-           if(roomId) {
-               const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
-               // Broadcast except sender? Usually whiteboard is echo-back or optimistic. 
-               // STOMP usually echoes back unless optimized.
-               this.broadcastToRoom(roomId, topic, {
-                   action: data.action,
-                   objectId: data.objectId,
-                   senderId: Number(userId),
-                   data: data.data
-               }, conn.id); // Exclude sender to avoid double draw if client is optimistic
-           }
+          const client = this.clients.get(conn.id);
+          const roomId = client?.roomId;
+          const userId = client?.userId;
+          const senderName = "User" + (userId || "?");
+
+          if (roomId) {
+              const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
+              const wbState = this.getOrCreateWhiteboardState(roomId);
+
+              switch (data.action) {
+                  case 'START':
+                      wbState.isActive = true;
+                      wbState.ownerId = userId || null;
+                      wbState.ownerName = senderName;
+                      // Broadcast START to all including sender
+                      this.broadcastToRoom(roomId, topic, {
+                          action: 'START',
+                          senderId: Number(userId),
+                          senderName: senderName,
+                          data: { isActive: true, ownerId: userId }
+                      });
+                      break;
+
+                  case 'CLOSE':
+                      wbState.isActive = false;
+                      wbState.ownerId = null;
+                      wbState.ownerName = null;
+                      // Optionally clear objects on close, or keep them
+                      // wbState.objects.clear();
+                      // wbState.history = [];
+                      this.broadcastToRoom(roomId, topic, {
+                          action: 'CLOSE',
+                          senderId: Number(userId),
+                          senderName: senderName
+                      });
+                      break;
+
+                  case 'CLEAR':
+                      wbState.objects.clear();
+                      wbState.history = [];
+                      this.broadcastToRoom(roomId, topic, {
+                          action: 'CLEAR',
+                          senderId: Number(userId)
+                      }, conn.id);
+                      break;
+
+                  case 'ADDED':
+                      if (data.objectId && data.data) {
+                          wbState.objects.set(data.objectId, data.data);
+                          wbState.history.push({ action: 'ADDED', objectId: data.objectId, data: data.data });
+                          console.log(`[Whiteboard] ADDED object ${data.objectId} to room ${roomId}, total objects: ${wbState.objects.size}`);
+                      }
+                      this.broadcastToRoom(roomId, topic, {
+                          action: 'ADDED',
+                          objectId: data.objectId,
+                          senderId: Number(userId),
+                          data: data.data
+                      }, conn.id);
+                      break;
+
+                  case 'MODIFIED':
+                      if (data.objectId && data.data) {
+                          wbState.objects.set(data.objectId, data.data);
+                          // Update history or just track latest state
+                      }
+                      this.broadcastToRoom(roomId, topic, {
+                          action: 'MODIFIED',
+                          objectId: data.objectId,
+                          senderId: Number(userId),
+                          data: data.data
+                      }, conn.id);
+                      break;
+
+                  case 'REMOVED':
+                      if (data.objectId) {
+                          wbState.objects.delete(data.objectId);
+                          wbState.history = wbState.history.filter(h => h.objectId !== data.objectId);
+                      }
+                      this.broadcastToRoom(roomId, topic, {
+                          action: 'REMOVED',
+                          objectId: data.objectId,
+                          senderId: Number(userId)
+                      }, conn.id);
+                      break;
+
+                  case 'SYNC':
+                      // Client requesting sync - send current state to requester only
+                      this.sendWhiteboardSync(conn, roomId);
+                      break;
+
+                  default:
+                      // Unknown action, just broadcast
+                      this.broadcastToRoom(roomId, topic, {
+                          action: data.action,
+                          objectId: data.objectId,
+                          senderId: Number(userId),
+                          data: data.data
+                      }, conn.id);
+              }
+          }
+      }
+      // F. Whiteboard Sync Request (alternative endpoint)
+      else if (destination === "/pub/studies/whiteboard/sync") {
+          const client = this.clients.get(conn.id);
+          // Use roomId from message body if available, otherwise fallback to client.roomId
+          const roomId = data.roomId ? String(data.roomId) : client?.roomId;
+          console.log(`[Whiteboard SYNC] Request from conn ${conn.id}, roomId: ${roomId}`);
+          if (roomId) {
+              // Ensure client is joined to the room
+              if (client && !client.roomId) {
+                  this.joinRoom(conn.id, roomId, client.userId || "0");
+              }
+              this.sendWhiteboardSync(conn, roomId);
+          } else {
+              console.warn(`[Whiteboard SYNC] No roomId available for conn ${conn.id}`);
+          }
       }
   }
   
@@ -372,6 +506,33 @@ export class SocketService {
       }
       frame += `\n${body}\0`;
       conn.write(frame);
+  }
+
+  // Send whiteboard sync data to a specific connection
+  private sendWhiteboardSync(conn: Connection, roomId: string) {
+      const wbState = this.getOrCreateWhiteboardState(roomId);
+      const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
+
+      // Convert objects Map to array for serialization
+      const objectsArray: Array<{ action: string; objectId: string; data: any }> = [];
+      wbState.objects.forEach((data, objectId) => {
+          objectsArray.push({ action: 'ADDED', objectId, data });
+      });
+
+      console.log(`[Whiteboard SYNC] Sending to conn ${conn.id}, room ${roomId}: ${objectsArray.length} objects, isActive: ${wbState.isActive}`);
+
+      this.sendFrame(conn, "MESSAGE", {
+          destination: topic,
+          "content-type": "application/json"
+      }, JSON.stringify({
+          action: 'SYNC',
+          data: {
+              isActive: wbState.isActive,
+              ownerId: wbState.ownerId,
+              ownerName: wbState.ownerName,
+              history: objectsArray
+          }
+      }));
   }
 
   // Public method to notify room about problem list updates (called from REST API)

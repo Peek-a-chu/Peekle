@@ -4,9 +4,10 @@ import { Repository, Between } from 'typeorm';
 import { StudyProblem } from '../entities/study-problem.entity';
 import { Submission } from '../entities/submission.entity';
 import { AvailableProblem } from '../entities/available-problem.entity';
+import { AppService } from '../app.service';
 import { randomBytes } from 'crypto';
 
-@Controller('api/studies')
+@Controller('studies')
 export class StudyController {
   constructor(
     @InjectRepository(StudyProblem)
@@ -15,6 +16,7 @@ export class StudyController {
     private submissionRepo: Repository<Submission>,
     @InjectRepository(AvailableProblem)
     private availableProblemRepo: Repository<AvailableProblem>,
+    private appService: AppService,
   ) {}
 
   // A. Study Room Management
@@ -62,14 +64,20 @@ export class StudyController {
 
   @Get(':id')
   async getStudyDetail(@Param('id') id: number) {
-    // Mock Detail
+    const room = await this.appService.getStudyRoom(String(id));
+    const participants = await this.appService.getParticipants(String(id));
     return {
       id: Number(id),
-      title: 'Java Algo',
-      members: [
-        { userId: 1, nickname: 'DevUser' },
-        { userId: 2, nickname: 'GuestUser' }
-      ]
+      title: room.roomTitle,
+      members: participants.map(p => ({
+        userId: p.userId,
+        nickname: p.nickname,
+        profileImage: p.profileImage,
+        isOwner: p.isOwner,
+        isMuted: p.isMuted,
+        isVideoOff: p.isVideoOff,
+        isOnline: p.isOnline,
+      })),
     };
   }
 
@@ -77,12 +85,9 @@ export class StudyController {
 
   @Get(':id/chats')
   async getChats(@Param('id') id: number, @Query('page') page = 0) {
-    // Mock Chat History
+    const chats = await this.appService.getChats(String(id));
     return {
-      content: [
-        { senderName: 'DevUser', content: 'Hello World', type: 'TALK' },
-        { senderName: 'System', content: 'Welcome', type: 'ENTER' }
-      ]
+      content: chats,
     };
   }
 

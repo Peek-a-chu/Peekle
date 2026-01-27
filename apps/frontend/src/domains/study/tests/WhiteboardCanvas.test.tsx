@@ -60,24 +60,4 @@ describe('WhiteboardCanvas', () => {
     render(<WhiteboardCanvas activeTool="shape" />);
     expect(mockCanvasInstance.isDrawingMode).toBe(false);
   });
-
-  it('calls onCursorMove callback on mouse:move event', () => {
-    const onCursorMove = vi.fn();
-    render(<WhiteboardCanvas onCursorMove={onCursorMove} />);
-
-    // Check if on was called with 'mouse:move'
-    // calls is an array of args: [event, handler]
-    const mouseMoveCall = mockCanvasInstance.on.mock.calls.find(
-      (call: any[]) => call[0] === 'mouse:move',
-    );
-    expect(mouseMoveCall).toBeDefined();
-
-    // Simulate event
-    const handler = mouseMoveCall![1];
-    handler({ e: {} }); // Mock event object
-
-    // Check if callback fired
-    expect(mockCanvasInstance.getPointer).toHaveBeenCalled();
-    expect(onCursorMove).toHaveBeenCalledWith(0, 0); // Mock getPointer returns 0,0
-  });
 });

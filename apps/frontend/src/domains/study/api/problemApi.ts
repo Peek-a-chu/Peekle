@@ -1,4 +1,9 @@
-import { DailyProblem, Submission, SubmissionResult, SubmissionSuccessUser } from '../types';
+import {
+  DailyProblem,
+  Submission,
+  SubmissionResult,
+  SubmissionSuccessUser,
+} from '@/domains/study/types';
 import { handleResponse } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -8,13 +13,21 @@ export async function fetchSubmissions(
   studyId: number,
   problemId: number,
 ): Promise<SubmissionSuccessUser[]> {
-  const res = await fetch(`${API_BASE_URL}/api/submissions/study/${studyId}/problem/${problemId}`);
+  const res = await fetch(`/api/submissions/study/${studyId}/problem/${problemId}`);
   return handleResponse<SubmissionSuccessUser[]>(res);
 }
 
 // 2. Daily Problems
 export async function fetchProblems(studyId: number, date: string): Promise<DailyProblem[]> {
-  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/curriculum/daily?date=${date}`);
+  // Add timestamp to prevent caching
+  const timestamp = new Date().getTime();
+  const res = await fetch(`/api/studies/${studyId}/curriculum/daily?date=${date}&_t=${timestamp}`, {
+    cache: 'no-store',
+    headers: {
+      Pragma: 'no-cache',
+      'Cache-Control': 'no-cache',
+    },
+  });
   return handleResponse<DailyProblem[]>(res);
 }
 
@@ -24,7 +37,7 @@ export async function submitProblem(
   problemId: number,
   code: string,
 ): Promise<SubmissionResult> {
-  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/submit`, {
+  const res = await fetch(`/api/studies/${studyId}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ problemId, code }),
@@ -36,7 +49,7 @@ export async function submitProblem(
 export async function fetchSubmissionDetail(
   submissionId: number,
 ): Promise<{ submissionId: number; code: string; language: string }> {
-  const res = await fetch(`${API_BASE_URL}/api/submissions/${submissionId}`);
+  const res = await fetch(`/api/submissions/${submissionId}`);
   return handleResponse<{ submissionId: number; code: string; language: string }>(res);
 }
 
@@ -47,15 +60,15 @@ export interface ExternalProblem {
 }
 
 export async function searchExternalProblems(query: string): Promise<ExternalProblem[]> {
-  const res = await fetch(`${API_BASE_URL}/api/external/search?query=${encodeURIComponent(query)}`);
+  const res = await fetch('/api/external/search?query=' + encodeURIComponent(query));
   return handleResponse<ExternalProblem[]>(res);
 }
 
 export async function deleteProblem(studyId: number, problemId: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/problems/${problemId}`, {
+  const res = await fetch(`/api/studies/${studyId}/problems/${problemId}`, {
     method: 'DELETE',
   });
   if (!res.ok) {
-    throw new Error(`Failed to delete problem: ${res.statusText}`);
+    throw new Error('Failed to delete problem: ' + res.statusText);
   }
 }

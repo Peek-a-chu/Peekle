@@ -5,7 +5,7 @@ import { useRoomStore } from './useRoomStore';
 import { useSocketContext } from '@/domains/study/context/SocketContext';
 
 export interface WhiteboardMessage {
-  action: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'START' | 'CLOSE' | 'CLEAR' | 'SYNC' | 'CURSOR';
+  action: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'START' | 'CLOSE' | 'CLEAR' | 'SYNC';
   objectId?: string;
   senderName?: string;
   senderId?: number;
@@ -23,6 +23,7 @@ export function useWhiteboardSocket(
 
   // Ref to hold the subscription
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
+  const hasSyncedRef = useRef(false);
 
   // Subscribe handling
   useEffect(() => {
@@ -33,10 +34,16 @@ export function useWhiteboardSocket(
       subscriptionRef.current.unsubscribe();
     }
 
+    // Reset sync flag on new subscription
+    hasSyncedRef.current = false;
+
     const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
+    console.log(`[useWhiteboardSocket] Subscribing to ${topic}`);
+
     const sub = client.subscribe(topic, (message: IMessage) => {
       try {
         const body = JSON.parse(message.body) as WhiteboardMessage;
+        console.log(`[useWhiteboardSocket] Received:`, body.action, body.objectId || '');
 
         // Global Toast Logic
         if (body.action === 'START') {
@@ -59,13 +66,25 @@ export function useWhiteboardSocket(
 
     subscriptionRef.current = sub;
 
+    // Request SYNC after subscription is established
+    setTimeout(() => {
+      if (client && connected && !hasSyncedRef.current) {
+        console.log(`[useWhiteboardSocket] Requesting initial SYNC for room ${roomId}`);
+        client.publish({
+          destination: '/pub/studies/whiteboard/sync',
+          body: JSON.stringify({ roomId }),
+        });
+        hasSyncedRef.current = true;
+      }
+    }, 200);
+
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
         subscriptionRef.current = null;
       }
     };
-  }, [client, connected, roomId, setWhiteboardOverlayOpen, onMessageReceived, enabled]); // onMessageReceived should be memoized by caller usually
+  }, [client, connected, roomId, setWhiteboardOverlayOpen, onMessageReceived, enabled]);
 
   const sendMessage = useCallback(
     (payload: WhiteboardMessage) => {
@@ -79,5 +98,15 @@ export function useWhiteboardSocket(
     [client, connected],
   );
 
-  return { isConnected: connected, sendMessage };
+  // Request sync explicitly (useful after reconnection or manual refresh)
+  const requestSync = useCallback(() => {
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/studies/whiteboard/sync',
+        body: JSON.stringify({ roomId }),
+      });
+    }
+  }, [client, connected, roomId]);
+
+  return { isConnected: connected, sendMessage, requestSync };
 }

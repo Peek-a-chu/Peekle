@@ -11,21 +11,10 @@ import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 import type { DailyProblem as Problem } from '@/domains/study/types';
-import { fetchStudyParticipants, fetchStudyRoom } from '@/api/studyApi';
+import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
-// import { WhiteboardOverlay } from '@/domains/study/components/whiteboard/WhiteboardOverlay';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
-import dynamic from 'next/dynamic';
-
 import { SocketProvider } from '@/domains/study/context/SocketContext';
-
-const WhiteboardOverlay = dynamic(
-  () =>
-    import('@/domains/study/components/whiteboard/WhiteboardOverlay').then(
-      (mod) => mod.WhiteboardOverlay,
-    ),
-  { ssr: false },
-);
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
@@ -149,15 +138,23 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     console.log('Settings clicked');
   };
 
-  const handleWhiteboardClick = (): void => {
+  // Control Bar button: Toggle whiteboard tile visibility in VideoGrid
+  const handleWhiteboardToggle = (): void => {
     if (isWhiteboardActive) {
-      setWhiteboardOverlayOpen(true);
+      // Turn off whiteboard - send CLOSE message
+      sendMessage({ action: 'CLOSE' });
+      setIsWhiteboardActive(false);
+      setWhiteboardOverlayOpen(false);
     } else {
+      // Turn on whiteboard - send START message
       sendMessage({ action: 'START' });
-      // Optimistically open and activate for the initiator
       setIsWhiteboardActive(true);
-      setWhiteboardOverlayOpen(true);
     }
+  };
+
+  // VideoGrid tile click: handled directly in WhiteboardTile component
+  const handleWhiteboardClick = (): void => {
+    // No-op: WhiteboardTile handles the toggle internally
   };
 
   const handleSelectProblem = (problem: Problem): void => {
@@ -204,7 +201,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         centerPanel={
           <CenterPanel
             onWhiteboardClick={handleWhiteboardClick}
-            onWhiteboardToggle={handleWhiteboardClick}
+            onWhiteboardToggle={handleWhiteboardToggle}
           />
         }
         rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
@@ -213,7 +210,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         isRightPanelFolded={isRightPanelFolded}
         onUnfoldRightPanel={() => setIsRightPanelFolded(false)}
       />
-      <WhiteboardOverlay />
     </>
   );
 }

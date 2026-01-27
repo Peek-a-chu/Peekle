@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
   experimental: {
     reactCompiler: true,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8080/api/:path*',
+      },
+    ];
+  },
   webpack: (config) => {
     config.externals.push({
       canvas: 'commonjs canvas',
