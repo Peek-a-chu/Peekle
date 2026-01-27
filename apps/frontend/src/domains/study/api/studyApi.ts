@@ -19,9 +19,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
   // Spec: GET /api/studies/{id} returns members list inside
   const room = await fetchStudyRoom(studyId);
-  return room.members.map(m => ({
+  return room.members.map((m) => ({
     ...m,
-    id: m.userId,          // Map userId to id for Store
+    id: m.userId, // Map userId to id for Store
     odUid: String(m.userId), // Mock OpenVidu UID
     isOwner: false, // Not provided in spec
     isMuted: false,
@@ -44,9 +44,12 @@ export async function fetchStudyChats(studyId: number): Promise<ChatMessageRespo
 }
 
 // 3. Study List (My Studies)
-export async function fetchMyStudies(page = 0, keyword = ''): Promise<{ content: any[], totalPages: number }> {
+export async function fetchMyStudies(
+  page = 0,
+  keyword = '',
+): Promise<{ content: any[]; totalPages: number }> {
   const res = await fetch(`/api/studies/my?page=${page}&keyword=${encodeURIComponent(keyword)}`);
-  return handleResponse<{ content: any[], totalPages: number }>(res);
+  return handleResponse<{ content: any[]; totalPages: number }>(res);
 }
 
 // 4. Create Study
@@ -60,19 +63,21 @@ export async function createStudy(title: string): Promise<{ inviteCode: string }
 }
 
 // 5. Join Study
-export async function joinStudy(inviteCode: string): Promise<StudyRoomDetail & { ownerId?: number }> {
-    const res = await fetch(`/api/studies/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteCode }),
-    });
-    return handleResponse<StudyRoomDetail & { ownerId?: number }>(res);
+export async function joinStudy(
+  inviteCode: string,
+): Promise<StudyRoomDetail & { ownerId?: number }> {
+  const res = await fetch(`/api/studies/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inviteCode }),
+  });
+  return handleResponse<StudyRoomDetail & { ownerId?: number }>(res);
 }
 
 // 6. Generate Invite Code
 export async function generateInviteCode(studyId: number): Promise<{ inviteCode: string }> {
-    const res = await fetch(`/api/studies/${studyId}/invite`, {
-        method: 'POST',
-    });
-    return handleResponse<{ inviteCode: string }>(res);
+  const res = await fetch(`/api/studies/${studyId}/invite`, {
+    method: 'POST',
+  });
+  return handleResponse<{ inviteCode: string }>(res);
 }

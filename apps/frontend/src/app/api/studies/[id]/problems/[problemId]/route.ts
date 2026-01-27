@@ -15,10 +15,10 @@ export async function DELETE(
       },
       cache: 'no-store',
     });
-    
+
     // DELETE might return 204 No Content
     if (res.status === 204) {
-        return new NextResponse(null, { status: 204 });
+      return new NextResponse(null, { status: 204 });
     }
 
     const data = await res.json().catch(() => ({})); // Handle empty body

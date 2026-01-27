@@ -100,7 +100,7 @@ export function CCProblemListPanel({
   };
 
   const selectedProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
-  
+
   console.log('[CCProblemListPanel] Rendered with problems:', problems?.length, problems);
 
   return (
@@ -159,7 +159,9 @@ export function CCProblemListPanel({
                   isSelected={selectedProblemId === problem.problemId}
                   onSelect={() => onSelectProblem?.(problem)}
                   onOpenSubmission={handleOpenSubmission}
-                  onRemove={onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined}
+                  onRemove={
+                    onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
+                  }
                 />
               </li>
             ))}

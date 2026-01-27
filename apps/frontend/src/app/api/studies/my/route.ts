@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:80
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const queryString = searchParams.toString();
-  
+
   try {
     const res = await fetch(`${API_BASE_URL}/api/studies/my?${queryString}`, {
       headers: {

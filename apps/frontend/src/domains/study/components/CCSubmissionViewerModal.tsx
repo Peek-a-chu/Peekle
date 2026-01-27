@@ -128,7 +128,9 @@ export function CCSubmissionViewerModal({
 
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-base text-foreground">{sub.nickname || 'Unknown'}</span>
+                        <span className="font-bold text-base text-foreground">
+                          {sub.nickname || 'Unknown'}
+                        </span>
                         <CheckCircle2 className="h-4 w-4 text-green-500 fill-green-100" />
                         <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
                           {sub.language}

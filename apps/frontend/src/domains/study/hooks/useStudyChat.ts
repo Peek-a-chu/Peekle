@@ -28,7 +28,7 @@ export function useStudyChat(roomId: number) {
               content: msg.content,
               type: msg.type,
               createdAt: new Date().toISOString(), // Mock
-              parentMessage: undefined
+              parentMessage: undefined,
             })),
           );
         })
@@ -39,7 +39,7 @@ export function useStudyChat(roomId: number) {
   // STOMP Subscription
   useEffect(() => {
     if (!socket || !roomId) return; // Prevent subscription to room specific topic if roomId is invalid (0)
-    
+
     // Spec Topic: /topic/studies/rooms/{id}/chat
     const subscription = socket.subscribe(`/topic/studies/rooms/${roomId}/chat`, (message) => {
       try {
@@ -75,12 +75,12 @@ export function useStudyChat(roomId: number) {
       const payload = {
         studyId: roomId,
         content: content,
-        parentId: replyingTo?.id
+        parentId: replyingTo?.id,
       };
 
       socket.publish({
         destination: '/pub/studies/chat',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
     },
     [socket, roomId, currentUserId, replyingTo],
@@ -96,7 +96,7 @@ export function useStudyChat(roomId: number) {
       isRealtime?: boolean,
     ): void => {
       if (!socket || !currentUserId) return;
-      
+
       const formattedContent = `[CODE:${language}] ${description}\nRef: ${ownerName || 'Unknown'} - ${problemTitle || 'Unknown'}\n${code}`;
       const payload = {
         studyId: roomId,
@@ -104,16 +104,16 @@ export function useStudyChat(roomId: number) {
         parentId: replyingTo?.id,
         // Optional: if backend accepts metadata separately
         metadata: {
-            code,
-            language,
-            problemTitle,
-            ownerName
-        }
+          code,
+          language,
+          problemTitle,
+          ownerName,
+        },
       };
 
       socket.publish({
         destination: '/pub/studies/chat',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
     },
     [socket, roomId, currentUserId, replyingTo],

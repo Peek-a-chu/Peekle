@@ -15,9 +15,7 @@ export interface ApiResponse<T> {
 }
 
 export async function checkNickname(nickname: string): Promise<ApiResponse<CheckNicknameResponse>> {
-  const res = await fetch(
-    `/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`,
-  );
+  const res = await fetch(`/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`);
   return res.json() as Promise<ApiResponse<CheckNicknameResponse>>;
 }
 

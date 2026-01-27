@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ submissionId: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ submissionId: string }> },
+) {
   const { submissionId } = await params;
   try {
     const res = await fetch(`${API_BASE_URL}/api/submissions/${submissionId}`, {

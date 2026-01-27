@@ -1,10 +1,18 @@
-import { DailyProblem, Submission, SubmissionResult, SubmissionSuccessUser } from '@/domains/study/types';
+import {
+  DailyProblem,
+  Submission,
+  SubmissionResult,
+  SubmissionSuccessUser,
+} from '@/domains/study/types';
 import { handleResponse } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 // 1. Successful Users list
-export async function fetchSubmissions(studyId: number, problemId: number): Promise<SubmissionSuccessUser[]> {
+export async function fetchSubmissions(
+  studyId: number,
+  problemId: number,
+): Promise<SubmissionSuccessUser[]> {
   const res = await fetch(`/api/submissions/study/${studyId}/problem/${problemId}`);
   return handleResponse<SubmissionSuccessUser[]>(res);
 }
@@ -16,15 +24,19 @@ export async function fetchProblems(studyId: number, date: string): Promise<Dail
   const res = await fetch(`/api/studies/${studyId}/curriculum/daily?date=${date}&_t=${timestamp}`, {
     cache: 'no-store',
     headers: {
-      'Pragma': 'no-cache',
-      'Cache-Control': 'no-cache'
-    }
+      Pragma: 'no-cache',
+      'Cache-Control': 'no-cache',
+    },
   });
   return handleResponse<DailyProblem[]>(res);
 }
 
 // 3. Submit Solution
-export async function submitProblem(studyId: number, problemId: number, code: string): Promise<SubmissionResult> {
+export async function submitProblem(
+  studyId: number,
+  problemId: number,
+  code: string,
+): Promise<SubmissionResult> {
   const res = await fetch(`/api/studies/${studyId}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -34,7 +46,9 @@ export async function submitProblem(studyId: number, problemId: number, code: st
 }
 
 // 4. Submission Detail
-export async function fetchSubmissionDetail(submissionId: number): Promise<{ submissionId: number; code: string; language: string }> {
+export async function fetchSubmissionDetail(
+  submissionId: number,
+): Promise<{ submissionId: number; code: string; language: string }> {
   const res = await fetch(`/api/submissions/${submissionId}`);
   return handleResponse<{ submissionId: number; code: string; language: string }>(res);
 }

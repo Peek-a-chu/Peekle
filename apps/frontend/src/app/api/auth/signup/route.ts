@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (setCookie) {
       response.headers.set('Set-Cookie', setCookie);
     }
-    
+
     return response;
   } catch (error) {
     return NextResponse.json(

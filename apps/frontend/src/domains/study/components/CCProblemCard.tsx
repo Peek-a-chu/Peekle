@@ -107,11 +107,11 @@ export function CCProblemCard({
         {/* Tier Row */}
         {showHint && (
           <div className="flex flex-col gap-1.5 mt-0.5">
-              <div className="flex items-center gap-1">
-                <span className={cn('text-[10px] font-bold text-muted-foreground')}>
-                  {problem.tier}
-                </span>
-              </div>
+            <div className="flex items-center gap-1">
+              <span className={cn('text-[10px] font-bold text-muted-foreground')}>
+                {problem.tier}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -134,9 +134,7 @@ export function CCProblemCard({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
-            <span>
-              {problem.solvedMemberCount}명 해결
-            </span>
+            <span>{problem.solvedMemberCount}명 해결</span>
           </div>
         </div>
       </div>

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
 import { DailyProblem } from '../types';
 import { fetchProblems } from '@/api/problemApi';
 import { format } from 'date-fns';
 import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';
-import { Client } from '@stomp/stompjs';
 
 interface UseProblemsResult {
   problems: DailyProblem[];
@@ -31,13 +33,13 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
       console.log(`[useProblems] Fetching problems for ${dateStr}`);
       const data = await fetchProblems(studyId, dateStr);
       console.log(`[useProblems] Fetched problems: ${data.length}`, data);
-      
+
       // Merge with existing problems if they were added via socket but not yet in DB?
       // For now, trust the API as source of truth for "official" list.
       // But if we just added one, and API is stale, we might lose it.
       // Optimistic merging is tricky without timestamps.
       // Let's rely on setProblems(data) and hope 1000ms delay was enough.
-      
+
       setProblems(data);
     } catch (err) {
       console.error('[useProblems] Failed to fetch problems:', err);
@@ -58,62 +60,67 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
     if (!socket || !socket.connected) {
       return;
     }
-    
-    console.log(`[useProblems] Subscribing to problems topic: /topic/studies/rooms/${studyId}/problems`);
+
+    console.log(
+      `[useProblems] Subscribing to problems topic: /topic/studies/rooms/${studyId}/problems`,
+    );
     // Subscribe to curriculum topic: /topic/studies/rooms/{id}/problems
     const sub = socket.subscribe(`/topic/studies/rooms/${studyId}/problems`, (message) => {
-         try {
-             console.log('[useProblems] Raw message received:', message.body);
-             const body = JSON.parse(message.body);
-             console.log('[useProblems] Parsed body:', body);
-             
-             if (body.type === 'CURRICULUM' && body.data) {
-                 const { action, problemId, title } = body.data;
-                 console.log(`[useProblems] Action: ${action}, ProblemId: ${problemId}`);
+      try {
+        console.log('[useProblems] Raw message received:', message.body);
+        const body = JSON.parse(message.body);
+        console.log('[useProblems] Parsed body:', body);
 
-                 if (action === 'ADD' && problemId) {
-                     const pid = Number(problemId);
-                     console.warn(`[useProblems] Processing ADD for problem ${pid}`);
-                     
-                     setProblems(prev => {
-                         if (prev.some(p => p.problemId === pid)) {
-                             console.warn('[useProblems] Problem already exists in state:', pid);
-                             return prev;
-                         }
-                         const newProblem: DailyProblem = {
-                             problemId: pid,
-                             title: title || `Problem ${pid}`,
-                             tier: 'Unrated',
-                             solvedMemberCount: 0
-                         };
-                         const newProblems = [...prev, newProblem];
-                         console.warn('[useProblems] Updated problems state:', newProblems);
-                         return newProblems;
-                     });
+        if (body.type === 'CURRICULUM' && body.data) {
+          const { action, problemId, title } = body.data;
+          console.log(`[useProblems] Action: ${action}, ProblemId: ${problemId}`);
 
-                     // Fallback refresh to ensure sync with DB - Increased delay to 1000ms
-                     setTimeout(() => {
-                        console.log('[useProblems] Executing fallback refresh');
-                        void loadProblems();
-                     }, 1000);
-                 } else if (action === 'REMOVE' && problemId) {
-                     const pid = Number(problemId);
-                     setProblems(prev => prev.filter(p => p.problemId !== pid));
-                 }
-             }
-         } catch(e) {
-            console.error('[useProblems] Error parsing message:', e);
-         }
+          if (action === 'ADD' && problemId) {
+            const pid = Number(problemId);
+            console.warn(`[useProblems] Processing ADD for problem ${pid}`);
+
+            setProblems((prev) => {
+              if (prev.some((p) => p.problemId === pid)) {
+                console.warn('[useProblems] Problem already exists in state:', pid);
+                return prev;
+              }
+              const newProblem: DailyProblem = {
+                problemId: pid,
+                title: title || `Problem ${pid}`,
+                tier: 'Unrated',
+                solvedMemberCount: 0,
+              };
+              const newProblems = [...prev, newProblem];
+              console.warn('[useProblems] Updated problems state:', newProblems);
+              return newProblems;
+            });
+
+            // Fallback refresh to ensure sync with DB - Increased delay to 1000ms
+            setTimeout(() => {
+              console.log('[useProblems] Executing fallback refresh');
+              void loadProblems();
+            }, 1000);
+          } else if (action === 'REMOVE' && problemId) {
+            const pid = Number(problemId);
+            setProblems((prev) => prev.filter((p) => p.problemId !== pid));
+          }
+        }
+      } catch (e) {
+        console.error('[useProblems] Error parsing message:', e);
+      }
     });
 
     return () => {
-        console.log('[useProblems] Unsubscribing from problems topic');
-        sub.unsubscribe();
+      console.log('[useProblems] Unsubscribing from problems topic');
+      sub.unsubscribe();
     };
-  }, [socket, studyId]); // loadProblems intentionally omitted to clean dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, studyId]);
 
   // STOMP Action for Add
-  const addProblem = useCallback(async (title: string, number: number, tags?: string[]) => {
+  const addProblem = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async (title: string, number: number, _tags?: string[]) => {
       if (!socket) {
         console.error('Socket instance is null');
         throw new Error('소켓 연결이 되어있지 않습니다.');
@@ -123,45 +130,52 @@ export function useProblems(studyId: number, date: Date): UseProblemsResult {
       }
 
       console.log(`[useProblems] Sending ADD request for Problem ${number}`);
-      
+
       // [Optimistic Update] Add to UI immediately
-      setProblems(prev => {
-          if (prev.some(p => p.problemId === number)) return prev;
-          const newProblem: DailyProblem = {
-              problemId: number,
-              title: title,
-              tier: 'Unrated',
-              solvedMemberCount: 0
-          };
-          return [...prev, newProblem];
+      setProblems((prev) => {
+        if (prev.some((p) => p.problemId === number)) return prev;
+        const newProblem: DailyProblem = {
+          problemId: number,
+          title: title,
+          tier: 'Unrated',
+          solvedMemberCount: 0,
+        };
+        return [...prev, newProblem];
       });
 
       socket.publish({
-          destination: '/pub/studies/problems',
-          body: JSON.stringify({ studyId, action: "ADD", problemId: number })
+        destination: '/pub/studies/problems',
+        body: JSON.stringify({ studyId, action: 'ADD', problemId: number }),
       });
       // Optionally trigger local refresh immediately?
-      // void loadProblems(); 
-  }, [socket, studyId]);
+      // void loadProblems();
+      return Promise.resolve();
+    },
+    [socket, studyId],
+  );
 
   // STOMP Action for Remove
-  const removeProblem = useCallback(async (problemId: number) => {
+  const removeProblem = useCallback(
+    async (problemId: number) => {
       if (!socket || !socket.connected) {
-          throw new Error('서버와 연결되지 않았습니다.');
+        throw new Error('서버와 연결되지 않았습니다.');
       }
       console.log(`[useProblems] Sending REMOVE request for Problem ${problemId}`);
       socket.publish({
-          destination: '/pub/studies/problems',
-          body: JSON.stringify({ studyId, action: "REMOVE", problemId })
+        destination: '/pub/studies/problems',
+        body: JSON.stringify({ studyId, action: 'REMOVE', problemId }),
       });
-  }, [socket, studyId]);
+      return Promise.resolve();
+    },
+    [socket, studyId],
+  );
 
-  return { 
-     problems, 
-     isLoading, 
-     error, 
-     addProblem, 
-     removeProblem, 
-     refresh: loadProblems 
+  return {
+    problems,
+    isLoading,
+    error,
+    addProblem,
+    removeProblem,
+    refresh: loadProblems,
   };
 }

@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
-import { WhiteboardCanvas, WhiteboardCanvasRef } from '@/domains/study/components/whiteboard/WhiteboardCanvas';
-import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
+import {
+  WhiteboardCanvas,
+  WhiteboardCanvasRef,
+} from '@/domains/study/components/whiteboard/WhiteboardCanvas';
+import { useWhiteboardSocket, WhiteboardMessage } from '@/domains/study/hooks/useWhiteboardSocket';
 import { Pencil, Square, Type, Eraser, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function WhiteboardOverlay() {
-  const { id: roomId } = useParams() as { id: string };
+  const { id: roomId } = useParams();
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
   const [activeTool, setActiveTool] = React.useState<'pen' | 'shape' | 'text' | 'eraser'>('pen');
@@ -17,7 +20,7 @@ export function WhiteboardOverlay() {
 
   const lastCursorSend = useRef<number>(0);
 
-  const { sendMessage } = useWhiteboardSocket(roomId, (msg) => {
+  const handleMessage = useCallback((msg: WhiteboardMessage) => {
     switch (msg.action) {
       case 'ADDED':
         canvasRef.current?.add(msg.data);
@@ -39,14 +42,19 @@ export function WhiteboardOverlay() {
       case 'SYNC':
         if (msg.data?.history) {
           canvasRef.current?.clear();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           msg.data.history.forEach((action: any) => {
-             if (action.action === 'ADDED' && action.data) {
-               canvasRef.current?.add(action.data);
-             }
+            if (action.action === 'ADDED' && action.data) {
+              canvasRef.current?.add(action.data);
+            }
           });
         }
         break;
     }
+  }, []);
+
+  const { sendMessage } = useWhiteboardSocket(roomId as string, handleMessage, {
+    enabled: isWhiteboardOverlayOpen,
   });
 
   const handleObjectAdded = (obj: any) => {
@@ -54,7 +62,7 @@ export function WhiteboardOverlay() {
     const data = obj.toObject ? obj.toObject(['id']) : obj;
     sendMessage({ action: 'ADDED', objectId: obj.id, data });
   };
-  
+
   const handleObjectModified = (obj: any) => {
     const data = obj.toObject ? obj.toObject(['id']) : obj;
     sendMessage({ action: 'MODIFIED', objectId: obj.id, data });
@@ -63,11 +71,12 @@ export function WhiteboardOverlay() {
   const handleObjectRemoved = (objectId: string) => {
     sendMessage({ action: 'REMOVED', objectId });
   };
-  
+
   const handleCursorMove = (x: number, y: number) => {
     const now = Date.now();
-    if (now - lastCursorSend.current > 50) { // Throttle 50ms
-      sendMessage({ action: 'CURSOR', data: { x, y } }); 
+    if (now - lastCursorSend.current > 50) {
+      // Throttle 50ms
+      sendMessage({ action: 'CURSOR', data: { x, y } });
       lastCursorSend.current = now;
     }
   };
@@ -83,13 +92,13 @@ export function WhiteboardOverlay() {
         <div className="flex items-center justify-between border-b bg-gray-50 px-4 py-3">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-700">화이트보드</h2>
-            
+
             <div className="ml-6 flex items-center gap-1 rounded-lg bg-white p-1 shadow-sm border border-gray-200">
               <button
                 onClick={() => setActiveTool('pen')}
                 className={cn(
-                  "rounded p-2 transition-colors hover:bg-gray-100",
-                  activeTool === 'pen' ? "bg-blue-100 text-blue-600" : "text-gray-600"
+                  'rounded p-2 transition-colors hover:bg-gray-100',
+                  activeTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                 )}
                 aria-label="펜"
                 title="펜"
@@ -99,8 +108,8 @@ export function WhiteboardOverlay() {
               <button
                 onClick={() => setActiveTool('shape')}
                 className={cn(
-                  "rounded p-2 transition-colors hover:bg-gray-100",
-                  activeTool === 'shape' ? "bg-blue-100 text-blue-600" : "text-gray-600"
+                  'rounded p-2 transition-colors hover:bg-gray-100',
+                  activeTool === 'shape' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                 )}
                 aria-label="도형"
                 title="도형"
@@ -110,8 +119,8 @@ export function WhiteboardOverlay() {
               <button
                 onClick={() => setActiveTool('text')}
                 className={cn(
-                  "rounded p-2 transition-colors hover:bg-gray-100",
-                  activeTool === 'text' ? "bg-blue-100 text-blue-600" : "text-gray-600"
+                  'rounded p-2 transition-colors hover:bg-gray-100',
+                  activeTool === 'text' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                 )}
                 aria-label="텍스트"
                 title="텍스트"
@@ -121,8 +130,8 @@ export function WhiteboardOverlay() {
               <button
                 onClick={() => setActiveTool('eraser')}
                 className={cn(
-                  "rounded p-2 transition-colors hover:bg-gray-100",
-                  activeTool === 'eraser' ? "bg-blue-100 text-blue-600" : "text-gray-600"
+                  'rounded p-2 transition-colors hover:bg-gray-100',
+                  activeTool === 'eraser' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                 )}
                 aria-label="지우개"
                 title="지우개"
@@ -144,10 +153,10 @@ export function WhiteboardOverlay() {
         {/* Canvas Area */}
         <div className="flex-1 overflow-auto bg-gray-100 p-4">
           <div className="flex h-full w-full items-center justify-center">
-            <WhiteboardCanvas 
+            <WhiteboardCanvas
               ref={canvasRef}
-              width={1200} 
-              height={800} 
+              width={1200}
+              height={800}
               activeTool={activeTool}
               onObjectAdded={handleObjectAdded}
               onObjectModified={handleObjectModified}

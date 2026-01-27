@@ -37,13 +37,13 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   // No, but children (StudyChatPanel) uses useRoomStore(state => state.roomId).
   // If we don't set it, it defaults to 0.
   // Let's set it in a LayoutEffect or Initializer if possible, but useEffect is standard.
-  // The fix in CCStudyRoomClient.tsx (adding immediate set in useEffect) should help, 
+  // The fix in CCStudyRoomClient.tsx (adding immediate set in useEffect) should help,
   // but better to pass studyId as prop to StudyChatPanel via context or props if possible.
   // However, StudyChatPanel reads from Store.
-  
+
   // We can also initialize store with props?
   useEffect(() => {
-     if(studyId) setRoomInfo({ roomId: studyId, roomTitle: '' });
+    if (studyId) setRoomInfo({ roomId: studyId, roomTitle: '' });
   }, [studyId, setRoomInfo]);
 
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
@@ -93,7 +93,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   useEffect(() => {
     // Ensure roomId is set in store immediately when studyId is available
     if (studyId) {
-        setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
+      setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
     }
 
     fetchStudyRoom(studyId)
@@ -154,6 +154,9 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       setWhiteboardOverlayOpen(true);
     } else {
       sendMessage({ action: 'START' });
+      // Optimistically open and activate for the initiator
+      setIsWhiteboardActive(true);
+      setWhiteboardOverlayOpen(true);
     }
   };
 
@@ -224,11 +227,10 @@ export function CCStudyRoomClient(): React.ReactNode {
   // Wait for userId to be initialized if you want to delay connection?
   // But we want to render the content immediately.
   // SocketProvider will handle connection updates when currentUserId changes.
-  
+
   return (
     <SocketProvider roomId={studyId} userId={currentUserId}>
       <StudyRoomContent studyId={studyId} />
     </SocketProvider>
   );
 }
-

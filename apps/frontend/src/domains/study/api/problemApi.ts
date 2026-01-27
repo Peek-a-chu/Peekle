@@ -4,7 +4,10 @@ import { handleResponse } from '@/lib/api';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 // 1. Successful Users list
-export async function fetchSubmissions(studyId: number, problemId: number): Promise<SubmissionSuccessUser[]> {
+export async function fetchSubmissions(
+  studyId: number,
+  problemId: number,
+): Promise<SubmissionSuccessUser[]> {
   const res = await fetch(`${API_BASE_URL}/api/submissions/study/${studyId}/problem/${problemId}`);
   return handleResponse<SubmissionSuccessUser[]>(res);
 }
@@ -16,7 +19,11 @@ export async function fetchProblems(studyId: number, date: string): Promise<Dail
 }
 
 // 3. Submit Solution
-export async function submitProblem(studyId: number, problemId: number, code: string): Promise<SubmissionResult> {
+export async function submitProblem(
+  studyId: number,
+  problemId: number,
+  code: string,
+): Promise<SubmissionResult> {
   const res = await fetch(`${API_BASE_URL}/api/studies/${studyId}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -26,7 +33,9 @@ export async function submitProblem(studyId: number, problemId: number, code: st
 }
 
 // 4. Submission Detail
-export async function fetchSubmissionDetail(submissionId: number): Promise<{ submissionId: number; code: string; language: string }> {
+export async function fetchSubmissionDetail(
+  submissionId: number,
+): Promise<{ submissionId: number; code: string; language: string }> {
   const res = await fetch(`${API_BASE_URL}/api/submissions/${submissionId}`);
   return handleResponse<{ submissionId: number; code: string; language: string }>(res);
 }

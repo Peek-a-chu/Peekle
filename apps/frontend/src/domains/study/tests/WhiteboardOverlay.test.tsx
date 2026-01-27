@@ -20,10 +20,11 @@ vi.mock('../hooks/useWhiteboardSocket', () => ({
 // Mock store
 const mockSetWhiteboardOverlayOpen = vi.fn();
 vi.mock('../hooks/useRoomStore', () => ({
-  useRoomStore: (selector: any) => selector({
-    isWhiteboardOverlayOpen: true,
-    setWhiteboardOverlayOpen: mockSetWhiteboardOverlayOpen,
-  }),
+  useRoomStore: (selector: any) =>
+    selector({
+      isWhiteboardOverlayOpen: true,
+      setWhiteboardOverlayOpen: mockSetWhiteboardOverlayOpen,
+    }),
 }));
 
 // Mock WhiteboardCanvas
@@ -34,7 +35,7 @@ vi.mock('../components/whiteboard/WhiteboardCanvas', () => ({
 describe('WhiteboardOverlay', () => {
   it('renders toolbar and canvas when open', () => {
     render(<WhiteboardOverlay />);
-    
+
     expect(screen.getByTestId('mock-whiteboard-canvas')).toBeInTheDocument();
     // Check for tool buttons (using aria-label or text)
     expect(screen.getByLabelText(/펜/i)).toBeInTheDocument();
@@ -46,7 +47,7 @@ describe('WhiteboardOverlay', () => {
 
   it('closes overlay when close button is clicked', () => {
     render(<WhiteboardOverlay />);
-    
+
     const closeBtn = screen.getByLabelText(/닫기/i);
     fireEvent.click(closeBtn);
     expect(mockSetWhiteboardOverlayOpen).toHaveBeenCalledWith(false);

@@ -16,4 +16,3 @@ export function quitStudy(client: Client, studyId: number, userId: number) {
     body: JSON.stringify({ studyId: studyId, userId: String(userId) }),
   });
 }
-

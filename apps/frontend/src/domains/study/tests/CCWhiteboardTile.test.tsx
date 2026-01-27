@@ -7,17 +7,18 @@ import { useRoomStore } from '../hooks/useRoomStore';
 const mockSetWhiteboardOverlayOpen = vi.fn();
 
 vi.mock('../hooks/useRoomStore', () => ({
-  useRoomStore: (selector: any) => selector({
-    isWhiteboardActive: true,
-    whiteboardOpenedBy: 'Tester',
-    setWhiteboardOverlayOpen: mockSetWhiteboardOverlayOpen,
-  }),
+  useRoomStore: (selector: any) =>
+    selector({
+      isWhiteboardActive: true,
+      whiteboardOpenedBy: 'Tester',
+      setWhiteboardOverlayOpen: mockSetWhiteboardOverlayOpen,
+    }),
 }));
 
 describe('CCWhiteboardTile', () => {
   it('calls setWhiteboardOverlayOpen(true) when clicked', () => {
     render(<CCWhiteboardTile />);
-    
+
     const tile = screen.getByRole('button');
     fireEvent.click(tile);
 

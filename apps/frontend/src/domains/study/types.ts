@@ -1,7 +1,7 @@
 export interface Problem {
-  problemId: number;     // Changed from id to problemId per spec
+  problemId: number; // Changed from id to problemId per spec
   title: string;
-  tier: string;         // Changed from number to string per spec (e.g. "Bronze 5")
+  tier: string; // Changed from number to string per spec (e.g. "Bronze 5")
   solvedMemberCount?: number;
 }
 
@@ -17,10 +17,10 @@ export interface Submission {
 }
 
 export interface SubmissionSuccessUser {
-    userId: number;
-    nickname: string;
-    memory: number;
-    executionTime: number;
+  userId: number;
+  nickname: string;
+  memory: number;
+  executionTime: number;
 }
 
 export interface DailyProblem {

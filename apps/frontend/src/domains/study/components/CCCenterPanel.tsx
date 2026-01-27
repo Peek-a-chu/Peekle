@@ -72,7 +72,7 @@ export function CCCenterPanel({
     if (socket && roomId && selectedProblemId) {
       socket.publish({
         destination: '/pub/ide/update',
-        body: JSON.stringify({ problemId: selectedProblemId, code })
+        body: JSON.stringify({ problemId: selectedProblemId, code }),
       });
     }
   };

@@ -1,4 +1,5 @@
 declare module 'sockjs-client' {
-  var SockJS: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const SockJS: any;
   export default SockJS;
 }
