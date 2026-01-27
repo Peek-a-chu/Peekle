@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Participant } from '@/domains/game/mocks/mock-data';
@@ -55,12 +56,13 @@ export function ParticipantCard({ participant, isEmpty = false }: ParticipantCar
       )}
 
       {/* 프로필 이미지 */}
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-purple-500 text-base font-medium text-white">
+      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-purple-500 text-base font-medium text-white">
         {participant.profileImg && participant.profileImg !== '/avatars/default.png' ? (
-          <img
+          <Image
             src={participant.profileImg}
             alt={participant.nickname}
-            className="h-full w-full rounded-full object-cover"
+            fill
+            className="rounded-full object-cover"
           />
         ) : (
           participant.nickname.charAt(0).toUpperCase()
