@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { ChatType } from '../types/chat';
 
 export type ViewMode = 'ONLY_MINE' | 'SPLIT_REALTIME' | 'SPLIT_SAVED';
 
@@ -50,6 +51,26 @@ export interface RoomState {
   isWhiteboardActive: boolean;
   whiteboardOpenedBy: string | null;
   whiteboardMessage: string | null;
+
+  // Problem State
+  selectedProblemId: number | null;
+  selectedProblemTitle: string | null;
+
+  // Chat State
+  pendingCodeShare: {
+    code: string;
+    language: string;
+    ownerName?: string;
+    problemTitle?: string;
+    isRealtime?: boolean;
+  } | null;
+  replyingTo: {
+    id: string;
+    senderId: number;
+    senderName: string;
+    content: string;
+    type: ChatType;
+  } | null;
 }
 
 export interface RoomActions {
@@ -63,6 +84,13 @@ export interface RoomActions {
   setViewMode: (mode: ViewMode) => void;
   setTargetSubmission: (submission: TargetSubmission | null) => void;
   viewRealtimeCode: (user: Participant) => void;
+  viewSharedCode: (data: {
+    code: string;
+    language: string;
+    ownerName: string;
+    problemTitle?: string;
+    isRealtime?: boolean;
+  }) => void;
   resetToOnlyMine: () => void;
 
   // Participant actions
@@ -81,6 +109,31 @@ export interface RoomActions {
   setIsWhiteboardActive: (isActive: boolean) => void;
   setWhiteboardOpenedBy: (user: string | null) => void;
   setWhiteboardMessage: (message: string | null) => void;
+
+  // Problem Actions
+  setSelectedProblemId: (id: number | null) => void;
+  setSelectedProblemTitle: (title: string | null) => void;
+  setSelectedProblem: (id: number | null, title: string | null) => void;
+
+  // Chat Actions
+  setPendingCodeShare: (
+    data: {
+      code: string;
+      language: string;
+      ownerName?: string;
+      problemTitle?: string;
+      isRealtime?: boolean;
+    } | null,
+  ) => void;
+  setReplyingTo: (
+    message: {
+      id: string;
+      senderId: number;
+      senderName: string;
+      content: string;
+      type: ChatType;
+    } | null,
+  ) => void;
 
   // Test helper
   reset: () => void;
@@ -107,46 +160,75 @@ const initialState: RoomState = {
   isWhiteboardActive: false,
   whiteboardOpenedBy: null,
   whiteboardMessage: null,
+
+  selectedProblemId: null,
+  selectedProblemTitle: null,
+
+  pendingCodeShare: null,
+  replyingTo: null,
 };
 
 export const useRoomStore = create<RoomState & RoomActions>((set) => ({
   ...initialState,
 
   // Actions
-  setRoomInfo: (info) => set((state) => ({ ...state, ...info })),
-  setCurrentDate: (date) => set({ currentDate: date }),
+  setRoomInfo: (info): void => set((state) => ({ ...state, ...info })),
+  setCurrentDate: (date): void => set({ currentDate: date }),
 
-  setViewMode: (mode) => set({ viewMode: mode }),
-  setTargetSubmission: (submission) => set({ targetSubmission: submission }),
-  viewRealtimeCode: (user) => set({ viewMode: 'SPLIT_REALTIME', viewingUser: user }),
-  resetToOnlyMine: () => set({ viewMode: 'ONLY_MINE', viewingUser: null, targetSubmission: null }),
+  setViewMode: (mode): void => set({ viewMode: mode }),
+  setTargetSubmission: (submission): void => set({ targetSubmission: submission }),
+  viewRealtimeCode: (user): void => set({ viewMode: 'SPLIT_REALTIME', viewingUser: user }),
+  viewSharedCode: (data): void =>
+    set({
+      viewMode: 'SPLIT_SAVED',
+      targetSubmission: {
+        id: Date.now(), // Unique ID for this shared code view
+        problemTitle: data.problemTitle || 'Unknown Problem',
+        username: data.ownerName,
+        language: data.language,
+        memory: 0,
+        executionTime: 0,
+        code: data.code,
+      },
+      viewingUser: null, // Clear realtime viewing user
+    }),
+  resetToOnlyMine: (): void =>
+    set({ viewMode: 'ONLY_MINE', viewingUser: null, targetSubmission: null }),
 
-  setParticipants: (participants) => set({ participants }),
-  updateParticipant: (id, updates) =>
+  setParticipants: (participants): void => set({ participants }),
+  updateParticipant: (id, updates): void =>
     set((state) => ({
       participants: state.participants.map((p) => (p.id === id ? { ...p, ...updates } : p)),
     })),
-  addParticipant: (participant) =>
+  addParticipant: (participant): void =>
     set((state) => ({ participants: [...state.participants, participant] })),
-  removeParticipant: (id) =>
+  removeParticipant: (id): void =>
     set((state) => ({
       participants: state.participants.filter((p) => p.id !== id),
     })),
-  setCurrentUserId: (id) => set({ currentUserId: id }),
+  setCurrentUserId: (id): void => set({ currentUserId: id }),
 
-  setInviteModalOpen: (isOpen) => set({ isInviteModalOpen: isOpen }),
-  setSettingsOpen: (isOpen) => set({ isSettingsOpen: isOpen }),
+  setInviteModalOpen: (isOpen): void => set({ isInviteModalOpen: isOpen }),
+  setSettingsOpen: (isOpen): void => set({ isSettingsOpen: isOpen }),
 
-  setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
-  setIsWhiteboardActive: (isActive) => set({ isWhiteboardActive: isActive }),
-  setWhiteboardOpenedBy: (user) => set({ whiteboardOpenedBy: user }),
-  setWhiteboardMessage: (message) => set({ whiteboardMessage: message }),
+  setRightPanelActiveTab: (tab): void => set({ rightPanelActiveTab: tab }),
+  setIsWhiteboardActive: (isActive): void => set({ isWhiteboardActive: isActive }),
+  setWhiteboardOpenedBy: (user): void => set({ whiteboardOpenedBy: user }),
+  setWhiteboardMessage: (message): void => set({ whiteboardMessage: message }),
 
-  reset: () => set(initialState),
+  setSelectedProblemId: (id): void => set({ selectedProblemId: id }),
+  setSelectedProblemTitle: (title): void => set({ selectedProblemTitle: title }),
+  setSelectedProblem: (id, title): void =>
+    set({ selectedProblemId: id, selectedProblemTitle: title }),
+
+  setPendingCodeShare: (data): void => set({ pendingCodeShare: data }),
+  setReplyingTo: (message): void => set({ replyingTo: message }),
+
+  reset: (): void => set(initialState),
 }));
 
 // Selectors
-export const selectSortedParticipants = (state: RoomState) => {
+export const selectSortedParticipants = (state: RoomState): Participant[] => {
   return [...state.participants].sort((a, b) => {
     // Owner first
     if (a.isOwner) return -1;
@@ -157,14 +239,14 @@ export const selectSortedParticipants = (state: RoomState) => {
     if (!a.isOnline && b.isOnline) return 1;
 
     // Alphabetical
-    return a.nickname.localeCompare(b.nickname);
+    return (a.nickname || '').localeCompare(b.nickname || '');
   });
 };
 
-export const selectOnlineCount = (state: RoomState) =>
+export const selectOnlineCount = (state: RoomState): number =>
   state.participants.filter((p) => p.isOnline).length;
 
-export const selectIsOwner = (state: RoomState) => {
+export const selectIsOwner = (state: RoomState): boolean => {
   if (!state.currentUserId) return false;
   const me = state.participants.find((p) => p.id === state.currentUserId);
   return me?.isOwner || false;
