@@ -69,8 +69,8 @@ export function GameProblemListPanel({
                                 className={cn(
                                     'w-full rounded-xl border p-4 text-left transition-all',
                                     selectedProblemId === problem.id
-                                        ? 'border-pink-500 bg-pink-50/30 ring-1 ring-pink-500'
-                                        : 'border-border bg-background hover:border-pink-200 hover:shadow-sm'
+                                        ? 'border-primary/60 bg-primary/10 ring-1 ring-primary/40'
+                                        : 'border-border bg-background hover:border-primary/30 hover:shadow-sm'
                                 )}
                             >
                                 {/* 문제 번호 */}
@@ -88,7 +88,7 @@ export function GameProblemListPanel({
                                             href={`https://www.acmicpc.net/problem/${problem.problemNumber.replace('#', '')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-muted-foreground hover:text-pink-500"
+                                            className="text-muted-foreground hover:text-primary"
                                             onClick={(e) => e.stopPropagation()}
                                             title="백준 문제 보러가기"
                                         >

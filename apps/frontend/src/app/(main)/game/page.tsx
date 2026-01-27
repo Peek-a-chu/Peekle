@@ -27,7 +27,7 @@ export default function GamesPage() {
   } = useGamePageLogic();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* 헤더 */}
         <GameLayoutHeader onCreateClick={() => setCreateModalOpen(true)} />

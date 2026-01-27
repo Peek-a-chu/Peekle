@@ -5,6 +5,7 @@ import { Home, Users, Gamepad2, BookOpen, Trophy, Medal, Search, Settings } from
 
 import UserProfileSection from './UserProfileSection';
 import SidebarItem from './SidebarItem';
+import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 
 const Sidebar = () => {
   const pathname = usePathname();
@@ -25,8 +26,10 @@ const Sidebar = () => {
     return false;
   };
 
+  const { openModal, isOpen } = useSettingsStore();
+
   return (
-    <aside className="w-[240px] h-screen bg-white border-r border-gray-100 flex flex-col fixed left-0 top-0 z-50 overflow-y-auto">
+    <aside className="w-[240px] h-screen bg-card border-r border-border flex flex-col fixed left-0 top-0 z-50 overflow-y-auto font-sans transition-colors duration-300">
       {/* User Logic Section */}
       <div className="mt-6">
         <UserProfileSection />
@@ -50,8 +53,8 @@ const Sidebar = () => {
         <SidebarItem
           icon={Settings}
           label="설정"
-          href="/settings" // Assuming settings page or just placeholder
-          isActive={pathname === '/settings'}
+          onClick={() => openModal()}
+          isActive={isOpen}
         />
       </div>
     </aside>

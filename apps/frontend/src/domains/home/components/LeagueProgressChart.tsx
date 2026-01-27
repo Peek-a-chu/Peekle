@@ -30,7 +30,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-lg border border-gray-100 p-3 min-w-[140px]">
+        <div className="bg-card rounded-lg shadow-lg border border-border p-3 min-w-[140px]">
             {/* 리그명 */}
             <div className="flex items-center gap-1.5 mb-2">
                 <span
@@ -42,17 +42,17 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 
             {/* 점수 - 한 줄로 */}
             <div className="flex items-baseline gap-1.5 mb-1.5">
-                <span className="text-[10px] text-gray-400">SCORE</span>
+                <span className="text-[10px] text-muted-foreground">SCORE</span>
                 <span className="text-base font-bold text-primary">{data.score.toLocaleString()}점</span>
             </div>
 
             {/* 구분선 */}
-            <div className="border-t border-gray-100 my-1.5" />
+            <div className="border-t border-border my-1.5" />
 
             {/* 기간 - 더 작게 */}
             <div className="flex items-center gap-1">
-                <span className="text-[9px] text-gray-400">PERIOD</span>
-                <span className="text-[10px] text-gray-500">
+                <span className="text-[9px] text-muted-foreground">PERIOD</span>
+                <span className="text-[10px] text-muted-foreground/80">
                     {formatDate(data.date)} ~ {formatDate(data.periodEnd)}
                 </span>
             </div>
@@ -152,7 +152,7 @@ const LeagueProgressChart = () => {
     const yAxisIcons = [...visibleLeagues].reverse();
 
     return (
-        <div className="bg-card border border-card-border rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6 transition-colors duration-300">
             {/* 헤더 */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
@@ -163,16 +163,16 @@ const LeagueProgressChart = () => {
                     <button
                         onClick={handlePrev}
                         disabled={!canGoPrev}
-                        className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-gray-100 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                        className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
                             }`}
                     >
-                        <ChevronLeft className="w-5 h-5 text-gray-400" />
+                        <ChevronLeft className="w-5 h-5 text-muted-foreground" />
                     </button>
-                    <span className="text-sm text-gray-500 text-center">{dateRangeText}</span>
+                    <span className="text-sm text-muted-foreground text-center font-medium">{dateRangeText}</span>
 
                     {/* 달력 아이콘 (Date Picker) */}
                     <div className="relative">
-                        <Calendar className="w-4 h-4 text-gray-400 hover:text-primary transition-colors cursor-pointer" />
+                        <Calendar className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-pointer" />
                         <input
                             type="date"
                             onChange={handleDateSelect}
@@ -184,10 +184,10 @@ const LeagueProgressChart = () => {
                     <button
                         onClick={handleNext}
                         disabled={!canGoNext}
-                        className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-gray-100 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                        className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
                             }`}
                     >
-                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </button>
                 </div>
             </div>
@@ -214,8 +214,8 @@ const LeagueProgressChart = () => {
                         <AreaChart data={visibleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorLeague" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#E24EA0" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#E24EA0" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <XAxis
@@ -223,7 +223,7 @@ const LeagueProgressChart = () => {
                                 tickFormatter={formatXAxis}
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fontSize: 12, fill: '#6B7280' }}
+                                tick={{ fontSize: 12, fill: 'currentColor', className: 'text-muted-foreground' }}
                             />
                             <YAxis
                                 domain={[yMin, yMax]}
@@ -237,12 +237,12 @@ const LeagueProgressChart = () => {
                             <Area
                                 type="monotone"
                                 dataKey="leagueIndex"
-                                stroke="#E24EA0"
+                                stroke="hsl(var(--primary))"
                                 strokeWidth={2}
                                 fillOpacity={1}
                                 fill="url(#colorLeague)"
                                 dot={false}
-                                activeDot={{ fill: '#E24EA0', strokeWidth: 0, r: 6 }}
+                                activeDot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 6 }}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -250,10 +250,10 @@ const LeagueProgressChart = () => {
             </div>
 
             {/* 범례 */}
-            <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
+            <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                     <div className="w-3 h-0.5 bg-primary rounded-full" />
-                    <span>주간 기준: 매주 수요일 6:00 ~ 다음 수요일 5:59</span>
+                    <span>*주간 기준: 매주 수요일 6:00 ~ 다음 수요일 5:59</span>
                 </div>
             </div>
         </div>

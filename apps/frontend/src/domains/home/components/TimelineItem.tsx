@@ -23,17 +23,17 @@ const TimelineItem = ({ data }: TimelineItemProps) => {
     const language = code?.includes('#include') ? 'cpp' : 'python';
 
     return (
-        <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+        <div className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
             <div className="flex items-center gap-4">
                 {/* 문제 번호 */}
-                <span className="text-sm text-gray-500 w-16">{problemId}</span>
+                <span className="text-sm text-muted-foreground w-16">{problemId}</span>
 
                 {/* 제목 */}
                 <span className="font-medium text-foreground">{title}</span>
 
                 {/* 티어 태그 (백준) */}
                 <span
-                    className="px-2 py-0.5 rounded-full text-xs font-medium border text-gray-500 dark:text-gray-400"
+                    className="px-2 py-0.5 rounded-full text-xs font-medium border text-muted-foreground"
                     style={{ borderColor: BOJ_TIER_COLORS[tier] }}
                 >
                     {BOJ_TIER_NAMES[tier]} {tierLevel}
@@ -43,7 +43,7 @@ const TimelineItem = ({ data }: TimelineItemProps) => {
                 <Link
                     href={link}
                     target="_blank"
-                    className="text-gray-400 hover:text-primary transition-colors"
+                    className="text-muted-foreground hover:text-primary transition-colors"
                 >
                     <ExternalLink className="w-4 h-4" />
                 </Link>
@@ -52,17 +52,17 @@ const TimelineItem = ({ data }: TimelineItemProps) => {
                 {code && (
                     <Dialog>
                         <DialogTrigger asChild>
-                            <button className="text-gray-400 hover:text-primary transition-colors">
+                            <button className="text-muted-foreground hover:text-primary transition-colors">
                                 <FileText className="w-4 h-4" />
                             </button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-3xl bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+                        <DialogContent className="max-w-3xl bg-card border-border">
                             <DialogHeader>
                                 <DialogTitle className="text-lg font-bold">
                                     {problemId} {title} - 제출 코드
                                 </DialogTitle>
                             </DialogHeader>
-                            <div className="mt-4 rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-800">
+                            <div className="mt-4 rounded-lg overflow-hidden border border-border">
                                 <Editor
                                     height="500px"
                                     defaultLanguage={language}
@@ -94,7 +94,7 @@ const TimelineItem = ({ data }: TimelineItemProps) => {
                     return (
                         <div
                             key={idx}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 dark:bg-zinc-800/80 text-primary text-xs font-medium max-w-[160px] shrink-0 border border-gray-100 dark:border-zinc-700"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-primary text-xs font-medium max-w-[160px] shrink-0 border border-border"
                             title={displayName}
                         >
                             {sourceType === 'study' ? (

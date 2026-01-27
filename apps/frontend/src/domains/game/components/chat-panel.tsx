@@ -10,15 +10,16 @@ import { cn } from '@/lib/utils'
 import type { ChatMessage, Participant } from '@/domains/game/mocks/mock-data'
 
 interface ChatPanelProps {
-  messages: ChatMessage[]
-  participants: Participant[]
-  currentUserId: string
-  isHost: boolean
-  onSendMessage: (content: string) => void
-  onMuteAll?: () => void
-  onTurnOffAllCams?: () => void
-  micState?: Record<string, boolean>
-  camState?: Record<string, boolean>
+  messages: ChatMessage[];
+  participants: Participant[];
+  currentUserId: string;
+  isHost: boolean;
+  onSendMessage: (content: string) => void;
+  onKickParticipant?: (participantId: string) => void;
+  onMuteAll?: () => void;
+  onTurnOffAllCams?: () => void;
+  micState?: Record<string, boolean>;
+  camState?: Record<string, boolean>;
 }
 
 export function ChatPanel({

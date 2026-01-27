@@ -53,7 +53,7 @@ export function RoomSettingsPanel({
           {/* 난이도 범위 */}
           <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-background p-3">
             <span className="mb-1 text-sm">🎯</span>
-            <span className="text-base font-bold text-foreground">
+            <span className="text-base font-bold text-primary">
               {tierMin} ~ {tierMax}
             </span>
             <span className="text-xs text-muted-foreground">난이도 범위</span>
@@ -63,7 +63,7 @@ export function RoomSettingsPanel({
         {/* 태그 */}
         <div className="flex gap-2">
           {tags.map((tag) => (
-            <Badge key={tag} variant="secondary">
+            <Badge key={tag} variant="secondary" className="dark:text-zinc-900">
               {tag}
             </Badge>
           ))}

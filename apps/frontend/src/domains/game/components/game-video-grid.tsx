@@ -75,7 +75,7 @@ export function GameVideoGrid({
                             key={participant.id}
                             className={cn(
                                 'relative flex h-24 w-32 shrink-0 flex-col items-center justify-center rounded-lg border transition-colors',
-                                isMe ? 'border-2 border-pink-500' : 'border', // 내 테두리는 핑크색 (팀 테두리보다 우선)
+                                isMe ? 'border-2 border-primary' : 'border', // 내 테두리는 액센트 컬러
                                 // 팀 배경색 및 테두리 (내 테두리가 우선이므로 배경색만 주로 적용됨, !isMe 제거)
                                 participant.team === 'RED' && !isMe && 'border-red-300',
                                 participant.team === 'BLUE' && !isMe && 'border-blue-300',
@@ -87,7 +87,7 @@ export function GameVideoGrid({
                             {/* 아바타 또는 카메라 화면 */}
                             <div className="relative h-12 w-12">
                                 <div className={cn(
-                                    "flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-purple-500 text-white text-lg font-medium shadow-sm transition-opacity",
+                                    "flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-white text-lg font-medium shadow-sm transition-opacity",
                                     isCamOff && "opacity-50 grayscale"
                                 )}>
                                     {participant.nickname.charAt(0)}

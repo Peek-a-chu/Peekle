@@ -25,6 +25,7 @@ export function GameControlBar({
     // Internal state removed to sync with global state
 
     // Handlers directly call props
+
     const handleMicToggle = () => {
         onMicToggle?.();
     };
@@ -42,44 +43,40 @@ export function GameControlBar({
         >
             {/* Center Controls - Media */}
             <div className="flex items-center gap-4">
-                <Button
-                    variant={isMuted ? 'destructive' : 'ghost'}
-                    size="icon"
-                    className={cn(
-                        'h-12 w-12 rounded-full',
-                        !isMuted && 'bg-[#EDF2F8] hover:bg-[#DFE7F0]',
-                    )}
+                <button
                     onClick={handleMicToggle}
+                    className={cn(
+                        'flex items-center justify-center h-12 w-12 rounded-full border transition-all duration-200 shadow-sm',
+                        isMuted
+                            ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
+                            : 'bg-secondary text-secondary-foreground border-border/50 hover:bg-secondary/80',
+                    )}
                     aria-label={isMuted ? '마이크 켜기' : '마이크 끄기'}
                 >
                     {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                </Button>
+                </button>
 
-                <Button
-                    variant={isVideoOff ? 'destructive' : 'ghost'}
-                    size="icon"
-                    className={cn(
-                        'h-12 w-12 rounded-full',
-                        !isVideoOff && 'bg-[#EDF2F8] hover:bg-[#DFE7F0]',
-                    )}
+                <button
                     onClick={handleVideoToggle}
+                    className={cn(
+                        'flex items-center justify-center h-12 w-12 rounded-full border transition-all duration-200 shadow-sm',
+                        isVideoOff
+                            ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
+                            : 'bg-secondary text-secondary-foreground border-border/50 hover:bg-secondary/80',
+                    )}
                     aria-label={isVideoOff ? '비디오 켜기' : '비디오 끄기'}
                 >
                     {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-                </Button>
+                </button>
 
-                {/* 화이트보드(Pencil) 제외됨 */}
-
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10 rounded-full bg-[#EDF2F8] hover:bg-[#DFE7F0]"
+                <button
                     onClick={onSettingsClick}
+                    className="flex items-center justify-center h-12 w-12 rounded-full bg-secondary text-secondary-foreground border border-border/50 hover:bg-secondary/80 transition-all duration-200 shadow-sm"
                     aria-label="설정"
                 >
                     <Settings className="h-5 w-5" />
-                </Button>
+                </button>
             </div>
-        </div>
+        </div >
     );
 }
