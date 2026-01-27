@@ -20,16 +20,19 @@ Next.js 15 frontend application for the Peekle project, built with TypeScript, T
 ## Installation
 
 1. Install pnpm globally (if not already installed):
+
 ```bash
 npm install -g pnpm@10.28.1
 ```
 
 2. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 3. Set up Git hooks:
+
 ```bash
 pnpm run prepare
 ```
@@ -37,6 +40,7 @@ pnpm run prepare
 ## Development
 
 Run the development server:
+
 ```bash
 pnpm dev
 ```
@@ -59,6 +63,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ### Pre-commit Hooks
 
 Git hooks are configured to run automatically before commits:
+
 - ESLint checks and auto-fixes
 - Prettier formatting
 - TypeScript type checking
@@ -66,6 +71,7 @@ Git hooks are configured to run automatically before commits:
 ### Linting Rules
 
 The project uses strict TypeScript and ESLint rules:
+
 - No unused variables
 - No explicit `any` types
 - Explicit function return types (warning)
@@ -95,11 +101,13 @@ apps/frontend/
 ## Adding Shadcn/UI Components
 
 To add new Shadcn/UI components:
+
 ```bash
 pnpm dlx shadcn-ui@latest add [component-name]
 ```
 
 Example:
+
 ```bash
 pnpm dlx shadcn-ui@latest add button
 pnpm dlx shadcn-ui@latest add card
@@ -119,6 +127,7 @@ The optimized production build will be created in the `.next` directory.
 ### UNC Path Issues (WSL on Windows)
 
 If you encounter UNC path errors when using pnpm, you can:
+
 1. Use npm instead: `npm install`
 2. Work from within WSL directly instead of accessing via Windows path
 3. Clone the repository to a Windows native path (e.g., `C:\projects\peekle`)
@@ -126,6 +135,7 @@ If you encounter UNC path errors when using pnpm, you can:
 ### Type Errors
 
 Run type checking to identify issues:
+
 ```bash
 pnpm type-check
 ```
@@ -133,6 +143,7 @@ pnpm type-check
 ### Linting Errors
 
 Fix linting errors automatically:
+
 ```bash
 pnpm lint:fix
 ```

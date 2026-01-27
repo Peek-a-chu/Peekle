@@ -18,11 +18,18 @@ fi
 # Frontend checks
 if [ -n "$FRONTEND_CHANGED" ]; then
   echo "\n📦 Frontend files changed, running checks..."
-  
-  echo "• Running tests..."
+
+  echo "• Running unit tests (vitest)..."
   pnpm --filter frontend test --run
   if [ $? -ne 0 ]; then
-    echo "❌ Frontend tests failed"
+    echo "❌ Frontend unit tests failed"
+    exit 1
+  fi
+
+  echo "• Running E2E tests (playwright)..."
+  pnpm --filter frontend test:e2e
+  if [ $? -ne 0 ]; then
+    echo "❌ Frontend E2E tests failed"
     exit 1
   fi
 
@@ -32,7 +39,7 @@ if [ -n "$FRONTEND_CHANGED" ]; then
     echo "❌ Frontend build failed"
     exit 1
   fi
-  
+
   echo "✅ Frontend checks passed"
 fi
 

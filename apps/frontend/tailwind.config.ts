@@ -1,4 +1,4 @@
-import type { Config } from 'tailwindcss'
+import type { Config } from 'tailwindcss';
 
 const config: Config = {
   darkMode: ['class'],
@@ -22,8 +22,8 @@ const config: Config = {
       },
       colors: {
         border: '#F7E8F0', // 전역 테두리
-        input: '#F7E8F0',  // Input 컴포넌트 테두리
-        ring: '#E24EA0',   // 포커스 링
+        input: '#F7E8F0', // Input 컴포넌트 테두리
+        ring: '#E24EA0', // 포커스 링
 
         // 사이트 배경 및 글자
         background: '#F7F8FC', // 사이트 전체 배경
@@ -45,7 +45,7 @@ const config: Config = {
           active: '#F6BAD2',
         },
 
-        // 카드 1 
+        // 카드 1
         card: {
           DEFAULT: '#FFFFFF',
           foreground: '#111827',
@@ -68,7 +68,7 @@ const config: Config = {
           light: {
             DEFAULT: '#DCFCE7',
             foreground: '#6B7280',
-          }
+          },
         },
 
         // --- 경고 (Warning) ---
@@ -79,7 +79,7 @@ const config: Config = {
           light: {
             DEFAULT: '#FEF3C7',
             foreground: '#92400E',
-          }
+          },
         },
 
         // --- 위험 (Destructive) ---
@@ -90,7 +90,7 @@ const config: Config = {
           light: {
             DEFAULT: '#FEE2E2',
             foreground: '#991B1B',
-          }
+          },
         },
       },
 
@@ -102,5 +102,5 @@ const config: Config = {
     },
   },
   plugins: [],
-}
-export default config
+};
+export default config;
