@@ -20,11 +20,13 @@ services:
     container_name: peekle-redis-commander
     env_file: .env
     environment:
-      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD}
+      - REDIS_HOSTS=peekle-redis:redis:6379:0:${REDIS_PASSWORD}
+      - REDIS_HOST=redis
     ports:
       - "8081:8081"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
