@@ -48,10 +48,13 @@ public class User extends BaseTimeEntity {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
-        // this.bojId = null; // 기본값 null
-        // this.league = LeagueTier.BRONZE; // Field init + Builder.Default
-        // this.leaguePoint = 0;
+        this.league = LeagueTier.BRONZE;
+        this.leaguePoint = 0;
         this.isDeleted = false;
+        this.extensionToken = java.util.UUID.randomUUID().toString();
+        this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
+        this.streakCurrent = 0;
+        this.streakMax = 0;
     }
 
 
