@@ -102,11 +102,11 @@ deploy-production:
         # Check if project directory exists
         if [ ! -d ~/peekle ]; then
           echo "Project directory not found. Cloning..."
-          git clone $REPO_URL ~/peekle
+          git clone \$REPO_URL ~/peekle
         else
           echo "Project directory exists. Updating remote URL..."
           cd ~/peekle
-          git remote set-url origin $REPO_URL
+          git remote set-url origin \$REPO_URL
         fi
 
         # Navigate to project directory
