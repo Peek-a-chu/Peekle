@@ -79,6 +79,9 @@ dependencies {
 
     // Jsoup
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    // Redisson
+    implementation 'org.redisson:redisson-spring-boot-starter:3.31.0'
 }
 
 tasks.named('test') {
