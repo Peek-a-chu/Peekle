@@ -134,47 +134,45 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
 
   if (isLoading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-4xl mx-auto min-h-[400px] flex flex-col justify-center items-center">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-500 font-medium">확장 프로그램 상태 확인 중...</p>
+      <div className="bg-card border border-border rounded-xl p-8 max-w-4xl mx-auto min-h-[400px] flex flex-col justify-center items-center">
+        <div className="w-10 h-10 border-4 border-muted border-t-primary rounded-full animate-spin mb-4"></div>
+        <p className="text-muted-foreground font-medium">확장 프로그램 상태 확인 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-card-border rounded-2xl bg-white overflow-hidden p-5">
+    <div className="border border-border rounded-2xl bg-card overflow-hidden p-5">
       {/* Header */}
       <div className="mb-6">
         <h3 className="font-bold text-foreground flex items-center gap-2">
           <Puzzle className="w-5 h-5 text-primary" /> 백준 확장 프로그램
         </h3>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           문제 제출 기능을 사용하려면 확장 프로그램을 설치하고 연동해주세요.
         </p>
       </div>
 
       {/* Status Banner */}
       <div
-        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${
-          status === 'LINKED'
-            ? 'bg-green-50 border border-green-100'
-            : status === 'MISMATCH'
-              ? 'bg-orange-50 border border-orange-100'
-              : status === 'INSTALLED'
-                ? 'bg-blue-50 border border-blue-100'
-                : 'bg-gray-100 border border-gray-200'
-        }`}
+        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${status === 'LINKED'
+          ? 'bg-green-500/10 border border-green-500/20'
+          : status === 'MISMATCH'
+            ? 'bg-orange-500/10 border border-orange-500/20'
+            : status === 'INSTALLED'
+              ? 'bg-blue-500/10 border border-blue-500/20'
+              : 'bg-muted border border-border'
+          }`}
       >
         <div
-          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-            status === 'LINKED'
-              ? 'text-green-600'
-              : status === 'MISMATCH'
-                ? 'text-orange-600'
-                : status === 'INSTALLED'
-                  ? 'text-blue-600'
-                  : 'text-gray-500'
-          }`}
+          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${status === 'LINKED'
+            ? 'text-green-600 dark:text-green-400'
+            : status === 'MISMATCH'
+              ? 'text-orange-600 dark:text-orange-400'
+              : status === 'INSTALLED'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-muted-foreground'
+            }`}
         >
           {status === 'LINKED'
             ? '✅'
@@ -186,15 +184,14 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
         </div>
         <div>
           <h3
-            className={`font-bold text-sm ${
-              status === 'LINKED'
-                ? 'text-green-900'
-                : status === 'MISMATCH'
-                  ? 'text-orange-900'
-                  : status === 'INSTALLED'
-                    ? 'text-blue-900'
-                    : 'text-gray-900'
-            }`}
+            className={`font-bold text-sm ${status === 'LINKED'
+              ? 'text-green-700 dark:text-green-300'
+              : status === 'MISMATCH'
+                ? 'text-orange-700 dark:text-orange-300'
+                : status === 'INSTALLED'
+                  ? 'text-blue-700 dark:text-blue-300'
+                  : 'text-foreground'
+              }`}
           >
             {status === 'LINKED'
               ? '연동 완료'
@@ -205,15 +202,14 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
                   : '확장 프로그램이 설치되지 않았습니다'}
           </h3>
           <p
-            className={`text-sm mt-1 ${
-              status === 'LINKED'
-                ? 'text-green-700'
-                : status === 'MISMATCH'
-                  ? 'text-orange-700'
-                  : status === 'INSTALLED'
-                    ? 'text-blue-700'
-                    : 'text-gray-600'
-            }`}
+            className={`text-sm mt-1 ${status === 'LINKED'
+              ? 'text-green-600/80 dark:text-green-400/80'
+              : status === 'MISMATCH'
+                ? 'text-orange-600/80 dark:text-orange-400/80'
+                : status === 'INSTALLED'
+                  ? 'text-blue-600/80 dark:text-blue-400/80'
+                  : 'text-muted-foreground'
+              }`}
           >
             {status === 'LINKED'
               ? '모든 기능이 정상 동작 중입니다.'
@@ -233,42 +229,40 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
             {/* Vertical Line */}
             {idx !== steps.length - 1 && (
               <div
-                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${
-                  s.isDone ? 'bg-green-500' : 'bg-gray-200'
-                }`}
+                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${s.isDone ? 'bg-green-500' : 'bg-border'
+                  }`}
               ></div>
             )}
 
             {/* Step Circle */}
             <div
-              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
-                s.isDone
-                  ? 'bg-green-500 text-white'
-                  : s.isActive
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-400'
-              }`}
+              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${s.isDone
+                ? 'bg-green-500 text-white'
+                : s.isActive
+                  ? 'bg-foreground text-background'
+                  : 'bg-muted text-muted-foreground'
+                }`}
             >
               {s.isDone ? '✓' : s.step}
             </div>
 
             {/* Content */}
             <div className={`${s.isActive || s.isDone ? 'opacity-100' : 'opacity-40'} pt-1`}>
-              <h4 className="font-bold text-gray-900 text-sm">{s.title}</h4>
-              <p className="text-sm text-gray-500 mt-0.5">{s.desc}</p>
+              <h4 className="font-bold text-foreground text-sm">{s.title}</h4>
+              <p className="text-sm text-muted-foreground mt-0.5">{s.desc}</p>
               {/* Debug Info in the stepper for Step 2 if linked */}
               {s.step === 2 && extensionToken && (
                 <div className="mt-3">
-                  <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-wider">
+                  <p className="text-xs font-bold text-muted-foreground uppercase mb-1 tracking-wider">
                     Verification Token
                   </p>
-                  <div className="mt-2 text-xs text-gray-500 font-mono bg-gray-50 p-2 rounded flex items-center justify-between gap-2 w-[280px]">
+                  <div className="mt-2 text-xs text-muted-foreground font-mono bg-muted/50 p-2 rounded flex items-center justify-between gap-2 w-[280px]">
                     <span className="truncate">
                       {showToken ? extensionToken : '••••••••••••••••••••••••'}
                     </span>
                     <button
                       onClick={() => setShowToken(!showToken)}
-                      className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 transition-colors"
+                      className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
                       title={showToken ? '토큰 숨기기' : '토큰 보기'}
                     >
                       {showToken ? (
@@ -347,7 +341,7 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
           <button
             onClick={() => void handleLinkAccount(true)}
             disabled={isSubmitting}
-            className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400 flex items-center gap-2"
+            className="px-5 py-2.5 bg-background border border-border text-foreground rounded-lg text-sm font-medium hover:bg-muted/50 disabled:bg-muted disabled:text-muted-foreground flex items-center gap-2"
           >
             {isSubmitting ? (
               <>
@@ -363,19 +357,19 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
 
       {/* Linked Features List */}
       {status === 'LINKED' && (
-        <div className="mt-10 border-t border-gray-100 pt-8">
-          <h4 className="font-bold text-sm text-gray-900 mb-4">사용 가능한 기능</h4>
+        <div className="mt-10 border-t border-border pt-8">
+          <h4 className="font-bold text-sm text-foreground mb-4">사용 가능한 기능</h4>
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-green-500">✓</span> 스터디 방에서 문제 풀기
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-green-500">✓</span> 게임 방에서 실시간 대전
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-green-500">✓</span> 자동 코드 제출
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-green-500">✓</span> 실시간 결과 확인
             </div>
           </div>
