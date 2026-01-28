@@ -32,6 +32,7 @@ erDiagram
         bigint id PK
         string nickname
         string profile_img
+        string profile_img_thumb
         string boj_id "백준 ID (확장프로그램 연동용)"
         string tier "CURRENT_TIER (Enum)"
         int league_point "이번 주 획득 점수"
@@ -47,13 +48,6 @@ erDiagram
         string tier "티어 등급"
         int season_week "2024-W10 (시즌 주차)"
         datetime created_at
-    }
-
-    LEAGUE_GROUPS {
-        BIGINT id PK
-        VARCHAR(20) tier %% 티어 등급
-        INT season_week %% YYYYWW (ex: 202410)
-        DATETIME created_at
     }
     
     %% 스트릭 용 테이블
@@ -199,6 +193,7 @@ erDiagram
 | `result` | VARCHAR(20) | | 승급(PROMOTED)/강등(DEMOTED) 여부 |
 | `season_week` | INT | | 시즌 주차 (YYYYWW) |
 | `closed_at` | DATETIME | | 시즌 종료일 |
+| `is_viewed` | BOOLEAN | Default FALSE | 결과 확인 여부 (모달 노출용) |
 
 **`daily_solved_counts`** (스트릭)
 | 컬럼 | 타입 | 설명 |
