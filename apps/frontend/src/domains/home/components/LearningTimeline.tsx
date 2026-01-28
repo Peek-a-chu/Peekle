@@ -7,13 +7,14 @@ import { useTimeline } from '../hooks/useDashboardData';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
-  selectedDate: string | null;
-  showHistoryLink?: boolean;
+    selectedDate: string | null;
+    showHistoryLink?: boolean;
+    nickname?: string;
 }
 
-const LearningTimeline = ({ selectedDate, showHistoryLink = false }: LearningTimelineProps) => {
-  const { data } = useTimeline(selectedDate || '');
-  const [expanded, setExpanded] = useState(false);
+const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: LearningTimelineProps) => {
+    const { data } = useTimeline(selectedDate || '');
+    const [expanded, setExpanded] = useState(false);
 
   // 기본 5개, 확장 시 전체
   const displayedItems = expanded ? data : data.slice(0, 5);
@@ -37,16 +38,13 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false }: LearningTim
           <p className="text-xs text-muted-foreground">총 {data.length}개 문제</p>
         </div>
 
-        {showHistoryLink && (
-          <Link
-            href="/profile/me/history"
-            className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1"
-          >
-            <span className="text-xs font-medium">풀이 내역 조회</span>
-            <ChevronRight className="w-5 h-5" />
-          </Link>
-        )}
-      </div>
+                {showHistoryLink && nickname && (
+                    <Link href={`/profile/${nickname}/history`} className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1">
+                        <span className="text-xs font-medium">풀이 내역 조회</span>
+                        <ChevronRight className="w-5 h-5" />
+                    </Link>
+                )}
+            </div>
 
       {/* 타임라인 목록 */}
       <div className="divide-y divide-border">

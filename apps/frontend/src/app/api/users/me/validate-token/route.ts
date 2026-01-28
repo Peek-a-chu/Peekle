@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
+import { serverFetch } from '@/lib/server-api';
 
 interface ValidateResponse {
-  success?: boolean;
-  data?: {
-    valid?: boolean;
-  };
-  error?: string;
+  valid?: boolean;
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -16,23 +13,23 @@ export async function GET(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Token (header) required' }, { status: 400 });
     }
 
-    const backendUrl = `${process.env.BACKEND_API_URL || 'http://localhost:8080'}/api/users/me/validate-token`;
+    const path = `/api/users/me/validate-token`;
 
-    const res = await fetch(backendUrl, {
+    // Pass custom headers (X-Peekle-Token) along with automatic cookies
+    const result = await serverFetch<ValidateResponse>(path, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Peekle-Token': token,
-      },
+        'X-Peekle-Token': token
+      }
     });
 
-    if (!res.ok) {
-      console.error('Failed to validate token from backend:', res.status);
-      return NextResponse.json({ error: 'Failed' }, { status: res.status });
+    if (!result.success) {
+      console.error('Failed to validate token from backend:', result.error);
+      return NextResponse.json({ error: 'Failed' }, { status: result.status });
     }
 
-    const data = (await res.json()) as ValidateResponse;
-    return NextResponse.json(data);
+    return NextResponse.json({ success: true, data: result.data });
+
   } catch (error) {
     console.error('Error in proxy route:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

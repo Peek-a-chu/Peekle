@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
+import { serverFetch } from '@/lib/server-api';
 
 interface TokenRequestBody {
   regenerate?: boolean;
 }
 
 interface TokenResponse {
-  success?: boolean;
-  data?: {
-    extensionToken?: string;
-  };
-  error?: string;
+  extensionToken?: string;
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -17,22 +14,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = (await request.json().catch(() => ({}))) as TokenRequestBody;
     const regenerate = body.regenerate || false;
 
-    const backendUrl = `${process.env.BACKEND_API_URL || 'http://localhost:8080'}/api/users/me/extension-token?regenerate=${regenerate}`;
+    const path = `/api/users/me/extension-token?regenerate=${regenerate}`;
 
-    const res = await fetch(backendUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // serverFetch now handles cookies automatically
+    const result = await serverFetch<{ extensionToken: string }>(path, {
+      method: 'POST'
     });
 
-    if (!res.ok) {
-      console.error('Failed to fetch token from backend:', res.status, res.statusText);
-      return NextResponse.json({ error: 'Failed to generate token' }, { status: res.status });
+    if (!result.success) {
+      console.error('Failed to fetch token from backend:', result.error);
+      return NextResponse.json({ error: 'Failed' }, { status: result.status });
     }
 
-    const data = (await res.json()) as TokenResponse;
-    return NextResponse.json(data);
+    // Wrap the data in the expected structure for the frontend
+    return NextResponse.json({ success: true, data: result.data });
+
   } catch (error) {
     console.error('Error in proxy route:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
