@@ -24,6 +24,7 @@ frontend-build:
   only:
     refs:
       - master
+      - merge_requests
   before_script:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
@@ -52,6 +53,7 @@ spring-backend-build:
   only:
     refs:
       - master
+      - merge_requests
   before_script:
     - cd apps/backend
     - chmod +x gradlew
