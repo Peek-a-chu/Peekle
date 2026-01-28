@@ -66,7 +66,7 @@ export const mockGameResult: GameResultData = {
         maxExp: 2000,
         gainedExp: 550
     },
-    mode: 'TIME_ATTACK',
-    teamType: 'TEAM',
+    mode: 'SPEED_RACE',
+    teamType: 'INDIVIDUAL',
     playTime: 500
 };
