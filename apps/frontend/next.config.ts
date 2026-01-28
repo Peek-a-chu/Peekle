@@ -3,7 +3,8 @@ import path from 'path';
 import fs from 'fs';
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  output: process.platform === 'win32' ? undefined : 'standalone',
+  outputFileTracingRoot: process.platform === 'win32' ? undefined : path.join(__dirname, '../../'),
   images: {
     remotePatterns: [
       {
@@ -51,3 +52,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+
