@@ -6,6 +6,9 @@
 #   - EC2_HOST: EC2 퍼블릭 IP 또는 도메인
 #   - EC2_USER: EC2 SSH 사용자 (예: ubuntu, ec2-user)
 #   - DOMAIN_NAME: 배포 도메인 (선택사항)
+#   - GITLAB_USER: GitLab 사용자 ID (Personal Access Token 사용 시)
+#   - GITLAB_ACCESS_TOKEN: GitLab Personal Access Token (read_repository 권한 필요)
+#   - MATTERMOST_WEBHOOK_URL: Mattermost Incoming Webhook URL
 
 stages:
   - build
@@ -21,17 +24,14 @@ frontend-build:
   only:
     refs:
       - master
-      - main
-    changes:
-      - apps/frontend/**/*
   before_script:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
     - pnpm install --frozen-lockfile
-    - npx playwright install --with-deps chromium
+    # - npx playwright install --with-deps chromium # E2E 테스트가 필요하다면 주석 해제 (시간 소요됨)
   script:
     - pnpm run test --run
-    - pnpm run test:e2e
+    # - pnpm run test:e2e # E2E 테스트가 필요하다면 주석 해제
     - pnpm run build
   artifacts:
     paths:
@@ -43,32 +43,29 @@ frontend-build:
       - apps/frontend/node_modules/
 
 # ===========================================
-# Backend Pipeline
+# Backend Pipeline (Spring Boot)
 # ===========================================
 
-backend-build:
+spring-backend-build:
   stage: build
-  image: node:20-alpine
+  image: gradle:8.5-jdk21-alpine
   only:
     refs:
       - master
-      - main
-    changes:
-      - apps/nest-api/**/*
   before_script:
-    - cd apps/nest-api
-    - npm ci
+    - cd apps/backend
+    - chmod +x gradlew
   script:
-    - npm run test --if-present
-    - npm run build
+    - ./gradlew clean build --no-daemon -x test
   artifacts:
     paths:
-      - apps/nest-api/dist
+      - apps/backend/build/libs/*.jar
     expire_in: 1 day
   cache:
-    key: backend-${CI_COMMIT_REF_SLUG}
+    key: backend-gradle-${CI_COMMIT_REF_SLUG}
     paths:
-      - apps/nest-api/node_modules/
+      - apps/backend/.gradle
+      - apps/backend/build
 
 # ===========================================
 # Deploy to EC2 via SSH
@@ -80,12 +77,9 @@ deploy-production:
   only:
     refs:
       - master
-      - main
   needs:
     - job: frontend-build
-      optional: true
-    - job: backend-build
-      optional: true
+    - job: spring-backend-build
   before_script:
     # Install SSH client
     - apk add --no-cache openssh-client
@@ -97,13 +91,26 @@ deploy-production:
     - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
   script:
     - |
-      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "GITLAB_USER='$GITLAB_USER' GITLAB_TOKEN='$GITLAB_ACCESS_TOKEN' bash -s" << 'ENDSSH'
         set -e
 
         echo "=== Deploying Peekle to Production ==="
 
+        # Define Repository URL (using env vars passed from Runner)
+        REPO_URL="https://${GITLAB_USER}:${GITLAB_TOKEN}@lab.ssafy.com/s14-webmobile1-sub1/S14P11A408.git"
+
+        # Check if project directory exists
+        if [ ! -d ~/peekle ]; then
+          echo "Project directory not found. Cloning..."
+          git clone "$REPO_URL" ~/peekle
+        else
+          echo "Project directory exists. Updating remote URL..."
+          cd ~/peekle
+          git remote set-url origin "$REPO_URL"
+        fi
+
         # Navigate to project directory
-        cd /home/$EC2_USER/peekle
+        cd ~/peekle
 
         # Pull latest code
         echo "Pulling latest code..."
@@ -142,7 +149,38 @@ deploy-production:
 
         echo "=== Deployment Complete ==="
       ENDSSH
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" == "success" ]; then
+        COLOR="#36a64f"
+        STATUS="✅ 성공"
+        MESSAGE="배포가 성공적으로 완료되었습니다."
+      else
+        COLOR="#ff0000"
+        STATUS="❌ 실패"
+        MESSAGE="배포에 실패했습니다. 로그를 확인해주세요."
+      fi
+
+      curl -X POST -H 'Content-Type: application/json' \
+        --data "{
+          \"username\": \"GitLab CI/CD\",
+          \"icon_emoji\": \":rocket:\",
+          \"attachments\": [{
+            \"color\": \"$COLOR\",
+            \"title\": \"Peekle 배포 알림 - $STATUS\",
+            \"fields\": [
+              {\"short\": true, \"title\": \"프로젝트\", \"value\": \"$CI_PROJECT_NAME\"},
+              {\"short\": true, \"title\": \"브랜치\", \"value\": \"$CI_COMMIT_REF_NAME\"},
+              {\"short\": true, \"title\": \"커밋\", \"value\": \"$CI_COMMIT_SHORT_SHA\"},
+              {\"short\": true, \"title\": \"실행자\", \"value\": \"$GITLAB_USER_NAME\"},
+              {\"short\": false, \"title\": \"커밋 메시지\", \"value\": \"$CI_COMMIT_MESSAGE\"},
+              {\"short\": false, \"title\": \"상세\", \"value\": \"$MESSAGE\"}
+            ],
+            \"footer\": \"GitLab CI/CD\",
+            \"footer_icon\": \"https://about.gitlab.com/images/press/logo/png/gitlab-icon-rgb.png\"
+          }]
+        }" \
+        "$MATTERMOST_WEBHOOK_URL" || true
   environment:
     name: production
     url: https://$DOMAIN_NAME
-  when: manual

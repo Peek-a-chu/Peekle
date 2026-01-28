@@ -51,6 +51,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - SERVER_PORT=8080
+      - REDIS_HOST=redis
+      - SPRING_DATA_REDIS_HOST=redis
     volumes:
       - h2-data:/app/data
     expose:

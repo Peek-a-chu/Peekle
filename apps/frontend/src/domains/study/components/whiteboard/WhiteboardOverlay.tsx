@@ -8,7 +8,7 @@ import {
   WhiteboardCanvasRef,
 } from '@/domains/study/components/whiteboard/WhiteboardCanvas';
 import { useWhiteboardSocket, WhiteboardMessage } from '@/domains/study/hooks/useWhiteboardSocket';
-import { Pencil, Square, Type, Eraser, X } from 'lucide-react';
+import { Pencil, Square, Type, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WhiteboardPanelProps {
@@ -18,16 +18,18 @@ interface WhiteboardPanelProps {
 export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   const { id: roomId } = useParams();
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
-  const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const currentUserId = useRoomStore((state) => state.currentUserId);
   const [activeTool, setActiveTool] = React.useState<'pen' | 'shape' | 'text' | 'eraser'>('pen');
   const canvasRef = useRef<WhiteboardCanvasRef>(null);
 
   const handleMessage = useCallback((msg: WhiteboardMessage) => {
+    console.log(`[WhiteboardOverlay] Received message:`, msg.action, msg.objectId || '');
     switch (msg.action) {
       case 'ADDED':
-        canvasRef.current?.add(msg.data);
+        // Pass senderId for color differentiation
+        canvasRef.current?.add(msg.data, msg.senderId?.toString());
         break;
       case 'MODIFIED':
         canvasRef.current?.modify(msg.data);
@@ -39,11 +41,15 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
         canvasRef.current?.clear();
         break;
       case 'SYNC':
+        console.log(
+          `[WhiteboardOverlay] SYNC received: ${msg.data?.history?.length || 0} objects, isActive: ${msg.data?.isActive}`,
+        );
         if (msg.data?.history) {
           canvasRef.current?.clear();
           msg.data.history.forEach((action: any) => {
             if (action.action === 'ADDED' && action.data) {
-              canvasRef.current?.add(action.data);
+              // Pass senderId from history for color differentiation
+              canvasRef.current?.add(action.data, action.senderId?.toString());
             }
           });
         }
@@ -55,19 +61,30 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
     enabled: isWhiteboardOverlayOpen,
   });
 
-  const handleObjectAdded = (obj: any) => {
-    const data = obj.toObject ? obj.toObject(['id']) : obj;
-    sendMessage({ action: 'ADDED', objectId: obj.id, data });
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleObjectAdded = useCallback(
+    (obj: any) => {
+      const data = obj.toObject ? obj.toObject(['id']) : obj;
+      sendMessage({ action: 'ADDED', objectId: obj.id, data });
+    },
+    [sendMessage],
+  );
 
-  const handleObjectModified = (obj: any) => {
-    const data = obj.toObject ? obj.toObject(['id']) : obj;
-    sendMessage({ action: 'MODIFIED', objectId: obj.id, data });
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleObjectModified = useCallback(
+    (obj: any) => {
+      const data = obj.toObject ? obj.toObject(['id']) : obj;
+      sendMessage({ action: 'MODIFIED', objectId: obj.id, data });
+    },
+    [sendMessage],
+  );
 
-  const handleObjectRemoved = (objectId: string) => {
-    sendMessage({ action: 'REMOVED', objectId });
-  };
+  const handleObjectRemoved = useCallback(
+    (objectId: string) => {
+      sendMessage({ action: 'REMOVED', objectId });
+    },
+    [sendMessage],
+  );
 
   if (!isWhiteboardOverlayOpen) {
     return null;
@@ -130,7 +147,9 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
         {selectedProblemId && selectedProblemTitle && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-gray-200 shadow-sm">
             <span className="text-sm font-medium text-blue-600">#{selectedProblemId}</span>
-            <span className="text-sm text-gray-700 truncate max-w-[200px]">{selectedProblemTitle}</span>
+            <span className="text-sm text-gray-700 truncate max-w-[200px]">
+              {selectedProblemTitle}
+            </span>
           </div>
         )}
       </div>
@@ -143,6 +162,7 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
             width={800}
             height={600}
             activeTool={activeTool}
+            currentUserId={currentUserId?.toString()}
             onObjectAdded={handleObjectAdded}
             onObjectModified={handleObjectModified}
             onObjectRemoved={handleObjectRemoved}

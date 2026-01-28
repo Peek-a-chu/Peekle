@@ -9,7 +9,18 @@ import {
 } from '@/domains/study/components/whiteboard/WhiteboardCanvas';
 import { useWhiteboardSocket, WhiteboardMessage } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
-import { Pencil, Square, Type, Eraser, Trash2, ArrowLeft, Users, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import {
+  Pencil,
+  Square,
+  Type,
+  Eraser,
+  Trash2,
+  ArrowLeft,
+  Users,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function WhiteboardTestContent() {
@@ -19,6 +30,8 @@ function WhiteboardTestContent() {
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
   const [messageLog, setMessageLog] = useState<string[]>([]);
   const canvasRef = useRef<WhiteboardCanvasRef>(null);
+  // Mock user ID for testing - in production, this would come from auth
+  const currentUserId = '1';
 
   const addLog = (msg: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -26,11 +39,12 @@ function WhiteboardTestContent() {
   };
 
   const handleMessage = useCallback((msg: WhiteboardMessage) => {
-    addLog(`Received: ${msg.action} ${msg.objectId || ''}`);
+    addLog(`Received: ${msg.action} ${msg.objectId || ''} from user ${msg.senderId || 'unknown'}`);
 
     switch (msg.action) {
       case 'ADDED':
-        canvasRef.current?.add(msg.data);
+        // Pass senderId for color differentiation
+        canvasRef.current?.add(msg.data, msg.senderId?.toString());
         break;
       case 'MODIFIED':
         canvasRef.current?.modify(msg.data);
@@ -52,16 +66,20 @@ function WhiteboardTestContent() {
         setConnectionStatus('Closed');
         break;
       case 'SYNC':
-        addLog(`Sync received: ${msg.data?.history?.length || 0} items, isActive: ${msg.data?.isActive}`);
+        addLog(
+          `Sync received: ${msg.data?.history?.length || 0} items, isActive: ${msg.data?.isActive}`,
+        );
         if (msg.data?.isActive) {
           setIsConnected(true);
           setConnectionStatus('Active');
         }
         if (msg.data?.history) {
           canvasRef.current?.clear();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           msg.data.history.forEach((action: any) => {
             if (action.action === 'ADDED' && action.data) {
-              canvasRef.current?.add(action.data);
+              // Pass senderId from history for color differentiation
+              canvasRef.current?.add(action.data, action.senderId?.toString());
             }
           });
         }
@@ -69,11 +87,11 @@ function WhiteboardTestContent() {
     }
   }, []);
 
-  const { sendMessage, isConnected: socketConnected, requestSync } = useWhiteboardSocket(
-    roomId as string,
-    handleMessage,
-    { enabled: true }
-  );
+  const {
+    sendMessage,
+    isConnected: socketConnected,
+    requestSync,
+  } = useWhiteboardSocket(roomId as string, handleMessage, { enabled: true });
 
   const handleRequestSync = () => {
     addLog('Requesting SYNC...');
@@ -130,7 +148,7 @@ function WhiteboardTestContent() {
       <div className="flex items-center justify-between border-b bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-4">
           <Link
-            href={`/study/${roomId}`}
+            href={`/study/${String(roomId)}`}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -138,15 +156,17 @@ function WhiteboardTestContent() {
           </Link>
           <div className="h-6 w-px bg-gray-300" />
           <h1 className="text-lg font-semibold text-gray-900">Whiteboard Test Page</h1>
-          <span className="text-sm text-gray-500">Room #{roomId}</span>
+          <span className="text-sm text-gray-500">Room #{String(roomId)}</span>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Connection Status */}
-          <div className={cn(
-            'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium',
-            socketConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          )}>
+          <div
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium',
+              socketConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',
+            )}
+          >
             {socketConnected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
             {connectionStatus}
           </div>
@@ -159,7 +179,7 @@ function WhiteboardTestContent() {
               'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
               !socketConnected
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-purple-500 text-white hover:bg-purple-600'
+                : 'bg-purple-500 text-white hover:bg-purple-600',
             )}
           >
             <RefreshCw className="h-4 w-4" />
@@ -172,7 +192,7 @@ function WhiteboardTestContent() {
               'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
               isConnected
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-blue-500 text-white hover:bg-blue-600',
             )}
           >
             Start Session
@@ -184,7 +204,7 @@ function WhiteboardTestContent() {
               'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
               !isConnected
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-red-500 text-white hover:bg-red-600',
             )}
           >
             Close Session
@@ -203,7 +223,7 @@ function WhiteboardTestContent() {
                   onClick={() => setActiveTool('pen')}
                   className={cn(
                     'rounded p-2 transition-colors hover:bg-gray-100',
-                    activeTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                    activeTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                   )}
                   title="Pen Tool"
                 >
@@ -213,7 +233,7 @@ function WhiteboardTestContent() {
                   onClick={() => setActiveTool('shape')}
                   className={cn(
                     'rounded p-2 transition-colors hover:bg-gray-100',
-                    activeTool === 'shape' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                    activeTool === 'shape' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                   )}
                   title="Shape Tool"
                 >
@@ -223,7 +243,7 @@ function WhiteboardTestContent() {
                   onClick={() => setActiveTool('text')}
                   className={cn(
                     'rounded p-2 transition-colors hover:bg-gray-100',
-                    activeTool === 'text' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                    activeTool === 'text' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                   )}
                   title="Text Tool"
                 >
@@ -233,7 +253,7 @@ function WhiteboardTestContent() {
                   onClick={() => setActiveTool('eraser')}
                   className={cn(
                     'rounded p-2 transition-colors hover:bg-gray-100',
-                    activeTool === 'eraser' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                    activeTool === 'eraser' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
                   )}
                   title="Eraser Tool"
                 >
@@ -255,7 +275,9 @@ function WhiteboardTestContent() {
 
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Users className="h-4 w-4" />
-              <span>Active Tool: <strong className="text-gray-700 capitalize">{activeTool}</strong></span>
+              <span>
+                Active Tool: <strong className="text-gray-700 capitalize">{activeTool}</strong>
+              </span>
             </div>
           </div>
 
@@ -268,6 +290,7 @@ function WhiteboardTestContent() {
                   width={1000}
                   height={700}
                   activeTool={activeTool}
+                  currentUserId={currentUserId}
                   onObjectAdded={handleObjectAdded}
                   onObjectModified={handleObjectModified}
                   onObjectRemoved={handleObjectRemoved}

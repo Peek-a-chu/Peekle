@@ -21,13 +21,13 @@ export class SocketService {
   private rooms = new Map<string, Set<string>>();
 
   // Whiteboard state storage per room
-  // RoomId -> { isActive: boolean, ownerId: string, objects: Map<objectId, objectData>, history: Array }
+  // RoomId -> { isActive: boolean, ownerId: string, objects: Map<objectId, {data, senderId}>, history: Array }
   private whiteboardState = new Map<string, {
     isActive: boolean;
     ownerId: string | null;
     ownerName: string | null;
-    objects: Map<string, any>;
-    history: Array<{ action: string; objectId?: string; data?: any }>;
+    objects: Map<string, { data: any; senderId: string }>;
+    history: Array<{ action: string; objectId?: string; data?: any; senderId?: string }>;
   }>();
 
   private getOrCreateWhiteboardState(roomId: string) {
@@ -345,11 +345,18 @@ export class SocketService {
 
       // E. Whiteboard
       else if (destination === "/pub/studies/whiteboard/message") {
-          // { action, objectId, data }
+          // { action, objectId, data, roomId }
           const client = this.clients.get(conn.id);
-          const roomId = client?.roomId;
+          // Prefer roomId from message payload for reliable cross-page sharing
+          const roomId = data.roomId ? String(data.roomId) : client?.roomId;
           const userId = client?.userId;
           const senderName = "User" + (userId || "?");
+
+          // Auto-join room if roomId is provided in message but client not in room
+          if (roomId && client && client.roomId !== roomId) {
+              this.joinRoom(conn.id, roomId, userId || "0");
+              console.log(`[Whiteboard] Auto-joined room ${roomId} for user ${userId}`);
+          }
 
           if (roomId) {
               const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
@@ -394,9 +401,10 @@ export class SocketService {
 
                   case 'ADDED':
                       if (data.objectId && data.data) {
-                          wbState.objects.set(data.objectId, data.data);
-                          wbState.history.push({ action: 'ADDED', objectId: data.objectId, data: data.data });
-                          console.log(`[Whiteboard] ADDED object ${data.objectId} to room ${roomId}, total objects: ${wbState.objects.size}`);
+                          // Store object with senderId for color differentiation
+                          wbState.objects.set(data.objectId, { data: data.data, senderId: userId || '0' });
+                          wbState.history.push({ action: 'ADDED', objectId: data.objectId, data: data.data, senderId: userId });
+                          console.log(`[Whiteboard] ADDED object ${data.objectId} by user ${userId} to room ${roomId}, total objects: ${wbState.objects.size}`);
                       }
                       this.broadcastToRoom(roomId, topic, {
                           action: 'ADDED',
@@ -408,8 +416,10 @@ export class SocketService {
 
                   case 'MODIFIED':
                       if (data.objectId && data.data) {
-                          wbState.objects.set(data.objectId, data.data);
-                          // Update history or just track latest state
+                          // Preserve original senderId when modifying
+                          const existing = wbState.objects.get(data.objectId);
+                          const originalSenderId = existing?.senderId || userId || '0';
+                          wbState.objects.set(data.objectId, { data: data.data, senderId: originalSenderId });
                       }
                       this.broadcastToRoom(roomId, topic, {
                           action: 'MODIFIED',
@@ -513,10 +523,10 @@ export class SocketService {
       const wbState = this.getOrCreateWhiteboardState(roomId);
       const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
 
-      // Convert objects Map to array for serialization
-      const objectsArray: Array<{ action: string; objectId: string; data: any }> = [];
-      wbState.objects.forEach((data, objectId) => {
-          objectsArray.push({ action: 'ADDED', objectId, data });
+      // Convert objects Map to array for serialization, including senderId for color differentiation
+      const objectsArray: Array<{ action: string; objectId: string; data: any; senderId: string }> = [];
+      wbState.objects.forEach((obj, objectId) => {
+          objectsArray.push({ action: 'ADDED', objectId, data: obj.data, senderId: obj.senderId });
       });
 
       console.log(`[Whiteboard SYNC] Sending to conn ${conn.id}, room ${roomId}: ${objectsArray.length} objects, isActive: ${wbState.isActive}`);

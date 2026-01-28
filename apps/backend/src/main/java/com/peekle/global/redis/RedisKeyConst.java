@@ -41,4 +41,16 @@ public class RedisKeyConst {
     // Whiteboard Private Topic (Pub/Sub - 1:1 Sync)
     // /topic/studies/rooms/{studyId}/whiteboard/{userId}
     public static final String TOPIC_WHITEBOARD_USER = "topic/studies/rooms/%d/whiteboard/%d";
+
+    // Game Status (Value)
+    // game:room:{roomId}:status -> WAITING, PLAYING...
+    public static final String GAME_STATUS = "game:room:%d:status";
+
+    // Game Lock (Lock)
+    // lock:game:room:{roomId}:status
+    public static final String LOCK_GAME_STATUS = "lock:game:room:%d:status";
+
+    // Game Topic (Pub/Sub)
+    // /topic/games/rooms/{gameId}
+    public static final String TOPIC_GAME_ROOM = "topic/games/rooms/%d";
 }

@@ -10,6 +10,7 @@ export interface WhiteboardMessage {
   senderName?: string;
   senderId?: number;
   data?: any;
+  roomId?: string; // Include roomId in message for cross-page sharing
 }
 
 export function useWhiteboardSocket(
@@ -88,14 +89,22 @@ export function useWhiteboardSocket(
 
   const sendMessage = useCallback(
     (payload: WhiteboardMessage) => {
-      if (client && connected) {
+      if (client && connected && roomId) {
+        // Always include roomId in message for reliable cross-page sharing
+        const messageWithRoom = { ...payload, roomId };
+        console.log(
+          `[useWhiteboardSocket] Sending:`,
+          messageWithRoom.action,
+          messageWithRoom.objectId || '',
+          `to room ${roomId}`,
+        );
         client.publish({
           destination: '/pub/studies/whiteboard/message',
-          body: JSON.stringify(payload),
+          body: JSON.stringify(messageWithRoom),
         });
       }
     },
-    [client, connected],
+    [client, connected, roomId],
   );
 
   // Request sync explicitly (useful after reconnection or manual refresh)

@@ -3,12 +3,29 @@ import path from 'path';
 import fs from 'fs';
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  output: process.platform === 'win32' ? undefined : 'standalone',
+  outputFileTracingRoot: process.platform === 'win32' ? undefined : path.join(__dirname, '../../'),
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'api.dicebear.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'm.samkyoung.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'k.kakaocdn.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ssl.pstatic.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
       },
     ],
   },
@@ -35,3 +52,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+

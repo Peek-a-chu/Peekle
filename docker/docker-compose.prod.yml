@@ -63,6 +63,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SERVER_PORT=8080
+      - REDIS_HOST=redis
+      - SPRING_DATA_REDIS_HOST=redis
     expose:
       - "8080"
     depends_on:
@@ -95,7 +97,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - peekle-network
+    - peekle-network
 
   # OpenVidu Server (WebRTC)
   openvidu:

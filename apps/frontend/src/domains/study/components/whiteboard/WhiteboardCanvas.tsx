@@ -2,8 +2,22 @@
 
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
 
+// Predefined colors for different users (excluding black which is for current user)
+const USER_COLORS = [
+  '#E53935', // Red
+  '#1E88E5', // Blue
+  '#43A047', // Green
+  '#FB8C00', // Orange
+  '#8E24AA', // Purple
+  '#00ACC1', // Cyan
+  '#F4511E', // Deep Orange
+  '#3949AB', // Indigo
+  '#7CB342', // Light Green
+  '#C0CA33', // Lime
+];
+
 export interface WhiteboardCanvasRef {
-  add: (objData: any) => void;
+  add: (objData: any, senderId?: string) => void;
   modify: (objData: any) => void;
   remove: (objectId: string) => void;
   clear: () => void;
@@ -13,6 +27,7 @@ interface WhiteboardCanvasProps {
   width?: number;
   height?: number;
   activeTool?: 'pen' | 'shape' | 'text' | 'eraser';
+  currentUserId?: string;
   onObjectAdded?: (obj: any) => void;
   onObjectModified?: (obj: any) => void;
   onObjectRemoved?: (objectId: string) => void;
@@ -24,6 +39,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       width = 800,
       height = 600,
       activeTool = 'pen',
+      currentUserId,
       onObjectAdded,
       onObjectModified,
       onObjectRemoved,
@@ -35,6 +51,39 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
     const fabricRef = useRef<any>(null);
     const [isFabricLoaded, setIsFabricLoaded] = useState(false);
 
+    // Map to track user colors for consistent coloring
+    const userColorsRef = useRef<Map<string, string>>(new Map());
+
+    // Get or assign a color for a user
+    const getUserColor = (userId: string): string => {
+      if (!userColorsRef.current.has(userId)) {
+        const usedColors = new Set(userColorsRef.current.values());
+        const availableColor =
+          USER_COLORS.find((c) => !usedColors.has(c)) ||
+          USER_COLORS[userColorsRef.current.size % USER_COLORS.length];
+        userColorsRef.current.set(userId, availableColor);
+      }
+      return userColorsRef.current.get(userId)!;
+    };
+
+    // Store callbacks in refs to avoid stale closures and unnecessary re-renders
+    const onObjectAddedRef = useRef(onObjectAdded);
+    const onObjectModifiedRef = useRef(onObjectModified);
+    const onObjectRemovedRef = useRef(onObjectRemoved);
+
+    // Keep refs updated with latest callbacks
+    useEffect(() => {
+      onObjectAddedRef.current = onObjectAdded;
+    }, [onObjectAdded]);
+
+    useEffect(() => {
+      onObjectModifiedRef.current = onObjectModified;
+    }, [onObjectModified]);
+
+    useEffect(() => {
+      onObjectRemovedRef.current = onObjectRemoved;
+    }, [onObjectRemoved]);
+
     // Helper to ensure ID
     const ensureId = (obj: any) => {
       if (!obj.id) {
@@ -44,15 +93,34 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
     };
 
     useImperativeHandle(ref, () => ({
-      add: (objData: any) => {
+      add: (objData: any, senderId?: string) => {
         if (!fabricCanvasRef.current || !fabricRef.current) return;
         const fabric = fabricRef.current;
+
+        // Determine if this is from another user
+        const isOtherUser = senderId && currentUserId && senderId !== currentUserId;
+        const userColor = isOtherUser ? getUserColor(senderId) : null;
+
         // Deserialize and add
         // Note: fabric.util.enlivenObjects usually async
         fabric.util.enlivenObjects(
           [objData],
           (objects: any[]) => {
             objects.forEach((o) => {
+              // Apply user color if from another user
+              if (userColor) {
+                if (o.type === 'path') {
+                  o.set('stroke', userColor);
+                } else if (o.type === 'rect') {
+                  o.set('stroke', userColor);
+                } else if (o.type === 'i-text' || o.type === 'text') {
+                  o.set('fill', userColor);
+                }
+              }
+              // Store senderId on the object for reference
+              if (senderId) {
+                o.senderId = senderId;
+              }
               fabricCanvasRef.current?.add(o);
             });
             fabricCanvasRef.current?.requestRenderAll();
@@ -89,12 +157,17 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       if (!canvasEl.current) return;
 
       let canvas: any;
+      let isMounted = true;
 
       const initFabric = async () => {
         try {
           const mod = await import('fabric');
-          fabricRef.current = mod.fabric;
-          const fabric = mod.fabric;
+          // fabric v5 compatibility: handle different export styles
+          const fabric = mod.fabric || mod.default || mod;
+
+          if (!isMounted) return;
+
+          fabricRef.current = fabric;
 
           // Initialize fabric canvas
           canvas = new fabric.Canvas(canvasEl.current, {
@@ -105,23 +178,28 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
           fabricCanvasRef.current = canvas;
 
-          // Core Event Listeners
+          // Initialize freeDrawingBrush for pen tool
+          if (!canvas.freeDrawingBrush) {
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+          }
+          canvas.freeDrawingBrush.width = 3;
+          canvas.freeDrawingBrush.color = '#000000';
+
+          // Core Event Listeners - use refs to always call latest callbacks
           canvas.on('path:created', (e: any) => {
             if (e.path) {
               ensureId(e.path);
-              onObjectAdded?.(e.path);
+              onObjectAddedRef.current?.(e.path);
             }
           });
 
           canvas.on('object:modified', (e: any) => {
             if (e.target) {
-              onObjectModified?.(e.target);
+              onObjectModifiedRef.current?.(e.target);
             }
           });
 
-          // Initial State
-          canvas.isDrawingMode = activeTool === 'pen';
-
+          // Initial State - don't set isDrawingMode here, let the tool effect handle it
           setIsFabricLoaded(true);
         } catch (err) {
           console.error('Failed to load fabric', err);
@@ -132,6 +210,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
       // Cleanup
       return () => {
+        isMounted = false;
         if (canvas) {
           canvas.dispose();
         }
@@ -154,19 +233,24 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
         mouseDownHandlerRef.current = null;
       }
 
-      // Reset canvas state
+      // Reset canvas state completely
       canvas.isDrawingMode = false;
       canvas.selection = true;
       canvas.defaultCursor = 'default';
       canvas.hoverCursor = 'move';
 
-      // Deselect all objects when switching tools
+      // Deselect all objects and render to apply changes
       canvas.discardActiveObject();
+      canvas.renderAll();
 
       let handler: ((opt: any) => void) | null = null;
 
       if (activeTool === 'pen') {
         canvas.isDrawingMode = true;
+        // Ensure freeDrawingBrush exists before setting properties
+        if (!canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+        }
         canvas.freeDrawingBrush.width = 3;
         canvas.freeDrawingBrush.color = '#000000';
       } else if (activeTool === 'eraser') {
@@ -179,7 +263,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
             const targetId = opt.target.id;
             canvas.remove(opt.target);
             canvas.requestRenderAll();
-            if (targetId) onObjectRemoved?.(targetId);
+            if (targetId) onObjectRemovedRef.current?.(targetId);
           }
         };
       } else if (activeTool === 'shape') {
@@ -202,7 +286,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           canvas.add(rect);
           canvas.setActiveObject(rect);
           canvas.requestRenderAll();
-          onObjectAdded?.(rect);
+          onObjectAddedRef.current?.(rect);
         };
       } else if (activeTool === 'text') {
         canvas.selection = false;
@@ -223,7 +307,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           canvas.setActiveObject(text);
           text.enterEditing();
           canvas.requestRenderAll();
-          onObjectAdded?.(text);
+          onObjectAddedRef.current?.(text);
         };
       }
 
@@ -233,22 +317,30 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       }
 
       canvas.requestRenderAll();
-    }, [activeTool, onObjectAdded, onObjectRemoved, isFabricLoaded]);
+
+      // Cleanup function to remove handler when tool changes or component unmounts
+      return () => {
+        if (mouseDownHandlerRef.current) {
+          canvas.off('mouse:down', mouseDownHandlerRef.current);
+          mouseDownHandlerRef.current = null;
+        }
+      };
+    }, [activeTool, isFabricLoaded]);
 
     // Special listener for Text editing exit to trigger modification update
     useEffect(() => {
-      if (!fabricCanvasRef.current) return;
+      if (!fabricCanvasRef.current || !isFabricLoaded) return;
       const canvas = fabricCanvasRef.current;
 
       const textHandler = (e: any) => {
-        onObjectModified?.(e.target);
+        onObjectModifiedRef.current?.(e.target);
       };
 
       canvas.on('text:editing:exited', textHandler);
       return () => {
         canvas.off('text:editing:exited', textHandler);
       };
-    }, [onObjectModified, isFabricLoaded]);
+    }, [isFabricLoaded]);
 
     return (
       <div className="relative border border-gray-200 shadow-sm">
