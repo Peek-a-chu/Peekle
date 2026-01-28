@@ -87,15 +87,15 @@ export function CCWorkbookRow({
         <span className="text-xs text-muted-foreground truncate block">{workbook.creator.nickname}</span>
       </div>
 
-      {/* 즐겨찾기 - w-16 */}
-      <div className="shrink-0 w-16 flex justify-center">
+      {/* 즐겨찾기 */}
+      <div className="shrink-0 w-14 flex justify-center">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleBookmark?.(workbook.id);
           }}
           className={cn(
-            'flex items-center gap-1 px-2 py-1 rounded-md transition-colors',
+            'group/star flex items-center gap-1 px-2 py-1 rounded-md transition-colors',
             isSelected
               ? 'hover:bg-pink-100 dark:hover:bg-pink-900/30'
               : 'hover:bg-accent'
@@ -107,10 +107,10 @@ export function CCWorkbookRow({
               'h-4 w-4 transition-colors',
               workbook.isBookmarked
                 ? 'fill-yellow-400 text-yellow-400'
-                : 'text-muted-foreground group-hover:text-yellow-400'
+                : 'text-muted-foreground group-hover/star:text-yellow-400'
             )}
           />
-          <span className="text-xs text-muted-foreground">{workbook.bookmarkCount}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{workbook.bookmarkCount}</span>
         </button>
       </div>
 

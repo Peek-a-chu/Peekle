@@ -1,13 +1,26 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { X, ExternalLink, CheckCircle2, Circle, User, Calendar } from 'lucide-react';
+import { X, ExternalLink, CheckCircle2, Circle, User, Calendar, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { Workbook, WorkbookProblem } from '../types';
 
 interface WorkbooksRightPanelProps {
   workbook: Workbook | null;
   problems: WorkbookProblem[];
   onClose: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
   className?: string;
 }
 
@@ -15,9 +28,18 @@ export function WorkbooksRightPanel({
   workbook,
   problems,
   onClose,
+  onEdit,
+  onDelete,
   className,
 }: WorkbooksRightPanelProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
   if (!workbook) return null;
+
+  const handleDelete = () => {
+    onDelete?.();
+    setDeleteDialogOpen(false);
+  };
 
   return (
     <div
@@ -44,9 +66,33 @@ export function WorkbooksRightPanel({
         </div>
 
         {/* 문제집 이름 */}
-        <h2 className="font-bold text-xl text-foreground leading-tight mb-3">
-          {workbook.title}
-        </h2>
+        <div className="flex items-center gap-1 mb-3">
+          <h2 className="font-bold text-xl text-foreground leading-tight">
+            {workbook.title}
+          </h2>
+          {workbook.isOwner && (
+            <>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  aria-label="문제집 수정"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  aria-label="문제집 삭제"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
         {/* 메타 정보: 만든 사람 • Last Updated 날짜 • 문제 수 */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
@@ -72,9 +118,9 @@ export function WorkbooksRightPanel({
         {/* 설명 */}
         {workbook.description && (
           <div className="mt-4 p-3 rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground">
+            <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-sans">
               {workbook.description}
-            </p>
+            </pre>
           </div>
         )}
       </div>
@@ -116,6 +162,35 @@ export function WorkbooksRightPanel({
           </div>
         ))}
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="max-w-[360px]">
+          <AlertDialogHeader className="space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+              <Trash2 className="h-6 w-6 text-destructive" />
+            </div>
+            <div className="space-y-2 text-center">
+              <AlertDialogTitle>{workbook.title}</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>문제집을 삭제하시겠습니까?</p>
+                  <p>삭제된 문제집은 복구할 수 없습니다.</p>
+                </div>
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2 mt-2">
+            <AlertDialogCancel className="flex-1 sm:flex-none">취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="flex-1 sm:flex-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,9 +1,8 @@
-import type { Workbook, WorkbookProblem, WorkbookTab, WorkbookSort } from '../types';
+import type { Workbook, WorkbookProblem, WorkbookTab, WorkbookSort, BojProblem } from '../types';
 
-export const mockWorkbooks: Workbook[] = [
+// 기본 문제집 템플릿
+const baseWorkbooks: Omit<Workbook, 'id' | 'number' | 'createdAt'>[] = [
   {
-    id: 'wb1',
-    number: 1,
     title: '초보자를 위한 기초 문제집',
     description: '프로그래밍을 처음 시작하는 분들을 위한 입문 문제집입니다.',
     problemCount: 10,
@@ -11,12 +10,9 @@ export const mockWorkbooks: Workbook[] = [
     bookmarkCount: 156,
     isBookmarked: false,
     isOwner: true,
-    createdAt: '2026-01-25T10:00:00',
     creator: { id: 'user1', nickname: '김코딩' },
   },
   {
-    id: 'wb2',
-    number: 2,
     title: '그래프 완전 정복',
     description: 'BFS, DFS부터 다익스트라까지 그래프 알고리즘 총정리',
     problemCount: 15,
@@ -24,12 +20,9 @@ export const mockWorkbooks: Workbook[] = [
     bookmarkCount: 89,
     isBookmarked: true,
     isOwner: false,
-    createdAt: '2026-01-24T10:00:00',
     creator: { id: 'user2', nickname: 'AlgoKing' },
   },
   {
-    id: 'wb3',
-    number: 3,
     title: 'DP 입문',
     description: '동적 프로그래밍의 기초부터 응용까지',
     problemCount: 8,
@@ -37,12 +30,9 @@ export const mockWorkbooks: Workbook[] = [
     bookmarkCount: 234,
     isBookmarked: false,
     isOwner: true,
-    createdAt: '2026-01-23T10:00:00',
     creator: { id: 'user1', nickname: '김코딩' },
   },
   {
-    id: 'wb4',
-    number: 4,
     title: '삼성 SW 역량테스트 대비',
     description: '삼성 코딩테스트 기출 유형 분석 및 연습',
     problemCount: 20,
@@ -50,10 +40,80 @@ export const mockWorkbooks: Workbook[] = [
     bookmarkCount: 512,
     isBookmarked: true,
     isOwner: false,
-    createdAt: '2026-01-22T10:00:00',
     creator: { id: 'user3', nickname: '취준생' },
   },
+  {
+    title: '백준 브론즈 탈출하기',
+    description: '브론즈에서 실버로 올라가기 위한 필수 문제들',
+    problemCount: 25,
+    solvedCount: 12,
+    bookmarkCount: 78,
+    isBookmarked: false,
+    isOwner: false,
+    creator: { id: 'user4', nickname: '알고리즘마스터' },
+  },
+  {
+    title: '문자열 처리 완벽 가이드',
+    description: 'KMP, 트라이, 해싱 등 문자열 알고리즘 총정리',
+    problemCount: 18,
+    solvedCount: 5,
+    bookmarkCount: 145,
+    isBookmarked: false,
+    isOwner: true,
+    creator: { id: 'user1', nickname: '김코딩' },
+  },
+  {
+    title: '이분탐색 마스터',
+    description: '이분탐색의 기초부터 parametric search까지',
+    problemCount: 12,
+    solvedCount: 7,
+    bookmarkCount: 203,
+    isBookmarked: true,
+    isOwner: false,
+    creator: { id: 'user5', nickname: 'BinaryKing' },
+  },
+  {
+    title: '트리 자료구조 정복',
+    description: '세그먼트 트리, 펜윅 트리, LCA 등',
+    problemCount: 22,
+    solvedCount: 3,
+    bookmarkCount: 167,
+    isBookmarked: false,
+    isOwner: false,
+    creator: { id: 'user6', nickname: 'TreeLover' },
+  },
 ];
+
+// 50개의 문제집 생성
+function generateMockWorkbooks(): Workbook[] {
+  const workbooks: Workbook[] = [];
+  const nicknames = ['김코딩', 'AlgoKing', '취준생', '알고리즘마스터', 'BinaryKing', 'TreeLover', 'CodeNinja', 'PS천재', '백준러', 'ACM준비생'];
+
+  for (let i = 0; i < 50; i++) {
+    const base = baseWorkbooks[i % baseWorkbooks.length];
+    const date = new Date('2026-01-25');
+    date.setDate(date.getDate() - i);
+
+    workbooks.push({
+      ...base,
+      id: `wb${i + 1}`,
+      number: i + 1,
+      title: i < baseWorkbooks.length ? base.title : `${base.title} ${Math.floor(i / baseWorkbooks.length) + 1}`,
+      bookmarkCount: Math.floor(Math.random() * 500) + 10,
+      isBookmarked: Math.random() > 0.7,
+      isOwner: i % 3 === 0,
+      createdAt: date.toISOString(),
+      creator: {
+        id: `user${(i % 10) + 1}`,
+        nickname: nicknames[i % nicknames.length]
+      },
+    });
+  }
+
+  return workbooks;
+}
+
+export const mockWorkbooks: Workbook[] = generateMockWorkbooks();
 
 export const mockWorkbookProblems: Record<string, WorkbookProblem[]> = {
   wb1: [
@@ -170,3 +230,70 @@ export function getTabCounts(workbooks: Workbook[]) {
     bookmarked: workbooks.filter((w) => w.isBookmarked).length,
   };
 }
+
+// 백준 문제 검색용 전체 목록
+export const mockAllBojProblems: BojProblem[] = [
+  { number: 1000, title: 'A+B' },
+  { number: 1001, title: 'A-B' },
+  { number: 1002, title: '터렛' },
+  { number: 1003, title: '피보나치 함수' },
+  { number: 1008, title: 'A/B' },
+  { number: 1149, title: 'RGB거리' },
+  { number: 1152, title: '단어의 개수' },
+  { number: 1157, title: '단어 공부' },
+  { number: 1260, title: 'DFS와 BFS' },
+  { number: 1330, title: '두 수 비교하기' },
+  { number: 1463, title: '1로 만들기' },
+  { number: 1504, title: '특정한 최단 경로' },
+  { number: 1753, title: '최단경로' },
+  { number: 1854, title: 'K번째 최단경로 찾기' },
+  { number: 1904, title: '01타일' },
+  { number: 1916, title: '최소비용 구하기' },
+  { number: 1932, title: '정수 삼각형' },
+  { number: 1956, title: '운동' },
+  { number: 2178, title: '미로 탐색' },
+  { number: 2438, title: '별 찍기 - 1' },
+  { number: 2557, title: 'Hello World' },
+  { number: 2579, title: '계단 오르기' },
+  { number: 2588, title: '곱셈' },
+  { number: 2606, title: '바이러스' },
+  { number: 2667, title: '단지번호붙이기' },
+  { number: 2750, title: '수 정렬하기' },
+  { number: 2751, title: '수 정렬하기 2' },
+  { number: 2753, title: '윤년' },
+  { number: 5719, title: '거의 최단 경로' },
+  { number: 9184, title: '신나는 함수 실행' },
+  { number: 9370, title: '미확인 도착지' },
+  { number: 9461, title: '파도반 수열' },
+  { number: 10171, title: '고양이' },
+  { number: 10172, title: '개' },
+  { number: 10217, title: 'KCM Travel' },
+  { number: 10430, title: '나머지' },
+  { number: 10869, title: '사칙연산' },
+  { number: 10998, title: 'A×B' },
+  { number: 11404, title: '플로이드' },
+  { number: 11562, title: '백양로 브레이크' },
+  { number: 11657, title: '타임머신' },
+  { number: 11779, title: '최소비용 구하기 2' },
+  { number: 12100, title: '2048 (Easy)' },
+  { number: 13460, title: '구슬 탈출 2' },
+  { number: 14501, title: '퇴사' },
+  { number: 14502, title: '연구소' },
+  { number: 14503, title: '로봇 청소기' },
+  { number: 14888, title: '연산자 끼워넣기' },
+  { number: 14889, title: '스타트와 링크' },
+  { number: 14890, title: '경사로' },
+  { number: 14891, title: '톱니바퀴' },
+  { number: 15683, title: '감시' },
+  { number: 15684, title: '사다리 조작' },
+  { number: 15685, title: '드래곤 커브' },
+  { number: 15686, title: '치킨 배달' },
+  { number: 16234, title: '인구 이동' },
+  { number: 16235, title: '나무 재테크' },
+  { number: 16236, title: '아기 상어' },
+  { number: 17140, title: '이차원 배열과 연산' },
+  { number: 17143, title: '낚시왕' },
+  { number: 17144, title: '미세먼지 안녕!' },
+  { number: 1238, title: '파티' },
+  { number: 20056, title: '마법사 상어와 파이어볼' },
+];

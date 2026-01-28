@@ -25,3 +25,23 @@ export interface WorkbookProblem {
 
 export type WorkbookTab = 'ALL' | 'MY' | 'BOOKMARKED';
 export type WorkbookSort = 'LATEST' | 'OLDEST' | 'BOOKMARKS' | 'PROBLEMS';
+
+// 백준 문제 검색용 타입
+export interface BojProblem {
+  number: number;
+  title: string;
+}
+
+// 모달에서 사용하는 문제 타입 (드래그앤드롭용 id 포함)
+export interface WorkbookProblemItem {
+  id: string;
+  number: number;
+  title: string;
+}
+
+// 문제집 생성/수정 폼 데이터
+export interface WorkbookFormData {
+  title: string;
+  description: string;
+  problems: WorkbookProblemItem[];
+}

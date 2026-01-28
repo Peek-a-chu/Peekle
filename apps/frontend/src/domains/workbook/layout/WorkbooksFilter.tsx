@@ -87,7 +87,7 @@ export function WorkbooksFilter({
       </div>
 
       {/* 검색 + 정렬 */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         {/* 검색바 */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

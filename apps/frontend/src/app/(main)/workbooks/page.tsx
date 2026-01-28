@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useWorkbooksPageLogic } from '@/domains/workbook/hooks/useWorkbooksPageLogic';
 import {
   WorkbooksHeader,
@@ -8,9 +8,10 @@ import {
   WorkbooksLeftPanel,
   WorkbooksRightPanel,
 } from '@/domains/workbook/layout';
+import { WorkbookModal } from '@/domains/workbook/components/WorkbookModal';
+import type { WorkbookProblemItem } from '@/domains/workbook/types';
 
 export default function WorkbooksPage() {
-  const router = useRouter();
   const {
     tab,
     setTab,
@@ -20,19 +21,48 @@ export default function WorkbooksPage() {
     setSortBy,
     tabCounts,
     workbooks,
+    totalCount,
     selectedWorkbook,
     selectedProblems,
+    hasMore,
+    isLoading,
+    loadMore,
     selectedId,
     setSelectedId,
     toggleBookmark,
+    createWorkbook,
+    updateWorkbook,
+    deleteWorkbook,
   } = useWorkbooksPageLogic();
 
+  // 모달 상태
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+
   const handleCreateClick = () => {
-    router.push('/workbooks/new');
+    setModalMode('create');
+    setModalOpen(true);
+  };
+
+  const handleEditClick = () => {
+    setModalMode('edit');
+    setModalOpen(true);
   };
 
   const handleClosePanel = () => {
     setSelectedId(null);
+  };
+
+  const handleModalSubmit = (data: {
+    title: string;
+    description: string;
+    problems: WorkbookProblemItem[];
+  }) => {
+    if (modalMode === 'create') {
+      createWorkbook(data);
+    } else if (selectedId) {
+      updateWorkbook(selectedId, data);
+    }
   };
 
   return (
@@ -57,9 +87,13 @@ export default function WorkbooksPage() {
         <div className="flex-1 min-h-0">
           <WorkbooksLeftPanel
             workbooks={workbooks}
+            totalCount={totalCount}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onToggleBookmark={toggleBookmark}
+            hasMore={hasMore}
+            isLoading={isLoading}
+            onLoadMore={loadMore}
           />
         </div>
       </div>
@@ -70,9 +104,21 @@ export default function WorkbooksPage() {
           workbook={selectedWorkbook}
           problems={selectedProblems}
           onClose={handleClosePanel}
+          onEdit={handleEditClick}
+          onDelete={() => selectedId && deleteWorkbook(selectedId)}
           className="fixed top-0 right-0 bottom-0"
         />
       )}
+
+      {/* 문제집 생성/수정 모달 */}
+      <WorkbookModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        mode={modalMode}
+        workbook={modalMode === 'edit' ? selectedWorkbook : null}
+        problems={modalMode === 'edit' ? selectedProblems : []}
+        onSubmit={handleModalSubmit}
+      />
     </div>
   );
 }
