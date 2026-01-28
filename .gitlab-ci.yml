@@ -21,8 +21,6 @@ frontend-build:
   only:
     refs:
       - master
-    changes:
-      - apps/frontend/**/*
   before_script:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
@@ -51,8 +49,6 @@ spring-backend-build:
   only:
     refs:
       - master
-    changes:
-      - apps/backend/**/*
   before_script:
     - cd apps/backend
     - chmod +x gradlew
@@ -80,9 +76,7 @@ deploy-production:
       - master
   needs:
     - job: frontend-build
-      optional: true
     - job: spring-backend-build
-      optional: true
   before_script:
     # Install SSH client
     - apk add --no-cache openssh-client
@@ -100,7 +94,7 @@ deploy-production:
         echo "=== Deploying Peekle to Production ==="
 
         # Navigate to project directory
-        cd /home/$EC2_USER/peekle
+        cd ~/peekle
 
         # Pull latest code
         echo "Pulling latest code..."
@@ -142,4 +136,3 @@ deploy-production:
   environment:
     name: production
     url: https://$DOMAIN_NAME
-  when: manual
