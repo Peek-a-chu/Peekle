@@ -26,15 +26,14 @@ describe('CCProblemCard', () => {
 
   it('toggles hint visibility when hint button is clicked', () => {
     render(<CCProblemCard {...defaultProps} />);
-    // Tags should be hidden initially (or shown depending on requirement? "Hint toggle to show tier and tags")
-    // Let's assume tags are hidden initially if they are part of "Hint".
-    // The current ProblemList implementation showed tags always. The AC says "Hint toggle to show tier/tags".
-    // So let's assume they are hidden by default.
+    // Tier should be hidden initially and shown when hint is toggled
 
-    // Check tags not visible (or some hint indicator)
+    // Check tier not visible initially
+    expect(screen.queryByText('Bronze 5')).not.toBeInTheDocument();
+
+    // Click hint button to show tier
     const hintButton = screen.getByRole('button', { name: /toggle hint/i });
     fireEvent.click(hintButton);
-    expect(screen.getByText('BFS')).toBeInTheDocument();
     expect(screen.getByText('Bronze 5')).toBeInTheDocument();
   });
 

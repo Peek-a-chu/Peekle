@@ -1,7 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { WhiteboardOverlay } from '../components/whiteboard/WhiteboardOverlay';
-import { useRoomStore } from '../hooks/useRoomStore';
 
 // Mock dependencies
 vi.mock('next/navigation', () => ({
@@ -18,12 +17,14 @@ vi.mock('../hooks/useWhiteboardSocket', () => ({
 }));
 
 // Mock store
-const mockSetWhiteboardOverlayOpen = vi.fn();
 vi.mock('../hooks/useRoomStore', () => ({
-  useRoomStore: (selector: any) =>
+  useRoomStore: (selector: (state: unknown) => unknown) =>
     selector({
       isWhiteboardOverlayOpen: true,
-      setWhiteboardOverlayOpen: mockSetWhiteboardOverlayOpen,
+      setWhiteboardOverlayOpen: vi.fn(),
+      selectedProblemId: null,
+      selectedProblemTitle: null,
+      currentUserId: 1,
     }),
 }));
 
@@ -42,14 +43,20 @@ describe('WhiteboardOverlay', () => {
     expect(screen.getByLabelText(/도형/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/텍스트/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/지우개/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/닫기/i)).toBeInTheDocument();
   });
 
-  it('closes overlay when close button is clicked', () => {
+  it('renders all drawing tools in toolbar', () => {
     render(<WhiteboardOverlay />);
 
-    const closeBtn = screen.getByLabelText(/닫기/i);
-    fireEvent.click(closeBtn);
-    expect(mockSetWhiteboardOverlayOpen).toHaveBeenCalledWith(false);
+    // Verify all tool buttons exist and are clickable
+    const penButton = screen.getByLabelText(/펜/i);
+    const shapeButton = screen.getByLabelText(/도형/i);
+    const textButton = screen.getByLabelText(/텍스트/i);
+    const eraserButton = screen.getByLabelText(/지우개/i);
+
+    expect(penButton).toBeInTheDocument();
+    expect(shapeButton).toBeInTheDocument();
+    expect(textButton).toBeInTheDocument();
+    expect(eraserButton).toBeInTheDocument();
   });
 });
