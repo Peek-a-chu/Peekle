@@ -6,6 +6,7 @@ import com.peekle.domain.user.service.UserService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,34 +29,54 @@ public class UserController {
     private final UserRepository userRepository;
 
     @GetMapping("/me")
-    public ApiResponse<Map<String, Object>> getCurrentUser() {
-        Long userId = getCurrentUserId();
+    public ApiResponse<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Long userId) {
+        if (userId == null) {
+            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
+        }
         Map<String, Object> userInfo = userService.getUserInfo(userId);
         return ApiResponse.success(userInfo);
     }
 
     @PostMapping("/me/extension-token")
-    public ApiResponse<Map<String, String>> generateExtensionToken(@RequestParam(defaultValue = "false") boolean regenerate) {
-        Long currentUserId = getCurrentUserId();
-        String token = userService.generateExtensionToken(currentUserId, regenerate);
+    public ApiResponse<Map<String, String>> generateExtensionToken(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "false") boolean regenerate) {
+        if (userId == null) {
+            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
+        }
+        String token = userService.generateExtensionToken(userId, regenerate);
         Map<String, String> response = new HashMap<>();
         response.put("extensionToken", token);
         return ApiResponse.success(response);
     }
 
     @GetMapping("/me/profile")
-    public ApiResponse<UserProfileResponse> getUserProfile(@RequestHeader(value = "X-Peekle-Token", required = false) String token) {
-        // TODO: Get actual logged-in user ID from SecurityContext
-        // me일 때 임시로 userid가 1인 걸로 하자
-        Long currentUserId = 1L;
-        UserProfileResponse response = userService.getUserProfile(currentUserId);
+    public ApiResponse<UserProfileResponse> getUserProfile(
+            @AuthenticationPrincipal Long userId,
+            @RequestHeader(value = "X-Peekle-Token", required = false) String token) {
+        if (userId == null) {
+            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
+        }
+        UserProfileResponse response = userService.getUserProfile(userId, userId);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{nickname}/profile")
+    public ApiResponse<UserProfileResponse> getUserProfileByNickname(
+            @PathVariable String nickname,
+            @AuthenticationPrincipal Long currentUserId) {
+        UserProfileResponse response = userService.getUserProfileByNickname(nickname, currentUserId);
         return ApiResponse.success(response);
     }
 
     @GetMapping("/me/validate-token")
-    public ApiResponse<TokenValidationResponse> validateToken(@RequestHeader("X-Peekle-Token") String token) {
-        Long currentUserId = getCurrentUserId();
-        boolean isValidUserToken = userService.validateExtensionToken(currentUserId, token);
+    public ApiResponse<TokenValidationResponse> validateToken(
+            @AuthenticationPrincipal Long userId,
+            @RequestHeader("X-Peekle-Token") String token) {
+        if (userId == null) {
+            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
+        }
+        boolean isValidUserToken = userService.validateExtensionToken(userId, token);
         return ApiResponse.success(new TokenValidationResponse(isValidUserToken));
     }
 
@@ -83,10 +104,5 @@ public class UserController {
                 "available", true,
                 "message", "사용 가능한 닉네임입니다."
         ));
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return (Long) authentication.getPrincipal();
     }
 }
