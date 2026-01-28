@@ -6,6 +6,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { useAuthStore } from '@/store/auth-store';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8080';
 const BROKER_URL = `${BASE_URL}/ws-stomp`;
@@ -28,6 +29,7 @@ interface SocketProviderProps {
 export function SocketProvider({ roomId, userId, children }: SocketProviderProps) {
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<Client | null>(null);
+  const { accessToken } = useAuthStore();
 
   // Need to access store actions, but be careful about loops if store depends on this.
   // Ideally, subscription logic specific to "store updates" should be in the Provider
@@ -50,12 +52,7 @@ export function SocketProvider({ roomId, userId, children }: SocketProviderProps
 
   useEffect(() => {
     // Wait for both parameters to start connection
-    if (!roomId) return;
-
-    // If userId is missing, we could connect as guest (0) or wait.
-    // Given the requirement for "Enter" with userId, it's better to wait or use 0 explicitly if allowed.
-    // Spec seems to imply userId is required for many actions.
-    // Let's assume we reconnect when userId becomes available.
+    if (!roomId || !userId) return;
 
     // Safety check: Avoid creating multiple clients if effect re-runs without cleanup (shouldn't happen with proper cleanup)
     if (clientRef.current?.active) {
@@ -64,14 +61,20 @@ export function SocketProvider({ roomId, userId, children }: SocketProviderProps
       // clientRef.current.deactivate();
     }
 
-    const uidStr = userId ? String(userId) : '1';
+    const uidStr = String(userId);
     console.log(`[SocketProvider] Initializing for Study ${roomId}, User ${uidStr}`);
+
+    const connectHeaders: Record<string, string> = {
+      userId: uidStr,
+    };
+
+    if (accessToken) {
+      connectHeaders['Authorization'] = `Bearer ${accessToken}`;
+    }
 
     const client = new Client({
       webSocketFactory: () => new SockJS(BROKER_URL),
-      connectHeaders: {
-        userId: uidStr,
-      },
+      connectHeaders,
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,

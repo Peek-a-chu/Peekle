@@ -15,10 +15,12 @@ import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
+import { useAuthStore } from '@/store/auth-store';
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
+  const { user, checkAuth } = useAuthStore();
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   // Ensure we set roomId immediately to store if possible
@@ -80,6 +82,11 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
+    // Load user if not already available
+    if (!user) {
+      void checkAuth();
+    }
+
     // Ensure roomId is set in store immediately when studyId is available
     if (studyId) {
       setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
@@ -112,8 +119,10 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       )
       .catch((err) => console.error('Failed to fetch participants:', err));
 
-    setCurrentUserId(1);
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId]);
+    if (user) {
+      setCurrentUserId(user.id);
+    }
+  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId, user]);
 
   const handleBack = (): void => {
     router.push('/study');

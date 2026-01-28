@@ -9,11 +9,13 @@ import { useProblemDates } from './useProblemDates';
 import { useSubmissions } from './useSubmissions';
 import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth-store';
 
 export function useStudyRoomLogic() {
   const params = useParams();
   const router = useRouter();
   const studyId = params.id as string;
+  const { user, checkAuth } = useAuthStore();
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
@@ -52,6 +54,11 @@ export function useStudyRoomLogic() {
 
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
+    // Load user if not already available
+    if (!user) {
+      void checkAuth();
+    }
+
     fetchStudyRoom(Number(studyId))
       .then((room) => {
         setRoomInfo({
@@ -67,8 +74,10 @@ export function useStudyRoomLogic() {
       .then(setParticipants)
       .catch((err) => console.error('Failed to fetch participants:', err));
 
-    setCurrentUserId(1);
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId]);
+    if (user) {
+      setCurrentUserId(user.id);
+    }
+  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId, user]);
 
   const handleBack = () => {
     router.push('/study');
