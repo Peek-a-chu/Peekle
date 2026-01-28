@@ -93,6 +93,13 @@ deploy-production:
 
         echo "=== Deploying Peekle to Production ==="
 
+        # Check if project directory exists, clone if not
+        if [ ! -d ~/peekle ]; then
+          echo "Project directory not found. Cloning..."
+          # Try cloning with SSH (requires server SSH key to be added to GitLab)
+          git clone git@lab.ssafy.com:s14-webmobile1-sub1/S14P11A408.git ~/peekle
+        fi
+
         # Navigate to project directory
         cd ~/peekle
 
