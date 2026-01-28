@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';
 import { ChatMessage, ChatType } from '../types/chat';
-import { fetchStudyChats } from '@/api/studyApi';
+import { fetchStudyChats } from '../api/studyApi';
 
 export function useStudyChat(roomId: number) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

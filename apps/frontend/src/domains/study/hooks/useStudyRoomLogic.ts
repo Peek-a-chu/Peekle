@@ -7,7 +7,7 @@ import { useStudyLayout } from './useStudyLayout';
 import { useProblems } from './useProblems';
 import { useProblemDates } from './useProblemDates';
 import { useSubmissions } from './useSubmissions';
-import { fetchStudyParticipants, fetchStudyRoom } from '@/api/studyApi';
+import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
 
 export function useStudyRoomLogic() {
