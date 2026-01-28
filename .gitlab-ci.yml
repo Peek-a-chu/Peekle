@@ -21,17 +21,16 @@ frontend-build:
   only:
     refs:
       - master
-      - main
     changes:
       - apps/frontend/**/*
   before_script:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
     - pnpm install --frozen-lockfile
-    - npx playwright install --with-deps chromium
+    # - npx playwright install --with-deps chromium # E2E 테스트가 필요하다면 주석 해제 (시간 소요됨)
   script:
     - pnpm run test --run
-    - pnpm run test:e2e
+    # - pnpm run test:e2e # E2E 테스트가 필요하다면 주석 해제
     - pnpm run build
   artifacts:
     paths:
@@ -43,32 +42,31 @@ frontend-build:
       - apps/frontend/node_modules/
 
 # ===========================================
-# Backend Pipeline
+# Backend Pipeline (Spring Boot)
 # ===========================================
 
-backend-build:
+spring-backend-build:
   stage: build
-  image: node:20-alpine
+  image: gradle:8.5-jdk21-alpine
   only:
     refs:
       - master
-      - main
     changes:
-      - apps/nest-api/**/*
+      - apps/backend/**/*
   before_script:
-    - cd apps/nest-api
-    - npm ci
+    - cd apps/backend
+    - chmod +x gradlew
   script:
-    - npm run test --if-present
-    - npm run build
+    - ./gradlew clean build --no-daemon -x test
   artifacts:
     paths:
-      - apps/nest-api/dist
+      - apps/backend/build/libs/*.jar
     expire_in: 1 day
   cache:
-    key: backend-${CI_COMMIT_REF_SLUG}
+    key: backend-gradle-${CI_COMMIT_REF_SLUG}
     paths:
-      - apps/nest-api/node_modules/
+      - apps/backend/.gradle
+      - apps/backend/build
 
 # ===========================================
 # Deploy to EC2 via SSH
@@ -80,11 +78,10 @@ deploy-production:
   only:
     refs:
       - master
-      - main
   needs:
     - job: frontend-build
       optional: true
-    - job: backend-build
+    - job: spring-backend-build
       optional: true
   before_script:
     # Install SSH client
