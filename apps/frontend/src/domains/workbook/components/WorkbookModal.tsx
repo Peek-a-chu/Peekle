@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Search, X, GripVertical, Trash2 } from 'lucide-react';
+import { Search, X, GripVertical, Trash2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,8 +28,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import type { WorkbookProblemItem, BojProblem, Workbook, WorkbookProblem } from '../types';
-import { mockAllBojProblems } from '../mocks/mockData';
+import type { WorkbookProblemItem, Workbook, WorkbookProblem } from '../types';
+import { searchBojProblems, type BojProblemResponse } from '../api/problemApi';
 
 interface WorkbookModalProps {
   open: boolean;
@@ -104,6 +104,8 @@ export function WorkbookModal({
   const [description, setDescription] = useState('');
   const [problemList, setProblemList] = useState<WorkbookProblemItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<BojProblemResponse[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -115,6 +117,7 @@ export function WorkbookModal({
     })
   );
 
+  // 모달 열릴 때 초기화
   useEffect(() => {
     if (open) {
       if (mode === 'edit' && workbook) {
@@ -133,10 +136,38 @@ export function WorkbookModal({
         setProblemList([]);
       }
       setSearchQuery('');
+      setSearchResults([]);
       setIsDropdownOpen(false);
     }
   }, [open, mode, workbook, problems]);
 
+  // 디바운스된 검색
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchBojProblems(searchQuery, 10);
+        // 이미 추가된 문제 제외
+        const addedNumbers = new Set(problemList.map((p) => p.number));
+        const filtered = results.filter((p) => !addedNumbers.has(Number(p.externalId)));
+        setSearchResults(filtered);
+      } catch (error) {
+        console.error('Failed to search problems:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, problemList]);
+
+  // 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -153,23 +184,6 @@ export function WorkbookModal({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-
-    const query = searchQuery.toLowerCase();
-    const addedNumbers = new Set(problemList.map((p) => p.number));
-
-    return mockAllBojProblems
-      .filter((p) => {
-        if (addedNumbers.has(p.number)) return false;
-        return (
-          p.number.toString().includes(query) ||
-          p.title.toLowerCase().includes(query)
-        );
-      })
-      .slice(0, 8);
-  }, [searchQuery, problemList]);
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -182,16 +196,17 @@ export function WorkbookModal({
     }
   };
 
-  const handleAddProblem = (problem: BojProblem) => {
+  const handleAddProblem = (problem: BojProblemResponse) => {
     setProblemList((prev) => [
       ...prev,
       {
-        id: `problem-${problem.number}-${Date.now()}`,
-        number: problem.number,
+        id: `problem-${problem.externalId}-${Date.now()}`,
+        number: Number(problem.externalId),
         title: problem.title,
       },
     ]);
     setSearchQuery('');
+    setSearchResults([]);
     setIsDropdownOpen(false);
     searchInputRef.current?.focus();
   };
@@ -261,6 +276,7 @@ export function WorkbookModal({
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
+                      setSearchResults([]);
                       setIsDropdownOpen(false);
                     }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
@@ -275,17 +291,23 @@ export function WorkbookModal({
                     ref={dropdownRef}
                     className="absolute z-[100] top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-xl"
                   >
-                    {searchResults.length > 0 ? (
+                    {isSearching ? (
+                      <div className="px-3 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>검색 중...</span>
+                      </div>
+                    ) : searchResults.length > 0 ? (
                       <div className="py-1 max-h-[240px] overflow-y-auto">
                         {searchResults.map((problem) => (
                           <button
-                            key={problem.number}
+                            key={problem.id}
                             type="button"
                             onClick={() => handleAddProblem(problem)}
                             className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 text-sm transition-colors"
                           >
-                            <span className="font-medium text-pink-500 w-12">{problem.number}</span>
+                            <span className="font-medium text-pink-500 w-12">{problem.externalId}</span>
                             <span className="truncate flex-1">{problem.title}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">{problem.tier}</span>
                           </button>
                         ))}
                       </div>
