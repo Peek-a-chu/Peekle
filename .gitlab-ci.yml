@@ -8,6 +8,7 @@
 #   - DOMAIN_NAME: 배포 도메인 (선택사항)
 #   - GITLAB_USER: GitLab 사용자 ID (Personal Access Token 사용 시)
 #   - GITLAB_ACCESS_TOKEN: GitLab Personal Access Token (read_repository 권한 필요)
+#   - MATTERMOST_WEBHOOK_URL: Mattermost Incoming Webhook URL
 
 stages:
   - build
@@ -148,6 +149,38 @@ deploy-production:
 
         echo "=== Deployment Complete ==="
       ENDSSH
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" == "success" ]; then
+        COLOR="#36a64f"
+        STATUS="✅ 성공"
+        MESSAGE="배포가 성공적으로 완료되었습니다."
+      else
+        COLOR="#ff0000"
+        STATUS="❌ 실패"
+        MESSAGE="배포에 실패했습니다. 로그를 확인해주세요."
+      fi
+
+      curl -X POST -H 'Content-Type: application/json' \
+        --data "{
+          \"username\": \"GitLab CI/CD\",
+          \"icon_emoji\": \":rocket:\",
+          \"attachments\": [{
+            \"color\": \"$COLOR\",
+            \"title\": \"Peekle 배포 알림 - $STATUS\",
+            \"fields\": [
+              {\"short\": true, \"title\": \"프로젝트\", \"value\": \"$CI_PROJECT_NAME\"},
+              {\"short\": true, \"title\": \"브랜치\", \"value\": \"$CI_COMMIT_REF_NAME\"},
+              {\"short\": true, \"title\": \"커밋\", \"value\": \"$CI_COMMIT_SHORT_SHA\"},
+              {\"short\": true, \"title\": \"실행자\", \"value\": \"$GITLAB_USER_NAME\"},
+              {\"short\": false, \"title\": \"커밋 메시지\", \"value\": \"$CI_COMMIT_MESSAGE\"},
+              {\"short\": false, \"title\": \"상세\", \"value\": \"$MESSAGE\"}
+            ],
+            \"footer\": \"GitLab CI/CD\",
+            \"footer_icon\": \"https://about.gitlab.com/images/press/logo/png/gitlab-icon-rgb.png\"
+          }]
+        }" \
+        "$MATTERMOST_WEBHOOK_URL" || true
   environment:
     name: production
     url: https://$DOMAIN_NAME
