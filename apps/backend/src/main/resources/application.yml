@@ -12,9 +12,11 @@ spring:
   # 공통 Redis 설정 (필요시 dev/prod 분리 가능)
   data:
     redis:
-      host: localhost
-      port: 6379
-      password: peekle-redis-password
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:peekle-redis-password}
+
+
 
   # OAuth2 설정
   security:
@@ -83,4 +85,16 @@ logging:
   level:
     com.peekle: INFO
     org.springframework.web: INFO
+
+springwolf:
+  docket:
+    base-package: com.peekle
+    info:
+      title: Peekle WebSocket API
+      version: 1.0.0
+      description: Peekle 프로젝트 실시간 통신 API 명세서
+    servers:
+      local-ws:
+        protocol: ws
+        host: localhost:8080
     org.springframework.security.oauth2: DEBUG

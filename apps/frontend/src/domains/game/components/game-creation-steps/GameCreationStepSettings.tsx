@@ -62,7 +62,7 @@ export function GameCreationStepSettings({
         <div className="flex items-center gap-4">
           <Slider
             value={[formData.maxPlayers]}
-            onValueChange={([value]) => onMaxPlayersChange(value)}
+            onValueChange={([value]: number[]) => onMaxPlayersChange(value)}
             min={isTeamMode ? 4 : 2}
             max={isTeamMode ? 12 : 8}
             step={isTeamMode ? 2 : 1}
@@ -102,7 +102,7 @@ export function GameCreationStepSettings({
           <div className="flex items-center gap-4">
             <Slider
               value={[formData.timeLimit]}
-              onValueChange={([value]) => onTimeLimitChange(value)}
+              onValueChange={([value]: number[]) => onTimeLimitChange(value)}
               min={10}
               max={240}
               step={10}
@@ -143,7 +143,7 @@ export function GameCreationStepSettings({
           <div className="flex items-center gap-4">
             <Slider
               value={[formData.problemCount]}
-              onValueChange={([value]) => onProblemCountChange(value)}
+              onValueChange={([value]: number[]) => onProblemCountChange(value)}
               min={1}
               max={10}
               step={1}

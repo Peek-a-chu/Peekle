@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ExtensionStatus, UserProfile } from '../types';
 import { CCProfileHeader } from './CCProfileHeader';
@@ -33,7 +32,7 @@ type TabKey = (typeof TABS)[keyof typeof TABS];
 export function CCProfileView({ user, isMe }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>(TABS.OVERVIEW);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const { isInstalled, extensionToken, checkInstallation } = useExtensionCheck();
+  const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
 
   // Extension Check State lifted from CCExtensionGuide
   const [status, setStatus] = useState<ExtensionStatus>('NOT_INSTALLED');
@@ -42,6 +41,12 @@ export function CCProfileView({ user, isMe }: Props) {
   // 확장 프로그램 상태 체크 및 로깅
   useEffect(() => {
     if (!isMe) return;
+
+    // 아직 확장프로그램 감지 중이면 로딩 유지
+    if (isChecking) {
+      setIsLoading(true);
+      return;
+    }
 
     const checkTokenValidity = async (token: string) => {
       try {
@@ -60,7 +65,6 @@ export function CCProfileView({ user, isMe }: Props) {
         } else {
           console.warn('❌ [CCProfileView] Token mismatch.');
           setStatus('MISMATCH');
-          // alert('확장 프로그램 계정 연동 정보가 일치하지 않습니다.\n다시 연동해주세요.');
         }
       } catch (e) {
         console.error('Failed to validate token:', e);
@@ -84,7 +88,7 @@ export function CCProfileView({ user, isMe }: Props) {
       setStatus('NOT_INSTALLED');
       setIsLoading(false);
     }
-  }, [isMe, isInstalled, extensionToken]);
+  }, [isMe, isInstalled, extensionToken, isChecking]);
 
   return (
     <div className="max-w-5xl p-6 md:p-10 space-y-8 min-h-screen">
@@ -101,18 +105,20 @@ export function CCProfileView({ user, isMe }: Props) {
       {/* 4. Tabs (Segmented Control) */}
       <div className="bg-secondary/30 p-1 rounded-xl">
         <div className={`grid gap-1 ${isMe ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          {(Object.values(TABS) as string[]).filter(tab => isMe || tab !== TABS.EXTENSION).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as TabKey)}
-              className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
-                ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
-                : 'text-muted-foreground hover:text-foreground'
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {(Object.values(TABS) as string[])
+            .filter((tab) => isMe || tab !== TABS.EXTENSION)
+            .map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as TabKey)}
+                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                    : 'text-muted-foreground hover:text-foreground'
+                  }`}
+              >
+                {tab}
+              </button>
+            ))}
         </div>
       </div>
 
@@ -124,7 +130,7 @@ export function CCProfileView({ user, isMe }: Props) {
             <ActivityStreak onDateSelect={setSelectedDate} />
 
             {/* 학습 타임라인 */}
-            <LearningTimeline selectedDate={selectedDate} showHistoryLink={isMe} />
+            <LearningTimeline selectedDate={selectedDate} showHistoryLink={isMe} nickname={user.nickname} />
           </div>
         </div>
       )}

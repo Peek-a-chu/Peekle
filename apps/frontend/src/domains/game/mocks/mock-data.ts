@@ -715,30 +715,30 @@ export function getMockGameRoomDetail(roomId: string): GameRoomDetail | null {
 
 // 게임 문제 인터페이스
 export interface GameProblem {
-  id: string
-  problemNumber: string  // 예: '#1753'
-  title: string
-  status: 'SOLVED' | 'UNSOLVED'  // 내 풀이 상태
-  solvedBy?: { id: string; nickname: string; team?: Team }[]  // 성공한 참여자 목록
+  id: string;
+  problemNumber: string; // 예: '#1753'
+  title: string;
+  status: 'SOLVED' | 'UNSOLVED'; // 내 풀이 상태
+  solvedBy?: { id: string; nickname: string; team?: Team }[]; // 성공한 참여자 목록
 }
 
 // 게임 플레이 참여자
 export interface GamePlayParticipant extends Participant {
-  score?: number  // 현재 점수
-  solvedCount?: number  // 푼 문제 수
+  score?: number; // 현재 점수
+  solvedCount?: number; // 푼 문제 수
 }
 
 // 게임 플레이 상태
 export interface GamePlayState {
-  roomId: string
-  title: string
-  mode: GameMode
-  teamType: TeamType
-  timeLimit: number  // 총 시간 (초)
-  remainingTime: number  // 남은 시간 (초)
-  problems: GameProblem[]
-  scores?: { RED: number; BLUE: number }  // 팀전일 경우
-  participants: GamePlayParticipant[]
+  roomId: string;
+  title: string;
+  mode: GameMode;
+  teamType: TeamType;
+  timeLimit: number; // 총 시간 (초)
+  remainingTime: number; // 남은 시간 (초)
+  problems: GameProblem[];
+  scores?: { RED: number; BLUE: number }; // 팀전일 경우
+  participants: GamePlayParticipant[];
 }
 
 // 공통 문제 목록
@@ -748,9 +748,7 @@ const commonProblems: GameProblem[] = [
     problemNumber: '#1753',
     title: '최단경로',
     status: 'SOLVED',
-    solvedBy: [
-      { id: 'user1', nickname: 'CodeNinja' },
-    ],
+    solvedBy: [{ id: 'user1', nickname: 'CodeNinja' }],
   },
   {
     id: 'p2',
@@ -766,7 +764,7 @@ const commonProblems: GameProblem[] = [
     status: 'UNSOLVED',
     solvedBy: [],
   },
-]
+];
 
 // Mock 게임 플레이 상태 (4가지 게임 모드별)
 export const mockGamePlayStates: Record<string, GamePlayState> = {
@@ -887,9 +885,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
         problemNumber: '#2580',
         title: '스도쿠',
         status: 'UNSOLVED',
-        solvedBy: [
-          { id: 'user2', nickname: 'PS마스터' },
-        ],
+        solvedBy: [{ id: 'user2', nickname: 'PS마스터' }],
       },
       {
         id: 'p3',
@@ -947,9 +943,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
         problemNumber: '#2040',
         title: '스도쿠',
         status: 'SOLVED',
-        solvedBy: [
-          { id: 'user3', nickname: '해론다이', team: 'RED' },
-        ],
+        solvedBy: [{ id: 'user3', nickname: '해론다이', team: 'RED' }],
       },
       {
         id: 'p2',
@@ -1062,9 +1056,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
         problemNumber: '#1753',
         title: '최단경로',
         status: 'UNSOLVED',
-        solvedBy: [
-          { id: 'user4', nickname: 'RedPlayer1', team: 'RED' },
-        ],
+        solvedBy: [{ id: 'user4', nickname: 'RedPlayer1', team: 'RED' }],
       },
       {
         id: 'p3',
@@ -1145,19 +1137,19 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       },
     ],
   },
-}
+};
 
 // 방 ID로 게임 플레이 상태 조회
 export function getMockGamePlayState(roomId: string): GamePlayState | null {
-  if (!roomId) return null
+  if (!roomId) return null;
 
   if (mockGamePlayStates[roomId]) {
-    return mockGamePlayStates[roomId]
+    return mockGamePlayStates[roomId];
   }
 
   // 기본 데이터 반환 (개인전 스피드)
   return {
     ...mockGamePlayStates['1'],
     roomId,
-  }
+  };
 }

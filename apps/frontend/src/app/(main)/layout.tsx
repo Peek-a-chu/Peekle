@@ -4,11 +4,11 @@ export default function MainLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {
+}>): React.ReactNode {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 ml-[240px] p-8 w-full">{children}</main>
+      <main className="flex-1 ml-[240px] px-8 py-0 w-full">{children}</main>
     </div>
   );
 }

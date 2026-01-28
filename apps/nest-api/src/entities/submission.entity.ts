@@ -9,7 +9,7 @@ export class Submission {
   studyId: number; // Connect to a study context conceptually
 
   @Column()
-  problemId: number;
+  studyProblemId: number; // Links to StudyProblem.id
 
   @Column()
   userId: number;

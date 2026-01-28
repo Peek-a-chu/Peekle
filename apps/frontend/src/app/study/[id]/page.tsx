@@ -1,6 +1,6 @@
 import 'server-only';
-import { CenterPanel } from '@/domains/study/components';
+import { StudyRoomClient } from '@/domains/study/components';
 
 export default function StudyRoomPage() {
-  return <CenterPanel />;
+  return <StudyRoomClient />;
 }

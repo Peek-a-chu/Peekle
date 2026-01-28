@@ -9,7 +9,7 @@ services:
       - "40000-40050:40000-40050/udp"
       - "40000-40050:40000-40050/tcp"
     env_file:
-      - .env
+      - ../.env
     environment:
        - KMS_MIN_PORT=40000
        - KMS_MAX_PORT=40050

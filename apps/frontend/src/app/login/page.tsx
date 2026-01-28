@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { getOAuthLoginUrl } from '@/app/api/authApi';
+import { getOAuthLoginUrl } from '@/api/authApi';
 
 export default function LoginPage() {
   const handleLogin = (provider: 'kakao' | 'naver' | 'google') => {
@@ -10,23 +10,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-slate-50 font-sans selection:bg-pink-100 selection:text-primary">
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-background font-sans selection:bg-primary/20 selection:text-primary">
       {/* 2. 로그인 카드 (글래스모피즘) */}
       <div className="w-full max-w-[440px] z-10 px-4">
-        <div className="relative bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl shadow-slate-200/50 rounded-3xl p-8 md:p-10 space-y-8">
+        <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl rounded-3xl p-8 md:p-10 space-y-8">
           {/* X 버튼 */}
           <Link href="/">
-            <button className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-pink-50/80 transition-all duration-200 group">
+            <button className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200 group">
               <X className="w-5 h-5" />
             </button>
           </Link>
           {/* --- 헤더 --- */}
           <div className="text-center space-y-6">
             <div className="space-y-2">
-              <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
+              <h1 className="text-xl md:text-2xl font-extrabold text-foreground tracking-tight">
                 오늘도 <span className="text-primary">힐끔힐끔코딩</span>과 함께 👀
               </h1>
-              <p className="text-slate-500 text-[15px] font-medium">
+              <p className="text-muted-foreground text-[15px] font-medium">
                 간편하게 로그인하고 시작하세요
               </p>
             </div>
@@ -63,7 +63,7 @@ export default function LoginPage() {
             {/* 3. 구글 */}
             <button
               onClick={() => handleLogin('google')}
-              className="relative w-full h-[52px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl flex items-center justify-center transition-all duration-200 hover:shadow-md active:brightness-95"
+              className="relative w-full h-[52px] bg-card border border-border hover:bg-muted/50 text-foreground font-semibold rounded-xl flex items-center justify-center transition-all duration-200 hover:shadow-md active:brightness-95"
             >
               <div className="absolute left-6">
                 <svg width="20" height="20" viewBox="0 0 24 24">
@@ -91,7 +91,7 @@ export default function LoginPage() {
         </div>
 
         {/* 하단 저작권 (카드 밖으로 빼서 여유롭게) */}
-        <p className="text-center text-slate-400 text-xs mt-8 opacity-60">
+        <p className="text-center text-muted-foreground text-xs mt-8 opacity-60">
           © 2026 Peekle. All rights reserved.
         </p>
       </div>

@@ -4,17 +4,11 @@ import { CCProblemCard } from '@/domains/study/components/CCProblemCard';
 import { Problem } from '@/domains/study/types';
 
 describe('CCProblemCard', () => {
-  const mockProblem: Problem = {
-    id: 1,
-    number: 1001,
+  const mockProblem = {
+    problemId: 1001,
     title: 'Test Problem',
-    source: 'BOJ',
-    status: 'completed',
-    tags: ['BFS', 'DFS'],
-    participantCount: 2,
-    totalParticipants: 4,
-    url: 'https://example.com/1',
-    tier: 1,
+    tier: 'Bronze 5',
+    solvedMemberCount: 2,
   };
 
   const defaultProps = {
@@ -26,20 +20,20 @@ describe('CCProblemCard', () => {
 
   it('renders problem title', () => {
     render(<CCProblemCard {...defaultProps} />);
-    expect(screen.getByText('1. Test Problem')).toBeInTheDocument();
+    expect(screen.getByText(/1001/)).toBeInTheDocument();
+    expect(screen.getByText(/Test Problem/)).toBeInTheDocument();
   });
 
   it('toggles hint visibility when hint button is clicked', () => {
     render(<CCProblemCard {...defaultProps} />);
-    // Tags should be hidden initially (or shown depending on requirement? "Hint toggle to show tier and tags")
-    // Let's assume tags are hidden initially if they are part of "Hint".
-    // The current ProblemList implementation showed tags always. The AC says "Hint toggle to show tier/tags".
-    // So let's assume they are hidden by default.
+    // Tier should be hidden initially and shown when hint is toggled
 
-    // Check tags not visible (or some hint indicator)
+    // Check tier not visible initially
+    expect(screen.queryByText('Bronze 5')).not.toBeInTheDocument();
+
+    // Click hint button to show tier
     const hintButton = screen.getByRole('button', { name: /toggle hint/i });
     fireEvent.click(hintButton);
-    expect(screen.getByText('BFS')).toBeInTheDocument();
     expect(screen.getByText('Bronze 5')).toBeInTheDocument();
   });
 
@@ -47,6 +41,6 @@ describe('CCProblemCard', () => {
     render(<CCProblemCard {...defaultProps} />);
     const viewButton = screen.getByRole('button', { name: /view submissions/i });
     fireEvent.click(viewButton);
-    expect(defaultProps.onOpenSubmission).toHaveBeenCalledWith(mockProblem.id);
+    expect(defaultProps.onOpenSubmission).toHaveBeenCalledWith(mockProblem.problemId);
   });
 });

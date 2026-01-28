@@ -2,8 +2,32 @@
 
 echo "🚀 Running pre-push checks..."
 
-# Get changed files in current branch compared to main
-FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
+# Get the default branch (master or main)
+DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | grep 'HEAD branch' | awk '{print $NF}')
+if [ -z "$DEFAULT_BRANCH" ]; then
+  # Fallback: check if origin/master or origin/main exists
+  if git rev-parse --verify origin/master >/dev/null 2>&1; then
+    DEFAULT_BRANCH="master"
+  elif git rev-parse --verify origin/main >/dev/null 2>&1; then
+    DEFAULT_BRANCH="main"
+  else
+    DEFAULT_BRANCH="master"
+  fi
+fi
+
+echo "📌 Comparing with origin/$DEFAULT_BRANCH"
+
+# Get changed files in current branch compared to default branch
+FILES=$(git diff --name-only origin/$DEFAULT_BRANCH...HEAD 2>/dev/null)
+if [ -z "$FILES" ]; then
+  # Fallback: compare with merge-base if three-dot diff fails
+  MERGE_BASE=$(git merge-base origin/$DEFAULT_BRANCH HEAD 2>/dev/null)
+  if [ -n "$MERGE_BASE" ]; then
+    FILES=$(git diff --name-only $MERGE_BASE HEAD)
+  else
+    FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+  fi
+fi
 
 # Check if frontend files changed
 FRONTEND_CHANGED=$(echo "$FILES" | grep -E '^apps/frontend/' || true)
@@ -18,11 +42,18 @@ fi
 # Frontend checks
 if [ -n "$FRONTEND_CHANGED" ]; then
   echo "\n📦 Frontend files changed, running checks..."
-  
-  echo "• Running tests..."
+
+  echo "• Running unit tests (vitest)..."
   pnpm --filter frontend test --run
   if [ $? -ne 0 ]; then
-    echo "❌ Frontend tests failed"
+    echo "❌ Frontend unit tests failed"
+    exit 1
+  fi
+
+  echo "• Running E2E tests (playwright)..."
+  pnpm --filter frontend test:e2e
+  if [ $? -ne 0 ]; then
+    echo "❌ Frontend E2E tests failed"
     exit 1
   fi
 
@@ -32,7 +63,7 @@ if [ -n "$FRONTEND_CHANGED" ]; then
     echo "❌ Frontend build failed"
     exit 1
   fi
-  
+
   echo "✅ Frontend checks passed"
 fi
 

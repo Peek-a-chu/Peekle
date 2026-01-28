@@ -7,12 +7,13 @@ import { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid
 import { CCControlBar as ControlBar } from '@/domains/study/components/CCControlBar';
 import { CCIDEPanel as IDEPanel } from '@/domains/study/components/CCIDEPanel';
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
+import { WhiteboardPanel } from '@/domains/study/components/whiteboard/WhiteboardOverlay';
 import { useRealtimeCode } from '@/domains/study/hooks/useRealtimeCode';
 import { useSocket } from '@/domains/study/hooks/useSocket';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Lock } from 'lucide-react';
 
 interface CCCenterPanelProps {
   ideContent?: ReactNode;
@@ -51,63 +52,38 @@ export function CCCenterPanel({
     handleRefChat,
   } = useCenterPanel();
 
-  const realtimeCode = useRealtimeCode(viewingUser);
+  const { code: realtimeCode, language: realtimeLanguage } = useRealtimeCode(
+    viewMode === 'SPLIT_REALTIME' ? viewingUser : null,
+  );
   const roomId = useRoomStore((state) => state.roomId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
+  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
+  const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
+
+  // Show right panel when viewing other's code OR whiteboard is open
+  const showRightPanel = isViewingOther || isWhiteboardOverlayOpen;
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
   const [restoredCode, setRestoredCode] = useState<string | null>(null);
+  const [restoreVersion, setRestoreVersion] = useState(0);
+  const previousProblemIdRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (!socket || !currentUserId) return;
-
-    const handleRequestCode = (data: { requesterId: string; targetUserId: number }) => {
-      // If someone is asking for MY code
-      if (data.targetUserId === currentUserId) {
-        // Send what I have
-        socket.emit('code-change', {
-          roomId: String(roomId),
-          code: myLatestCodeRef.current,
-        });
-      }
-    };
-
-    socket.on('request-code', handleRequestCode);
-
-    // [New] Restore my code if the server has it
-    const handleCodeRestore = (data: { code: string; language?: string }) => {
-      console.log('Restoring code...', data.code);
-      if (data.code) {
-        setRestoredCode(data.code);
-      }
-      if (data.language) {
-        console.log('Restoring language...', data.language);
-        setLanguage(data.language);
-      }
-    };
-    socket.on('code-restore', handleCodeRestore);
-
-    return () => {
-      socket.off('request-code', handleRequestCode);
-      socket.off('code-restore', handleCodeRestore);
-    };
-  }, [socket, currentUserId, roomId]);
-
-  const handleCodeChange = (code: string) => {
+  // [Problem Selection] Save current code before switching, then request new problem's code
+  const handleCodeChange = (code: string): void => {
     myLatestCodeRef.current = code;
-    if (socket && roomId) {
-      socket.emit('code-change', { roomId: String(roomId), code });
+    if (socket && roomId && selectedProblemId) {
+      socket.publish({
+        destination: '/pub/ide/update',
+        body: JSON.stringify({ problemId: selectedProblemId, code }),
+      });
     }
   };
 
-  const handleLanguageChange = (lang: string) => {
+  const handleLanguageChange = (lang: string): void => {
     setLanguage(lang);
-    if (socket && roomId) {
-      console.log('Emitting language-change:', lang);
-      socket.emit('language-change', { roomId: String(roomId), language: lang });
-    }
   };
 
   return (
@@ -154,22 +130,71 @@ export function CCCenterPanel({
                 void handleCopy();
               }}
               onRefChat={() => {
-                void handleRefChat();
+                const currentSelectedProblemTitle = useRoomStore.getState().selectedProblemTitle;
+
+                if (isViewingOther) {
+                  // Smart Ref Chat: Capture other's code
+                  const code = viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode;
+                  const lang =
+                    viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage;
+
+                  // For bots, we want to include (Bot) and for saved submissions, indicate it's stored code
+                  let ownerName =
+                    viewMode === 'SPLIT_SAVED' ? targetSubmission?.username : viewingUser?.nickname;
+                  if (viewMode === 'SPLIT_SAVED' && targetSubmission) {
+                    const isBot =
+                      targetSubmission.username === 'PS러버' ||
+                      targetSubmission.username === 'CodeNinja';
+                    ownerName = `${targetSubmission.username}${isBot ? ' (Bot)' : ''}의 저장된 코드`;
+                  }
+
+                  if (code) {
+                    useRoomStore.getState().setPendingCodeShare({
+                      code,
+                      language: lang || 'python', // Fallback or infer
+                      ownerName: ownerName || 'Unknown',
+                      problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
+                      isRealtime: viewMode === 'SPLIT_REALTIME',
+                    });
+                    useRoomStore.getState().setRightPanelActiveTab('chat');
+                    setTimeout(() => {
+                      const chatInput = document.getElementById('chat-input');
+                      if (chatInput) chatInput.focus();
+                    }, 0);
+                  }
+                } else {
+                  // Capture My Code
+                  void handleRefChat();
+
+                  // Enhancing pending share with problem title
+                  setTimeout(() => {
+                    const currentPending = useRoomStore.getState().pendingCodeShare;
+                    if (currentPending) {
+                      useRoomStore.getState().setPendingCodeShare({
+                        ...currentPending,
+                        problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
+                        isRealtime: true, // Own code is treated as realtime capable
+                      });
+                    }
+                  }, 0);
+                }
               }}
               onSubmit={() => {
                 void handleSubmit();
               }}
               // Toggles
               showSubmit={!isViewingOther}
-              showChatRef={!isViewingOther}
+              showChatRef={true} // Always show Ref Chat
             />
           </div>
         </div>
 
         {/* Editor Body Row */}
-        <div className="flex min-h-0 flex-1 min-w-0">
+        <div className="flex min-h-0 flex-1 min-w-0 relative">
           {/* Left IDE Panel (My Code) */}
-          <div className={cn('flex-1 min-w-0', isViewingOther && 'border-r border-border')}>
+          <div
+            className={cn('flex-1 min-w-0 relative', showRightPanel && 'border-r border-border')}
+          >
             {ideContent ?? (
               <IDEPanel
                 ref={leftPanelRef}
@@ -180,23 +205,42 @@ export function CCCenterPanel({
                 hideToolbar // Pass this so it doesn't render double toolbar
                 onCodeChange={handleCodeChange}
                 restoredCode={restoredCode}
+                restoreVersion={restoreVersion}
               />
+            )}
+
+            {/* [New] Overlay if no problem is selected and not viewing other */}
+            {!selectedProblemTitle && !isViewingOther && !isWhiteboardOverlayOpen && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
+                <Lock className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  좌측 목록에서 문제를 선택해주세요
+                </p>
+              </div>
             )}
           </div>
 
-          {/* Right IDE Panel (Other's Code - Read Only) */}
-          {isViewingOther && (
+          {/* Right Panel: Whiteboard OR Other's Code */}
+          {showRightPanel && (
             <div className="flex-1 min-w-0">
-              <IDEPanel
-                editorId="other-editor"
-                readOnly
-                hideToolbar
-                initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
-                theme={theme} // Sync theme
-                borderColorClass={
-                  viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
-                }
-              />
+              {isWhiteboardOverlayOpen ? (
+                <WhiteboardPanel className="border-l-2 border-rose-400" />
+              ) : (
+                <IDEPanel
+                  key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
+                  editorId="other-editor"
+                  readOnly
+                  hideToolbar
+                  initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
+                  language={
+                    viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
+                  }
+                  theme={theme} // Sync theme
+                  borderColorClass={
+                    viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
+                  }
+                />
+              )}
             </div>
           )}
         </div>

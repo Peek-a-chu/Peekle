@@ -2,11 +2,12 @@ services:
   redis:
     image: redis:7-alpine
     container_name: peekle-redis
+    env_file: .env
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --requirepass peekle-redis-password
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -17,12 +18,15 @@ services:
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: peekle-redis-commander
+    env_file: .env
     environment:
-      - REDIS_HOSTS=local:redis:6379:0:peekle-redis-password
+      - REDIS_HOSTS=peekle-redis:redis:6379:0:${REDIS_PASSWORD}
+      - REDIS_HOST=redis
     ports:
       - "8081:8081"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

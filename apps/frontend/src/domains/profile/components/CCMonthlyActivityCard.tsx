@@ -12,10 +12,10 @@ export function CCMonthlyActivityCard({ onDateSelect }: Props) {
   const days = 7;
 
   // Helper to generate mock data
-  const generateGrid = () => {
-    const grid = [];
+  const generateGrid = (): number[][] => {
+    const grid: number[][] = [];
     for (let w = 0; w < weeks; w++) {
-      const week = [];
+      const week: number[] = [];
       for (let d = 0; d < days; d++) {
         // Random activity level: 0 (none) to 4 (high)
         week.push(Math.floor(Math.random() * 5));
@@ -25,15 +25,15 @@ export function CCMonthlyActivityCard({ onDateSelect }: Props) {
     return grid;
   };
 
-  const generateEmptyGrid = () => {
-    const grid = [];
+  const generateEmptyGrid = (): number[][] => {
+    const grid: number[][] = [];
     for (let w = 0; w < weeks; w++) {
-      grid.push(new Array(days).fill(0));
+      grid.push(new Array<number>(days).fill(0));
     }
     return grid;
   };
 
-  const [gridData, setGridData] = useState(generateEmptyGrid());
+  const [gridData, setGridData] = useState<number[][]>(generateEmptyGrid());
 
   useEffect(() => {
     setGridData(generateGrid());

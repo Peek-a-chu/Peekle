@@ -42,8 +42,8 @@ export function CCViewModeBanner({
 
         <span className="text-sm font-medium">
           {isRealtime
-            ? `${viewingUser.nickname}의 코드 열람 중`
-            : `${viewingUser.nickname}의 저장된 코드`}
+            ? `${viewingUser?.nickname}의 코드 실시간 열람 중`
+            : `${targetSubmission?.username}의 저장 된 코드 열람 중`}
         </span>
 
         {isSaved && targetSubmission && (

@@ -7,15 +7,16 @@ export interface UserProfile {
   leagueGroupId?: string | null;
   streakCurrent: number;
   streakMax: number;
-  avatarUrl?: string;
+  profileImg?: string;
   solvedCount: number;
+  isMe?: boolean;
 }
 
 export interface SubmissionHistory {
   id: string;
   problemId: number;
   problemTitle: string;
-  tier: string; // "Bronze V" etc.
+  tier: string; // "Bronze 5" etc.
   language: string;
   memory: string; // "31120KB"
   time: string; // "40ms"

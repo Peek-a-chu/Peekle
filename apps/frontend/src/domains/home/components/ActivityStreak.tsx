@@ -18,7 +18,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
 
     // 선택된 년도 데이터만 필터링
     const yearData = useMemo(() => {
-        return allData.filter(item => {
+        return allData.filter((item) => {
             const year = new Date(item.date).getFullYear();
             return year === selectedYear;
         });
@@ -28,7 +28,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
     const monthlyData = useMemo(() => {
         const months: { [key: string]: { date: string; count: number }[] } = {};
 
-        yearData.forEach(item => {
+        yearData.forEach((item) => {
             const date = new Date(item.date);
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -43,9 +43,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
 
     // 색상 계산 (문제 풀이 수에 따라)
     const getColor = (count: number) => {
-        if (count === 0) return 'bg-muted';
-        if (count <= 2) return 'bg-secondary';
-        if (count <= 4) return 'bg-primary/50';
+        if (count === 0) return 'bg-muted/30';
+        if (count <= 2) return 'bg-primary/30';
+        if (count <= 4) return 'bg-primary/60';
         return 'bg-primary';
     };
 
@@ -62,7 +62,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
 
     // 월 이름 포맷
     const formatMonth = (monthKey: string) => {
-        const [year, month] = monthKey.split('-');
+        const [, month] = monthKey.split('-');
         return `${month}월`;
     };
 
@@ -80,7 +80,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                 <div className="flex items-center justify-between">
                     {/* 총 문제 수 */}
                     <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-bold text-primary">{totalProblems.toLocaleString()}</span>
+                        <span className="text-2xl font-bold text-primary">
+                            {totalProblems.toLocaleString()}
+                        </span>
                         <span className="text-sm text-muted-foreground">문제</span>
                     </div>
 
@@ -116,8 +118,8 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                                         key={day.date}
                                         onClick={() => handleDateClick(day.date)}
                                         className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${selectedDate === day.date
-                                            ? 'ring-1 ring-primary ring-offset-1'
-                                            : 'hover:ring-1 hover:ring-border'
+                                                ? 'ring-1 ring-primary ring-offset-1'
+                                                : 'hover:ring-1 hover:ring-border'
                                             }`}
                                         title={`${day.date}: ${day.count}문제`}
                                     />
@@ -132,9 +134,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
             <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
                 <span>적음</span>
                 <div className="flex gap-0.5">
-                    <div className="w-3 h-3 rounded-sm bg-muted" />
-                    <div className="w-3 h-3 rounded-sm bg-secondary" />
-                    <div className="w-3 h-3 rounded-sm bg-primary/50" />
+                    <div className="w-3 h-3 rounded-sm bg-muted/30" />
+                    <div className="w-3 h-3 rounded-sm bg-primary/30" />
+                    <div className="w-3 h-3 rounded-sm bg-primary/60" />
                     <div className="w-3 h-3 rounded-sm bg-primary" />
                 </div>
                 <span>많음</span>

@@ -1,0 +1,38 @@
+# Build outputs
+build
+out
+target
+bin
+
+# Gradle
+.gradle
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea
+*.iml
+*.ipr
+*.iws
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
+logs
+
+# Test
+test-results
+
+# Misc
+.git
+.gitignore
+*.md
+.env*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data

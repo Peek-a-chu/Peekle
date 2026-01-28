@@ -42,16 +42,30 @@ export interface ActivityStreakData {
     count: number;
 }
 
+// 시드 기반 랜덤 생성기 (Hydration Mismatch 방지용)
+const seededRandom = (seed: number) => {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+};
+
 // 3년간 데이터 생성 (2024-01-01 ~ 2026-12-31)
 const generateStreakData = (): ActivityStreakData[] => {
     const data: ActivityStreakData[] = [];
     const startDate = new Date('2024-01-01');
     const endDate = new Date('2026-12-31');
 
+    let seed = 123456789; // 고정 시드
+
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split('T')[0];
+
+        // 시드 기반 랜덤값 사용
+        seed++;
+        const randomVal = seededRandom(seed);
+        const randomCountVal = seededRandom(seed + 9999);
+
         // 랜덤 문제 풀이 수 (0~8)
-        const count = Math.random() > 0.3 ? Math.floor(Math.random() * 8) : 0;
+        const count = randomVal > 0.3 ? Math.floor(randomCountVal * 8) : 0;
         data.push({ date: dateStr, count });
     }
     return data;
@@ -103,7 +117,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         link: 'https://www.acmicpc.net/problem/11687',
         sources: ['알고스터디'],
         sourceType: 'study',
-        code: `import sys\ninput = sys.stdin.readline\n\ndef solve():\n    N, M = map(int, input().split())\n    # ... 솔루션 코드 ...\n    print(ans)`
+        code: `import sys\ninput = sys.stdin.readline\n\ndef solve():\n    N, M = map(int, input().split())\n    # ... 솔루션 코드 ...\n    print(ans)`,
     },
     {
         problemId: '#14503',
@@ -113,7 +127,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         link: 'https://www.acmicpc.net/problem/14503',
         sources: ['알고리즘 스터디123'],
         sourceType: 'study',
-        code: `#include <iostream>\nusing namespace std;\n\nint main() {\n    int N, M;\n    cin >> N >> M;\n    // ... DP 로직 ...\n    return 0;\n}`
+        code: `#include <iostream>\nusing namespace std;\n\nint main() {\n    int N, M;\n    cin >> N >> M;\n    // ... DP 로직 ...\n    return 0;\n}`,
     },
     {
         problemId: '#12865',
@@ -124,7 +138,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         sources: ['알고리즘 스터디123', '스피드 레이스'], // 중복 태그 예시
         sourceType: 'game',
         gameType: 'team',
-        code: `#include <vector>\n#include <algorithm>\nusing namespace std;\n\nint main() {\n    // 평범한 배낭 문제 (Knapsack)\n    return 0;\n}`
+        code: `#include <vector>\n#include <algorithm>\nusing namespace std;\n\nint main() {\n    // 평범한 배낭 문제 (Knapsack)\n    return 0;\n}`,
     },
     {
         problemId: '#1003',
@@ -135,7 +149,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         sources: ['스피드 레이스'],
         sourceType: 'game',
         gameType: 'personal',
-        code: `def fibonacci(n):\n    pass`
+        code: `def fibonacci(n):\n    pass`,
     },
     {
         problemId: '#10971',
@@ -146,7 +160,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         sources: ['타임어택'],
         sourceType: 'game',
         gameType: 'team',
-        code: `# TSP (외판원 순회) 문제\n// ...`
+        code: `# TSP (외판원 순회) 문제\n// ...`,
     },
     {
         problemId: '#2580',
@@ -156,7 +170,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         link: 'https://www.acmicpc.net/problem/2580',
         sources: ['알고스터디'],
         sourceType: 'study',
-        code: `// 백트래킹으로 스도쿠 풀기`
+        code: `// 백트래킹으로 스도쿠 풀기`,
     },
     {
         problemId: '#9663',
@@ -167,7 +181,7 @@ export const MOCK_TIMELINE: TimelineItemData[] = [
         sources: ['스피드 레이스'],
         sourceType: 'game',
         gameType: 'personal',
-        code: `def n_queens(i, col):`
+        code: `def n_queens(i, col):`,
     },
 ];
 
@@ -188,7 +202,8 @@ export const MOCK_AI_RECOMMENDATIONS: AIRecommendationData[] = [
         tier: 'silver',
         tierLevel: 1,
         tags: ['다이나믹프로그래밍', 'BFS'],
-        reason: '최근 DP 문제의 배열을 많이 틀렸던 경험을 가졌고, 이를 해결하기 위해 DP의 배열에 대해 친숙해지고 싶습니다.',
+        reason:
+            '최근 DP 문제의 배열을 많이 틀렸던 경험을 가졌고, 이를 해결하기 위해 DP의 배열에 대해 친숙해지고 싶습니다.',
     },
     {
         problemId: '#2178',
@@ -281,29 +296,59 @@ export interface LeagueRankingMember {
 export interface LeagueRankingData {
     myLeague: LeagueType;
     myRank: number;
+    maxLeague?: LeagueType; // 최고 도달 리그
+    maxScore?: number; // 최고 도달 점수
     members: LeagueRankingMember[];
 }
 
-// 리그별 승급/강등 규칙
+// 리그별 승급/강등 규칙 (백분율 %)
 export interface LeagueRule {
-    promote: number; // 상위 N명 승급
-    demote: number;  // 하위 N명 강등
+    promotePercent: number; // 상위 P% 승급
+    demotePercent: number; // 하위 D% 강등
 }
 
 export const LEAGUE_RULES: Record<LeagueType, LeagueRule> = {
-    stone: { promote: 4, demote: 0 },
-    bronze: { promote: 4, demote: 2 },
-    silver: { promote: 3, demote: 3 },
-    gold: { promote: 3, demote: 3 },
-    platinum: { promote: 2, demote: 4 },
-    emerald: { promote: 2, demote: 4 },
-    diamond: { promote: 1, demote: 5 },
-    ruby: { promote: 0, demote: 5 },
+    stone: { promotePercent: 40, demotePercent: 0 }, // 상위 40% 승급
+    bronze: { promotePercent: 40, demotePercent: 20 }, // 상위 40% 승급, 하위 20% 강등
+    silver: { promotePercent: 30, demotePercent: 30 }, // 상위 30% 승급, 하위 30% 강등
+    gold: { promotePercent: 30, demotePercent: 30 }, // 상위 30% 승급, 하위 30% 강등
+    platinum: { promotePercent: 20, demotePercent: 40 }, // 상위 20% 승급, 하위 40% 강등
+    emerald: { promotePercent: 20, demotePercent: 40 }, // 상위 20% 승급, 하위 40% 강등
+    diamond: { promotePercent: 10, demotePercent: 50 }, // 상위 10% 승급, 하위 50% 강등
+    ruby: { promotePercent: 0, demotePercent: 50 }, // 상위 0% 승급, 하위 50% 강등
+};
+
+/**
+ * 리그 인원에 따른 승급/강등 커트라인 인원 계산
+ * 규칙:
+ * 1. N=1이면 변동 없음
+ * 2. N>=2이면 유지 인원 최소 1명 보장
+ * 3. 비율 적용은 올림(ceil)
+ * 4. 우선순위: 승급 -> 강등
+ */
+export const calculateLeagueCutoffs = (totalMembers: number, rule: LeagueRule) => {
+    if (totalMembers <= 1) {
+        return { promoteCount: 0, demoteCount: 0 };
+    }
+
+    // 1. 승급 인원 계산
+    // 승급 = min( ceil(N * P), N - 1 )
+    let promoteCount = Math.ceil(totalMembers * (rule.promotePercent / 100));
+    promoteCount = Math.min(promoteCount, totalMembers - 1);
+
+    // 2. 강등 인원 계산
+    // 강등 = min( ceil(N * D), N - 승급 - 1 )
+    let demoteCount = Math.ceil(totalMembers * (rule.demotePercent / 100));
+    demoteCount = Math.min(demoteCount, totalMembers - promoteCount - 1);
+
+    return { promoteCount, demoteCount };
 };
 
 export const MOCK_LEAGUE_RANKING: LeagueRankingData = {
     myLeague: 'gold',
     myRank: 3,
+    maxLeague: 'diamond',
+    maxScore: 230,
     members: [
         { rank: 1, name: 'user_1', avatar: '/avatars/default.png', score: 970 },
         { rank: 2, name: '꿈꾸며유영', avatar: '/avatars/default.png', score: 880 },

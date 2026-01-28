@@ -45,7 +45,7 @@ const normalizeCode = (str: string) => str.replace(/\r\n/g, '\n').trim();
 
 export interface CCIDEPanelRef {
   handleCopy: () => Promise<void>;
-  handleSubmit: () => Promise<void>;
+  handleSubmit: () => void;
   handleRefChat: () => void;
   toggleTheme: () => void;
   setLanguage: (lang: string) => void;
@@ -65,6 +65,7 @@ interface CCIDEPanelProps {
   onCodeChange?: (code: string) => void;
   editorId?: string;
   restoredCode?: string | null;
+  restoreVersion?: number;
 }
 
 export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
@@ -82,6 +83,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       onCodeChange,
       editorId = 'default',
       restoredCode,
+      restoreVersion,
     },
     ref,
   ) => {
@@ -98,32 +100,44 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // 현재 화면에 보여지는 코드
     const [code, setCode] = useState(initialCode || DEFAULT_CODE.python);
 
-    // [Realtime Fix] ReadOnly 모드일 때 외부에서 들어오는 코드(initialCode)가 변경되면 즉시 반영
-    // 이는 실시간 코드 보기(Viewing Mode)에서 소켓 데이터를 에디터에 보여주기 위함입니다.
-    useEffect(() => {
-      if (readOnly && initialCode !== undefined) {
-        setCode(initialCode);
-      }
-    }, [initialCode, readOnly]);
+    // [Realtime Fix] - 통합됨 (아래 useEffect에서 처리)
+    // 기존에 있던 readOnly 전용 이펙트는 아래의 일반 initialCode 이펙트와 중복되므로 제거하거나 병합합니다.
+    // useEffect(() => {
+    //   if (readOnly && initialCode !== undefined) {
+    //     setCode(initialCode);
+    //   }
+    // }, [initialCode, readOnly]);
 
     // [Restoration Fix] 복구된 코드가 들어오면 에디터에 적용
+    // restoredCode === '' 은 해당 문제에 저장된 코드가 없음을 의미 -> 기본 코드로 초기화
+    // restoreVersion이 변경될 때마다 무조건 실행 (같은 코드여도 문제 전환 시 새로 적용)
+    const lastRestoreVersionRef = useRef<number | undefined>(undefined);
     useEffect(() => {
-      if (restoredCode && restoredCode !== code) {
-        console.log('[CCIDEPanel] Restoring code, remounting editor...');
-        setCode(restoredCode);
-        originCodeRef.current = restoredCode;
-        isDirtyRef.current = false;
+      if (restoredCode === null || restoredCode === undefined) return;
+      if (restoreVersion === lastRestoreVersionRef.current) return;
 
-        // 모델 ID를 변경하여 에디터를 강제로 다시 마운트합니다.
-        // setValue만으로 해결되지 않는 렌더링 타이밍 이슈를 원천 차단합니다.
-        setModelId((prev) => prev + 1);
+      lastRestoreVersionRef.current = restoreVersion;
 
-        // 상위 컴포넌트(CCCenterPanel)에도 알림
-        if (onCodeChange) {
-          onCodeChange(restoredCode);
-        }
+      const newCode =
+        restoredCode === '' ? DEFAULT_CODE[getSafeLanguageKey(language)] : restoredCode;
+
+      console.log(
+        '[CCIDEPanel] Restoring code, remounting editor...',
+        restoredCode === '' ? '(using default)' : '',
+      );
+      setCode(newCode);
+      originCodeRef.current = newCode;
+      isDirtyRef.current = false;
+
+      // 모델 ID를 변경하여 에디터를 강제로 다시 마운트합니다.
+      // setValue만으로 해결되지 않는 렌더링 타이밍 이슈를 원천 차단합니다.
+      setModelId((prev) => prev + 1);
+
+      // 상위 컴포넌트(CCCenterPanel)에도 알림
+      if (onCodeChange) {
+        onCodeChange(newCode);
       }
-    }, [restoredCode]);
+    }, [restoredCode, restoreVersion, language, onCodeChange]);
 
     // [핵심] Monaco Editor 경로 캐싱 방지용 ID
     const [modelId, setModelId] = useState(0);
@@ -142,6 +156,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
     const readOnlyRef = useRef(readOnly);
     const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
+    const setPendingCodeShare = useRoomStore((state) => state.setPendingCodeShare);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ----------------------------------------------------------------------
@@ -182,32 +197,17 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         setCode((prev) =>
           prev === DEFAULT_CODE[internalLanguage as keyof typeof DEFAULT_CODE]
             ? DEFAULT_CODE[propLanguage as keyof typeof DEFAULT_CODE]
-            : prev
+            : prev,
         );
         setInternalLanguage(propLanguage);
       }
-    }, [propLanguage]);
-
-    // Store listeners for cleanup
-    const listenersRef = useRef<{
-      preventClipboard: (e: Event) => void;
-      stopKeyPropagation: (e: Event) => void;
-      container: HTMLElement | null;
-    } | null>(null);
-
-
-
-    useEffect(() => {
-      return () => {
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      };
-    }, []);
+    }, [propLanguage, internalLanguage, onCodeChange]);
 
     // ----------------------------------------------------------------------
     // 언어 변경 로직
     // ----------------------------------------------------------------------
 
-    const proceedLanguageChange = (newLang: string) => {
+    const proceedLanguageChange = (newLang: string): void => {
       // 1. 플래그 설정: "지금부터 언어 바꿀 거니까 외부 prop 간섭하지 마라"
       isSwitchingLanguageRef.current = true;
 
@@ -243,7 +243,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       }, 500);
     };
 
-    const handleLanguageChangeAttempt = (targetLang: string) => {
+    const handleLanguageChangeAttempt = (targetLang: string): void => {
       if (readOnly) {
         proceedLanguageChange(targetLang);
         return;
@@ -274,7 +274,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       }
     };
 
-    const confirmLanguageChange = () => {
+    const confirmLanguageChange = (): void => {
       if (pendingLanguage) {
         proceedLanguageChange(pendingLanguage);
       }
@@ -283,13 +283,13 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // ----------------------------------------------------------------------
     // 기타 핸들러
     // ----------------------------------------------------------------------
-    const toggleTheme = () => {
+    const toggleTheme = (): void => {
       const newTheme = theme === 'light' ? 'vs-dark' : 'light';
       setInternalTheme(newTheme);
       if (propOnThemeChange) propOnThemeChange(newTheme);
     };
 
-    const handleCopy = async () => {
+    const handleCopy = async (): Promise<void> => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
         try {
@@ -301,7 +301,16 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       }
     };
 
-    const handleRefChat = () => {
+    const handleRefChat = (): void => {
+      if (editorRef.current) {
+        const currentCode = editorRef.current.getValue();
+        setPendingCodeShare({
+          code: currentCode,
+          language,
+          ownerName: 'Me',
+          isRealtime: true,
+        });
+      }
       setRightPanelActiveTab('chat');
       setTimeout(() => {
         const chatInput = document.getElementById('chat-input');
@@ -309,22 +318,25 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       }, 0);
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = (): void => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
         // TODO: 문제번호 넣어주세용
         const problemId = '1000';
 
         // 확장 프로그램에 메시지 전송 (확장 프로그램이 수신 후 스토리지 저장 -> 페이지 이동 처리)
-        window.postMessage({
-          type: 'PEEKLE_SUBMIT_CODE',
-          payload: {
-            problemId,
-            code: value,
-            language: language, // 'python', 'java', 'cpp' 등
-            studyId: studyId // <--- Inject Study ID from params
-          }
-        }, '*');
+        window.postMessage(
+          {
+            type: 'PEEKLE_SUBMIT_CODE',
+            payload: {
+              problemId,
+              code: value,
+              language: language, // 'python', 'java', 'cpp' 등
+              studyId: studyId, // <--- Inject Study ID from params
+            },
+          },
+          '*',
+        );
 
         toast.info('자동 제출을 시작합니다...');
       }
@@ -334,7 +346,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // Editor Mount
     // ----------------------------------------------------------------------
 
-    const handleEditorDidMount: OnMount = (editor) => {
+    const handleEditorDidMount: OnMount = (editor): void => {
       editorRef.current = editor;
       if (onEditorMount) onEditorMount(editor);
 
@@ -348,11 +360,11 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       }
 
       const container = editor.getContainerDomNode();
-      const preventClipboard = (e: Event) => {
+      const preventClipboard = (e: Event): void => {
         e.preventDefault();
         e.stopPropagation();
       };
-      const handleKeyDown = (e: KeyboardEvent) => {
+      const handleKeyDown = (e: KeyboardEvent): void => {
         if (!readOnlyRef.current) return;
         const allowedKeys = [
           'ArrowUp',

@@ -8,7 +8,9 @@ group = 'com.peekle'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    sourceCompatibility = '21'
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 configurations {
@@ -52,8 +54,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
 
     // Lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
@@ -77,6 +79,9 @@ dependencies {
 
     // Jsoup
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    // Redisson
+    implementation 'org.redisson:redisson-spring-boot-starter:3.31.0'
 }
 
 tasks.named('test') {

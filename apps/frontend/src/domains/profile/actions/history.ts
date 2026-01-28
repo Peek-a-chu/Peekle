@@ -64,7 +64,7 @@ export interface HistoryFilter {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function getSubmissionHistory(_filter?: HistoryFilter): Promise<SubmissionHistory[]> {
+export async function getSubmissionHistory(_nickname: string, _filter?: HistoryFilter): Promise<SubmissionHistory[]> {
   await new Promise((resolve) => setTimeout(resolve, 300)); // Mock API delay
   return MOCK_HISTORY;
 }
