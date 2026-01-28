@@ -24,7 +24,7 @@ const MOCK_ME: UserProfile = {
   leagueGroupId: '100',
   streakCurrent: 5,
   streakMax: 12,
-  avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+  profileImg: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
   solvedCount: 156,
 };
 
@@ -38,7 +38,7 @@ const MOCK_OTHERS: Record<string, UserProfile> = {
     leagueGroupId: '101',
     streakCurrent: 42,
     streakMax: 42,
-    avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
+    profileImg: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
     solvedCount: 320,
   },
 };
@@ -52,8 +52,18 @@ export async function getMyProfile(): Promise<UserProfile> {
       },
       next: { revalidate: 0 },
     });
-    const json = (await res.json()) as ProfileApiResponse;
-    const { data } = json;
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch profile: ${res.status}`);
+    }
+
+    const json = await res.json();
+
+    if (!json.success || !json.data) {
+      throw new Error(json.message || 'Failed to fetch profile data');
+    }
+
+    const data = json.data;
 
     return {
       id: String(data.id),
@@ -64,8 +74,9 @@ export async function getMyProfile(): Promise<UserProfile> {
       leagueGroupId: null, // 추후 구현
       streakCurrent: data.streakCurrent,
       streakMax: data.streakMax,
-      avatarUrl: data.profileImage || undefined,
+      profileImg: data.profileImg || undefined,
       solvedCount: Number(data.solvedCount),
+      isMe: data.me,
     };
   } catch (e) {
     console.error('Failed to fetch profile:', e);
@@ -73,20 +84,70 @@ export async function getMyProfile(): Promise<UserProfile> {
   }
 }
 
-export async function getUserProfile(id: string): Promise<UserProfile> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return (
-    MOCK_OTHERS[id] || {
-      ...MOCK_ME,
-      id,
-      nickname: `User ${id}`,
-      bojId: null,
-      league: 'Bronze',
+export async function getUserProfile(nickname: string): Promise<UserProfile> {
+  try {
+    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('access_token')?.value;
+
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers['Cookie'] = `access_token=${accessToken}`;
+    }
+
+    // 닉네임은 URL 인코딩 필요
+    const encodedNickname = encodeURIComponent(nickname);
+    const res = await fetch(`${backendUrl}/api/users/${encodedNickname}/profile`, {
+      headers: headers,
+      next: { revalidate: 0 },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch user profile: ${res.status}`);
+    }
+
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      console.error('Failed to parse profile response:', text.substring(0, 100)); // Log first 100 chars
+      throw new Error('Invalid JSON response');
+    }
+
+    if (!json.success || !json.data) {
+      throw new Error(json.message || 'Failed to fetch profile data');
+    }
+
+    const data = json.data;
+
+    return {
+      id: String(data.id),
+      nickname: data.nickname,
+      bojId: data.bojId,
+      league: data.leagueName,
+      leaguePoint: Number(data.score),
+      leagueGroupId: null,
+      streakCurrent: data.streakCurrent,
+      streakMax: data.streakMax,
+      profileImg: data.profileImg || undefined,
+      solvedCount: Number(data.solvedCount),
+      isMe: data.me,
+    };
+  } catch (e) {
+    console.error(`Failed to fetch profile for ${nickname}:`, e);
+    // 에러 발생 시 Mock 데이터 반환 혹은 에러 처리
+    // 여기서는 빈 프로필 반환
+    return {
+      id: '',
+      nickname: nickname,
+      bojId: '',
+      league: 'Stone',
       leaguePoint: 0,
       leagueGroupId: null,
       streakCurrent: 0,
       streakMax: 0,
-      avatarUrl: undefined,
+      profileImg: undefined,
       solvedCount: 0,
     }
   );

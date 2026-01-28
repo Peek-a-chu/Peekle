@@ -13,11 +13,8 @@ const UserProfileSection = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Mock user data
-  const user = {
-    nickname: 'CodeMaster',
-    profileImage: '', // Empty for placeholder
-  };
+  const user = useAuthStore((state) => state.user);
+  const checkAuth = useAuthStore((state) => state.checkAuth);
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -26,6 +23,9 @@ const UserProfileSection = () => {
         setIsOpen(false);
       }
     };
+
+    // 컴포넌트 마운트 시 최신 유저 정보 조회 (프로필 이미지 등 동기화)
+    checkAuth();
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -67,9 +67,9 @@ const UserProfileSection = () => {
       <div className="relative mb-6" ref={dropdownRef}>
         <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center gap-3 group">
           <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center overflow-hidden border-2 border-background shrink-0 ml-2 shadow-sm">
-            {user.profileImage ? (
+            {user.profileImg ? (
               <Image
-                src={user.profileImage}
+                src={user.profileImg}
                 alt={user.nickname}
                 fill
                 className="object-cover rounded-full"
