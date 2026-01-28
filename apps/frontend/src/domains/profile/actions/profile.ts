@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { UserProfile } from '../types';
 
 interface ProfileApiResponse {
@@ -150,5 +151,5 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
       profileImg: undefined,
       solvedCount: 0,
     }
-  );
+  }
 }

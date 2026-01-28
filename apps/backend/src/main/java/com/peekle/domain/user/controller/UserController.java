@@ -8,12 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,9 +25,7 @@ public class UserController {
 
     @GetMapping("/me")
     public ApiResponse<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Long userId) {
-        if (userId == null) {
-            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
-        }
+
         Map<String, Object> userInfo = userService.getUserInfo(userId);
         return ApiResponse.success(userInfo);
     }
@@ -41,23 +34,9 @@ public class UserController {
     public ApiResponse<Map<String, String>> generateExtensionToken(
             @AuthenticationPrincipal Long userId,
             @RequestParam(defaultValue = "false") boolean regenerate) {
-        if (userId == null) {
-            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
-        }
         String token = userService.generateExtensionToken(userId, regenerate);
         Map<String, String> response = new HashMap<>();
         response.put("extensionToken", token);
-        return ApiResponse.success(response);
-    }
-
-    @GetMapping("/me/profile")
-    public ApiResponse<UserProfileResponse> getUserProfile(
-            @AuthenticationPrincipal Long userId,
-            @RequestHeader(value = "X-Peekle-Token", required = false) String token) {
-        if (userId == null) {
-            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
-        }
-        UserProfileResponse response = userService.getUserProfile(userId, userId);
         return ApiResponse.success(response);
     }
 
@@ -73,9 +52,7 @@ public class UserController {
     public ApiResponse<TokenValidationResponse> validateToken(
             @AuthenticationPrincipal Long userId,
             @RequestHeader("X-Peekle-Token") String token) {
-        if (userId == null) {
-            throw new com.peekle.global.exception.BusinessException(com.peekle.global.exception.ErrorCode.UNAUTHORIZED);
-        }
+
         boolean isValidUserToken = userService.validateExtensionToken(userId, token);
         return ApiResponse.success(new TokenValidationResponse(isValidUserToken));
     }
