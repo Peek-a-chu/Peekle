@@ -6,6 +6,8 @@
 #   - EC2_HOST: EC2 퍼블릭 IP 또는 도메인
 #   - EC2_USER: EC2 SSH 사용자 (예: ubuntu, ec2-user)
 #   - DOMAIN_NAME: 배포 도메인 (선택사항)
+#   - GITLAB_USER: GitLab 사용자 ID (Personal Access Token 사용 시)
+#   - GITLAB_ACCESS_TOKEN: GitLab Personal Access Token (read_repository 권한 필요)
 
 stages:
   - build
@@ -88,16 +90,23 @@ deploy-production:
     - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
   script:
     - |
-      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << ENDSSH
         set -e
 
         echo "=== Deploying Peekle to Production ==="
 
-        # Check if project directory exists, clone if not
+        # Define Repository URL with Personal Access Token
+        # Note: Variables are expanded by GitLab Runner before sending to SSH
+        REPO_URL="https://${GITLAB_USER}:${GITLAB_ACCESS_TOKEN}@lab.ssafy.com/s14-webmobile1-sub1/S14P11A408.git"
+
+        # Check if project directory exists
         if [ ! -d ~/peekle ]; then
           echo "Project directory not found. Cloning..."
-          # Try cloning with SSH (requires server SSH key to be added to GitLab)
-          git clone git@lab.ssafy.com:s14-webmobile1-sub1/S14P11A408.git ~/peekle
+          git clone $REPO_URL ~/peekle
+        else
+          echo "Project directory exists. Updating remote URL..."
+          cd ~/peekle
+          git remote set-url origin $REPO_URL
         fi
 
         # Navigate to project directory
