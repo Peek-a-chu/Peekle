@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { UserProfile } from '../types';
 
 interface Props {
@@ -12,12 +13,13 @@ export function CCProfileHeader({ user, isMe }: Props) {
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-6">
         {/* Avatar (Placeholder based on nickname) */}
-        <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center text-3xl font-bold text-indigo-600 shrink-0 border-4 border-white shadow-sm">
+        <div className="relative w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center text-3xl font-bold text-indigo-600 shrink-0 border-4 border-white shadow-sm">
           {user.avatarUrl ? (
-            <img
+            <Image
               src={user.avatarUrl}
               alt={user.nickname}
-              className="w-full h-full rounded-full object-cover"
+              fill
+              className="rounded-full object-cover"
             />
           ) : (
             user.nickname.charAt(0).toUpperCase()

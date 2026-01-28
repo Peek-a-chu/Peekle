@@ -1,0 +1,91 @@
+services:
+  # Nginx Reverse Proxy (HTTP & HTTPS for localhost)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: peekle-nginx-dev
+    environment:
+      - DOMAIN_NAME=localhost
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/dev.conf:ro
+      - nginx-certs:/etc/letsencrypt
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - peekle-network-dev
+
+  # Frontend - Next.js (Dev mode)
+  frontend:
+    build:
+      context: ../apps/frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://localhost/api
+        - NEXT_PUBLIC_SOCKET_URL=https://localhost
+    container_name: peekle-frontend-dev
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=https://localhost/api
+      - NEXT_PUBLIC_SOCKET_URL=https://localhost
+    expose:
+      - "3000"
+    networks:
+      - peekle-network-dev
+
+  # Backend - Spring Boot (Dev profile)
+  backend:
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+    container_name: peekle-backend-dev
+    user: root
+    entrypoint: ["sh", "-c", "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS -jar app.jar"]
+    env_file:
+      - ../apps/backend/.env
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SERVER_PORT=8080
+    volumes:
+      - h2-data:/app/data
+    expose:
+      - "8080"
+    depends_on:
+      - redis
+    networks:
+      - peekle-network-dev
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: peekle-redis-dev
+    expose:
+      - "6379"
+    networks:
+      - peekle-network-dev
+
+  # OpenVidu Server (WebRTC) - Local Dev Mode
+  openvidu:
+    image: openvidu/openvidu-dev:2.29.0
+    container_name: peekle-openvidu-dev
+    environment:
+      - OPENVIDU_SECRET=MY_SECRET
+      - DOMAIN_OR_PUBLIC_IP=localhost
+      - OPENVIDU_PUBLICURL=https://localhost/openvidu
+    networks:
+      - peekle-network-dev
+
+networks:
+  peekle-network-dev:
+    driver: bridge
+
+volumes:
+  h2-data:
+    driver: local
+  nginx-certs:
+    driver: local

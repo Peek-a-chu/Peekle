@@ -19,9 +19,13 @@ _bmad-output
 .vscode
 
 # Dependency Directories
-
 .turbo
 node_modules
+
+# Build Outputs
+dist/
+.next/
+*.tsbuildinfo
 peekle.sqlite
 .idea
 apps/frontend/build.log
@@ -30,3 +34,5 @@ apps/frontend/build.log
 
 test-chat
 test-ide
+
+test-results

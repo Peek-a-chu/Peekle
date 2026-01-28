@@ -14,14 +14,5 @@ interface StudyLayoutProps {
 }
 
 export default function StudyLayout({ children }: StudyLayoutProps) {
-  return (
-    <div className={cn('flex h-screen flex-col bg-background')}>
-      <StudyLayoutHeader />
-      <div className="relative flex min-h-0 flex-1">
-        <StudyLayoutLeftPanel />
-        <StudyLayoutCenter>{children}</StudyLayoutCenter>
-        <StudyLayoutRightPanel />
-      </div>
-    </div>
-  );
+  return <>{children}</>;
 }

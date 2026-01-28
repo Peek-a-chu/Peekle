@@ -1,8 +1,5 @@
 'use client';
 
-import { useState } from 'react'; // Added in case, though not strictly used in the slice I see, but good practice if hooks are used later. Actually better not to add unused imports.
-// Just adding 'use client' at top.
-
 export type ActivityType = 'STUDY' | 'GAME' | 'SOLO';
 
 export interface CCDailyActivity {
@@ -85,8 +82,9 @@ export function CCDailyActivityList({ date, activities = MOCK_ACTIVITIES }: Prop
               <div className="flex items-center gap-4">
                 {/* Status Icon */}
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${activity.isSuccess ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'
-                    }`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${
+                    activity.isSuccess ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'
+                  }`}
                 >
                   {activity.isSuccess ? '✓' : '✗'}
                 </div>

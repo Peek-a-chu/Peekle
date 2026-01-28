@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Mic, MicOff, Video, VideoOff, Pencil, Settings } from 'lucide-react';
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 
 interface CCControlBarProps {
   onMicToggle?: () => void;
@@ -22,6 +23,7 @@ export function CCControlBar({
 }: CCControlBarProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+  const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
 
   const handleMicToggle = () => {
     setIsMuted(!isMuted);
@@ -63,11 +65,16 @@ export function CCControlBar({
         </Button>
 
         <Button
-          variant="ghost"
+          variant={isWhiteboardActive ? 'default' : 'ghost'}
           size="icon"
-          className="h-10 w-10 rounded-full bg-[#EDF2F8] hover:bg-[#DFE7F0]"
+          className={cn(
+            'h-10 w-10 rounded-full',
+            isWhiteboardActive
+              ? 'bg-rose-500 hover:bg-rose-600 text-white'
+              : 'bg-[#EDF2F8] hover:bg-[#DFE7F0]',
+          )}
           onClick={onWhiteboardToggle}
-          aria-label="화이트보드"
+          aria-label={isWhiteboardActive ? '화이트보드 끄기' : '화이트보드 켜기'}
         >
           <Pencil className="h-5 w-5" />
         </Button>

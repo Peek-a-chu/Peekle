@@ -4,7 +4,7 @@ export default function MainLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {
+}>): React.ReactNode {
   return (
     <div className="flex min-h-screen">
       <Sidebar />

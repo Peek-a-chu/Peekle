@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Image from 'next/image';
 import { UserProfile } from '../types';
 
 interface Props {
@@ -23,10 +24,12 @@ export function CCProfileStatsRow({ user }: Props) {
               UR
             </div>
           ) : (
-            <img
+            <Image
               src={iconPath}
               alt={`${user.league} tier icon`}
-              className="w-6 h-6 object-contain"
+              width={24}
+              height={24}
+              className="object-contain"
               onError={() => setImgError(true)}
             />
           )}

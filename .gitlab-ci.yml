@@ -1,47 +1,145 @@
 # GitLab CI/CD Configuration for Peekle
-# Jenkins가 주 CI/CD 도구이지만, GitLab CI를 통한 간단한 검증도 가능
+# GitLab Pipeline + EC2 SSH 키 연동을 통한 자동 배포
+#
+# 필요한 GitLab CI/CD Variables (Settings > CI/CD > Variables):
+#   - SSH_PRIVATE_KEY_BASE64: EC2 SSH 프라이빗 키 (base64 인코딩)
+#   - EC2_HOST: EC2 퍼블릭 IP 또는 도메인
+#   - EC2_USER: EC2 SSH 사용자 (예: ubuntu, ec2-user)
+#   - DOMAIN_NAME: 배포 도메인 (선택사항)
 
 stages:
-  - lint
   - build
+  - deploy
 
-# Frontend 린트 및 빌드는 Jenkins Jenkinsfile에서 처리
-# 이 파일은 GitLab 내장 CI를 사용하려는 경우에만 활성화
-
-frontend-lint:
-  stage: lint
-  image: node:20-alpine
-  only:
-    changes:
-      - apps/frontend/**/*
-  before_script:
-    - cd apps/frontend
-    - npm install -g pnpm@10.28.1
-    - pnpm install --frozen-lockfile
-  script:
-    - pnpm run lint
-    - pnpm run format:check
-    - pnpm run type-check
-  cache:
-    paths:
-      - apps/frontend/node_modules/
+# ===========================================
+# Frontend Pipeline
+# ===========================================
 
 frontend-build:
   stage: build
   image: node:20-alpine
   only:
+    refs:
+      - master
     changes:
       - apps/frontend/**/*
   before_script:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
     - pnpm install --frozen-lockfile
+    # - npx playwright install --with-deps chromium # E2E 테스트가 필요하다면 주석 해제 (시간 소요됨)
   script:
+    - pnpm run test --run
+    # - pnpm run test:e2e # E2E 테스트가 필요하다면 주석 해제
     - pnpm run build
   artifacts:
     paths:
       - apps/frontend/.next
-    expire_in: 7 days
+    expire_in: 1 day
   cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
     paths:
       - apps/frontend/node_modules/
+
+# ===========================================
+# Backend Pipeline (Spring Boot)
+# ===========================================
+
+spring-backend-build:
+  stage: build
+  image: gradle:8.5-jdk21-alpine
+  only:
+    refs:
+      - master
+    changes:
+      - apps/backend/**/*
+  before_script:
+    - cd apps/backend
+    - chmod +x gradlew
+  script:
+    - ./gradlew clean build --no-daemon -x test
+  artifacts:
+    paths:
+      - apps/backend/build/libs/*.jar
+    expire_in: 1 day
+  cache:
+    key: backend-gradle-${CI_COMMIT_REF_SLUG}
+    paths:
+      - apps/backend/.gradle
+      - apps/backend/build
+
+# ===========================================
+# Deploy to EC2 via SSH
+# ===========================================
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  only:
+    refs:
+      - master
+  needs:
+    - job: frontend-build
+      optional: true
+    - job: spring-backend-build
+      optional: true
+  before_script:
+    # Install SSH client
+    - apk add --no-cache openssh-client
+    # Setup SSH key (base64 decoded)
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    # Add EC2 host to known hosts
+    - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+        set -e
+
+        echo "=== Deploying Peekle to Production ==="
+
+        # Navigate to project directory
+        cd /home/$EC2_USER/peekle
+
+        # Pull latest code
+        echo "Pulling latest code..."
+        git fetch origin master
+        git reset --hard origin/master
+
+        # Create .env file if not exists
+        if [ ! -f docker/.env ]; then
+          echo "Creating .env file..."
+          cp docker/.env.example docker/.env
+        fi
+
+        # Navigate to docker directory
+        cd docker
+
+        # Build and deploy with Docker Compose
+        echo "Building Docker images..."
+        docker compose -f docker-compose.prod.yml build --no-cache
+
+        echo "Stopping old containers..."
+        docker compose -f docker-compose.prod.yml down
+
+        echo "Starting new containers..."
+        docker compose -f docker-compose.prod.yml up -d
+
+        # Clean up old images
+        echo "Cleaning up old images..."
+        docker image prune -f
+
+        # Health check
+        echo "Waiting for services to be healthy..."
+        sleep 10
+
+        # Check if containers are running
+        docker compose -f docker-compose.prod.yml ps
+
+        echo "=== Deployment Complete ==="
+      ENDSSH
+  environment:
+    name: production
+    url: https://$DOMAIN_NAME
+  when: manual

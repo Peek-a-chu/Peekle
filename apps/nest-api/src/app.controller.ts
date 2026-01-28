@@ -41,6 +41,11 @@ export class AppController {
     return this.appService.getParticipants(studyId);
   }
 
+  @Get('study/:studyId/chats')
+  getChats(@Param('studyId') studyId: string) {
+    return this.appService.getChats(studyId);
+  }
+
   @Get('study/:studyId')
   getStudyRoom(@Param('studyId') studyId: string) {
     return this.appService.getStudyRoom(studyId);
@@ -60,10 +65,17 @@ export class AppController {
   }
 
   @Delete('study/:studyId/problems/:problemId')
-  deleteProblem(
+  async deleteProblem(
     @Param('studyId') studyId: string,
     @Param('problemId') problemId: string,
   ) {
-    return this.appService.deleteProblem(studyId, problemId);
+    try {
+      return await this.appService.deleteProblem(studyId, problemId);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    }
   }
 }

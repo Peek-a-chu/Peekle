@@ -1,13 +1,13 @@
-import { GamePlayContainer } from '@/domains/game/components/game-play-container'
+import { GamePlayContainer } from '@/domains/game/components/game-play-container';
 
 interface GamePlayPageProps {
-    params: Promise<{
-        roomId: string
-    }>
+  params: Promise<{
+    roomId: string;
+  }>;
 }
 
 export default async function GamePlayPage({ params }: GamePlayPageProps) {
-    const { roomId } = await params
+  const { roomId } = await params;
 
-    return <GamePlayContainer roomId={roomId} />
+  return <GamePlayContainer roomId={roomId} />;
 }

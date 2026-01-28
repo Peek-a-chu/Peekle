@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { Send, Mic, MicOff, Video, VideoOff, MoreVertical } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { cn } from '@/lib/utils'
-import type { ChatMessage, Participant } from '@/domains/game/mocks/mock-data'
+import { useState, useRef, useEffect } from 'react';
+import { Send, Mic, MicOff, Video, VideoOff, MoreVertical } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import type { ChatMessage, Participant } from '@/domains/game/mocks/mock-data';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -33,52 +33,52 @@ export function ChatPanel({
   micState = {},
   camState = {},
 }: ChatPanelProps) {
-  const [inputValue, setInputValue] = useState('')
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [inputValue, setInputValue] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false)
+        setIsMenuOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // 현재 사용자의 팀 확인
-  const myTeam = participants.find((p) => p.id === currentUserId)?.team
+  const myTeam = participants.find((p) => p.id === currentUserId)?.team;
 
   // 메시지 필터링 (팀전일 경우 우리 팀 메시지만)
   const filteredMessages = messages.filter((msg) => {
-    if (!myTeam) return true // 개인전이면 모두 표시
+    if (!myTeam) return true; // 개인전이면 모두 표시
     // 시스템 메시지(team 없음)거나 같은 팀 메시지만 표시
-    return !msg.senderTeam || msg.senderTeam === myTeam
-  })
+    return !msg.senderTeam || msg.senderTeam === myTeam;
+  });
 
   // 새 메시지가 오면 스크롤 맨 아래로
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSend = () => {
     if (inputValue.trim()) {
-      onSendMessage(inputValue.trim())
-      setInputValue('')
+      onSendMessage(inputValue.trim());
+      setInputValue('');
     }
-  }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   return (
     <Card className="flex h-full flex-col border-border bg-card">
@@ -103,14 +103,11 @@ export function ChatPanel({
           <CardContent className="flex-1 overflow-y-auto p-3">
             <div className="space-y-3">
               {filteredMessages.map((message) => {
-                const isMe = message.senderId === currentUserId
+                const isMe = message.senderId === currentUserId;
                 return (
                   <div
                     key={message.id}
-                    className={cn(
-                      'flex gap-2',
-                      isMe ? 'flex-row-reverse' : 'flex-row'
-                    )}
+                    className={cn('flex gap-2', isMe ? 'flex-row-reverse' : 'flex-row')}
                   >
                     {/* 아바타 */}
                     {!isMe && (
@@ -118,12 +115,7 @@ export function ChatPanel({
                         {message.senderNickname.charAt(0)}
                       </div>
                     )}
-                    <div
-                      className={cn(
-                        'max-w-[70%]',
-                        isMe ? 'text-right' : 'text-left'
-                      )}
-                    >
+                    <div className={cn('max-w-[70%]', isMe ? 'text-right' : 'text-left')}>
                       {!isMe && (
                         <span className="mb-1 block text-xs text-muted-foreground">
                           {message.senderNickname}
@@ -132,16 +124,14 @@ export function ChatPanel({
                       <div
                         className={cn(
                           'inline-block rounded-2xl px-3 py-2 text-sm',
-                          isMe
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-foreground'
+                          isMe ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
                         )}
                       >
                         {message.content}
                       </div>
                     </div>
                   </div>
-                )
+                );
               })}
               <div ref={messagesEndRef} />
             </div>
@@ -174,8 +164,8 @@ export function ChatPanel({
           <CardContent className="p-3">
             <div className="space-y-1">
               {participants.map((participant) => {
-                const isMicOff = micState[participant.id]
-                const isCamOff = camState[participant.id]
+                const isMicOff = micState[participant.id];
+                const isCamOff = camState[participant.id];
 
                 return (
                   <div
@@ -190,19 +180,13 @@ export function ChatPanel({
                     {/* 이름 및 상태 */}
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">
-                          {participant.nickname}
-                        </span>
-                        {participant.isHost && (
-                          <span className="text-xs text-yellow-500">👑</span>
-                        )}
+                        <span className="text-sm font-medium">{participant.nickname}</span>
+                        {participant.isHost && <span className="text-xs text-yellow-500">👑</span>}
                       </div>
                       <span
                         className={cn(
                           'text-xs',
-                          participant.status === 'READY'
-                            ? 'text-primary'
-                            : 'text-muted-foreground'
+                          participant.status === 'READY' ? 'text-primary' : 'text-muted-foreground',
                         )}
                       >
                         {participant.isHost
@@ -215,8 +199,16 @@ export function ChatPanel({
 
                     {/* 상태 표시 아이콘 (우측 정렬, 메뉴 공간 확보) */}
                     <div className="flex items-center gap-1 text-muted-foreground ml-auto">
-                      {isMicOff ? <MicOff className="h-4 w-4 text-destructive" /> : <Mic className="h-4 w-4" />}
-                      {isCamOff ? <VideoOff className="h-4 w-4 text-destructive" /> : <Video className="h-4 w-4" />}
+                      {isMicOff ? (
+                        <MicOff className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <Mic className="h-4 w-4" />
+                      )}
+                      {isCamOff ? (
+                        <VideoOff className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <Video className="h-4 w-4" />
+                      )}
                     </div>
 
                     {/* 방장 메뉴 (방장만, 내 아이템(방장) 옆에 점 3개, 없을 경우 공간만 차지하거나 조정) */}
@@ -241,9 +233,9 @@ export function ChatPanel({
                               <button
                                 className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                                 onClick={(e) => {
-                                  e.stopPropagation()
-                                  onMuteAll?.()
-                                  setIsMenuOpen(false)
+                                  e.stopPropagation();
+                                  onMuteAll?.();
+                                  setIsMenuOpen(false);
                                 }}
                               >
                                 <MicOff className="h-4 w-4 text-destructive" />
@@ -252,9 +244,9 @@ export function ChatPanel({
                               <button
                                 className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                                 onClick={(e) => {
-                                  e.stopPropagation()
-                                  onTurnOffAllCams?.()
-                                  setIsMenuOpen(false)
+                                  e.stopPropagation();
+                                  onTurnOffAllCams?.();
+                                  setIsMenuOpen(false);
                                 }}
                               >
                                 <VideoOff className="h-4 w-4 text-destructive" />
@@ -266,12 +258,12 @@ export function ChatPanel({
                       )}
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           </CardContent>
         </TabsContent>
       </Tabs>
     </Card>
-  )
+  );
 }

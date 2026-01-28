@@ -50,12 +50,7 @@ const Sidebar = () => {
 
       {/* Footer Section */}
       <div className="p-4 mt-auto">
-        <SidebarItem
-          icon={Settings}
-          label="설정"
-          onClick={() => openModal()}
-          isActive={isOpen}
-        />
+        <SidebarItem icon={Settings} label="설정" onClick={() => openModal()} isActive={isOpen} />
       </div>
     </aside>
   );

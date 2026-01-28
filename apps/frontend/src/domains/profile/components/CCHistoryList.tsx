@@ -101,12 +101,13 @@ export function CCHistoryList({ initialHistory }: Props) {
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold text-white
-                                    ${item.tier.includes('Bronze')
-                          ? 'bg-amber-700'
-                          : item.tier.includes('Silver')
-                            ? 'bg-slate-400'
-                            : 'bg-yellow-500' // Gold etc
-                        }`}
+                                    ${
+                                      item.tier.includes('Bronze')
+                                        ? 'bg-amber-700'
+                                        : item.tier.includes('Silver')
+                                          ? 'bg-slate-400'
+                                          : 'bg-yellow-500' // Gold etc
+                                    }`}
                     >
                       {item.tier}
                     </span>

@@ -4,7 +4,8 @@ import { ReactNode } from 'react';
 import { useRoomStore, selectOnlineCount } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Send } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { StudyChatPanel } from './chat/StudyChatPanel';
 
 interface CCRightPanelProps {
   chatContent?: ReactNode;
@@ -66,39 +67,10 @@ export function CCRightPanel({
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'chat' ? (
-          <div className="h-full">{chatContent ?? <ChatPlaceholder />}</div>
+          <div className="h-full">{chatContent ?? <StudyChatPanel />}</div>
         ) : (
           <div className="h-full">{participantsContent ?? <ParticipantsPlaceholder />}</div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function ChatPlaceholder() {
-  return (
-    <div className="flex h-full flex-col">
-      {/* Chat Messages Area */}
-      <div className="flex flex-1 items-center justify-center p-4 text-center">
-        <p className="text-sm text-muted-foreground">채팅 기능이 곧 추가됩니다</p>
-      </div>
-
-      {/* Chat Input Area */}
-      <div className="border-t border-border p-3">
-        <div className="flex gap-2">
-          <input
-            id="chat-input"
-            type="text"
-            placeholder="메시지를 입력하세요..."
-            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          <button
-            type="button"
-            className="rounded-md bg-pink-500 px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            <Send className="inline-block h-4 w-4" />
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ExtensionStatus, UserProfile } from '../types';
 import { CCProfileHeader } from './CCProfileHeader';
@@ -101,18 +100,21 @@ export function CCProfileView({ user, isMe }: Props) {
       {/* 4. Tabs (Segmented Control) */}
       <div className="bg-secondary/30 p-1 rounded-xl">
         <div className={`grid gap-1 ${isMe ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          {(Object.values(TABS) as string[]).filter(tab => isMe || tab !== TABS.EXTENSION).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as TabKey)}
-              className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
-                ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
-                : 'text-muted-foreground hover:text-foreground'
+          {(Object.values(TABS) as string[])
+            .filter((tab) => isMe || tab !== TABS.EXTENSION)
+            .map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as TabKey)}
+                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  activeTab === tab
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
-            >
-              {tab}
-            </button>
-          ))}
+              >
+                {tab}
+              </button>
+            ))}
         </div>
       </div>
 

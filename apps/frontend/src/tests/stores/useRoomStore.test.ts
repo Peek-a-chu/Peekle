@@ -16,23 +16,23 @@ describe('useRoomStore', () => {
   });
 
   describe('selectSortedParticipants', () => {
-    it('sorts self first and others by recent speaking activity', () => {
+    it('sorts owner first, then online status, then alphabetically', () => {
       const mockState = {
         currentUserId: 1,
         participants: [
-          { id: 2, lastSpeakingAt: 100 },
-          { id: 3, lastSpeakingAt: 300 }, // Most recent speaker
-          { id: 1 }, // Self
-          { id: 4, lastSpeakingAt: 200 },
+          { id: 2, nickname: 'Zebra', isOnline: true, isOwner: false },
+          { id: 3, nickname: 'Apple', isOnline: true, isOwner: true }, // Owner
+          { id: 1, nickname: 'Middle', isOnline: false, isOwner: false }, // Me, Offline
+          { id: 4, nickname: 'Bear', isOnline: true, isOwner: false },
         ] as Participant[],
       } as RoomState & RoomActions;
 
       const sorted = selectSortedParticipants(mockState);
 
-      expect(sorted[0].id).toBe(1);
-      expect(sorted[1].id).toBe(3);
-      expect(sorted[2].id).toBe(4);
-      expect(sorted[3].id).toBe(2);
+      expect(sorted[0].id).toBe(3); // Owner
+      expect(sorted[1].id).toBe(4); // Online, 'Bear' < 'Zebra'
+      expect(sorted[2].id).toBe(2); // Online, 'Zebra'
+      expect(sorted[3].id).toBe(1); // Offline
     });
   });
 

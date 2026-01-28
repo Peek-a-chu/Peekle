@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRoomStore, type Participant } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Crown, Mic, MicOff, VideoOff, User } from 'lucide-react';
@@ -40,12 +41,13 @@ export function CCVideoTile({
       {/* Video Area */}
       <div className="flex flex-1 items-center justify-center bg-muted-foreground/10">
         {participant.isVideoOff ? (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted-foreground/20">
+          <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-muted-foreground/20">
             {participant.profileImage ? (
-              <img
+              <Image
                 src={participant.profileImage}
                 alt={participant.nickname}
-                className="h-full w-full rounded-full object-cover"
+                fill
+                className="rounded-full object-cover"
               />
             ) : (
               <User className="h-6 w-6 text-muted-foreground" />

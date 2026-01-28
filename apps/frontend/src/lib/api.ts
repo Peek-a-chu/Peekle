@@ -1,14 +1,21 @@
+import { ApiResponse } from '@/types/apiUtils';
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
-interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: { code: string; message: string } | null;
+export async function handleResponse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    throw new Error(`API call failed: ${res.statusText}`);
+  }
+  const json = await res.json();
+  if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+    return json.data as T;
+  }
+  return json as T;
 }
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
   const url = `${BACKEND_URL}${path}`;
 
@@ -38,13 +45,17 @@ export async function apiFetch<T>(
           ...options.headers,
         },
       });
-      return retryResponse.json();
+      return retryResponse.json() as Promise<ApiResponse<T>>;
     } else {
       // Refresh도 실패 -> 로그인 페이지로
       window.location.href = '/login';
-      return { success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Session expired' } };
+      return {
+        success: false,
+        data: null,
+        error: { code: 'UNAUTHORIZED', message: 'Session expired' },
+      };
     }
   }
 
-  return response.json();
+  return response.json() as Promise<ApiResponse<T>>;
 }

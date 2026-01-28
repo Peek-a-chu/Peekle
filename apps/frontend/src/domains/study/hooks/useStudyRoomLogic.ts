@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import type { Problem } from '@/domains/study/types';
 import { useStudyStore } from '@/domains/study/store/useStudyStore';
 import { useStudyLayout } from './useStudyLayout';
 import { useProblems } from './useProblems';
 import { useProblemDates } from './useProblemDates';
 import { useSubmissions } from './useSubmissions';
-import { fetchStudyParticipants, fetchStudyRoom } from '@/app/api/studyApi';
+import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
 
 export function useStudyRoomLogic() {
@@ -20,6 +21,10 @@ export function useStudyRoomLogic() {
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
+  const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
+
+  // Global state for selected problem (used by CCCenterPanel for socket events)
+  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
 
   // Global state for selected date
   const selectedDate = useStudyStore((state) => state.selectedDate);
@@ -48,7 +53,12 @@ export function useStudyRoomLogic() {
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
     fetchStudyRoom(Number(studyId))
-      .then(setRoomInfo)
+      .then((room) => {
+        setRoomInfo({
+          roomId: room.id,
+          roomTitle: room.title,
+        });
+      })
       .catch((err) => console.error('Failed to fetch room info:', err));
 
     setCurrentDate(formatDate(new Date()));
@@ -74,8 +84,9 @@ export function useStudyRoomLogic() {
     console.log('Settings clicked');
   };
 
-  const handleSelectProblem = (problemId: number) => {
-    console.log('Selected problem:', problemId);
+  const handleSelectProblem = (problem: Problem) => {
+    setSelectedProblem(problem.problemId, problem.title);
+    console.log('Selected problem:', problem.title);
   };
 
   const handleDateChange = (date: Date) => {
@@ -97,6 +108,7 @@ export function useStudyRoomLogic() {
     handleSelectProblem,
     handleDateChange,
     selectedDate,
+    selectedProblemId: selectedProblemId ?? undefined,
     problems,
     historyDates,
     submissions,

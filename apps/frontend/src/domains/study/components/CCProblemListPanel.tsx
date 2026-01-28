@@ -6,18 +6,18 @@ import { ChevronLeft, FileText, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CCCalendarWidget, CCInlineCalendar } from './CCCalendarWidget';
 import { CCProblemCard } from './CCProblemCard';
-import { Problem, Submission } from '@/domains/study/types';
+import { DailyProblem, Submission } from '@/domains/study/types';
 import { CCSubmissionViewerModal } from './CCSubmissionViewerModal';
 import { CCAddProblemModal } from './CCAddProblemModal';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 
 // Re-export Problem type from types.ts to maintain potential compatibility if imported elsewhere
-export type { Problem } from '@/domains/study/types';
+export type { DailyProblem as Problem } from '@/domains/study/types';
 
 export interface CCProblemListPanelProps {
-  problems?: Problem[];
+  problems?: DailyProblem[];
   selectedProblemId?: number;
-  onSelectProblem?: (problemId: number) => void;
+  onSelectProblem?: (problem: DailyProblem) => void;
   className?: string;
   onToggleFold: () => void;
   isFolded: boolean;
@@ -66,21 +66,21 @@ export function CCProblemListPanel({
   };
 
   const handleViewCode = (submissionId: number) => {
-    const submission = submissions.find((s) => s.id === submissionId);
+    const submission = submissions.find((s) => s.submissionId === submissionId);
     if (!submission) return;
 
     // Use selectedProblem from outer scope logic or find it here
-    const currentProblem = problems.find((p) => p.id === selectedSubmissionProblemId);
+    const currentProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
 
     setTargetSubmission({
-      id: submission.id,
+      id: submission.submissionId!,
       problemTitle: currentProblem
-        ? `${currentProblem.number}. ${currentProblem.title}`
+        ? `${currentProblem.problemId}. ${currentProblem.title}`
         : 'Unknown Problem',
-      username: submission.username,
-      language: submission.language,
-      memory: submission.memory,
-      executionTime: submission.time,
+      username: submission.nickname || 'Unknown',
+      language: submission.language || 'plaintext',
+      memory: submission.memory || 0,
+      executionTime: submission.executionTime || 0,
       code: submission.code || '// No code available',
     });
     setViewMode('SPLIT_SAVED');
@@ -99,7 +99,9 @@ export function CCProblemListPanel({
     }
   };
 
-  const selectedProblem = problems.find((p) => p.id === selectedSubmissionProblemId);
+  const selectedProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
+
+  console.log('[CCProblemListPanel] Rendered with problems:', problems?.length, problems);
 
   return (
     <div className={cn('flex h-full flex-col relative bg-card', className)}>
@@ -151,15 +153,15 @@ export function CCProblemListPanel({
         ) : (
           <ul className="space-y-3 p-4">
             {problems.map((problem) => (
-              <li key={problem.id}>
+              <li key={problem.problemId}>
                 <CCProblemCard
-                  problem={{
-                    ...problem,
-                    url: `https://www.acmicpc.net/problem/${problem.number}`,
-                  }}
-                  isSelected={selectedProblemId === problem.id}
-                  onSelect={() => onSelectProblem?.(problem.id)}
+                  problem={problem}
+                  isSelected={selectedProblemId === problem.problemId}
+                  onSelect={() => onSelectProblem?.(problem)}
                   onOpenSubmission={handleOpenSubmission}
+                  onRemove={
+                    onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
+                  }
                 />
               </li>
             ))}
@@ -171,7 +173,7 @@ export function CCProblemListPanel({
         isOpen={submissionModalOpen}
         onClose={() => setSubmissionModalOpen(false)}
         problemTitle={selectedProblem ? selectedProblem.title : ''}
-        problemNumber={selectedProblem ? selectedProblem.number : undefined}
+        problemNumber={selectedProblem ? selectedProblem.problemId : undefined}
         submissions={submissions}
         onViewCode={handleViewCode}
       />

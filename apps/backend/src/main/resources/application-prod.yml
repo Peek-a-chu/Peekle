@@ -2,15 +2,15 @@ spring:
   config:
     activate:
       on-profile: prod
-  
+
   datasource:
     # 운영 DB 정보는 환경변수나 Secret으로 주입받는 것이 안전합니다.
     # 예: url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-    url: ${DB_URL} 
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
+
   jpa:
     hibernate:
       ddl-auto: validate # 운영용: 스키마 변경 방지 (검증만 수행)
@@ -19,8 +19,17 @@ spring:
         format_sql: false
         show_sql: false
     database-platform: org.hibernate.dialect.MySQLDialect
-  
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    validate-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+
+OPENVIDU_URL: ${OPENVIDU_URL:https://openvidu:4443}
+OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+
+flyway:
+  enabled: true
+  baseline-on-migrate: true
+  validate-on-migrate: true

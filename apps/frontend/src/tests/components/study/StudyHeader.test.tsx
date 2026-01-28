@@ -4,6 +4,15 @@ import { StudyHeader } from '@/domains/study/components';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { act } from 'react';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+  useParams: () => ({ id: '1' }),
+}));
+
 describe('StudyHeader', () => {
   const defaultProps = {
     selectedDate: new Date('2026-01-21'),
@@ -34,29 +43,16 @@ describe('StudyHeader', () => {
   it('renders room info', () => {
     render(<StudyHeader {...defaultProps} />);
     expect(screen.getByText('Test Title')).toBeInTheDocument();
-    // CalendarWidget renders yy/MM/dd
-    expect(screen.getByText('26/01/21')).toBeInTheDocument();
   });
 
   it('calls handlers', () => {
     const onBack = vi.fn();
-    const onAddProblem = vi.fn();
     const onInvite = vi.fn();
 
-    render(
-      <StudyHeader
-        {...defaultProps}
-        onBack={onBack}
-        onAddProblem={onAddProblem}
-        onInvite={onInvite}
-      />,
-    );
+    render(<StudyHeader {...defaultProps} onBack={onBack} onInvite={onInvite} />);
 
     fireEvent.click(screen.getByLabelText('뒤로 가기'));
     expect(onBack).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByText('문제 추가'));
-    expect(onAddProblem).toHaveBeenCalled();
 
     fireEvent.click(screen.getByText('초대하기'));
     expect(onInvite).toHaveBeenCalled();

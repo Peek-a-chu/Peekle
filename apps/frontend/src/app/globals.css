@@ -6,7 +6,7 @@
 
 .monaco-editor-overlaymessage,
 .monaco-editor .monaco-editor-overlaymessage,
-div[class*="monaco-editor-overlaymessage"],
+div[class*='monaco-editor-overlaymessage'],
 .monaco-editor .overlayWidgets .message {
   display: none !important;
   opacity: 0 !important;
@@ -127,4 +127,84 @@ div[class*="monaco-editor-overlaymessage"],
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.3);
+}
+
+@layer components {
+  /* Common Markdown Styles */
+  .markdown-prose {
+    @apply text-sm leading-relaxed break-words;
+  }
+
+  .markdown-prose p {
+    @apply my-1 first:mt-0 last:mb-0;
+  }
+
+  .markdown-prose h1 {
+    @apply text-lg font-bold mt-2 mb-1;
+  }
+
+  .markdown-prose h2 {
+    @apply text-base font-bold mt-2 mb-1;
+  }
+
+  .markdown-prose h3 {
+    @apply text-sm font-bold mt-1 mb-0.5;
+  }
+
+  .markdown-prose strong {
+    @apply font-bold;
+  }
+
+  .markdown-prose em {
+    @apply italic;
+  }
+
+  .markdown-prose code {
+    @apply rounded px-1 py-0.5 font-mono text-[0.8em] font-normal align-middle;
+  }
+
+  .markdown-prose pre {
+    @apply my-2 overflow-x-auto rounded-md p-2;
+  }
+
+  .markdown-prose pre code {
+    @apply bg-transparent p-0 text-xs;
+  }
+
+  .markdown-prose ul {
+    @apply ml-4 list-disc;
+  }
+
+  .markdown-prose ol {
+    @apply ml-4 list-decimal;
+  }
+
+  /* Default (Light Bubble / Others Message) */
+  /* Parent is bg-muted (Light Gray) */
+  .markdown-prose:not(.markdown-prose-invert) a {
+    @apply font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700;
+  }
+
+  .markdown-prose:not(.markdown-prose-invert) code {
+    /* Muted background on Muted bubble might be invisible, so use slightly darker or white */
+    @apply bg-background border border-border/50 text-foreground;
+  }
+
+  .markdown-prose:not(.markdown-prose-invert) pre {
+    @apply bg-background border border-border/50 text-foreground;
+  }
+
+  /* Invert (Dark Bubble / My Message) */
+  /* Parent is bg-primary (Dark Blue/Black) */
+  .markdown-prose-invert a {
+    @apply font-medium text-blue-300 underline underline-offset-2 hover:text-blue-200;
+  }
+
+  .markdown-prose-invert code {
+    @apply bg-black/20 text-current border border-white/10;
+  }
+
+  .markdown-prose-invert pre {
+    @apply bg-black/20 border border-white/10;
+  }
 }

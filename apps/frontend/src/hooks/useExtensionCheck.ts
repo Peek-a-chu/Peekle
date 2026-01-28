@@ -39,7 +39,7 @@ export function useExtensionCheck() {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [isInstalled]);
+  }, []);
 
   // 마운트 시 최초 1회 체크
   useEffect(() => {

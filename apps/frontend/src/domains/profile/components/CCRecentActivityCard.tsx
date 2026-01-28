@@ -41,12 +41,13 @@ export function CCRecentActivityCard() {
           <div key={item.id} className="flex gap-4 items-start">
             <div
               className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center shrink-0 
-              ${item.type === 'solve'
+              ${
+                item.type === 'solve'
                   ? 'bg-green-100 text-green-600'
                   : item.type === 'study'
                     ? 'bg-blue-100 text-blue-600'
                     : 'bg-purple-100 text-purple-600'
-                }`}
+              }`}
             >
               {item.type === 'solve' ? '✓' : item.type === 'study' ? '🕒' : '🏆'}
             </div>

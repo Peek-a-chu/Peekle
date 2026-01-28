@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Search, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { searchExternalProblems, ExternalProblem } from '@/app/api/problemApi';
+import { searchExternalProblems, ExternalProblem } from '../api/problemApi';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from 'sonner';
 
@@ -21,7 +21,12 @@ interface CCAddProblemModalProps {
   onRemove: (problemId: number) => Promise<void>;
 }
 
-export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddProblemModalProps) {
+export function CCAddProblemModal({
+  isOpen,
+  onClose,
+  onAdd,
+  onRemove,
+}: CCAddProblemModalProps): React.ReactNode {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +41,7 @@ export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddPro
       return;
     }
 
-    const search = async () => {
+    const search = async (): Promise<void> => {
       setIsLoading(true);
       try {
         const data = await searchExternalProblems(debouncedQuery);
@@ -53,7 +58,7 @@ export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddPro
 
   if (!isOpen) return null;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!selectedProblem) return;
 
     // [Validation] If trying to delete a problem that has submissions
@@ -69,6 +74,7 @@ export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddPro
       if (selectedProblem.isRegistered && selectedProblem.registeredId) {
         await onRemove(selectedProblem.registeredId);
       } else {
+        console.log(`[Adding Problem] ${selectedProblem.title} (#${selectedProblem.number})`);
         await onAdd(selectedProblem.title, selectedProblem.number, selectedProblem.tags);
       }
       setQuery('');
@@ -80,6 +86,8 @@ export function CCAddProblemModal({ isOpen, onClose, onAdd, onRemove }: CCAddPro
       toast.error('작업 수행 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
+      // Don't close to allow adding more? Or close?
+      // onClose(); -> Spec says we might search again.
     }
   };
 

@@ -253,9 +253,12 @@ ROOT
 │   └── fonts                # (Local Font를 쓸 경우)
 │
 ├── src
+│   ├── api                  # [API] 클라이언트 API 래퍼 (fetch wrappers)
+│   │   └── gameApi.ts
 │   ├── app
-│   │   ├── api              # [API] 백엔드 데이터 패칭 (fetch wrappers)
-│   │   │   └── gameApi.ts
+│   │   ├── api              # [Route] Next.js Route Handlers (BFF/Proxy)
+│   │   │   └── studies
+│   │   │       └── route.ts
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
 │   │   └── globals.css      # [Global CSS] Tailwind Directive (@tailwind base...) 포함
@@ -288,8 +291,19 @@ ROOT
 
 데이터 패칭(Fetching), 서버 액션(Mutation), 그리고 라우트 핸들러(Route Handler)의 역할을 명확히 분리합니다.
 
-- **`app/api/`**: 
-  - 백엔드 API와의 통신을 담당하는 **fetch Wrapper** 및 **Route Handler**를 위치시킵니다.
+- **`src/api/`** (Client Wrappers):
+  - 클라이언트 사이드에서 호출하는 API 함수들을 위치시킵니다.
+  - 이 함수들은 내부적으로 `src/app/api`의 Route Handler를 호출합니다.
+
+- **`src/app/api/`** (Route Handlers):
+  - **Route Handler** (`route.ts`) 파일만 위치시킵니다. (BFF/Proxy 역할)
+  - **[Next.js 15 규칙]** 동적 라우트의 `params`는 **비동기(Promise)**로 처리해야 합니다.
+    ```typescript
+    export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+      const { id } = await params; // 반드시 await 해야 함
+      // ...
+    }
+    ```
 
 - **`domains/{feature}/actions/`**:
   - Next.js **Server Actions** (`'use server'`)를 포함합니다.
