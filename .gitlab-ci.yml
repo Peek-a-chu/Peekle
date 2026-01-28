@@ -90,23 +90,22 @@ deploy-production:
     - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
   script:
     - |
-      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << ENDSSH
+      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "GITLAB_USER='$GITLAB_USER' GITLAB_TOKEN='$GITLAB_ACCESS_TOKEN' bash -s" << 'ENDSSH'
         set -e
 
         echo "=== Deploying Peekle to Production ==="
 
-        # Define Repository URL with Personal Access Token
-        # Note: Variables are expanded by GitLab Runner before sending to SSH
-        REPO_URL="https://${GITLAB_USER}:${GITLAB_ACCESS_TOKEN}@lab.ssafy.com/s14-webmobile1-sub1/S14P11A408.git"
+        # Define Repository URL (using env vars passed from Runner)
+        REPO_URL="https://${GITLAB_USER}:${GITLAB_TOKEN}@lab.ssafy.com/s14-webmobile1-sub1/S14P11A408.git"
 
         # Check if project directory exists
         if [ ! -d ~/peekle ]; then
           echo "Project directory not found. Cloning..."
-          git clone \$REPO_URL ~/peekle
+          git clone "$REPO_URL" ~/peekle
         else
           echo "Project directory exists. Updating remote URL..."
           cd ~/peekle
-          git remote set-url origin \$REPO_URL
+          git remote set-url origin "$REPO_URL"
         fi
 
         # Navigate to project directory
