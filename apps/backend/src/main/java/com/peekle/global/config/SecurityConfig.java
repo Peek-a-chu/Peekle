@@ -54,7 +54,7 @@ public class SecurityConfig {
 
                 // Extension / APIs
                 .requestMatchers("/api/submissions/**").permitAll()
-                .requestMatchers("/api/problems/sync").permitAll()      // 내부 Key 검증
+                .requestMatchers("/api/problems/**").permitAll()        // 문제 검색/동기화
                 .requestMatchers("/api/users/me/**").permitAll()        // Extension token endpoints
 
                 // Dev / Test
