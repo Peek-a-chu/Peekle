@@ -19,7 +19,11 @@ export function CCWorkbookCard({
   onToggleBookmark,
   className,
 }: CCWorkbookCardProps) {
-  const progress = Math.round((workbook.solvedCount / workbook.problemCount) * 100);
+  // 0/0일 때 NaN 방지
+  const progress =
+    workbook.problemCount > 0
+      ? Math.round((workbook.solvedCount / workbook.problemCount) * 100)
+      : 0;
 
   return (
     <div
@@ -36,7 +40,7 @@ export function CCWorkbookCard({
         isSelected
           ? 'border-pink-500 ring-1 ring-pink-500 bg-pink-50/5'
           : 'border-border hover:border-pink-200',
-        className
+        className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -50,9 +54,7 @@ export function CCWorkbookCard({
           {/* 콘텐츠 */}
           <div className="flex-1 min-w-0">
             {/* 제목 */}
-            <h3 className="font-semibold text-foreground text-sm line-clamp-1">
-              {workbook.title}
-            </h3>
+            <h3 className="font-semibold text-foreground text-sm line-clamp-1">{workbook.title}</h3>
 
             {/* 설명 */}
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
@@ -66,13 +68,15 @@ export function CCWorkbookCard({
                 <span className="font-medium text-foreground">{progress}%</span>
               </div>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all',
-                    progress === 100 ? 'bg-green-500' : 'bg-pink-500'
-                  )}
-                  style={{ width: `${progress}%` }}
-                />
+                {progress > 0 && (
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      progress === 100 ? 'bg-green-500' : 'bg-pink-500',
+                    )}
+                    style={{ width: `${progress}%` }}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -93,7 +97,7 @@ export function CCWorkbookCard({
                 'h-5 w-5 transition-colors',
                 workbook.isBookmarked
                   ? 'fill-yellow-400 text-yellow-400'
-                  : 'text-muted-foreground hover:text-yellow-400'
+                  : 'text-muted-foreground hover:text-yellow-400',
               )}
             />
           </button>
