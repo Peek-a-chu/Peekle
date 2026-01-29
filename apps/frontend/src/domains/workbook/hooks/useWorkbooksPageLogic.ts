@@ -30,7 +30,7 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
     title: item.title,
     description: item.description || '',
     problemCount: item.problemCount,
-    solvedCount: 0, // TODO: 서버에서 추가 필요
+    solvedCount: item.solvedCount,
     bookmarkCount: item.bookmarkCount,
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
@@ -43,13 +43,14 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
 }
 
 function mapWorkbookResponseToWorkbook(item: WorkbookResponse): Workbook {
+  const solvedCount = item.problems?.filter((p) => p.solved).length ?? 0;
   return {
     id: String(item.id),
     number: item.id,
     title: item.title,
     description: item.description || '',
     problemCount: item.problemCount,
-    solvedCount: 0,
+    solvedCount,
     bookmarkCount: item.bookmarkCount,
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
@@ -67,7 +68,7 @@ function mapProblemsToWorkbookProblems(problems: WorkbookResponse['problems']): 
     id: p.id, // Problem 엔티티의 DB ID
     number: p.number,
     title: p.title,
-    isSolved: false, // TODO: 서버에서 추가 필요
+    isSolved: p.solved,
     url: p.url,
   }));
 }

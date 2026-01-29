@@ -12,6 +12,7 @@ export interface WorkbookProblemResponse {
   title: string;
   tier: string;
   url: string;
+  solved: boolean;
 }
 
 export interface WorkbookResponse {
@@ -32,6 +33,7 @@ export interface WorkbookListResponse {
   title: string;
   description: string;
   problemCount: number;
+  solvedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;
