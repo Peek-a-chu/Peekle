@@ -46,7 +46,10 @@ public enum ErrorCode {
     // Whiteboard
     WHITEBOARD_ALREADY_ACTIVE(HttpStatus.CONFLICT, "WHITEBOARD_001", "이미 활성화된 화이트보드가 있습니다."),
     WHITEBOARD_NOT_FOUND(HttpStatus.NOT_FOUND, "WHITEBOARD_002", "활성화된 화이트보드를 찾을 수 없습니다."),
-    WHITEBOARD_PERMISSION_DENIED(HttpStatus.FORBIDDEN, "WHITEBOARD_003", "화이트보드 제어 권한이 없습니다.");
+    WHITEBOARD_PERMISSION_DENIED(HttpStatus.FORBIDDEN, "WHITEBOARD_003", "화이트보드 제어 권한이 없습니다."),
+
+    // Workbook
+    WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
