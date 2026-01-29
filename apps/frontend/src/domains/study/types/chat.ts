@@ -19,6 +19,10 @@ export interface ChatMessage {
     language?: string;
     problemTitle?: string;
     ownerName?: string;
+    problemId?: number;
+    isRealtime?: boolean;
+    targetUserId?: number;
+    isRefChat?: boolean;
     [key: string]: unknown;
   };
   createdAt: string;
