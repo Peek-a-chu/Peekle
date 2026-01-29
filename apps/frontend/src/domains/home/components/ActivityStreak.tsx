@@ -6,22 +6,54 @@ import { useActivityStreak } from '../hooks/useDashboardData';
 
 interface ActivityStreakProps {
     onDateSelect?: (date: string) => void;
+    selectedDate?: string | null;
 }
 
-// 사용 가능한 년도들 (목업용)
-const AVAILABLE_YEARS = [2024, 2025, 2026];
+// 사용 가능한 년도들 (동적 생성)
+const CURRENT_YEAR = new Date().getFullYear();
 
-const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
+const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate }: ActivityStreakProps) => {
     const { data: allData } = useActivityStreak();
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [selectedYear, setSelectedYear] = useState(2025);
+    const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
+    const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
 
-    // 선택된 년도 데이터만 필터링
-    const yearData = useMemo(() => {
-        return allData.filter((item) => {
+    // 외부 prop이 있으면 그것을 사용, 없으면 내부 state 사용
+    const selectedDate = externalSelectedDate !== undefined ? externalSelectedDate : internalSelectedDate;
+
+    // 사용 가능한 년도 계산 (데이터 기반 + 현재 년도)
+    const availableYears = useMemo(() => {
+        const years = new Set<number>();
+        years.add(CURRENT_YEAR); // 현재 년도는 항상 포함
+
+        allData.forEach((item) => {
             const year = new Date(item.date).getFullYear();
-            return year === selectedYear;
+            if (!isNaN(year)) {
+                years.add(year);
+            }
         });
+
+        return Array.from(years).sort((a, b) => a - b);
+    }, [allData]);
+
+    // 선택된 년도 데이터만 필터링 (로컬에서 전체 날짜 생성)
+    const yearData = useMemo(() => {
+        // 1. 해당 연도의 모든 날짜 생성
+        const fullDates: { date: string; count: number }[] = [];
+        const startDate = new Date(`${selectedYear}-01-01`);
+        const endDate = new Date(`${selectedYear}-12-31`);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().split('T')[0];
+            fullDates.push({ date: dateStr, count: 0 });
+        }
+
+        // 2. 실제 데이터 매핑
+        const dataMap = new Map(allData.map(item => [item.date, item.count]));
+
+        return fullDates.map(item => ({
+            ...item,
+            count: dataMap.get(item.date) || 0
+        }));
     }, [allData, selectedYear]);
 
     // 데이터를 월별로 그룹화
@@ -56,7 +88,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
 
     // 날짜 클릭 핸들러
     const handleDateClick = (date: string) => {
-        setSelectedDate(date);
+        if (externalSelectedDate === undefined) {
+            setInternalSelectedDate(date);
+        }
         onDateSelect?.(date);
     };
 
@@ -93,7 +127,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                             onChange={(e) => setSelectedYear(Number(e.target.value))}
                             className="appearance-none bg-muted/30 border border-border text-muted-foreground text-sm font-medium py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                         >
-                            {AVAILABLE_YEARS.map((year) => (
+                            {availableYears.map((year) => (
                                 <option key={year} value={year}>
                                     {year}년
                                 </option>
@@ -105,7 +139,7 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
             </div>
 
             {/* 히트맵 */}
-            <div className="overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden">
+            <div className="overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden p-1">
                 <div className="flex gap-1 min-w-max">
                     {Object.entries(monthlyData).map(([monthKey, days]) => (
                         <div key={monthKey} className="flex flex-col gap-1">
@@ -118,8 +152,8 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
                                         key={day.date}
                                         onClick={() => handleDateClick(day.date)}
                                         className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${selectedDate === day.date
-                                                ? 'ring-1 ring-primary ring-offset-1'
-                                                : 'hover:ring-1 hover:ring-border'
+                                            ? 'ring-1 ring-primary ring-offset-1 relative z-10'
+                                            : 'hover:ring-1 hover:ring-border'
                                             }`}
                                         title={`${day.date}: ${day.count}문제`}
                                     />
