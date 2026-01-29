@@ -5,22 +5,24 @@ interface ValidateResponse {
   valid?: boolean;
 }
 
-export async function GET(request: Request): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const token = request.headers.get('X-Peekle-Token');
+    const body = await request.json();
+    const { token } = body;
 
     if (!token) {
-      return NextResponse.json({ error: 'Token (header) required' }, { status: 400 });
+      return NextResponse.json({ error: 'Token (body) required' }, { status: 400 });
     }
 
     const path = `/api/users/me/validate-token`;
 
-    // Pass custom headers (X-Peekle-Token) along with automatic cookies
+    // Forward the token in the body as expected by the backend
     const result = await serverFetch<ValidateResponse>(path, {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'X-Peekle-Token': token,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ token })
     });
 
     if (!result.success) {

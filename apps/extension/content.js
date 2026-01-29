@@ -630,4 +630,16 @@ window.addEventListener('message', async (event) => {
             }
         });
     }
+    // [New] Handle Theme Sync
+    if (event.data?.type === 'PEEKLE_THEME_SYNC') {
+        const { mode, accentColor, customColor } = event.data.payload;
+        try {
+            await chrome.storage.local.set({
+                'themeSettings': { mode, accentColor, customColor }
+            });
+            // console.log('[Peekle] Theme settings saved:', { mode, accentColor });
+        } catch (e) {
+            console.error('[Peekle] Failed to save theme settings:', e);
+        }
+    }
 });
