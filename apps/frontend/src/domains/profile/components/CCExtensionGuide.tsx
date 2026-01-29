@@ -155,24 +155,26 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
 
       {/* Status Banner */}
       <div
-        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${status === 'LINKED'
-          ? 'bg-green-500/10 border border-green-500/20'
-          : status === 'MISMATCH'
-            ? 'bg-orange-500/10 border border-orange-500/20'
-            : status === 'INSTALLED'
-              ? 'bg-blue-500/10 border border-blue-500/20'
-              : 'bg-muted border border-border'
-          }`}
+        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${
+          status === 'LINKED'
+            ? 'bg-green-500/10 border border-green-500/20'
+            : status === 'MISMATCH'
+              ? 'bg-orange-500/10 border border-orange-500/20'
+              : status === 'INSTALLED'
+                ? 'bg-blue-500/10 border border-blue-500/20'
+                : 'bg-muted border border-border'
+        }`}
       >
         <div
-          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${status === 'LINKED'
-            ? 'text-green-600 dark:text-green-400'
-            : status === 'MISMATCH'
-              ? 'text-orange-600 dark:text-orange-400'
-              : status === 'INSTALLED'
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-muted-foreground'
-            }`}
+          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+            status === 'LINKED'
+              ? 'text-green-600 dark:text-green-400'
+              : status === 'MISMATCH'
+                ? 'text-orange-600 dark:text-orange-400'
+                : status === 'INSTALLED'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-muted-foreground'
+          }`}
         >
           {status === 'LINKED'
             ? '✅'
@@ -184,14 +186,15 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
         </div>
         <div>
           <h3
-            className={`font-bold text-sm ${status === 'LINKED'
-              ? 'text-green-700 dark:text-green-300'
-              : status === 'MISMATCH'
-                ? 'text-orange-700 dark:text-orange-300'
-                : status === 'INSTALLED'
-                  ? 'text-blue-700 dark:text-blue-300'
-                  : 'text-foreground'
-              }`}
+            className={`font-bold text-sm ${
+              status === 'LINKED'
+                ? 'text-green-700 dark:text-green-300'
+                : status === 'MISMATCH'
+                  ? 'text-orange-700 dark:text-orange-300'
+                  : status === 'INSTALLED'
+                    ? 'text-blue-700 dark:text-blue-300'
+                    : 'text-foreground'
+            }`}
           >
             {status === 'LINKED'
               ? '연동 완료'
@@ -202,14 +205,15 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
                   : '확장 프로그램이 설치되지 않았습니다'}
           </h3>
           <p
-            className={`text-sm mt-1 ${status === 'LINKED'
-              ? 'text-green-600/80 dark:text-green-400/80'
-              : status === 'MISMATCH'
-                ? 'text-orange-600/80 dark:text-orange-400/80'
-                : status === 'INSTALLED'
-                  ? 'text-blue-600/80 dark:text-blue-400/80'
-                  : 'text-muted-foreground'
-              }`}
+            className={`text-sm mt-1 ${
+              status === 'LINKED'
+                ? 'text-green-600/80 dark:text-green-400/80'
+                : status === 'MISMATCH'
+                  ? 'text-orange-600/80 dark:text-orange-400/80'
+                  : status === 'INSTALLED'
+                    ? 'text-blue-600/80 dark:text-blue-400/80'
+                    : 'text-muted-foreground'
+            }`}
           >
             {status === 'LINKED'
               ? '모든 기능이 정상 동작 중입니다.'
@@ -229,19 +233,21 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
             {/* Vertical Line */}
             {idx !== steps.length - 1 && (
               <div
-                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${s.isDone ? 'bg-green-500' : 'bg-border'
-                  }`}
+                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${
+                  s.isDone ? 'bg-green-500' : 'bg-border'
+                }`}
               ></div>
             )}
 
             {/* Step Circle */}
             <div
-              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${s.isDone
-                ? 'bg-green-500 text-white'
-                : s.isActive
-                  ? 'bg-foreground text-background'
-                  : 'bg-muted text-muted-foreground'
-                }`}
+              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
+                s.isDone
+                  ? 'bg-green-500 text-white'
+                  : s.isActive
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground'
+              }`}
             >
               {s.isDone ? '✓' : s.step}
             </div>

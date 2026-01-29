@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react'
-import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom'
-import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout'
-import { CCGameResultModal } from './game-result-modal/CCGameResultModal'
-import { mockGameResult } from '../mocks/resultMock'
+import { useState } from 'react';
+import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
+import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout';
+import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
+import { mockGameResult } from '../mocks/resultMock';
 
 interface GamePlayContainerProps {
   roomId: string;
@@ -26,9 +26,9 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
     currentUserId,
     sendMessage,
     submitCode,
-  } = useGamePlayRoom(roomId)
+  } = useGamePlayRoom(roomId);
 
-  const [isResultModalOpen, setIsResultModalOpen] = useState(false)
+  const [isResultModalOpen, setIsResultModalOpen] = useState(false);
 
   // 로딩 상태
   if (isLoading || !gameState) {
@@ -39,7 +39,7 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
           <p className="text-muted-foreground">게임을 불러오는 중...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // 게임 화면 렌더링
@@ -78,5 +78,5 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
         data={mockGameResult}
       />
     </>
-  )
+  );
 }

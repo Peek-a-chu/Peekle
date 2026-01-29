@@ -77,7 +77,9 @@ export function CCHistoryList({ initialHistory }: Props) {
         <div
           className={`flex-1 space-y-3 transition-all ${selectedSubmission ? 'w-2/3' : 'w-full'}`}
         >
-          <p className="text-sm font-medium text-muted-foreground mb-2">총 {history.length}개의 기록</p>
+          <p className="text-sm font-medium text-muted-foreground mb-2">
+            총 {history.length}개의 기록
+          </p>
 
           {history.map((item) => (
             <div
@@ -101,12 +103,13 @@ export function CCHistoryList({ initialHistory }: Props) {
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold text-white
-                                    ${item.tier.includes('Bronze')
-                          ? 'bg-amber-700'
-                          : item.tier.includes('Silver')
-                            ? 'bg-slate-400'
-                            : 'bg-yellow-500' // Gold etc
-                        }`}
+                                    ${
+                                      item.tier.includes('Bronze')
+                                        ? 'bg-amber-700'
+                                        : item.tier.includes('Silver')
+                                          ? 'bg-slate-400'
+                                          : 'bg-yellow-500' // Gold etc
+                                    }`}
                     >
                       {item.tier}
                     </span>
