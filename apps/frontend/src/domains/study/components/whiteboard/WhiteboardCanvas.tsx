@@ -10,11 +10,7 @@ import React, {
 } from 'react';
 import { USER_COLORS } from '@/lib/constants';
 import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
-import {
-  getDeterministicUserColor,
-  isBlankText,
-  WHITEBOARD_TEXT_PLACEHOLDER,
-} from '@/domains/study/utils/whiteboard';
+import { getDeterministicUserColor, isBlankText } from '@/domains/study/utils/whiteboard';
 
 export interface WhiteboardCanvasRef {
   add: (objData: any, senderId?: string) => void;
@@ -73,6 +69,8 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
     const applyUserColorToObject = (obj: any, userColor: string | null) => {
       if (!userColor || !obj?.set) return;
+      // [Fix] Skip images to prevent coloring code screenshots or other images
+      if (obj.type === 'image') return;
       // Text
       if (obj.type === 'i-text' || obj.type === 'text') {
         obj.set('fill', userColor);
@@ -156,6 +154,12 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                   if (objectData.id) {
                     o.id = objectData.id;
                   }
+                  // [Fix] Restore custom properties that enlivenObjects might have missed
+                  Object.keys(objectData).forEach((key) => {
+                    if (o[key] === undefined) {
+                      o[key] = objectData[key];
+                    }
+                  });
 
                   applyUserColorToObject(o, userColor);
                   if (normalizedSenderId) {
@@ -198,7 +202,13 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
             }
             break;
           case 'CLEAR':
-            canvas.clear();
+            // [Fix] Use manual cleanup instead of canvas.clear() to avoid 'fire' undefined error
+            canvas.discardActiveObject();
+            canvas.getObjects().slice().forEach((obj: any) => {
+              canvas.remove(obj);
+            });
+            canvas.backgroundImage = null;
+            canvas.overlayImage = null;
             canvas.setBackgroundColor('#ffffff', () => canvas.renderAll());
             break;
         }
@@ -239,6 +249,14 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                   const eventData = fabricDataList[i];
                   // ID 및 속성 복구
                   if (eventData.id) o.id = eventData.id;
+
+                  // [Fix] Restore custom properties
+                  Object.keys(eventData).forEach((key) => {
+                    if (o[key] === undefined) {
+                      o[key] = eventData[key];
+                    }
+                  });
+
                   if (event.senderId !== undefined && event.senderId !== null) {
                     o.senderId = event.senderId;
                   }
@@ -302,6 +320,14 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                 objects.forEach((o, i) => {
                   const objData = objectsData[i];
                   if (objData.id) o.id = objData.id;
+
+                  // [Fix] Restore custom properties
+                  Object.keys(objData).forEach((key) => {
+                    if (o[key] === undefined) {
+                      o[key] = objData[key];
+                    }
+                  });
+
                   if (objData.senderId !== undefined && objData.senderId !== null) {
                     o.senderId = objData.senderId;
                   }
@@ -547,7 +573,8 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
         handler = (opt) => {
           if (opt.target) return;
           const pointer = canvas.getPointer(opt.e);
-          const text = new fabric.IText(WHITEBOARD_TEXT_PLACEHOLDER, {
+          // Start with empty text so no placeholder is ever visible while typing
+          const text = new fabric.IText('', {
             left: pointer.x,
             top: pointer.y,
             fontFamily: 'Arial',
@@ -555,8 +582,6 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
             fontSize: 20,
           });
           text.id = crypto.randomUUID();
-          // mark as placeholder text (local-only until confirmed)
-          (text as any).isPlaceholder = true;
           canvas.add(text);
           canvas.setActiveObject(text);
           text.enterEditing();
@@ -591,12 +616,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       const enteredHandler = (e: any) => {
         const target = e?.target;
         if (!target) return;
-        // Placeholder should disappear immediately when user starts editing
-        if ((target as any).isPlaceholder && target.text === WHITEBOARD_TEXT_PLACEHOLDER) {
-          target.text = '';
-          (target as any).isPlaceholder = false;
-          canvas.requestRenderAll();
-        }
+        // no-op for now; we start with empty text so no placeholder is visible
       };
 
       const exitedHandler = (e: any) => {

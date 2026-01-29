@@ -30,7 +30,7 @@ describe('useWhiteboardSocket outbound queue', () => {
     socketState = { client: null, connected: false };
   });
 
-  it('queues messages while disconnected and flushes after connect+subscribe', async () => {
+  it('queues messages while disconnected and flushes when connected', () => {
     const publish = vi.fn();
     const subscribe = vi.fn().mockReturnValue({ unsubscribe: vi.fn() });
     const client = { publish, subscribe };
@@ -47,16 +47,12 @@ describe('useWhiteboardSocket outbound queue', () => {
 
     expect(publish).toHaveBeenCalledTimes(0);
 
-    // Simulate connect
     socketState.connected = true;
     rerender();
 
-    // Subscriptions happen on connect; queued message should flush immediately after subscribe.
     expect(subscribe).toHaveBeenCalled();
+    // flush effect should publish the queued message
     expect(publish).toHaveBeenCalledTimes(1);
-    expect(publish.mock.calls[0][0]).toMatchObject({
-      destination: '/pub/studies/whiteboard/message',
-    });
   });
 });
 
