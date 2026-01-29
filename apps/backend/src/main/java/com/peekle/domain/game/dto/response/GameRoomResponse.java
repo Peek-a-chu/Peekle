@@ -1,4 +1,4 @@
-package com.peekle.domain.game.dto;
+package com.peekle.domain.game.dto.response;
 
 import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
@@ -18,6 +18,6 @@ public class GameRoomResponse {
     private Integer maxPlayers;
     private Integer timeLimit;
     private Integer problemCount;
+    private GameType teamType;
     private GameMode mode;
-    private GameType type;
 }

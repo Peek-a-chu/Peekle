@@ -25,6 +25,7 @@ public class WebSocketEventListener {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
+    private final com.peekle.domain.game.service.RedisGameService gameService;
 
     // 연결 연결 시 (SUBSCRIBEFrame이 아니라 최초 socket 연결 handshake 완료 시점, 혹은 CONNECTED)
     // 여기서 userId와 sessionId 매핑을 저장
@@ -94,6 +95,10 @@ public class WebSocketEventListener {
         Object studyIdObj = headerAccessor.getSessionAttributes() != null
                 ? headerAccessor.getSessionAttributes().get("studyId")
                 : null;
+        // Game ID check
+        Object gameIdObj = headerAccessor.getSessionAttributes() != null
+                ? headerAccessor.getSessionAttributes().get("gameId")
+                : null;
 
         if (userIdObj != null) {
             Long userId = (Long) userIdObj;
@@ -102,7 +107,18 @@ public class WebSocketEventListener {
             // 1. Session 매핑 삭제
             redisTemplate.delete("user:" + userId + ":session");
 
-            // 2. 스터디 방에 있었다면 Online Users 제거 및 퇴장 알림
+            // 2. 게임 방에 있었다면 -> 퇴장 처리
+            if (gameIdObj != null) {
+                Long gameId = (Long) gameIdObj;
+                log.info("Abrupt Disconnection: User {} from Game Room {}", userId, gameId);
+                try {
+                    gameService.exitGameRoom(gameId, userId);
+                } catch (Exception e) {
+                    log.error("Failed to exit game room on disconnect", e);
+                }
+            }
+
+            // 3. 스터디 방에 있었다면 Online Users 제거 및 퇴장 알림
             if (studyIdObj != null) {
                 Long studyId = (Long) studyIdObj;
                 redisTemplate.opsForSet().remove("study:" + studyId + ":online_users", userId.toString());
@@ -111,7 +127,7 @@ public class WebSocketEventListener {
                         new ChannelTopic("topic/studies/rooms/" + studyId),
                         SocketResponse.of("LEAVE", userId));
 
-                // 3. IDE 관찰자 목록 정리 (Cleanup Watchers)
+                // 4. IDE 관찰자 목록 정리 (Cleanup Watchers)
                 cleanUpWatchers(studyId, userId);
             }
         } else {
