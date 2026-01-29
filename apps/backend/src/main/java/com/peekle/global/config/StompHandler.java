@@ -22,11 +22,11 @@ public class StompHandler implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
-        
+
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String userId = accessor.getFirstNativeHeader("userId");
             String studyId = accessor.getFirstNativeHeader("studyId");
-            
+
             log.info("[StompHandler] Connect request: userId={}, studyId={}", userId, studyId);
 
             if (userId != null && studyId != null) {
