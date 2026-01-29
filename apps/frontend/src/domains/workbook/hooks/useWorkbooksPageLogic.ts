@@ -311,12 +311,24 @@ export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
 
         const newWorkbook = mapWorkbookResponseToWorkbook(response);
 
-        // 목록 맨 앞에 추가
-        setWorkbookList((prev) => [newWorkbook, ...prev]);
-        setTotalElements((prev) => prev + 1);
+        // 즐겨찾기 탭에서는 새 문제집이 즐겨찾기 되어있지 않으므로 목록에 추가하지 않음
+        if (tab === 'BOOKMARKED') {
+          // 개수만 다시 조회
+          fetchCounts();
+          return;
+        }
 
-        // 새로 만든 문제집 선택
-        setSelectedId(newWorkbook.id);
+        // 최신순 정렬일 때만 맨 앞에 추가 (새 문제집이 가장 최신이므로)
+        // 다른 정렬에서는 목록을 새로고침하여 서버 정렬과 일치시킴
+        if (sortBy === 'LATEST') {
+          setWorkbookList((prev) => [newWorkbook, ...prev]);
+          setTotalElements((prev) => prev + 1);
+          setSelectedId(newWorkbook.id);
+        } else {
+          // 다른 정렬 기준에서는 목록 새로고침
+          await fetchWorkbooks(0, true);
+          setSelectedId(newWorkbook.id);
+        }
 
         // 개수 다시 조회
         fetchCounts();
@@ -324,7 +336,7 @@ export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
         console.error('Failed to create workbook:', error);
       }
     },
-    [fetchCounts],
+    [tab, sortBy, fetchCounts, fetchWorkbooks],
   );
 
   // 문제집 수정
