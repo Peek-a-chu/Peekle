@@ -17,19 +17,28 @@ export type RoomInfo = StudyRoomDetail;
 export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
   // Spec: GET /api/studies/{id} returns members list inside
   const room = await fetchStudyRoom(studyId);
-  return room.members.map((m) => ({
+  const roomData = room as any;
+  const ownerId = roomData.owner?.id;
+
+  return roomData.members.map((m: any) => ({
     ...m,
     id: m.userId, // Map userId to id for Store
     odUid: String(m.userId), // Mock OpenVidu UID
-    isOwner: false, // Not provided in spec
+    // Use role from JSON or fallback to ownerId check
+    isOwner: m.role === 'OWNER' || (ownerId && m.userId === ownerId),
     isMuted: false,
     isVideoOff: false,
     isOnline: true,
+    // isOnline: m.online ?? false,
   }));
 }
 
-export async function fetchStudyRoom(studyId: number): Promise<RoomInfo> {
-  const res = await apiFetch<StudyRoomDetail>(`/api/studies/${studyId}`);
+export async function fetchStudyRoom(
+  studyId: number,
+): Promise<RoomInfo & { owner?: { id: number } }> {
+  const res = await apiFetch<StudyRoomDetail & { owner?: { id: number } }>(
+    `/api/studies/${studyId}`,
+  );
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to fetch study room');
   }
