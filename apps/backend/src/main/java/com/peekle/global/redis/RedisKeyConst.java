@@ -53,4 +53,13 @@ public class RedisKeyConst {
     // Game Topic (Pub/Sub)
     // /topic/games/rooms/{gameId}
     public static final String TOPIC_GAME_ROOM = "topic/games/rooms/%d";
+
+    // Game Room Info (Hash) -> title, password, mode, capacity...
+    public static final String GAME_ROOM_INFO = "game:room:%d:info";
+
+    // Active Game Room IDs (Set) -> 목록 조회를 위해 활성화된 방 ID들 저장
+    public static final String GAME_ROOM_IDS = "game:rooms";
+
+    // Game Room ID Generator (Atomic Long)
+    public static final String GAME_ROOM_ID_SEQ = "game:room:seq";
 }

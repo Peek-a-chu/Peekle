@@ -21,7 +21,9 @@
       "sqlite3",
       "@nestjs/core",
       "esbuild",
-      "sharp"
+      "sharp",
+      "unrs-resolver",
+      "canvas"
     ]
   },
   "lint-staged": {

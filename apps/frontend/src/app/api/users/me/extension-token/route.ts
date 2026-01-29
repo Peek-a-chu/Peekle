@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // serverFetch now handles cookies automatically
     const result = await serverFetch<{ extensionToken: string }>(path, {
-      method: 'POST'
+      method: 'POST',
     });
 
     if (!result.success) {
@@ -28,7 +28,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Wrap the data in the expected structure for the frontend
     return NextResponse.json({ success: true, data: result.data });
-
   } catch (error) {
     console.error('Error in proxy route:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

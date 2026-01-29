@@ -1,4 +1,5 @@
 # Backend Data (H2 Database)
+data/
 apps/backend/data/*.db
 apps/backend/data/*.lock
 apps/backend/data/*.trace
