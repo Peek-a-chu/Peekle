@@ -3,6 +3,7 @@ package com.peekle.global.config;
 import com.peekle.global.auth.handler.OAuth2FailureHandler;
 import com.peekle.global.auth.handler.OAuth2SuccessHandler;
 import com.peekle.global.auth.jwt.JwtAuthenticationFilter;
+import com.peekle.global.auth.filter.ExtensionAuthenticationFilter;
 import com.peekle.global.auth.repository.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.peekle.global.auth.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class SecurityConfig {
         private final OAuth2SuccessHandler oAuth2SuccessHandler;
         private final OAuth2FailureHandler oAuth2FailureHandler;
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final ExtensionAuthenticationFilter extensionAuthenticationFilter;
         private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
         private final OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> accessTokenResponseClient;
 
@@ -82,6 +84,7 @@ public class SecurityConfig {
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
                 )
+                .addFilterBefore(extensionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console iframe 허용
 

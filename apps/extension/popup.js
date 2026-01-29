@@ -4,6 +4,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const nicknameEl = document.getElementById('nickname');
     const statusEl = document.getElementById('status');
 
+    // 0. 테마 적용 (저장된 설정 확인)
+    chrome.storage.local.get(['themeSettings'], (result) => {
+        if (result.themeSettings) {
+            applyTheme(result.themeSettings);
+        }
+    });
+
+    // [New] 실시간 테마 변경 감지
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.themeSettings) {
+            applyTheme(changes.themeSettings.newValue);
+        }
+    });
+
     // 1. 초기 연동 여부 확인
     chrome.storage.local.get(['peekle_token', 'userData'], (result) => {
         if (result.peekle_token) {
@@ -75,6 +89,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (json.success && json.data) {
                     const userData = json.data;
 
+                    // [New] 추가 상태 정보 조회 (Streak + Today Solved)
+                    const statusResponse = await fetch(`http://localhost:8080/api/users/me/extension-status`, {
+                        headers: { 'X-Peekle-Token': token }
+                    });
+
+                    if (statusResponse.ok) {
+                        const statusJson = await statusResponse.json();
+                        if (statusJson.success && statusJson.data) {
+                            userData.streakCurrent = statusJson.data.streakCurrent;
+                            userData.isSolvedToday = statusJson.data.isSolvedToday;
+                        }
+                    }
+
                     // 캐싱
                     chrome.storage.local.set({ userData: userData });
                     updateUI(userData);
@@ -101,11 +128,82 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('user-score').innerText = (data.score || 0) + "점";
         document.getElementById('user-rank').innerText = (data.rank ? data.rank + "위" : "-");
 
+        // [New] 스트릭 및 오늘 문제 상태
+        const streakEl = document.getElementById('user-streak');
+        if (streakEl) streakEl.innerText = (data.streakCurrent || 0) + "일";
+
+        const todayStatusEl = document.getElementById('today-status');
+        if (todayStatusEl) {
+            if (data.isSolvedToday) {
+                todayStatusEl.innerText = "오늘의 문제 완료! 🎉";
+                todayStatusEl.style.color = "var(--primary)";
+            } else {
+                todayStatusEl.innerText = "아직 문제를 풀지 않았어요";
+                todayStatusEl.style.color = "var(--muted-foreground)";
+            }
+        }
+
         // 프로필 이미지 표시 (무조건 이미지 사용)
         const tierIconEl = document.getElementById('tier-icon');
         // 이미지가 없으면 기본값(예: empty string) 처리 -> onerror로 핸들링하거나 빈 이미지
         const imgUrl = data.profileImage || "";
 
         tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+    }
+
+    // 테마 적용 헬퍼
+    function applyTheme(settings) {
+        const { mode, accentColor, customColor } = settings;
+        const root = document.documentElement;
+
+        // 1. Light/Dark Base Colors
+        if (mode === 'dark') {
+            root.style.setProperty('--background', '#09090b'); // zinc-950
+            root.style.setProperty('--foreground', '#d4d4d8'); // zinc-300 (Grayish text)
+            root.style.setProperty('--card', '#18181b'); // zinc-900
+            root.style.setProperty('--card-foreground', '#e4e4e7'); // zinc-200 (Slightly brighter than foreground)
+            root.style.setProperty('--muted', '#27272a'); // zinc-800
+            root.style.setProperty('--muted-foreground', '#a1a1aa'); // zinc-400
+            root.style.setProperty('--border', '#27272a');
+            root.style.setProperty('--primary-foreground', '#18181b'); // dark text on bright primary
+        } else {
+            root.style.setProperty('--background', '#f4f4f7');
+            root.style.setProperty('--foreground', '#09090b');
+            root.style.setProperty('--card', '#ffffff');
+            root.style.setProperty('--card-foreground', '#09090b');
+            root.style.setProperty('--muted', '#f3f4f6');
+            root.style.setProperty('--muted-foreground', '#71717a');
+            root.style.setProperty('--border', '#e4e4e7');
+            root.style.setProperty('--primary-foreground', '#ffffff');
+        }
+
+        // 2. Accent Color
+        let primaryColor = '#E24EA0'; // Default Pink
+        const colors = {
+            blue: '#3b82f6',
+            skyblue: '#06b6d4',
+            orange: '#f97316',
+            pink: '#db2777',
+            green: '#22c55e',
+            lime: '#84cc16'
+        };
+
+        if (accentColor === 'custom' && customColor) {
+            primaryColor = customColor;
+        } else if (colors[accentColor]) {
+            primaryColor = colors[accentColor];
+        }
+
+        root.style.setProperty('--primary', primaryColor);
+
+        // 추가: 오늘 문제 완료 상태 텍스트 색상 실시간 반영용 (변수가 이미 설정되어 있으므로 명시적 호출 불필요할 수 있으나 안전장치)
+        const statusText = document.getElementById('today-status');
+        if (statusText) {
+            if (statusText.innerText.includes('완료')) {
+                statusText.style.color = 'var(--primary)';
+            } else {
+                statusText.style.color = 'var(--muted-foreground)';
+            }
+        }
     }
 });

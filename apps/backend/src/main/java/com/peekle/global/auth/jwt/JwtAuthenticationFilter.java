@@ -32,6 +32,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // 이미 인증된 상태(예: ExtensionAuthenticationFilter를 통해)라면 JWT 필터 로직 스킵
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = extractTokenFromCookie(request, "access_token");
 
         if (token != null && jwtTokenProvider.validateToken(token)) {
