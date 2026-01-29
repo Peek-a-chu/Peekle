@@ -110,8 +110,40 @@ public class SubmissionService {
             }
         }
 
+        // tier level calculation for problem creation (already done above)
+        // reuse tierStr if possible or fetch from problem if it was existing.
+        // If problem was looked up (not new), we rely on problem.getTier().
+        // BUT user wanted to use "Extension Data".
+        // Request has problemTitle and problemTier?
+        // request.getProblemTier() is "11", we convert to "Gold 5".
+        
+        // Let's ensure we have the correct tier string to pass.
+        // If we created a new problem, we have tierStr.
+        // If we found an existing problem, we might want to use the one from DB OR the one from request.
+        // To respect "Extension provided", we should re-calculate tierStr from request.
+        
+        int reqTierLevel = 0;
+        try {
+            reqTierLevel = Integer.parseInt(request.getProblemTier());
+        } catch (NumberFormatException e) {
+            reqTierLevel = 0;
+        }
+        String reqTierStr = SolvedAcLevelUtil.convertLevelToTier(reqTierLevel);
+
+        // 5. Tag 생성 (방 이름 등)
+        // 현재는 확장 프로그램에서 직접 호출 시 room 정보가 없을 수 있음.
+        // 추후 request에 roomName 등이 포함되거나, roomId로 조회하여 설정 필요.
+        // 우선은 null 또는 기본값 설정.
+        String tag = null; 
+        if (request.getSourceType() != null && !request.getSourceType().equalsIgnoreCase("EXTENSION")) {
+             // If manual submission from study/game, maybe generate tag here?
+             // For now, simpler to leave null as user said implementations are pending.
+        }
+
         SubmissionLog log = SubmissionLog.create(
                 user, problem, sourceType,
+                request.getProblemTitle(), reqTierStr, externalId,
+                tag,
                 request.getCode(),
                 request.getMemory(), request.getExecutionTime(),
                 request.getLanguage(), submittedAt);

@@ -1,5 +1,7 @@
 package com.peekle.domain.user.controller;
 
+import com.peekle.domain.user.dto.ExtensionStatusResponse;
+import com.peekle.domain.user.dto.TokenValidationRequest;
 import com.peekle.domain.user.dto.TokenValidationResponse;
 import com.peekle.domain.user.dto.UserProfileResponse;
 import com.peekle.domain.user.service.UserService;
@@ -48,13 +50,26 @@ public class UserController {
         return ApiResponse.success(response);
     }
 
-    @GetMapping("/me/validate-token")
+    @GetMapping("/me/profile")
+    public ApiResponse<UserProfileResponse> getMyProfile(@AuthenticationPrincipal Long userId) {
+        // 자신의 프로필 조회 (isMe = true)
+        UserProfileResponse response = userService.getUserProfile(userId, userId);
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/me/validate-token")
     public ApiResponse<TokenValidationResponse> validateToken(
             @AuthenticationPrincipal Long userId,
-            @RequestHeader("X-Peekle-Token") String token) {
+            @RequestBody TokenValidationRequest request) {
 
-        boolean isValidUserToken = userService.validateExtensionToken(userId, token);
+        boolean isValidUserToken = userService.validateExtensionToken(userId, request.token());
         return ApiResponse.success(new TokenValidationResponse(isValidUserToken));
+    }
+
+    @GetMapping("/me/streak")
+    public ApiResponse<java.util.List<com.peekle.domain.user.dto.ActivityStreakDto>> getActivityStreak(
+            @AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(userService.getUserActivityStreak(userId));
     }
 
     @GetMapping("/check-nickname")
@@ -82,4 +97,17 @@ public class UserController {
                 "message", "사용 가능한 닉네임입니다."
         ));
     }
+    @GetMapping("/me/timeline")
+    public ApiResponse<java.util.List<com.peekle.domain.user.dto.TimelineItemDto>> getDailyTimeline(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String date) {
+        return ApiResponse.success(userService.getDailyTimeline(userId, date));
+    }
+    
+    @GetMapping("/me/extension-status")
+    public ApiResponse<com.peekle.domain.user.dto.ExtensionStatusResponse> getExtensionStatus(
+            @AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(userService.getExtensionStatus(userId));
+    }
 }
+

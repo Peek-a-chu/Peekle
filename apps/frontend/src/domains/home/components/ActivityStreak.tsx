@@ -5,24 +5,56 @@ import { Flame, ChevronDown } from 'lucide-react';
 import { useActivityStreak } from '../hooks/useDashboardData';
 
 interface ActivityStreakProps {
-  onDateSelect?: (date: string) => void;
+    onDateSelect?: (date: string) => void;
+    selectedDate?: string | null;
 }
 
-// 사용 가능한 년도들 (목업용)
-const AVAILABLE_YEARS = [2024, 2025, 2026];
+// 사용 가능한 년도들 (동적 생성)
+const CURRENT_YEAR = new Date().getFullYear();
 
-const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
-  const { data: allData } = useActivityStreak();
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState(2025);
+const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate }: ActivityStreakProps) => {
+    const { data: allData } = useActivityStreak();
+    const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
+    const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
 
-  // 선택된 년도 데이터만 필터링
-  const yearData = useMemo(() => {
-    return allData.filter((item) => {
-      const year = new Date(item.date).getFullYear();
-      return year === selectedYear;
-    });
-  }, [allData, selectedYear]);
+    // 외부 prop이 있으면 그것을 사용, 없으면 내부 state 사용
+    const selectedDate = externalSelectedDate !== undefined ? externalSelectedDate : internalSelectedDate;
+
+    // 사용 가능한 년도 계산 (데이터 기반 + 현재 년도)
+    const availableYears = useMemo(() => {
+        const years = new Set<number>();
+        years.add(CURRENT_YEAR); // 현재 년도는 항상 포함
+
+        allData.forEach((item) => {
+            const year = new Date(item.date).getFullYear();
+            if (!isNaN(year)) {
+                years.add(year);
+            }
+        });
+
+        return Array.from(years).sort((a, b) => a - b);
+    }, [allData]);
+
+    // 선택된 년도 데이터만 필터링 (로컬에서 전체 날짜 생성)
+    const yearData = useMemo(() => {
+        // 1. 해당 연도의 모든 날짜 생성
+        const fullDates: { date: string; count: number }[] = [];
+        const startDate = new Date(`${selectedYear}-01-01`);
+        const endDate = new Date(`${selectedYear}-12-31`);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().split('T')[0];
+            fullDates.push({ date: dateStr, count: 0 });
+        }
+
+        // 2. 실제 데이터 매핑
+        const dataMap = new Map(allData.map(item => [item.date, item.count]));
+
+        return fullDates.map(item => ({
+            ...item,
+            count: dataMap.get(item.date) || 0
+        }));
+    }, [allData, selectedYear]);
 
   // 데이터를 월별로 그룹화
   const monthlyData = useMemo(() => {
@@ -54,11 +86,13 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
     return yearData.reduce((sum, item) => sum + item.count, 0);
   }, [yearData]);
 
-  // 날짜 클릭 핸들러
-  const handleDateClick = (date: string) => {
-    setSelectedDate(date);
-    onDateSelect?.(date);
-  };
+    // 날짜 클릭 핸들러
+    const handleDateClick = (date: string) => {
+        if (externalSelectedDate === undefined) {
+            setInternalSelectedDate(date);
+        }
+        onDateSelect?.(date);
+    };
 
   // 월 이름 포맷
   const formatMonth = (monthKey: string) => {
@@ -86,50 +120,49 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
             <span className="text-sm text-muted-foreground">문제</span>
           </div>
 
-          {/* 년도 선택 (드롭다운) */}
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="appearance-none bg-muted/30 border border-border text-muted-foreground text-sm font-medium py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
-            >
-              {AVAILABLE_YEARS.map((year) => (
-                <option key={year} value={year}>
-                  {year}년
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          </div>
-        </div>
-      </div>
-
-      {/* 히트맵 */}
-      <div className="overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden">
-        <div className="flex gap-1 min-w-max">
-          {Object.entries(monthlyData).map(([monthKey, days]) => (
-            <div key={monthKey} className="flex flex-col gap-1">
-              <span className="text-[10px] text-muted-foreground/70 mb-1 h-3">
-                {formatMonth(monthKey)}
-              </span>
-              <div className="grid grid-rows-7 grid-flow-col gap-px">
-                {days.map((day) => (
-                  <button
-                    key={day.date}
-                    onClick={() => handleDateClick(day.date)}
-                    className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${
-                      selectedDate === day.date
-                        ? 'ring-1 ring-primary ring-offset-1'
-                        : 'hover:ring-1 hover:ring-border'
-                    }`}
-                    title={`${day.date}: ${day.count}문제`}
-                  />
-                ))}
-              </div>
+                    {/* 년도 선택 (드롭다운) */}
+                    <div className="relative">
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                            className="appearance-none bg-muted/30 border border-border text-muted-foreground text-sm font-medium py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                        >
+                            {availableYears.map((year) => (
+                                <option key={year} value={year}>
+                                    {year}년
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    </div>
+                </div>
             </div>
-          ))}
-        </div>
-      </div>
+
+            {/* 히트맵 */}
+            <div className="overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden p-1">
+                <div className="flex gap-1 min-w-max">
+                    {Object.entries(monthlyData).map(([monthKey, days]) => (
+                        <div key={monthKey} className="flex flex-col gap-1">
+                            <span className="text-[10px] text-muted-foreground/70 mb-1 h-3">
+                                {formatMonth(monthKey)}
+                            </span>
+                            <div className="grid grid-rows-7 grid-flow-col gap-px">
+                                {days.map((day) => (
+                                    <button
+                                        key={day.date}
+                                        onClick={() => handleDateClick(day.date)}
+                                        className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${selectedDate === day.date
+                                            ? 'ring-1 ring-primary ring-offset-1 relative z-10'
+                                            : 'hover:ring-1 hover:ring-border'
+                                            }`}
+                                        title={`${day.date}: ${day.count}문제`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
       {/* 범례 */}
       <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
