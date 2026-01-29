@@ -11,13 +11,20 @@ export async function fetchSubmissions(
   studyId: number,
   problemId: number,
 ): Promise<SubmissionSuccessUser[]> {
-  const res = await apiFetch<SubmissionSuccessUser[]>(
-    `/api/submissions/study/${studyId}/problem/${problemId}`,
-  );
+  const res = await apiFetch<any>(`/api/submissions/studies/${studyId}/problems/${problemId}`);
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to fetch submissions');
   }
-  return res.data;
+  // Backend returns Page<SubmissionLogResponse>, so we extract content
+  if (res.data.content && Array.isArray(res.data.content)) {
+    return res.data.content;
+  }
+  // Fallback if it returns list directly
+  if (Array.isArray(res.data)) {
+    return res.data;
+  }
+  // If neither, return empty array to avoid crashes
+  return [];
 }
 
 // 2. Daily Problems
@@ -75,18 +82,13 @@ export interface ExternalProblem {
 }
 
 export async function searchExternalProblems(query: string): Promise<ExternalProblem[]> {
-  const res = await apiFetch<ExternalProblem[]>('/api/external/search?query=' + encodeURIComponent(query));
+  const res = await apiFetch<ExternalProblem[]>(
+    '/api/external/search?query=' + encodeURIComponent(query),
+  );
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to search external problems');
   }
   return res.data;
 }
 
-export async function deleteProblem(studyId: number, problemId: number): Promise<void> {
-  const res = await apiFetch<void>(`/api/studies/${studyId}/problems/${problemId}`, {
-    method: 'DELETE',
-  });
-  if (!res.success) {
-    throw new Error(res.error?.message || 'Failed to delete problem');
-  }
-}
+// deleteProblem was deprecated and removed in favor of WebSocket action
