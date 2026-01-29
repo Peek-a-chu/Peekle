@@ -43,8 +43,8 @@ export function StudyChatPanel() {
     return <div className="p-4 text-center text-muted-foreground">스터디 룸에 입장해주세요.</div>;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col" ref={scrollRef}>
+    <div className="flex flex-col h-full ">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" ref={scrollRef}>
         {messages.map((msg) => (
           <ChatMessageItem key={msg.id} message={msg} isMine={msg.senderId === currentUserId} />
         ))}

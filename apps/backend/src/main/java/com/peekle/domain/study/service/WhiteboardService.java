@@ -105,13 +105,16 @@ public class WhiteboardService {
         Map<String, Object> stateData = new HashMap<>();
         stateData.put("isActive", isActive);
 
-        if (isActive) {
-            // 활성화 상태라면 이력(History)과 방장 정보도 포함
-            List<Object> history = redisTemplate.opsForList().range(historyKey, 0, -1);
-            stateData.put("history", history);
-            stateData.put("ownerId", config.get("ownerId"));
-            stateData.put("status", config.get("status"));
-        }
+        // NOTE:
+        // - 기존 구현은 isActive=false 일 때 history를 아예 포함하지 않아,
+        //   클라이언트가 SYNC를 요청해도 빈 상태만 받는 문제가 발생할 수 있습니다.
+        // - UI의 "화이트보드 창 ON/OFF"는 세션(isActive)과 별개로 동작할 수 있으므로,
+        //   SYNC 응답에는 history를 항상 포함시켜 복원이 안정적으로 되도록 합니다.
+        List<Object> history = redisTemplate.opsForList().range(historyKey, 0, -1);
+        stateData.put("history", history);
+        // config 값이 있으면 같이 내려줌 (없어도 무방)
+        stateData.put("ownerId", config.get("ownerId"));
+        stateData.put("status", config.get("status"));
 
         // 응답값
         WhiteboardResponse syncMessage = WhiteboardResponse.builder()
@@ -120,8 +123,15 @@ public class WhiteboardService {
                 .timestamp(LocalDateTime.now())
                 .build();
 
+        // 1) 사용자 전용 토픽으로 전송 (기존 동작)
         String userTopic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD_USER, studyId, userId);
         messagingTemplate.convertAndSend(userTopic, syncMessage);
+
+        // 2) 동시에 방 브로드캐스트 토픽으로도 전송
+        //    - 프론트에서 사용자 전용 토픽 구독이 늦게 되거나 userId 매칭에 실패해도
+        //      최소한 방 공용 토픽으로 SYNC 데이터를 받을 수 있도록 보강
+        String broadcastTopic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
+        messagingTemplate.convertAndSend(broadcastTopic, syncMessage);
     }
 
     public void saveDrawEvent(Long studyId, Long userId, WhiteboardRequest request) {

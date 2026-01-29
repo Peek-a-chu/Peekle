@@ -32,11 +32,24 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
     canvasRef.current?.handleServerMessage(msg);
   }, []);
 
-  const { sendMessage } = useWhiteboardSocket(roomId as string, handleMessage, {
-    enabled: isWhiteboardOverlayOpen,
-  });
+  const { sendMessage } = useWhiteboardSocket(
+    roomId as string,
+    currentUserId?.toString() || '',
+    handleMessage,
+    {
+      enabled: isWhiteboardOverlayOpen,
+    },
+  );
 
   const hasJoinedRef = useRef(false);
+
+  // Reset join status when whiteboard is closed
+  useEffect(() => {
+    if (!isWhiteboardOverlayOpen) {
+      // Reset when whiteboard is closed so SYNC will be requested again when reopened
+      hasJoinedRef.current = false;
+    }
+  }, [isWhiteboardOverlayOpen]);
 
   // Reset join status on disconnect
   useEffect(() => {
@@ -45,7 +58,15 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
     }
   }, [connected]);
 
-  // [Fix] Request initial state when connected
+  // Note:
+  // SYNC 요청은 `useWhiteboardSocket`에서 "구독 완료 후 자동 SYNC"로 처리합니다.
+  // Overlay에서 추가로 setTimeout SYNC를 보내면, overlay on/off 및 재연결 타이밍에서
+  // 세션 종료 후 늦게 publish 되는 레이스로 서버에 "No decoder for session id" 로그가 발생할 수 있어 제거했습니다.
+  const handleCanvasReady = useCallback(() => {
+    console.log('[WhiteboardOverlay] Canvas ready');
+  }, []);
+
+  // [Fix] Request initial state when connected and whiteboard is open
   useEffect(() => {
     if (isWhiteboardOverlayOpen && connected && !hasJoinedRef.current) {
       console.log('[WhiteboardOverlay] Sending JOIN request');
@@ -159,6 +180,7 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
             onObjectAdded={handleObjectAdded}
             onObjectModified={handleObjectModified}
             onObjectRemoved={handleObjectRemoved}
+            onReady={handleCanvasReady}
           />
         </div>
       </div>
