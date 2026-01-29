@@ -2,6 +2,7 @@ package com.peekle.domain.workbook.service;
 
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
+import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.domain.workbook.dto.request.WorkbookCreateRequest;
@@ -22,7 +23,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 @Service
@@ -35,6 +38,7 @@ public class WorkbookService {
     private final WorkbookBookmarkRepository workbookBookmarkRepository;
     private final ProblemRepository problemRepository;
     private final UserRepository userRepository;
+    private final SubmissionLogRepository submissionLogRepository;
 
     // 문제집 생성
     @Transactional
@@ -57,7 +61,7 @@ public class WorkbookService {
         }
 
         // 3. 응답 생성
-        List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook);
+        List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
         return WorkbookResponse.of(workbook, false, true, problemResponses);
     }
 
@@ -84,12 +88,27 @@ public class WorkbookService {
 
         final User user = userId != null ? userRepository.findById(userId).orElse(null) : null;
 
+        // 모든 문제집의 문제 ID 수집 (solvedCount 계산용)
+        List<Long> allProblemIds = workbooks.getContent().stream()
+                .flatMap(w -> w.getProblems().stream())
+                .map(wp -> wp.getProblem().getId())
+                .distinct()
+                .toList();
+
+        // 유저가 푼 문제 ID 목록 조회
+        Set<Long> solvedProblemIds = (userId != null && !allProblemIds.isEmpty())
+                ? new HashSet<>(submissionLogRepository.findSolvedProblemIds(userId, allProblemIds))
+                : Set.of();
+
         List<WorkbookListResponse> content = workbooks.getContent().stream()
                 .map(workbook -> {
                     int problemCount = workbook.getProblems().size();
+                    int solvedCount = (int) workbook.getProblems().stream()
+                            .filter(wp -> solvedProblemIds.contains(wp.getProblem().getId()))
+                            .count();
                     boolean isBookmarked = user != null && workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
                     boolean isOwner = user != null && workbook.getCreator().getId().equals(userId);
-                    return WorkbookListResponse.of(workbook, problemCount, isBookmarked, isOwner);
+                    return WorkbookListResponse.of(workbook, problemCount, solvedCount, isBookmarked, isOwner);
                 })
                 .toList();
 
@@ -117,7 +136,7 @@ public class WorkbookService {
             }
         }
 
-        List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook);
+        List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
 
         return WorkbookResponse.of(workbook, isBookmarked, isOwner, problemResponses);
     }
@@ -148,7 +167,7 @@ public class WorkbookService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         boolean isBookmarked = workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
-        List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook);
+        List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
 
         return WorkbookResponse.of(workbook, isBookmarked, true, problemResponses);
     }
@@ -223,10 +242,28 @@ public class WorkbookService {
         });
     }
 
-    // 문제집의 문제 목록 조회
-    private List<WorkbookProblemResponse> getWorkbookProblems(Workbook workbook) {
-        return workbookProblemRepository.findByWorkbookWithProblem(workbook).stream()
-                .map(WorkbookProblemResponse::of)
+    // 문제집의 문제 목록 조회 (유저의 풀이 여부 포함)
+    private List<WorkbookProblemResponse> getWorkbookProblems(Workbook workbook, Long userId) {
+        List<WorkbookProblem> workbookProblems = workbookProblemRepository.findByWorkbookWithProblem(workbook);
+
+        // 로그인하지 않은 경우: 모든 문제를 미풀이로 표시
+        if (userId == null || workbookProblems.isEmpty()) {
+            return workbookProblems.stream()
+                    .map(wp -> WorkbookProblemResponse.of(wp, false))
+                    .toList();
+        }
+
+        // 로그인한 경우: 유저가 푼 문제 ID 목록 조회
+        List<Long> problemIds = workbookProblems.stream()
+                .map(wp -> wp.getProblem().getId())
+                .toList();
+
+        Set<Long> solvedProblemIds = new HashSet<>(
+                submissionLogRepository.findSolvedProblemIds(userId, problemIds)
+        );
+
+        return workbookProblems.stream()
+                .map(wp -> WorkbookProblemResponse.of(wp, solvedProblemIds.contains(wp.getProblem().getId())))
                 .toList();
     }
 }
