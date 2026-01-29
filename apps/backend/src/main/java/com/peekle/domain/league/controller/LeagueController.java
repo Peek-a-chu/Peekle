@@ -47,4 +47,3 @@ public class LeagueController {
         return ApiResponse.success(rules);
     }
 }
-

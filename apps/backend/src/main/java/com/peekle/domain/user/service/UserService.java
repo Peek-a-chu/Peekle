@@ -54,11 +54,23 @@ public class UserService {
     public UserProfileResponse getUserProfileByToken(String token) {
         User user = userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
-        return getUserProfile(user.getId());
+        return getUserProfile(user.getId(), null);
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getUserProfileByNickname(String nickname, Long currentUserId) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return getUserProfile(user.getId(), currentUserId);
     }
 
     @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(Long userId) {
+        return getUserProfile(userId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getUserProfile(Long userId, Long currentUserId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -68,6 +80,8 @@ public class UserService {
         // 3. 필드 데이터 조회
         long solvedCount = submissionLogRepository.countByUserId(user.getId());
 
+        boolean isMe = currentUserId != null && currentUserId.equals(userId);
+
         // 4. DTO 반환
         return UserProfileResponse.builder()
                 .id(user.getId())
@@ -76,10 +90,11 @@ public class UserService {
                 .leagueName(user.getLeague().name())
                 .score((long) user.getLeaguePoint())
                 .rank((int) rank)
-                .profileImage(user.getProfileImgThumb())
+                .profileImg(user.getProfileImgThumb())
                 .streakCurrent(user.getStreakCurrent())
                 .streakMax(user.getStreakMax())
                 .solvedCount(solvedCount)
+                .me(isMe)
                 .build();
     }
     public User getUserByExtensionToken(String token) {

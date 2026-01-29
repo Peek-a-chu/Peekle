@@ -8,8 +8,11 @@ import AIRecommendation from '@/domains/home/components/AIRecommendation';
 import WeeklyScoreCard from '@/domains/home/components/WeeklyScoreCard';
 import LeagueRanking from '@/domains/home/components/LeagueRanking';
 
+import { useAuthStore } from '@/lib/auth-store';
+
 export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const user = useAuthStore((state) => state.user);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 transition-colors duration-300">
@@ -25,7 +28,11 @@ export default function HomePage() {
               <ActivityStreak onDateSelect={setSelectedDate} />
 
               {/* 학습 타임라인 */}
-              <LearningTimeline selectedDate={selectedDate} showHistoryLink={true} />
+              <LearningTimeline
+                selectedDate={selectedDate}
+                showHistoryLink={true}
+                nickname={user?.nickname}
+              />
             </div>
             {/* AI 추천 & 주간 점수 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

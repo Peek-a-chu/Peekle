@@ -54,11 +54,11 @@ div[class*='monaco-editor-overlaymessage'],
 
   .dark {
     --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --foreground: 218 11% 65%;
     --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: 218 11% 65%;
     --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 218 11% 65%;
     --primary-foreground: 210 40% 98%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -130,6 +130,7 @@ div[class*='monaco-editor-overlaymessage'],
 }
 
 @layer components {
+
   /* Common Markdown Styles */
   .markdown-prose {
     @apply text-sm leading-relaxed break-words;

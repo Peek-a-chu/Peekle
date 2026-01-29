@@ -42,16 +42,30 @@ export interface ActivityStreakData {
   count: number;
 }
 
+// 시드 기반 랜덤 생성기 (Hydration Mismatch 방지용)
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
 // 3년간 데이터 생성 (2024-01-01 ~ 2026-12-31)
 const generateStreakData = (): ActivityStreakData[] => {
   const data: ActivityStreakData[] = [];
   const startDate = new Date('2024-01-01');
   const endDate = new Date('2026-12-31');
 
+  let seed = 123456789; // 고정 시드
+
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split('T')[0];
+
+    // 시드 기반 랜덤값 사용
+    seed++;
+    const randomVal = seededRandom(seed);
+    const randomCountVal = seededRandom(seed + 9999);
+
     // 랜덤 문제 풀이 수 (0~8)
-    const count = Math.random() > 0.3 ? Math.floor(Math.random() * 8) : 0;
+    const count = randomVal > 0.3 ? Math.floor(randomCountVal * 8) : 0;
     data.push({ date: dateStr, count });
   }
   return data;

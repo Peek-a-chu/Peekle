@@ -7,17 +7,15 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, User, LogOut } from 'lucide-react';
 import MyLeagueCard from './MyLeagueCard';
 import { logout } from '@/api/authApi';
+import { useAuthStore } from '@/lib/auth-store';
 
 const UserProfileSection = () => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Mock user data
-  const user = {
-    nickname: 'CodeMaster',
-    profileImage: '', // Empty for placeholder
-  };
+  const user = useAuthStore((state) => state.user);
+  const checkAuth = useAuthStore((state) => state.checkAuth);
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -26,6 +24,9 @@ const UserProfileSection = () => {
         setIsOpen(false);
       }
     };
+
+    // 컴포넌트 마운트 시 최신 유저 정보 조회 (프로필 이미지 등 동기화)
+    checkAuth();
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -41,35 +42,16 @@ const UserProfileSection = () => {
     }
   };
 
+  if (!user) return null;
+
   return (
     <div className="px-5 py-1">
-      <Link href="/profile/me" className="flex items-center gap-3 mb-6 group">
-        <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center overflow-hidden border border-white shrink-0 ml-2 shadow-sm">
-          {/* Avatar: Use image if available, else show first letter */}
-          {user.profileImage ? (
-            <Image
-              src={user.profileImage}
-              alt={user.nickname}
-              fill
-              className="object-cover rounded-full"
-            />
-          ) : (
-            <span className="text-white font-bold text-lg">
-              {user.nickname.charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
-        <span className="flex-1 font-semibold text-sm text-slate-800 truncate group-hover:text-slate-900">
-          {user.nickname}
-        </span>
-        <ChevronDown className="w-5 h-5 text-gray-400 shrink-0 mr-4" />
-      </Link>
       <div className="relative mb-6" ref={dropdownRef}>
         <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center gap-3 group">
           <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center overflow-hidden border-2 border-background shrink-0 ml-2 shadow-sm">
-            {user.profileImage ? (
+            {user.profileImg ? (
               <Image
-                src={user.profileImage}
+                src={user.profileImg}
                 alt={user.nickname}
                 fill
                 className="object-cover rounded-full"
@@ -89,10 +71,11 @@ const UserProfileSection = () => {
         </button>
 
         {/* 드롭다운 메뉴 */}
+
         {isOpen && (
           <div className="absolute top-full left-0 right-0 mt-2 mx-2 bg-card rounded-xl shadow-lg border border-border py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
             <Link
-              href="/profile/me"
+              href={`/profile/${user.nickname}`}
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
             >

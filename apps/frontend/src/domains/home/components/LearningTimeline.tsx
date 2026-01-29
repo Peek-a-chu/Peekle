@@ -9,9 +9,14 @@ import TimelineItem from './TimelineItem';
 interface LearningTimelineProps {
   selectedDate: string | null;
   showHistoryLink?: boolean;
+  nickname?: string;
 }
 
-const LearningTimeline = ({ selectedDate, showHistoryLink = false }: LearningTimelineProps) => {
+const LearningTimeline = ({
+  selectedDate,
+  showHistoryLink = false,
+  nickname,
+}: LearningTimelineProps) => {
   const { data } = useTimeline(selectedDate || '');
   const [expanded, setExpanded] = useState(false);
 
@@ -37,9 +42,9 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false }: LearningTim
           <p className="text-xs text-muted-foreground">총 {data.length}개 문제</p>
         </div>
 
-        {showHistoryLink && (
+        {showHistoryLink && nickname && (
           <Link
-            href="/profile/me/history"
+            href={`/profile/${nickname}/history`}
             className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1"
           >
             <span className="text-xs font-medium">풀이 내역 조회</span>

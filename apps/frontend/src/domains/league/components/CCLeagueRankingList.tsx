@@ -67,8 +67,7 @@ const CCLeagueRankingList = () => {
       </div>
     );
   }
-
-  // 그룹 나누기 (Backend에서 status 필드로 구분됨)
+  // 그룹 나누기
   const promotionZone = data.members.filter((m) => m.status === 'PROMOTE');
   const maintenanceZone = data.members.filter((m) => m.status === 'STAY');
   const demotionZone = data.members.filter((m) => m.status === 'DEMOTE');
@@ -81,159 +80,129 @@ const CCLeagueRankingList = () => {
           {LEAGUE_NAMES[data.myLeague]} 리그 순위
         </h3>
         {/* 리그 기간 */}
-        <span className="text-[10px] text-muted-foreground font-medium bg-secondary/50 px-2 py-0.5 rounded-full">
+        <span className="text-[10px] text-primary font-medium bg-primary/10 px-2 py-0.5 rounded-full">
           {getLeaguePeriodString()}
         </span>
       </div>
 
       {/* 랭킹 리스트 컨테이너 */}
-      <div className="space-y-1 overflow-y-auto pr-1 custom-scrollbar">
-        {/* 1. 승급 구간 */}
+      <div className="space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+        {/* 1. 승급 구간 (컨테이너 배경) */}
         {promotionZone.length > 0 && (
-          <RankingSection
-            title="승급 구간"
-            subtitle={`상위권`}
-            icon={<TrendingUp className="w-3 h-3 text-green-500" />}
-            members={promotionZone}
-            type="promotion"
-          />
+          <div className="rounded-xl border border-green-500/10 bg-green-500/5 overflow-hidden">
+            {promotionZone.map((member) => (
+              <RankingItem key={member.rank} member={member} />
+            ))}
+          </div>
         )}
 
-        {/* divider */}
-        {maintenanceZone.length > 0 && <div className="h-[1px] bg-border/40 mx-2 my-1" />}
+        {/* 승급 구분선 */}
+        {promotionZone.length > 0 && (maintenanceZone.length > 0 || demotionZone.length > 0) && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-[1px] flex-1 bg-green-500/20"></div>
+            <span className="text-[10px] text-green-500 font-medium">승급</span>
+            <div className="h-[1px] flex-1 bg-green-500/20"></div>
+          </div>
+        )}
 
-        {/* 2. 유지 구간 */}
+        {/* 2. 유지 구간 (배경 없음/기본) */}
         {maintenanceZone.length > 0 && (
-          <RankingSection
-            title="유지 구간"
-            subtitle={`중위권`}
-            icon={<GripHorizontal className="w-3 h-3 text-gray-400" />}
-            members={maintenanceZone}
-            type="maintenance"
-          />
+          <div className="rounded-xl border border-transparent">
+            {maintenanceZone.map((member) => (
+              <RankingItem key={member.rank} member={member} />
+            ))}
+          </div>
         )}
 
-        {/* divider */}
-        {demotionZone.length > 0 && <div className="h-[1px] bg-border/40 mx-2 my-1" />}
+        {/* 강등 구분선 */}
+        {(promotionZone.length > 0 || maintenanceZone.length > 0) && demotionZone.length > 0 && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-[1px] flex-1 bg-red-500/20"></div>
+            <span className="text-[10px] text-red-500 font-medium">강등</span>
+            <div className="h-[1px] flex-1 bg-red-500/20"></div>
+          </div>
+        )}
 
-        {/* 3. 강등 구간 */}
+        {/* 3. 강등 구간 (컨테이너 배경) */}
         {demotionZone.length > 0 && (
-          <RankingSection
-            title="강등 구간"
-            subtitle={`하위권`}
-            icon={<TrendingDown className="w-3 h-3 text-red-500" />}
-            members={demotionZone}
-            type="demotion"
-          />
+          <div className="rounded-xl border border-red-500/10 bg-red-500/5 overflow-hidden">
+            {demotionZone.map((member) => (
+              <RankingItem key={member.rank} member={member} />
+            ))}
+          </div>
         )}
       </div>
     </div>
   );
 };
 
-// 하위 섹션 컴포넌트
-interface RankingSectionProps {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  members: LeagueRankingMember[];
-  type: 'promotion' | 'maintenance' | 'demotion';
-}
+// 개별 아이템 컴포넌트
+const RankingItem = ({ member }: { member: LeagueRankingMember }) => {
+  const isMe = member.me;
 
-const RankingSection = ({ title, subtitle, icon, members, type }: RankingSectionProps) => {
-  // 내 행 하이라이트 스타일
-  const getMyRowStyle = (isMe: boolean) => {
-    if (!isMe) return 'hover:bg-muted/30 border-transparent';
-    return 'bg-primary/5 border-l-2 border-l-primary border-y-transparent border-r-transparent pl-[calc(0.5rem-2px)]';
-  };
-
-  // 존별 스타일
-  const getZoneContainerStyle = () => {
-    switch (type) {
-      case 'promotion':
-        return 'bg-green-500/5 border border-green-500/10';
-      case 'demotion':
-        return 'bg-red-500/5 border border-red-500/10';
-      default:
-        return 'border border-transparent'; // 유지 구간은 투명
-    }
-  };
+  // 유저가 원한 예전 스타일 복원
+  const rowClass = isMe
+    ? 'bg-primary/5 border-l-2 border-l-primary border-y-transparent border-r-transparent pl-[calc(0.75rem-2px)] pr-3'
+    : 'hover:bg-muted/30 border-transparent px-3';
 
   return (
-    <div className={`space-y-1 rounded-lg p-1.5 transition-colors ${getZoneContainerStyle()}`}>
-      {/* 섹션 헤더 */}
-      <div className="flex items-center justify-between px-1 py-0.5 mb-1 bg-transparent rounded-md">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-          {icon}
-          <span>{title}</span>
-        </div>
-        <span className="text-[9px] text-muted-foreground/60 font-medium">{subtitle}</span>
+    <div
+      className={`
+                relative flex items-center py-2 transition-all border-b last:border-b-0
+                ${rowClass}
+            `}
+    >
+      {/* 1. 랭크 */}
+      <div className="w-8 flex items-center justify-center shrink-0">
+        <span
+          className={`text-xs font-bold tabular-nums ${isMe ? 'text-primary' : 'text-muted-foreground'}`}
+        >
+          {member.rank}
+        </span>
       </div>
 
-      {/* 리스트 아이템 */}
-      <div className="space-y-0.5">
-        {members.map((member) => (
-          <div
-            key={member.rank}
-            className={`
-                            relative flex items-center py-1 px-2 rounded-md transition-all border group
-                            ${getMyRowStyle(member.me || false)}
-                            ${!member.me ? 'bg-background/50' : ''} 
-                        `}
+      {/* 2. 아바타 & 닉네임 */}
+      <div className="flex-1 flex items-center gap-2 ml-1 min-w-0">
+        <div
+          className={`w-7 h-7 rounded-full overflow-hidden bg-muted flex items-center justify-center border shrink-0 ${isMe ? 'border-primary/30' : 'border-border'}`}
+        >
+          {member.avatar || member.profileImgThumb ? (
+            <Image
+              src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
+              alt={member.name}
+              width={28}
+              height={28}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          ) : null}
+          {!member.avatar && !member.profileImgThumb && (
+            <span className="text-[10px] font-bold text-muted-foreground uppercase absolute">
+              {member.name.substring(0, 1)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center min-w-0 justify-center gap-1">
+          <span
+            className={`text-xs truncate leading-none ${isMe ? 'text-foreground font-bold' : 'text-foreground/90'}`}
           >
-            {/* 1. 랭크 */}
-            <div className="w-6 flex items-center gap-0.5 shrink-0">
-              <span
-                className={`text-[11px] font-bold tabular-nums ${member.me ? 'text-primary' : 'text-muted-foreground'}`}
-              >
-                {member.rank}
-              </span>
-            </div>
+            {member.name}
+          </span>
+          {isMe && <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+        </div>
+      </div>
 
-            {/* 2. 아바타 */}
-            <div className="shrink-0 mr-2">
-              <div
-                className={`w-5 h-5 rounded-full overflow-hidden bg-muted flex items-center justify-center border ${member.me ? 'border-primary/30' : 'border-border'}`}
-              >
-                {member.avatar || member.profileImgThumb ? (
-                  <Image
-                    src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
-                    alt={member.name}
-                    width={20}
-                    height={20}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
-                ) : null}
-                <span className="text-[8px] font-bold text-muted-foreground uppercase absolute">
-                  {member.name.substring(0, 1)}
-                </span>
-              </div>
-            </div>
-
-            {/* 3. 닉네임 */}
-            <div className="flex-1 flex items-center gap-1.5 min-w-0">
-              <span
-                className={`text-xs truncate ${member.me ? 'text-foreground font-bold' : 'text-foreground/90'}`}
-              >
-                {member.name}
-              </span>
-              {member.me && <span className="shrink-0 w-1 h-1 rounded-full bg-primary" />}
-            </div>
-
-            {/* 4. 점수 */}
-            <div className="shrink-0 w-12 text-right">
-              <span
-                className={`text-[11px] font-bold tabular-nums tracking-tight ${member.me ? 'text-primary' : 'text-muted-foreground'}`}
-              >
-                {member.score.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        ))}
+      {/* 3. 점수 */}
+      <div className="shrink-0 w-20 text-right">
+        <span
+          className={`text-sm font-bold tabular-nums tracking-tight ${isMe ? 'text-primary' : 'text-muted-foreground'}`}
+        >
+          {member.score.toLocaleString()}
+        </span>
       </div>
     </div>
   );

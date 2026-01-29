@@ -42,37 +42,47 @@ const LeagueRuleModal = ({
     if (myLeague) setSelectedLeague(myLeague);
   }, [myLeague]);
 
-  const currentStat = leagueStats?.find((s) => s.tier === selectedLeague);
-  // 내 리그면 내 백분위, 아니면 해당 티어의 시작 백분위
-  const displayPercentile = selectedLeague === myLeague ? myPercentile : currentStat?.percentile;
+  // 리그별 누적 상위 백분위 (Standard Cumulative Distribution)
+  const CUMULATIVE_PERCENTILES: Record<LeagueType, number> = {
+    ruby: 3,
+    emerald: 5,
+    diamond: 10,
+    platinum: 20,
+    gold: 40,
+    silver: 70,
+    bronze: 90,
+    stone: 100,
+  };
+
+  const displayPercentile = CUMULATIVE_PERCENTILES[selectedLeague];
 
   const rule = rules?.[selectedLeague] || { promotePercent: 0, demotePercent: 0 };
   const promotePercent = rule.promotePercent;
   const demotePercent = rule.demotePercent;
 
-  // 점수 획득 방법 데이터 (아이콘, 라벨, 값)
+  // 점수 획득 방법 데이터 (아이콘, 라벨, 값) - 통합된 테마 컬러 적용
   const SCORE_RULES = [
     {
       icon: Brain,
       label: '문제 풀이',
       value: '+10 ~ 50점',
       desc: '난이도(티어)에 따라 차등 지급됩니다.',
-      // Blue theme
-      style: 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10',
-      iconStyle: 'text-blue-500 bg-blue-500/10 border-blue-200/20',
-      textStyle: 'text-blue-700 dark:text-blue-400',
-      badgeStyle: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+      // Theme Primary
+      style: 'bg-primary/5 border-primary/20 hover:bg-primary/10',
+      iconStyle: 'text-primary bg-primary/10 border-primary/20',
+      textStyle: 'text-foreground font-bold',
+      badgeStyle: 'bg-primary/10 text-primary border-primary/20',
     },
     {
       icon: Gamepad2,
       label: '게임 승리',
       value: '참여 인원 비례',
       desc: '1등: N*10점, 이후 순위별 -10점씩 차감 (예: 3명 참여시 1등 30점, 2등 20점)',
-      // Orange/Amber theme
-      style: 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10',
-      iconStyle: 'text-amber-500 bg-amber-500/10 border-amber-200/20',
-      textStyle: 'text-amber-700 dark:text-amber-400',
-      badgeStyle: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+      // Theme Primary
+      style: 'bg-primary/5 border-primary/20 hover:bg-primary/10',
+      iconStyle: 'text-primary bg-primary/10 border-primary/20',
+      textStyle: 'text-foreground font-bold',
+      badgeStyle: 'bg-primary/10 text-primary border-primary/20',
     },
   ];
 
@@ -114,14 +124,11 @@ const LeagueRuleModal = ({
               <div className="flex items-center gap-3">
                 <LeagueIcon league={selectedLeague} size={36} />
                 <div>
-                  <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
                     <span>{LEAGUE_NAMES[selectedLeague]}</span>
                     {displayPercentile !== undefined && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] px-1.5 py-0 h-5 font-normal"
-                      >
-                        상위 {displayPercentile.toFixed(1)}%
+                      <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 text-[10px] px-1.5 py-0 h-5 font-normal shadow-none">
+                        상위 {displayPercentile}%
                       </Badge>
                     )}
                   </DialogTitle>
@@ -248,20 +255,18 @@ const LeagueRuleModal = ({
                     </div>
                   ))}
                 </div>
-                {/* 팀전 규칙 카드 */}
-                <div className="group p-3 rounded-lg border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors mt-2">
+                {/* 팀전 규칙 카드 - Unified Theme */}
+                <div className="group p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors mt-2">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-md bg-background border border-indigo-200/20 shadow-sm">
-                        <Users className="w-4 h-4 text-indigo-500" />
+                      <div className="p-1.5 rounded-md bg-background border border-primary/20 shadow-sm">
+                        <Users className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                        팀전 점수 분배
-                      </span>
+                      <span className="text-sm font-bold text-foreground">팀전 점수 분배</span>
                     </div>
                     <Badge
                       variant="outline"
-                      className="font-mono bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400"
+                      className="font-mono bg-primary/10 border-primary/20 text-primary"
                     >
                       균등 분배
                     </Badge>
