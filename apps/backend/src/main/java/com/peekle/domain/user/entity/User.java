@@ -48,10 +48,13 @@ public class User extends BaseTimeEntity {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
-        // this.bojId = null; // 기본값 null
-        // this.league = LeagueTier.BRONZE; // Field init + Builder.Default
-        // this.leaguePoint = 0;
+        this.league = LeagueTier.BRONZE;
+        this.leaguePoint = 0;
         this.isDeleted = false;
+        this.extensionToken = java.util.UUID.randomUUID().toString();
+        this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
+        this.streakCurrent = 0;
+        this.streakMax = 0;
     }
 
 
@@ -79,6 +82,21 @@ public class User extends BaseTimeEntity {
     @Builder.Default
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
+    
+    @Column(name = "last_solved_date")
+    private java.time.LocalDate lastSolvedDate;
+
+    public void updateStreak(boolean increment) {
+        if (increment) {
+            this.streakCurrent++;
+        } else {
+            this.streakCurrent = 1;
+        }
+        if (this.streakCurrent > this.streakMax) {
+            this.streakMax = this.streakCurrent;
+        }
+        this.lastSolvedDate = java.time.LocalDate.now();
+    }
 
     public void addLeaguePoint(int amount) {
         this.leaguePoint += amount;
