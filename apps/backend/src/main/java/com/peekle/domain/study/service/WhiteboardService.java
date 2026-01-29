@@ -9,6 +9,7 @@ import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.redis.RedisKeyConst;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,7 @@ import java.util.Map;
 public class WhiteboardService {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
@@ -32,7 +34,7 @@ public class WhiteboardService {
         String key = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
 
         // 이미 화이트보드가 켜져있는지 확인 필요
-        Object activeValue = redisTemplate.opsForHash().get(key, "isActive");
+        Object activeValue = stringRedisTemplate.opsForHash().get(key, "isActive");
 
         if (activeValue != null && activeValue.toString().equals("true")){
             // 이미 화이트보드 열려있음
@@ -47,8 +49,8 @@ public class WhiteboardService {
         config.put("status", "UNLOCKED"); // 잠금 해제
         config.put("revision", "0"); // 이벤트 버전 (누락 감지/재동기화용)
 
-        redisTemplate.opsForHash().putAll(key, config);
-        redisTemplate.expire(key, Duration.ofHours(24)); // TTL 설정
+        stringRedisTemplate.opsForHash().putAll(key, config);
+        stringRedisTemplate.expire(key, Duration.ofHours(24)); // TTL 설정
 
         String nickName = getUserNickname(userId);
 
@@ -72,13 +74,13 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 권한 확인(주인장만 끌수있음 -> 화이트보드를 킨 사람)
-        Object ownerId = redisTemplate.opsForHash().get(configKey, "ownerId");
+        Object ownerId = stringRedisTemplate.opsForHash().get(configKey, "ownerId");
         if(ownerId == null || !String.valueOf(userId).equals(ownerId.toString())) {
             throw new BusinessException(ErrorCode.WHITEBOARD_PERMISSION_DENIED);
         }
 
         // 데이터 지우기
-        redisTemplate.delete(List.of(configKey, historyKey));
+        stringRedisTemplate.delete(List.of(configKey, historyKey));
 
 
         // 종료 메시지
@@ -99,7 +101,7 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // Reids 정보 조회
-        Map<Object, Object> config = redisTemplate.opsForHash().entries(configKey);
+        Map<Object, Object> config = stringRedisTemplate.opsForHash().entries(configKey);
 
         boolean isActive = config.containsKey("isActive") && "true".equals(config.get("isActive").toString());
         Long revision = 0L;
@@ -145,7 +147,7 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 활성화 상태 확인
-        Object isActive = redisTemplate.opsForHash().get(configKey, "isActive");
+        Object isActive = stringRedisTemplate.opsForHash().get(configKey, "isActive");
         if(isActive == null || !isActive.toString().equals("true")) {
             throw new BusinessException(ErrorCode.WHITEBOARD_NOT_FOUND);
         }
@@ -155,7 +157,7 @@ public class WhiteboardService {
 
         WhiteboardResponse response = WhiteboardResponse.from(request, userId, nickName);
         // bump revision (atomic)
-        Long newRevision = redisTemplate.opsForHash().increment(configKey, "revision", 1L);
+        Long newRevision = stringRedisTemplate.opsForHash().increment(configKey, "revision", 1L);
         response = WhiteboardResponse.builder()
                 .action(response.getAction())
                 .objectId(response.getObjectId())
@@ -195,13 +197,13 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 활성화 여부 확인
-        Object isActive = redisTemplate.opsForHash().get(configKey, "isActive");
+        Object isActive = stringRedisTemplate.opsForHash().get(configKey, "isActive");
         if (isActive == null || !isActive.toString().equals("true")) {
             throw new BusinessException(ErrorCode.WHITEBOARD_NOT_FOUND);
         }
 
         // 권한 확인(주인장만 전체 지우기 권한 주기)
-        Object ownerId = redisTemplate.opsForHash().get(configKey, "ownerId");
+        Object ownerId = stringRedisTemplate.opsForHash().get(configKey, "ownerId");
         if(ownerId == null || !String.valueOf(userId).equals(ownerId.toString())) {
             throw new BusinessException(ErrorCode.WHITEBOARD_PERMISSION_DENIED);
         }
@@ -215,7 +217,7 @@ public class WhiteboardService {
                 .senderId(userId)
                 .senderName(nickName)
                 .timestamp(LocalDateTime.now())
-                .revision(redisTemplate.opsForHash().increment(configKey, "revision", 1L))
+                .revision(stringRedisTemplate.opsForHash().increment(configKey, "revision", 1L))
                 .build();
 
         String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
