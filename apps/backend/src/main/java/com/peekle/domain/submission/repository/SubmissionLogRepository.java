@@ -26,5 +26,16 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
     // 최신 순으로 정렬 후 유저별로 하나씩... JPQL이나 Java Stream 처리 필요.
     // 여기선 해당 방 + 문제의 모든 로그를 가져와서 Service에서 최신것만 필터링하는 것이 간단할 수 있음.
     // 데이터가 많지 않다고 가정.
+    // [New] 특정 스터디, 특정 문제에 대해 각 유저별 최신 성공 풀이 조회
     List<SubmissionLog> findAllByRoomIdAndProblemIdOrderBySubmittedAtDesc(Long roomId, Long problemId);
+
+    // 유저의 모든 제출 기록 조회 (스트릭 계산용, 오래된 순)
+    List<SubmissionLog> findAllByUserIdOrderBySubmittedAtAsc(Long userId);
+
+    // [New] 특정 유저의 특정 일자(범위) 제출 기록 조회
+    List<SubmissionLog> findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+            Long userId, 
+            java.time.LocalDateTime start, 
+            java.time.LocalDateTime end
+    );
 }
