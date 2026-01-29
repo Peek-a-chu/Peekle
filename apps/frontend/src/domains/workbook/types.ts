@@ -16,8 +16,8 @@ export interface Workbook {
 }
 
 export interface WorkbookProblem {
-  id: number;
-  number: number;
+  id: number; // Problem 엔티티의 DB ID
+  number: number; // 백준 문제 번호
   title: string;
   isSolved: boolean;
   url: string;
@@ -29,6 +29,7 @@ export type WorkbookSort = 'LATEST' | 'OLDEST' | 'BOOKMARKS' | 'PROBLEMS';
 // 모달에서 사용하는 문제 타입 (드래그앤드롭용 id 포함)
 export interface WorkbookProblemItem {
   id: string;
+  problemId?: number; // Problem 엔티티의 DB ID
   number: number;
   title: string;
 }

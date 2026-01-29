@@ -1,15 +1,76 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type {
+  Workbook,
+  WorkbookProblem,
+  WorkbookTab,
+  WorkbookSort,
+  WorkbookProblemItem,
+} from '../types';
 import {
-  mockWorkbooks,
-  mockWorkbookProblems,
-  filterWorkbooks,
-  getTabCounts,
-} from '../mocks/mockData';
-import type { Workbook, WorkbookProblem, WorkbookTab, WorkbookSort, WorkbookProblemItem } from '../types';
+  getWorkbooks,
+  getWorkbook,
+  getWorkbookCounts,
+  createWorkbook as createWorkbookApi,
+  updateWorkbook as updateWorkbookApi,
+  deleteWorkbook as deleteWorkbookApi,
+  toggleWorkbookBookmark,
+  type WorkbookListResponse,
+  type WorkbookResponse,
+} from '../api/workbookApi';
 
 const PAGE_SIZE = 15;
+
+// API 응답을 프론트엔드 타입으로 변환
+function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
+  return {
+    id: String(item.id),
+    number: item.id,
+    title: item.title,
+    description: item.description || '',
+    problemCount: item.problemCount,
+    solvedCount: 0, // TODO: 서버에서 추가 필요
+    bookmarkCount: item.bookmarkCount,
+    isBookmarked: item.isBookmarked,
+    isOwner: item.isOwner,
+    createdAt: item.createdAt,
+    creator: {
+      id: String(item.creator.id),
+      nickname: item.creator.nickname || '알 수 없음',
+    },
+  };
+}
+
+function mapWorkbookResponseToWorkbook(item: WorkbookResponse): Workbook {
+  return {
+    id: String(item.id),
+    number: item.id,
+    title: item.title,
+    description: item.description || '',
+    problemCount: item.problemCount,
+    solvedCount: 0,
+    bookmarkCount: item.bookmarkCount,
+    isBookmarked: item.isBookmarked,
+    isOwner: item.isOwner,
+    createdAt: item.createdAt,
+    creator: {
+      id: String(item.creator.id),
+      nickname: item.creator.nickname || '알 수 없음',
+    },
+  };
+}
+
+function mapProblemsToWorkbookProblems(problems: WorkbookResponse['problems']): WorkbookProblem[] {
+  if (!problems) return [];
+  return problems.map((p) => ({
+    id: p.id, // Problem 엔티티의 DB ID
+    number: p.number,
+    title: p.title,
+    isSolved: false, // TODO: 서버에서 추가 필요
+    url: p.url,
+  }));
+}
 
 export interface UseWorkbooksPageLogicReturn {
   // 필터 상태
@@ -38,179 +99,297 @@ export interface UseWorkbooksPageLogicReturn {
 
   // 액션
   toggleBookmark: (id: string) => void;
-  createWorkbook: (data: { title: string; description: string; problems: WorkbookProblemItem[] }) => void;
-  updateWorkbook: (id: string, data: { title: string; description: string; problems: WorkbookProblemItem[] }) => void;
+  createWorkbook: (data: {
+    title: string;
+    description: string;
+    problems: WorkbookProblemItem[];
+  }) => void;
+  updateWorkbook: (
+    id: string,
+    data: { title: string; description: string; problems: WorkbookProblemItem[] },
+  ) => void;
   deleteWorkbook: (id: string) => void;
+
+  // 새로고침
+  refresh: () => void;
 }
 
 export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
-  // 로컬 상태로 문제집 목록 관리
-  const [workbookList, setWorkbookList] = useState<Workbook[]>(mockWorkbooks);
+  // 데이터 상태
+  const [workbookList, setWorkbookList] = useState<Workbook[]>([]);
+  const [totalElements, setTotalElements] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMoreData, setHasMoreData] = useState(true);
 
-  // 문제집별 문제 목록도 상태로 관리
-  const [problemsMap, setProblemsMap] = useState<Record<string, WorkbookProblem[]>>(mockWorkbookProblems);
+  // 선택된 문제집 상세 정보
+  const [selectedWorkbookDetail, setSelectedWorkbookDetail] = useState<Workbook | null>(null);
+  const [selectedProblemsList, setSelectedProblemsList] = useState<WorkbookProblem[]>([]);
 
   // 필터 상태
   const [tab, setTab] = useState<WorkbookTab>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<WorkbookSort>('LATEST');
 
-  // 페이징 상태
-  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  // 탭별 개수
+  const [tabCounts, setTabCounts] = useState({ all: 0, my: 0, bookmarked: 0 });
+
+  // 로딩 상태
   const [isLoading, setIsLoading] = useState(false);
+  const isInitialLoadRef = useRef(true);
 
   // 선택 상태
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // 필터링된 전체 문제집 목록
-  const filteredWorkbooks = useMemo(() => {
-    return filterWorkbooks(workbookList, tab, searchQuery, sortBy);
-  }, [workbookList, tab, searchQuery, sortBy]);
+  // 탭별 개수 조회
+  const fetchCounts = useCallback(async () => {
+    try {
+      const counts = await getWorkbookCounts();
+      setTabCounts({
+        all: counts.all,
+        my: counts.my,
+        bookmarked: counts.bookmarked,
+      });
+    } catch (error) {
+      console.error('Failed to fetch counts:', error);
+    }
+  }, []);
 
-  // 현재 표시할 문제집 (페이징 적용)
-  const workbooks = useMemo(() => {
-    return filteredWorkbooks.slice(0, displayCount);
-  }, [filteredWorkbooks, displayCount]);
+  // 문제집 목록 조회
+  const fetchWorkbooks = useCallback(
+    async (page: number, reset: boolean = false) => {
+      // 첫 로드이거나 더 불러오기일 때만 로딩 표시 (탭 전환 시 깜빡임 방지)
+      if (isInitialLoadRef.current || !reset) {
+        setIsLoading(true);
+      }
 
-  // 더 불러올 데이터가 있는지
-  const hasMore = displayCount < filteredWorkbooks.length;
+      try {
+        const response = await getWorkbooks(tab, searchQuery || undefined, sortBy, page, PAGE_SIZE);
+        const mappedWorkbooks = response.content.map(mapWorkbookListToWorkbook);
 
-  // 총 개수
-  const totalCount = filteredWorkbooks.length;
+        if (reset) {
+          setWorkbookList(mappedWorkbooks);
+        } else {
+          setWorkbookList((prev) => [...prev, ...mappedWorkbooks]);
+        }
 
-  // 탭별 개수
-  const tabCounts = useMemo(() => getTabCounts(workbookList), [workbookList]);
+        setTotalElements(response.totalElements);
+        setHasMoreData(!response.last);
+        setCurrentPage(page);
+        isInitialLoadRef.current = false;
+      } catch (error) {
+        console.error('Failed to fetch workbooks:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [tab, searchQuery, sortBy],
+  );
 
-  // 선택된 문제집
-  const selectedWorkbook = useMemo(() => {
-    if (!selectedId) return null;
-    return workbookList.find((w) => w.id === selectedId) || null;
-  }, [workbookList, selectedId]);
+  // 선택된 문제집 상세 조회
+  const fetchWorkbookDetail = useCallback(async (id: string) => {
+    try {
+      const response = await getWorkbook(Number(id));
+      setSelectedWorkbookDetail(mapWorkbookResponseToWorkbook(response));
+      setSelectedProblemsList(mapProblemsToWorkbookProblems(response.problems));
+    } catch (error) {
+      console.error('Failed to fetch workbook detail:', error);
+      setSelectedWorkbookDetail(null);
+      setSelectedProblemsList([]);
+    }
+  }, []);
 
-  // 선택된 문제집의 문제 목록
-  const selectedProblems = useMemo(() => {
-    if (!selectedId) return [];
-    return problemsMap[selectedId] || [];
-  }, [selectedId, problemsMap]);
+  // 선택 변경 시 상세 조회
+  useEffect(() => {
+    if (selectedId) {
+      fetchWorkbookDetail(selectedId);
+    } else {
+      setSelectedWorkbookDetail(null);
+      setSelectedProblemsList([]);
+    }
+  }, [selectedId, fetchWorkbookDetail]);
 
   // 더 불러오기
   const loadMore = useCallback(() => {
-    if (isLoading || !hasMore) return;
+    if (isLoading || !hasMoreData) return;
+    fetchWorkbooks(currentPage + 1, false);
+  }, [isLoading, hasMoreData, currentPage, fetchWorkbooks]);
 
-    setIsLoading(true);
-    // 실제 API에서는 여기서 fetch
-    setTimeout(() => {
-      setDisplayCount((prev) => prev + PAGE_SIZE);
-      setIsLoading(false);
-    }, 300);
-  }, [isLoading, hasMore]);
-
-  // 필터 변경 시 페이징 리셋
+  // 필터 변경 시 리셋
   const handleSetTab = useCallback((newTab: WorkbookTab) => {
     setTab(newTab);
-    setDisplayCount(PAGE_SIZE);
+    setSelectedId(null);
+    setCurrentPage(0);
   }, []);
 
   const handleSetSearchQuery = useCallback((query: string) => {
     setSearchQuery(query);
-    setDisplayCount(PAGE_SIZE);
+    setCurrentPage(0);
   }, []);
 
   const handleSetSortBy = useCallback((sort: WorkbookSort) => {
     setSortBy(sort);
-    setDisplayCount(PAGE_SIZE);
+    setCurrentPage(0);
   }, []);
+
+  // 초기 로드 및 필터 변경 시 데이터 로드 (한 번만)
+  useEffect(() => {
+    fetchCounts();
+  }, [fetchCounts]);
+
+  useEffect(() => {
+    fetchWorkbooks(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, searchQuery, sortBy]);
 
   // 북마크 토글
-  const toggleBookmark = useCallback((id: string) => {
-    setWorkbookList((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              isBookmarked: !w.isBookmarked,
-              bookmarkCount: w.isBookmarked ? w.bookmarkCount - 1 : w.bookmarkCount + 1,
-            }
-          : w
-      )
-    );
-  }, []);
+  const toggleBookmark = useCallback(
+    async (id: string) => {
+      try {
+        const result = await toggleWorkbookBookmark(Number(id));
+
+        // 즐겨찾기 탭에서 즐겨찾기 취소 시 목록에서 제거
+        if (tab === 'BOOKMARKED' && !result.isBookmarked) {
+          setWorkbookList((prev) => prev.filter((w) => w.id !== id));
+          setTotalElements((prev) => prev - 1);
+
+          // 선택된 문제집이면 선택 해제
+          if (selectedId === id) {
+            setSelectedId(null);
+          }
+        } else {
+          // 다른 탭에서는 상태만 업데이트
+          setWorkbookList((prev) =>
+            prev.map((w) =>
+              w.id === id
+                ? {
+                    ...w,
+                    isBookmarked: result.isBookmarked,
+                    bookmarkCount: result.isBookmarked ? w.bookmarkCount + 1 : w.bookmarkCount - 1,
+                  }
+                : w,
+            ),
+          );
+        }
+
+        // 선택된 문제집도 업데이트
+        if (selectedWorkbookDetail?.id === id) {
+          setSelectedWorkbookDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isBookmarked: result.isBookmarked,
+                  bookmarkCount: result.isBookmarked
+                    ? prev.bookmarkCount + 1
+                    : prev.bookmarkCount - 1,
+                }
+              : null,
+          );
+        }
+
+        // 개수 다시 조회
+        fetchCounts();
+      } catch (error) {
+        console.error('Failed to toggle bookmark:', error);
+      }
+    },
+    [tab, selectedId, selectedWorkbookDetail, fetchCounts],
+  );
 
   // 문제집 생성
-  const createWorkbook = useCallback((data: { title: string; description: string; problems: WorkbookProblemItem[] }) => {
-    const newId = `workbook-${Date.now()}`;
-    const maxNumber = Math.max(...workbookList.map(w => w.number), 0);
+  const createWorkbook = useCallback(
+    async (data: { title: string; description: string; problems: WorkbookProblemItem[] }) => {
+      try {
+        const problemIds = data.problems
+          .map((p) => p.problemId)
+          .filter((id): id is number => id !== undefined);
 
-    const newWorkbook: Workbook = {
-      id: newId,
-      number: maxNumber + 1,
-      title: data.title,
-      description: data.description,
-      problemCount: data.problems.length,
-      solvedCount: 0,
-      bookmarkCount: 0,
-      isBookmarked: false,
-      isOwner: true,
-      createdAt: new Date().toISOString(),
-      creator: {
-        id: 'current-user',
-        nickname: '나',
-      },
-    };
+        const response = await createWorkbookApi({
+          title: data.title,
+          description: data.description,
+          problemIds,
+        });
 
-    const newProblems: WorkbookProblem[] = data.problems.map((p, index) => ({
-      id: index + 1,
-      number: p.number,
-      title: p.title,
-      isSolved: false,
-      url: `https://www.acmicpc.net/problem/${p.number}`,
-    }));
+        const newWorkbook = mapWorkbookResponseToWorkbook(response);
 
-    setWorkbookList((prev) => [newWorkbook, ...prev]);
-    setProblemsMap((prev) => ({ ...prev, [newId]: newProblems }));
-    setSelectedId(newId);
-  }, [workbookList]);
+        // 목록 맨 앞에 추가
+        setWorkbookList((prev) => [newWorkbook, ...prev]);
+        setTotalElements((prev) => prev + 1);
+
+        // 새로 만든 문제집 선택
+        setSelectedId(newWorkbook.id);
+
+        // 개수 다시 조회
+        fetchCounts();
+      } catch (error) {
+        console.error('Failed to create workbook:', error);
+      }
+    },
+    [fetchCounts],
+  );
 
   // 문제집 수정
-  const updateWorkbook = useCallback((id: string, data: { title: string; description: string; problems: WorkbookProblemItem[] }) => {
-    setWorkbookList((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              title: data.title,
-              description: data.description,
-              problemCount: data.problems.length,
-              createdAt: new Date().toISOString(),
-            }
-          : w
-      )
-    );
+  const updateWorkbook = useCallback(
+    async (
+      id: string,
+      data: { title: string; description: string; problems: WorkbookProblemItem[] },
+    ) => {
+      try {
+        const problemIds = data.problems
+          .map((p) => p.problemId)
+          .filter((id): id is number => id !== undefined);
 
-    const updatedProblems: WorkbookProblem[] = data.problems.map((p, index) => {
-      const existing = problemsMap[id]?.find((ep) => ep.number === p.number);
-      return {
-        id: index + 1,
-        number: p.number,
-        title: p.title,
-        isSolved: existing?.isSolved ?? false,
-        url: `https://www.acmicpc.net/problem/${p.number}`,
-      };
-    });
+        const response = await updateWorkbookApi(Number(id), {
+          title: data.title,
+          description: data.description,
+          problemIds,
+        });
 
-    setProblemsMap((prev) => ({ ...prev, [id]: updatedProblems }));
-  }, [problemsMap]);
+        const updatedWorkbook = mapWorkbookResponseToWorkbook(response);
+
+        // 목록 업데이트
+        setWorkbookList((prev) => prev.map((w) => (w.id === id ? updatedWorkbook : w)));
+
+        // 선택된 문제집도 업데이트
+        if (selectedId === id) {
+          setSelectedWorkbookDetail(updatedWorkbook);
+          setSelectedProblemsList(mapProblemsToWorkbookProblems(response.problems));
+        }
+      } catch (error) {
+        console.error('Failed to update workbook:', error);
+      }
+    },
+    [selectedId],
+  );
 
   // 문제집 삭제
-  const deleteWorkbook = useCallback((id: string) => {
-    setWorkbookList((prev) => prev.filter((w) => w.id !== id));
-    setProblemsMap((prev) => {
-      const newMap = { ...prev };
-      delete newMap[id];
-      return newMap;
-    });
-    setSelectedId(null);
-  }, []);
+  const deleteWorkbook = useCallback(
+    async (id: string) => {
+      try {
+        await deleteWorkbookApi(Number(id));
+
+        // 목록에서 제거
+        setWorkbookList((prev) => prev.filter((w) => w.id !== id));
+        setTotalElements((prev) => prev - 1);
+
+        // 선택 해제
+        if (selectedId === id) {
+          setSelectedId(null);
+        }
+
+        // 개수 다시 조회
+        fetchCounts();
+      } catch (error) {
+        console.error('Failed to delete workbook:', error);
+      }
+    },
+    [selectedId, fetchCounts],
+  );
+
+  // 새로고침
+  const refresh = useCallback(() => {
+    fetchCounts();
+    fetchWorkbooks(0, true);
+  }, [fetchCounts, fetchWorkbooks]);
 
   return {
     tab,
@@ -220,11 +399,11 @@ export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
     sortBy,
     setSortBy: handleSetSortBy,
     tabCounts,
-    workbooks,
-    totalCount,
-    selectedWorkbook,
-    selectedProblems,
-    hasMore,
+    workbooks: workbookList,
+    totalCount: totalElements,
+    selectedWorkbook: selectedWorkbookDetail,
+    selectedProblems: selectedProblemsList,
+    hasMore: hasMoreData,
     isLoading,
     loadMore,
     selectedId,
@@ -233,5 +412,6 @@ export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
     createWorkbook,
     updateWorkbook,
     deleteWorkbook,
+    refresh,
   };
 }

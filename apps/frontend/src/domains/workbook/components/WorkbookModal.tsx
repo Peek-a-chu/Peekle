@@ -19,12 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Search, X, GripVertical, Trash2, Loader2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -47,14 +42,9 @@ interface SortableProblemItemProps {
 }
 
 function SortableProblemItem({ item, index, onRemove }: SortableProblemItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -67,7 +57,7 @@ function SortableProblemItem({ item, index, onRemove }: SortableProblemItemProps
       style={style}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 bg-muted/40 rounded-md group',
-        isDragging && 'opacity-50 shadow-lg ring-1 ring-pink-500/30'
+        isDragging && 'opacity-50 shadow-lg ring-1 ring-pink-500/30',
       )}
     >
       <button
@@ -114,7 +104,7 @@ export function WorkbookModal({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   // 모달 열릴 때 초기화
@@ -126,9 +116,10 @@ export function WorkbookModal({
         setProblemList(
           problems.map((p) => ({
             id: `problem-${p.id}`,
+            problemId: p.id, // Problem 엔티티의 DB ID
             number: p.number,
             title: p.title,
-          }))
+          })),
         );
       } else {
         setTitle('');
@@ -201,6 +192,7 @@ export function WorkbookModal({
       ...prev,
       {
         id: `problem-${problem.externalId}-${Date.now()}`,
+        problemId: problem.id, // Problem 엔티티의 DB ID
         number: Number(problem.externalId),
         title: problem.title,
       },
@@ -225,9 +217,7 @@ export function WorkbookModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[800px] h-[560px] flex flex-col p-0 gap-0 overflow-visible">
         <DialogHeader className="px-6 py-4 border-b shrink-0">
-          <DialogTitle>
-            {mode === 'create' ? '새 문제집 만들기' : '문제집 수정'}
-          </DialogTitle>
+          <DialogTitle>{mode === 'create' ? '새 문제집 만들기' : '문제집 수정'}</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 flex min-h-0">
@@ -305,9 +295,13 @@ export function WorkbookModal({
                             onClick={() => handleAddProblem(problem)}
                             className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 text-sm transition-colors"
                           >
-                            <span className="font-medium text-pink-500 w-12">{problem.externalId}</span>
+                            <span className="font-medium text-pink-500 w-12">
+                              {problem.externalId}
+                            </span>
                             <span className="truncate flex-1">{problem.title}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">{problem.tier}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {problem.tier}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -319,9 +313,7 @@ export function WorkbookModal({
                   </div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                클릭하면 우측 목록에 추가됩니다
-              </p>
+              <p className="text-xs text-muted-foreground mt-2">클릭하면 우측 목록에 추가됩니다</p>
             </div>
           </div>
 
