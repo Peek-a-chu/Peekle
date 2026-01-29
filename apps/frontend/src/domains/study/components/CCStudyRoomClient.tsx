@@ -16,11 +16,15 @@ import { formatDate } from '@/lib/utils';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
 import { useAuthStore } from '@/store/auth-store';
+import { useStudyEntry } from '@/domains/study/hooks/useStudyEntry';
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
   const { user, checkAuth } = useAuthStore();
+
+  // Send ENTER message on socket connect
+  useStudyEntry(studyId);
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   // Ensure we set roomId immediately to store if possible
