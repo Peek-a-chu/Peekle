@@ -15,12 +15,7 @@ export function CCProfileHeader({ user, isMe }: Props) {
         {/* Avatar (Placeholder based on nickname) */}
         <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-primary/10 flex items-center justify-center text-4xl font-bold text-primary shrink-0 border-4 border-background shadow-lg overflow-hidden">
           {user.profileImg ? (
-            <Image
-              src={user.profileImg}
-              alt={user.nickname}
-              fill
-              className="object-cover"
-            />
+            <Image src={user.profileImg} alt={user.nickname} fill className="object-cover" />
           ) : (
             user.nickname.charAt(0).toUpperCase()
           )}

@@ -131,7 +131,11 @@ export function CCProfileView({ user, isMe }: Props) {
             <ActivityStreak onDateSelect={setSelectedDate} />
 
             {/* 학습 타임라인 */}
-            <LearningTimeline selectedDate={selectedDate} showHistoryLink={isMe} nickname={user.nickname} />
+            <LearningTimeline
+              selectedDate={selectedDate}
+              showHistoryLink={isMe}
+              nickname={user.nickname}
+            />
           </div>
         </div>
       )}
