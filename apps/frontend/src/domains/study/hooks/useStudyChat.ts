@@ -19,16 +19,21 @@ export function useStudyChat(roomId: number) {
     if (roomId) {
       fetchStudyChats(roomId)
         .then((history) => {
+          // Backend returns latest first (Page 0), but UI renders top-to-bottom (oldest first)
+          // So we need to reverse the array.
+          const sortedHistory = [...history].reverse();
+
           setMessages(
-            history.map((msg) => ({
-              id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            sortedHistory.map((msg) => ({
+              id: msg.id || `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               roomId: roomId,
-              senderId: 0, // Mock or infer
+              senderId: msg.senderId,
               senderName: msg.senderName,
               content: msg.content,
               type: msg.type,
-              createdAt: new Date().toISOString(), // Mock
-              parentMessage: undefined,
+              createdAt: msg.createdAt,
+              parentMessage: undefined, // API might not return parent details fully yet
+              metadata: msg.metadata,
             })),
           );
         })
@@ -98,7 +103,7 @@ export function useStudyChat(roomId: number) {
       if (!socket || !currentUserId) return;
 
       const formattedContent = `[CODE:${language}] ${description}\nRef: ${ownerName || 'Unknown'} - ${problemTitle || 'Unknown'}`;
-      
+
       const payload = {
         content: formattedContent,
         type: isRealtime ? 'TALK' : 'SUBMISSION',
