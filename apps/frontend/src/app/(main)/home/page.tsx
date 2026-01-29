@@ -5,14 +5,17 @@ import LeagueProgressChart from '@/domains/home/components/LeagueProgressChart';
 import ActivityStreak from '@/domains/home/components/ActivityStreak';
 import LearningTimeline from '@/domains/home/components/LearningTimeline';
 import AIRecommendation from '@/domains/home/components/AIRecommendation';
-import WeeklyScoreCard from '@/domains/home/components/WeeklyScoreCard';
+import { CCWeeklyScore } from '@/domains/home/components/CCWeeklyScore';
 import LeagueRanking from '@/domains/home/components/LeagueRanking';
 
 import { useAuthStore } from '@/lib/auth-store';
 
 export default function HomePage() {
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const user = useAuthStore((state) => state.user);
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
+  const user = useAuthStore((state) => state.user);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 transition-colors duration-300">
@@ -25,17 +28,22 @@ export default function HomePage() {
             <LeagueProgressChart />
             <div className="border border-card-border rounded-2xl bg-card overflow-hidden">
               {/* 활동 스트릭 */}
-              <ActivityStreak onDateSelect={setSelectedDate} />
+              <ActivityStreak onDateSelect={setSelectedDate} selectedDate={selectedDate} />
 
-                            {/* 학습 타임라인 */}
-                            <LearningTimeline selectedDate={selectedDate} showHistoryLink={true} nickname={user?.nickname} />
-                        </div>
-                        {/* AI 추천 & 주간 점수 */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <AIRecommendation />
-                            <WeeklyScoreCard />
-                        </div>
-                    </div>
+              {/* 학습 타임라인 */}
+              <LearningTimeline selectedDate={selectedDate} showHistoryLink={true} nickname={user?.nickname} />
+            </div>
+            {/* AI 추천 & 주간 점수 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <AIRecommendation />
+              {/* 주간 점수 카드: AI 추천 카드 높이에 맞춤 (overflow 처리) */}
+              <div className="relative min-h-[600px]">
+                <div className="h-full md:absolute md:inset-0">
+                  <CCWeeklyScore />
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* 오른쪽 사이드바 - 리그 순위 */}
           <div className="order-2 xl:order-2">

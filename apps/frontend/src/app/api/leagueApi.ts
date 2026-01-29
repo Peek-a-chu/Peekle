@@ -89,3 +89,53 @@ export async function getLeagueRules(): Promise<LeagueRulesMap | null> {
     return null;
   }
 }
+export interface PointActivity {
+  description: string;
+  amount: number;
+  createdAt: string;
+  category?: 'PROBLEM' | 'GAME' | 'STUDY' | string; // Enum from backend
+}
+
+export interface WeeklyPointSummary {
+  totalScore: number;
+  startDate: string;
+  endDate: string;
+  activities: PointActivity[];
+}
+
+export async function getWeeklyPointSummary(date?: string): Promise<WeeklyPointSummary | null> {
+  try {
+    const query = date ? `?date=${date}` : '';
+    const res = await fetch(`${API_BASE_URL}/api/league/weekly-summary${query}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch weekly summary');
+    const json: ApiResponse<WeeklyPointSummary> = await res.json();
+    return json.data || null;
+  } catch (error) {
+    console.error('Error fetching weekly summary:', error);
+    return null;
+  }
+}
+
+export interface LeagueProgressData {
+  league: LeagueType;
+  score: number;
+  date: string;
+  periodEnd: string;
+  leagueIndex: number;
+}
+
+export async function getLeagueProgress(): Promise<LeagueProgressData[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/league/progress`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch league progress');
+    const json: ApiResponse<LeagueProgressData[]> = await res.json();
+    return json.data || [];
+  } catch (error) {
+    console.error('Error fetching league progress:', error);
+    return [];
+  }
+}
