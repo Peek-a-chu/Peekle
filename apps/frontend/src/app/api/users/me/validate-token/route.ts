@@ -19,8 +19,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     const result = await serverFetch<ValidateResponse>(path, {
       method: 'GET',
       headers: {
-        'X-Peekle-Token': token
-      }
+        'X-Peekle-Token': token,
+      },
     });
 
     if (!result.success) {
@@ -29,7 +29,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     return NextResponse.json({ success: true, data: result.data });
-
   } catch (error) {
     console.error('Error in proxy route:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
