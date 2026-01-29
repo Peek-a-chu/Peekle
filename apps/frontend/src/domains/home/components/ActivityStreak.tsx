@@ -43,9 +43,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
 
   // 색상 계산 (문제 풀이 수에 따라)
   const getColor = (count: number) => {
-    if (count === 0) return 'bg-muted';
-    if (count <= 2) return 'bg-secondary';
-    if (count <= 4) return 'bg-primary/50';
+    if (count === 0) return 'bg-muted/30';
+    if (count <= 2) return 'bg-primary/30';
+    if (count <= 4) return 'bg-primary/60';
     return 'bg-primary';
   };
 
@@ -135,9 +135,9 @@ const ActivityStreak = ({ onDateSelect }: ActivityStreakProps) => {
       <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
         <span>적음</span>
         <div className="flex gap-0.5">
-          <div className="w-3 h-3 rounded-sm bg-muted" />
-          <div className="w-3 h-3 rounded-sm bg-secondary" />
-          <div className="w-3 h-3 rounded-sm bg-primary/50" />
+          <div className="w-3 h-3 rounded-sm bg-muted/30" />
+          <div className="w-3 h-3 rounded-sm bg-primary/30" />
+          <div className="w-3 h-3 rounded-sm bg-primary/60" />
           <div className="w-3 h-3 rounded-sm bg-primary" />
         </div>
         <span>많음</span>

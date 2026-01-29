@@ -16,10 +16,7 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:peekle-redis-password}
 
-  # Docker network internal resolution support for some Spring versions
-  redis:
-    host: ${SPRING_DATA_REDIS_HOST:redis}
-    port: ${SPRING_DATA_REDIS_PORT:6379}
+
 
   # OAuth2 설정
   security:
