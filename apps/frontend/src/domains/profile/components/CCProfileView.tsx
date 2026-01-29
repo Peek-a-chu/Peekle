@@ -111,10 +111,11 @@ export function CCProfileView({ user, isMe }: Props) {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabKey)}
-                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
+                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  activeTab === tab
                     ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
                     : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                }`}
               >
                 {tab}
               </button>
@@ -130,7 +131,11 @@ export function CCProfileView({ user, isMe }: Props) {
             <ActivityStreak onDateSelect={setSelectedDate} />
 
             {/* 학습 타임라인 */}
-            <LearningTimeline selectedDate={selectedDate} showHistoryLink={isMe} nickname={user.nickname} />
+            <LearningTimeline
+              selectedDate={selectedDate}
+              showHistoryLink={isMe}
+              nickname={user.nickname}
+            />
           </div>
         </div>
       )}

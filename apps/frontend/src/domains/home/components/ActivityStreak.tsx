@@ -56,35 +56,35 @@ const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate }: Ac
         }));
     }, [allData, selectedYear]);
 
-    // 데이터를 월별로 그룹화
-    const monthlyData = useMemo(() => {
-        const months: { [key: string]: { date: string; count: number }[] } = {};
+  // 데이터를 월별로 그룹화
+  const monthlyData = useMemo(() => {
+    const months: { [key: string]: { date: string; count: number }[] } = {};
 
-        yearData.forEach((item) => {
-            const date = new Date(item.date);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    yearData.forEach((item) => {
+      const date = new Date(item.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-            if (!months[monthKey]) {
-                months[monthKey] = [];
-            }
-            months[monthKey].push(item);
-        });
+      if (!months[monthKey]) {
+        months[monthKey] = [];
+      }
+      months[monthKey].push(item);
+    });
 
-        return months;
-    }, [yearData]);
+    return months;
+  }, [yearData]);
 
-    // 색상 계산 (문제 풀이 수에 따라)
-    const getColor = (count: number) => {
-        if (count === 0) return 'bg-muted/30';
-        if (count <= 2) return 'bg-primary/30';
-        if (count <= 4) return 'bg-primary/60';
-        return 'bg-primary';
-    };
+  // 색상 계산 (문제 풀이 수에 따라)
+  const getColor = (count: number) => {
+    if (count === 0) return 'bg-muted/30';
+    if (count <= 2) return 'bg-primary/30';
+    if (count <= 4) return 'bg-primary/60';
+    return 'bg-primary';
+  };
 
-    // 해당 년도 총 문제 수 계산
-    const totalProblems = useMemo(() => {
-        return yearData.reduce((sum, item) => sum + item.count, 0);
-    }, [yearData]);
+  // 해당 년도 총 문제 수 계산
+  const totalProblems = useMemo(() => {
+    return yearData.reduce((sum, item) => sum + item.count, 0);
+  }, [yearData]);
 
     // 날짜 클릭 핸들러
     const handleDateClick = (date: string) => {
@@ -94,31 +94,31 @@ const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate }: Ac
         onDateSelect?.(date);
     };
 
-    // 월 이름 포맷
-    const formatMonth = (monthKey: string) => {
-        const [, month] = monthKey.split('-');
-        return `${month}월`;
-    };
+  // 월 이름 포맷
+  const formatMonth = (monthKey: string) => {
+    const [, month] = monthKey.split('-');
+    return `${month}월`;
+  };
 
-    return (
-        <div className="p-6 transition-colors duration-300">
-            {/* 헤더 */}
-            <div className="flex flex-col gap-4 mb-6">
-                {/* 1행: 제목 */}
-                <div className="flex items-center gap-2">
-                    <Flame className="w-5 h-5 text-primary" />
-                    <h3 className="font-bold text-foreground">활동 스트릭</h3>
-                </div>
+  return (
+    <div className="p-6 transition-colors duration-300">
+      {/* 헤더 */}
+      <div className="flex flex-col gap-4 mb-6">
+        {/* 1행: 제목 */}
+        <div className="flex items-center gap-2">
+          <Flame className="w-5 h-5 text-primary" />
+          <h3 className="font-bold text-foreground">활동 스트릭</h3>
+        </div>
 
-                {/* 2행: 컨트롤 그룹 (문제수 + 년도) */}
-                <div className="flex items-center justify-between">
-                    {/* 총 문제 수 */}
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-bold text-primary">
-                            {totalProblems.toLocaleString()}
-                        </span>
-                        <span className="text-sm text-muted-foreground">문제</span>
-                    </div>
+        {/* 2행: 컨트롤 그룹 (문제수 + 년도) */}
+        <div className="flex items-center justify-between">
+          {/* 총 문제 수 */}
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-bold text-primary">
+              {totalProblems.toLocaleString()}
+            </span>
+            <span className="text-sm text-muted-foreground">문제</span>
+          </div>
 
                     {/* 년도 선택 (드롭다운) */}
                     <div className="relative">
@@ -164,19 +164,19 @@ const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate }: Ac
                 </div>
             </div>
 
-            {/* 범례 */}
-            <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
-                <span>적음</span>
-                <div className="flex gap-0.5">
-                    <div className="w-3 h-3 rounded-sm bg-muted/30" />
-                    <div className="w-3 h-3 rounded-sm bg-primary/30" />
-                    <div className="w-3 h-3 rounded-sm bg-primary/60" />
-                    <div className="w-3 h-3 rounded-sm bg-primary" />
-                </div>
-                <span>많음</span>
-            </div>
+      {/* 범례 */}
+      <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
+        <span>적음</span>
+        <div className="flex gap-0.5">
+          <div className="w-3 h-3 rounded-sm bg-muted/30" />
+          <div className="w-3 h-3 rounded-sm bg-primary/30" />
+          <div className="w-3 h-3 rounded-sm bg-primary/60" />
+          <div className="w-3 h-3 rounded-sm bg-primary" />
         </div>
-    );
+        <span>많음</span>
+      </div>
+    </div>
+  );
 };
 
 export default ActivityStreak;
