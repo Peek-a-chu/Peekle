@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, User, LogOut } from 'lucide-react';
 import MyLeagueCard from './MyLeagueCard';
 import { logout } from '@/api/authApi';
-import { useAuthStore } from '@/lib/auth-store';
+import { useAuthStore } from '@/store/auth-store';
 
 const UserProfileSection = () => {
   const router = useRouter();

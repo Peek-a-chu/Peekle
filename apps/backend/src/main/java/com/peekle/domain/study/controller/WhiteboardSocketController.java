@@ -36,9 +36,9 @@ public class WhiteboardSocketController {
                 case "START":
                     whiteboardService.startWhiteboard(studyId, userId);
                     break;
-                case "CLOSE":
-                    whiteboardService.stopWhiteboard(studyId, userId);
-                    break;
+//                case "CLOSE":
+//                    whiteboardService.stopWhiteboard(studyId, userId);
+//                    break;
                 case "CLEAR":
                     whiteboardService.clearWhiteboard(studyId, userId);
                     break;

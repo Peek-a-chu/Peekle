@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useRoomStore } from './useRoomStore';
 import { useSocketContext } from '@/domains/study/context/SocketContext';
 import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
+import { useAuthStore } from '@/store/auth-store';
 
 export function useWhiteboardSocket(
   roomId: string,
@@ -12,6 +13,7 @@ export function useWhiteboardSocket(
 ) {
   const { client, connected } = useSocketContext();
   const { setWhiteboardOverlayOpen } = useRoomStore();
+  const { user } = useAuthStore();
   const { enabled = true } = options;
 
   // Ref to hold the subscription
@@ -31,9 +33,11 @@ export function useWhiteboardSocket(
     hasSyncedRef.current = false;
 
     const topic = `/topic/studies/rooms/${roomId}/whiteboard`;
-    console.log(`[useWhiteboardSocket] Subscribing to ${topic}`);
+    const userTopic = user?.id ? `/topic/studies/rooms/${roomId}/whiteboard/${user.id}` : null;
 
-    const sub = client.subscribe(topic, (message: IMessage) => {
+    console.log(`[useWhiteboardSocket] Subscribing to ${topic} (and ${userTopic})`);
+
+    const handleMessage = (message: IMessage) => {
       try {
         const body = JSON.parse(message.body) as WhiteboardMessage;
         console.log(`[useWhiteboardSocket] Received:`, body.action, body.objectId || '');
@@ -55,17 +59,29 @@ export function useWhiteboardSocket(
       } catch (err) {
         console.error('Failed to parse whiteboard message', err);
       }
-    });
+    };
 
-    subscriptionRef.current = sub;
+    const sub = client.subscribe(topic, handleMessage);
+    let userSub: any = null;
+
+    if (userTopic) {
+      userSub = client.subscribe(userTopic, handleMessage);
+    }
+
+    subscriptionRef.current = {
+      unsubscribe: () => {
+        sub.unsubscribe();
+        if (userSub) userSub.unsubscribe();
+      }
+    };
 
     // Request SYNC after subscription is established
     setTimeout(() => {
       if (client && connected && !hasSyncedRef.current) {
         console.log(`[useWhiteboardSocket] Requesting initial SYNC for room ${roomId}`);
         client.publish({
-          destination: '/pub/studies/whiteboard/sync',
-          body: JSON.stringify({ roomId }),
+          destination: '/pub/studies/whiteboard/message',
+          body: JSON.stringify({ action: 'SYNC' }),
         });
         hasSyncedRef.current = true;
       }
@@ -77,7 +93,7 @@ export function useWhiteboardSocket(
         subscriptionRef.current = null;
       }
     };
-  }, [client, connected, roomId, setWhiteboardOverlayOpen, onMessageReceived, enabled]);
+  }, [client, connected, roomId, setWhiteboardOverlayOpen, onMessageReceived, enabled, user]);
 
   const sendMessage = useCallback(
     (payload: WhiteboardMessage) => {
@@ -102,9 +118,10 @@ export function useWhiteboardSocket(
   // Request sync explicitly (useful after reconnection or manual refresh)
   const requestSync = useCallback(() => {
     if (client && connected) {
+      console.log(`[useWhiteboardSocket] Manual SYNC request`);
       client.publish({
-        destination: '/pub/studies/whiteboard/sync',
-        body: JSON.stringify({ roomId }),
+        destination: '/pub/studies/whiteboard/message',
+        body: JSON.stringify({ action: 'SYNC' }),
       });
     }
   }, [client, connected, roomId]);
