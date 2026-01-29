@@ -46,4 +46,31 @@ public class LeagueController {
                 ));
         return ApiResponse.success(rules);
     }
+
+    @GetMapping("/weekly-summary")
+    public ApiResponse<com.peekle.domain.league.dto.WeeklyPointSummaryResponse> getWeeklyPointSummary(
+            @AuthenticationPrincipal Long userId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) 
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) 
+            java.time.LocalDate date
+    ) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID from token is null");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                
+        return ApiResponse.success(leagueService.getWeeklyPointSummary(user, date));
+    }
+    
+    @GetMapping("/progress")
+    public ApiResponse<java.util.List<com.peekle.domain.league.dto.LeagueProgressResponse>> getLeagueProgress(@AuthenticationPrincipal Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID from token is null");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        
+        return ApiResponse.success(leagueService.getLeagueProgress(user));
+    }
 }

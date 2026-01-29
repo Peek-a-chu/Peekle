@@ -37,29 +37,41 @@ public class LeagueService {
      * - 중복 해결 여부를 체크하고, 최초 해결 시 포인트 지급
      */
     public int updateLeaguePointForSolvedProblem(User user, Problem problem) {
-        // 이미 해결한 기록이 1개(방금 저장한 것)뿐인지 확인 = 최초 해결
-        long successCount = submissionLogRepository.countByUserIdAndProblemId(
-                user.getId(), problem.getId()
-        );
+        int totalEarnedPoints = 0;
 
-        // 로직 개선: successCount가 1일 때만 주는데, 간혹 동시성이 있을 수 있음.
-        // 하지만 여기선 간단히 1이면 최초라고 가정. (원래는 exists check를 먼저 하고 save했어야 함)
+        // 1. 문제 풀이 기본 점수 (최초 1회)
+        long successCount = submissionLogRepository.countByUserIdAndProblemId(user.getId(), problem.getId());
         
         if (successCount == 1) {
-            int pointAmount = calculateProblemPoint(problem.getTier());
+            int problemPoints = calculateProblemPoint(problem.getTier());
+            user.addLeaguePoint(problemPoints);
+            totalEarnedPoints += problemPoints;
+
+            // POINT_LOG 기록
+            String desc = String.format("%s (%s)", problem.getTitle(), problem.getTier());
+            pointLogRepository.save(new PointLog(user, PointCategory.PROBLEM, problemPoints, desc));
             
-            user.addLeaguePoint(pointAmount);
+            // Streak Logic (기존 유지)
+            updateStreak(user);
+        }
+
+        if (totalEarnedPoints > 0) {
             userRepository.save(user);
+            System.out.println("🏆 League Point Updated! User: " + user.getNickname() + ", Points: +" + totalEarnedPoints);
+        }
+        
+        return totalEarnedPoints;
+    }
 
-            String description = String.format("Solved problem: %s (%s)", problem.getTitle(), problem.getTier());
-            PointLog pointLog = new PointLog(user, PointCategory.PROBLEM, pointAmount, description);
-            pointLogRepository.save(pointLog);
-
-            System.out.println("🏆 League Point Updated! User: " + user.getNickname() + ", Points: +" + pointAmount);
-            return pointAmount;
-        } else {
-            System.out.println("⚠️ Already solved. No league points awarded.");
-            return 0; // 포인트 없음
+    private void updateStreak(User user) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate yesterday = today.minusDays(1);
+        
+        boolean alreadySolvedToday = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(today);
+        
+        if (!alreadySolvedToday) {
+             boolean continuesStreak = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(yesterday);
+             user.updateStreak(continuesStreak);
         }
     }
 
@@ -198,7 +210,108 @@ public class LeagueService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public com.peekle.domain.league.dto.WeeklyPointSummaryResponse getWeeklyPointSummary(User user, java.time.LocalDate date) {
+        // Use provided date or default to now
+        java.time.ZonedDateTime referenceTime;
+        if (date != null) {
+            // If date is provided, use it at current time (or end of day? let's stick to preserving time or just noon)
+            // Ideally, we just need a point in time to find the containing "Week"
+            
+            // Note: We need to be careful. The week starts on Wednesday 06:00. 
+            // If user selects Wednesday, does it calculate from that Wednesday 6am?
+            // Let's assume the date provided is in KST context.
+            referenceTime = date.atStartOfDay(java.time.ZoneId.of("Asia/Seoul")).plusHours(12); // Noon on that day to be safe
+        } else {
+            referenceTime = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        }
+        
+        // Find the start of the current week (Wednesday 06:00 KST)
+        java.time.ZonedDateTime startOfWeek = referenceTime.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.WEDNESDAY))
+                .withHour(6).withMinute(0).withSecond(0).withNano(0);
+        
+        // If reference time is before Wednesday 06:00, the week started last Wednesday
+        if (referenceTime.isBefore(startOfWeek)) {
+            startOfWeek = startOfWeek.minusWeeks(1);
+        }
+        
+        java.time.ZonedDateTime endOfWeek = startOfWeek.plusWeeks(1);
+        
+        // Convert to LocalDateTime for DB query
+        java.time.LocalDateTime start = startOfWeek.toLocalDateTime();
+        java.time.LocalDateTime end = endOfWeek.toLocalDateTime();
+        
+        List<PointLog> logs = pointLogRepository.findAllByUserIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                user.getId(), start, end
+        );
+        
+        int totalScore = logs.stream()
+                .mapToInt(PointLog::getAmount)
+                .sum();
+        
+        List<com.peekle.domain.league.dto.PointActivityDto> activities = logs.stream()
+                .map(log -> com.peekle.domain.league.dto.PointActivityDto.builder()
+                        .description(log.getDescription())
+                        .amount(log.getAmount())
+                        .createdAt(log.getCreatedAt())
+                        .category(log.getCategory())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+                
+        return com.peekle.domain.league.dto.WeeklyPointSummaryResponse.builder()
+                .totalScore(totalScore)
+                .startDate(start)
+                .endDate(end)
+                .activities(activities)
+                .build();
+    }
+
     private int calculateProblemPoint(String tier) {
         return com.peekle.global.util.SolvedAcLevelUtil.getPointFromTier(tier);
+    }
+    
+    private final com.peekle.domain.league.repository.LeagueHistoryRepository leagueHistoryRepository;
+
+    @Transactional(readOnly = true)
+    public List<com.peekle.domain.league.dto.LeagueProgressResponse> getLeagueProgress(User user) {
+        List<com.peekle.domain.league.dto.LeagueProgressResponse> progressList = new ArrayList<>();
+        
+        // 1. Fetch History
+        List<com.peekle.domain.league.entity.LeagueHistory> histories = leagueHistoryRepository.findAllByUserIdOrderBySeasonWeekAsc(user.getId());
+        
+        for (com.peekle.domain.league.entity.LeagueHistory h : histories) {
+            // closedAt is the END of the week (Wednesday 06:00)
+            // Start date would be 7 days before closedAt
+            java.time.LocalDate end = h.getClosedAt().toLocalDate();
+            java.time.LocalDate start = end.minusDays(7);
+            
+            progressList.add(com.peekle.domain.league.dto.LeagueProgressResponse.builder()
+                    .league(h.getLeague().name().toLowerCase())
+                    .score(h.getFinalPoint())
+                    .date(start)
+                    .periodEnd(end)
+                    .leagueIndex(h.getLeague().ordinal())
+                    .build());
+        }
+        
+        // 2. Append Current Status
+        // Current week calculation
+        java.time.ZonedDateTime nowKst = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        java.time.ZonedDateTime startOfWeek = nowKst.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.WEDNESDAY))
+                .withHour(6).withMinute(0).withSecond(0).withNano(0);
+        if (nowKst.isBefore(startOfWeek)) {
+            startOfWeek = startOfWeek.minusWeeks(1);
+        }
+        java.time.ZonedDateTime endOfWeek = startOfWeek.plusWeeks(1);
+        
+        progressList.add(com.peekle.domain.league.dto.LeagueProgressResponse.builder()
+                .league(user.getLeague().name().toLowerCase())
+                .score(user.getLeaguePoint())
+                .date(startOfWeek.toLocalDate())
+                .periodEnd(endOfWeek.toLocalDate())
+                .leagueIndex(user.getLeague().ordinal())
+                .build());
+                
+        return progressList;
     }
 }
