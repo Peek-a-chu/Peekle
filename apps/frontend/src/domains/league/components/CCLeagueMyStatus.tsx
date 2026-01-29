@@ -300,7 +300,7 @@ const CCLeagueMyStatus = () => {
 
           {/* 상세 정보 (게이지 제거, 텍스트 강조) */}
           <div className="pt-2">
-            <div className="p-3 rounded-xl bg-secondary/50 border border-border/50 text-center">
+            <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-center">
               <span className="text-sm font-bold text-primary">{statusDetail}</span>
             </div>
           </div>
