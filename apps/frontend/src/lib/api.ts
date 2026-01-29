@@ -13,6 +13,11 @@ export async function handleResponse<T>(res: Response): Promise<T> {
   return json as T;
 }
 
+/*
+   사용자가 로그인을 유지하려면 모든 API 요청이 이 apiFetch를 통과해야합니다.
+   그래야 Access Token이 만료되어도, /refresh로 토큰을 갱신하거든요!
+
+ */
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
