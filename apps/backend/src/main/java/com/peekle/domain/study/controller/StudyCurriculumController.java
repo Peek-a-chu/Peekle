@@ -5,6 +5,7 @@ import com.peekle.domain.study.service.StudyCurriculumService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -25,7 +26,7 @@ public class StudyCurriculumController {
     public ApiResponse<List<ProblemStatusResponse>> getDailyCurriculum(
             @PathVariable Long studyId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId) {
+            @AuthenticationPrincipal Long userId) {
 
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
         List<ProblemStatusResponse> response = studyCurriculumService.getDailyProblems(userId, studyId, targetDate);

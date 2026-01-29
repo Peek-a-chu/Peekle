@@ -15,15 +15,13 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -155,26 +153,16 @@ public class SubmissionService {
     }
 
     /**
-     * 특정 스터디, 특정 문제의 성공한 제출 목록 조회 (유저별 최신 1개)
+     * 특정 스터디, 특정 문제의 성공한 제출 목록 조회 (유저별 최신 제출 1건씩 반환) - Pagination
      */
     @Transactional(readOnly = true)
-    public List<SubmissionLogResponse> getStudyProblemSubmissions(
-            Long studyId, Long problemId) {
-        // 모든 제출 내역 조회 (최신순)
-        List<SubmissionLog> logs = submissionLogRepository
-                .findAllByRoomIdAndProblemIdOrderBySubmittedAtDesc(studyId, problemId);
+    public Page<SubmissionLogResponse> getStudyProblemSubmissions(
+            Long studyId, Long problemId, Pageable pageable) {
 
-        // 유저별 중복 제거 (첫 번째로 나온 것이 최신)
-        Set<Long> processedUserIds = new HashSet<>();
-        List<SubmissionLogResponse> result = new ArrayList<>();
+        Page<SubmissionLog> logs = submissionLogRepository
+                .findLatestSubmissionsByRoomIdAndProblemId(studyId, problemId, pageable);
 
-        for (SubmissionLog log : logs) {
-            if (!processedUserIds.contains(log.getUser().getId())) {
-                processedUserIds.add(log.getUser().getId());
-                result.add(SubmissionLogResponse.from(log));
-            }
-        }
-        return result;
+        return logs.map(SubmissionLogResponse::from);
     }
 
     /**

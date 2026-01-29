@@ -43,6 +43,7 @@ public class StudySocketController {
         private final SimpMessagingTemplate messagingTemplate;
         private final StudyChatService studyChatService; // Injected
         private final WhiteboardService whiteboardService; // Injected
+        private final com.peekle.domain.user.repository.UserRepository userRepository; // Custom injection
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
@@ -134,9 +135,18 @@ public class StudySocketController {
 
                 // 5. [SYSTEM CHAT] 입장 메시지 전송 (초기화 여부 무관)
                 try {
+                        String nickname = "알 수 없는 사용자";
+                        try {
+                                nickname = userRepository.findById(userId)
+                                                .map(com.peekle.domain.user.entity.User::getNickname)
+                                                .orElse("알 수 없는 사용자");
+                        } catch (Exception e) {
+                                log.error("User Fetch Failed", e);
+                        }
+
                         studyChatService.sendChat(studyId, userId,
                                         ChatMessageRequest.builder()
-                                                        .content("님이 스터디에 입장하셨습니다.")
+                                                        .content(nickname + "님이 스터디에 입장하셨습니다.")
                                                         .type(StudyChatLog.ChatType.SYSTEM)
                                                         .build());
                 } catch (Exception e) {
