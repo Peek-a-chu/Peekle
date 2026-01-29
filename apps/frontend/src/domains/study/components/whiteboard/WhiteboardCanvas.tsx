@@ -516,7 +516,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       let handler: ((opt: any) => void) | null = null;
       
       // Determine user color
-      const myColor = '#000000';
+      const myColor = currentUserId ? getUserColor(String(currentUserId)) : '#000000';
 
       if (activeTool === 'select') {
         canvas.isDrawingMode = false;
