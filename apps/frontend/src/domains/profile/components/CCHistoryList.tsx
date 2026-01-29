@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SubmissionHistory } from '../types';
 
 interface Props {
@@ -10,6 +11,18 @@ interface Props {
 export function CCHistoryList({ initialHistory }: Props) {
   const [history] = useState(initialHistory);
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionHistory | null>(null);
+  const searchParams = useSearchParams();
+
+  // URL query params 처리 (submissionId)
+  useEffect(() => {
+    const submissionId = searchParams.get('submissionId');
+    if (submissionId) {
+      const target = history.find(h => String(h.id) === submissionId);
+      if (target) {
+        setSelectedSubmission(target);
+      }
+    }
+  }, [searchParams, history]);
 
   // Mock Filters
   const tiers = ['전체', 'Bronze', 'Silver', 'Gold', 'Platinum'];

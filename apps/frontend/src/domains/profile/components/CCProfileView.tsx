@@ -6,7 +6,7 @@ import { CCProfileHeader } from './CCProfileHeader';
 import { CCProfileStatsRow } from './CCProfileStatsRow';
 import ActivityStreak from '@/domains/home/components/ActivityStreak';
 import LearningTimeline from '@/domains/home/components/LearningTimeline';
-import { CCExtensionBanner } from './CCExtensionBanner';
+
 import { CCExtensionGuide } from './CCExtensionGuide';
 import { useExtensionCheck } from '@/hooks/useExtensionCheck';
 
@@ -31,7 +31,7 @@ type TabKey = (typeof TABS)[keyof typeof TABS];
 
 export function CCProfileView({ user, isMe }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>(TABS.OVERVIEW);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
 
   // Extension Check State lifted from CCExtensionGuide
@@ -51,7 +51,9 @@ export function CCProfileView({ user, isMe }: Props) {
     const checkTokenValidity = async (token: string) => {
       try {
         const res = await fetch(`/api/users/me/validate-token`, {
-          headers: { 'X-Peekle-Token': token },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
         });
         const json = (await res.json()) as ValidateResponse;
 
@@ -96,8 +98,7 @@ export function CCProfileView({ user, isMe }: Props) {
         {/* 1. Header Section */}
         <CCProfileHeader user={user} isMe={isMe} />
 
-        {/* 2. Extension Alert (Show only if not linked and it's me) */}
-        {!user.bojId && isMe && <CCExtensionBanner />}
+
         {/* 3. Stats Row */}
         <CCProfileStatsRow user={user} />
       </div>
@@ -112,8 +113,8 @@ export function CCProfileView({ user, isMe }: Props) {
                 key={tab}
                 onClick={() => setActiveTab(tab as TabKey)}
                 className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
-                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
-                    : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                  : 'text-muted-foreground hover:text-foreground'
                   }`}
               >
                 {tab}
