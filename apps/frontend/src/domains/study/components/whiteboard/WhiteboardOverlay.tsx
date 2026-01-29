@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import {
   WhiteboardCanvas,
   WhiteboardCanvasRef,
 } from '@/domains/study/components/whiteboard/WhiteboardCanvas';
-import { useWhiteboardSocket, WhiteboardMessage } from '@/domains/study/hooks/useWhiteboardSocket';
+import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
+import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 import { Pencil, Square, Type, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSocketContext } from '@/domains/study/context/SocketContext';
 
 interface WhiteboardPanelProps {
   className?: string;
@@ -23,43 +25,34 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const [activeTool, setActiveTool] = React.useState<'pen' | 'shape' | 'text' | 'eraser'>('pen');
   const canvasRef = useRef<WhiteboardCanvasRef>(null);
+  const { connected } = useSocketContext();
 
   const handleMessage = useCallback((msg: WhiteboardMessage) => {
     console.log(`[WhiteboardOverlay] Received message:`, msg.action, msg.objectId || '');
-    switch (msg.action) {
-      case 'ADDED':
-        // Pass senderId for color differentiation
-        canvasRef.current?.add(msg.data, msg.senderId?.toString());
-        break;
-      case 'MODIFIED':
-        canvasRef.current?.modify(msg.data);
-        break;
-      case 'REMOVED':
-        if (msg.objectId) canvasRef.current?.remove(msg.objectId);
-        break;
-      case 'CLEAR':
-        canvasRef.current?.clear();
-        break;
-      case 'SYNC':
-        console.log(
-          `[WhiteboardOverlay] SYNC received: ${msg.data?.history?.length || 0} objects, isActive: ${msg.data?.isActive}`,
-        );
-        if (msg.data?.history) {
-          canvasRef.current?.clear();
-          msg.data.history.forEach((action: any) => {
-            if (action.action === 'ADDED' && action.data) {
-              // Pass senderId from history for color differentiation
-              canvasRef.current?.add(action.data, action.senderId?.toString());
-            }
-          });
-        }
-        break;
-    }
+    canvasRef.current?.handleServerMessage(msg);
   }, []);
 
   const { sendMessage } = useWhiteboardSocket(roomId as string, handleMessage, {
     enabled: isWhiteboardOverlayOpen,
   });
+
+  const hasJoinedRef = useRef(false);
+
+  // Reset join status on disconnect
+  useEffect(() => {
+    if (!connected) {
+      hasJoinedRef.current = false;
+    }
+  }, [connected]);
+
+  // [Fix] Request initial state when connected
+  useEffect(() => {
+    if (isWhiteboardOverlayOpen && connected && !hasJoinedRef.current) {
+      console.log('[WhiteboardOverlay] Sending JOIN request');
+      sendMessage({ action: 'JOIN' });
+      hasJoinedRef.current = true;
+    }
+  }, [isWhiteboardOverlayOpen, connected, sendMessage]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleObjectAdded = useCallback(

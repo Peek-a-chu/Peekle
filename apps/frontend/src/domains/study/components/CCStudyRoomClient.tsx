@@ -77,7 +77,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
 
   // API Hooks
-  const { problems, addProblem, removeProblem } = useProblems(studyId, selectedDate);
+  const { problems, addProblem, deleteProblem } = useProblems(studyId);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
   // Initialize room data (in real app, fetch from API)
@@ -194,11 +194,15 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         }
         leftPanel={
           <ProblemListPanel
-            problems={problems}
+            problems={problems.map((p: any) => ({
+              ...p,
+              problemId: p.id ?? p.problemId,
+              solvedMemberCount: p.solvedMemberCount ?? 0,
+            }))}
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
             onAddProblem={addProblem}
-            onRemoveProblem={removeProblem}
+            onRemoveProblem={deleteProblem}
             onSelectProblem={handleSelectProblem}
             selectedProblemId={selectedProblemId ?? undefined}
             onToggleFold={handleToggleLeftPanel}
@@ -234,7 +238,7 @@ export function CCStudyRoomClient(): React.ReactNode {
   // SocketProvider will handle connection updates when currentUserId changes.
 
   return (
-    <SocketProvider roomId={studyId} userId={currentUserId}>
+    <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
       <StudyRoomContent studyId={studyId} />
     </SocketProvider>
   );

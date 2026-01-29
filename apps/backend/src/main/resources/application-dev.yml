@@ -2,13 +2,13 @@ spring:
   config:
     activate:
       on-profile: dev
-  
+
   datasource:
-    url: jdbc:h2:file:./data/peekledb;MODE=MySQL;AUTO_SERVER=TRUE
+    url: jdbc:h2:file:./data/peekle;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
-    password: 
-  
+    password:
+
   jpa:
     hibernate:
       ddl-auto: update # 개발용: 엔티티 기반 자동 생성
@@ -17,12 +17,12 @@ spring:
         format_sql: true
         show_sql: true
     database-platform: org.hibernate.dialect.H2Dialect
-  
+
   h2:
     console:
       enabled: true
       path: /h2-console
-  
+
   flyway:
     enabled: false # 개발용: Flyway 비활성화
 

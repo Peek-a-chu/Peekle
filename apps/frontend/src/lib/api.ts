@@ -1,6 +1,15 @@
 import { ApiResponse } from '@/types/apiUtils';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+let BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080';
+
+// 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환
+if (
+  BACKEND_URL.startsWith('https://') &&
+  (BACKEND_URL.includes('localhost') || BACKEND_URL.includes('127.0.0.1'))
+) {
+  BACKEND_URL = BACKEND_URL.replace('https://', 'http://');
+}
 
 let authToken: string | null = null;
 
@@ -21,21 +30,22 @@ export async function handleResponse<T>(res: Response): Promise<T> {
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestInit & { skipAuth?: boolean } = {},
 ): Promise<ApiResponse<T>> {
+  const { skipAuth, ...fetchOptions } = options;
   const url = `${BACKEND_URL}${path}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(fetchOptions.headers as any),
   };
 
-  if (authToken) {
+  if (authToken && !skipAuth) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   const response = await fetch(url, {
-    ...options,
+    ...fetchOptions,
     credentials: 'include',
     headers,
   });
@@ -50,11 +60,11 @@ export async function apiFetch<T>(
     if (refreshResponse.ok) {
       // 재시도
       const retryResponse = await fetch(url, {
-        ...options,
+        ...fetchOptions,
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...options.headers,
+          ...(fetchOptions.headers as any),
         },
       });
       return retryResponse.json() as Promise<ApiResponse<T>>;

@@ -43,7 +43,7 @@ export function useStudyRoomLogic() {
   } = useStudyLayout();
 
   // Load problems using real API
-  const { problems, addProblem } = useProblems(Number(studyId), selectedDate);
+  const { problems, addProblem } = useProblems(Number(studyId));
   const { historyDates, refresh: refreshDates } = useProblemDates(Number(studyId));
   const { submissions, loadSubmissions } = useSubmissions(Number(studyId));
 

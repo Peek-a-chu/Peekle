@@ -73,13 +73,13 @@ export function useStudyChat(roomId: number) {
       if (!socket || !currentUserId) return;
 
       const payload = {
-        studyId: roomId,
         content: content,
+        type: 'TALK',
         parentId: replyingTo?.id,
       };
 
       socket.publish({
-        destination: '/pub/studies/chat',
+        destination: '/pub/chat/message',
         body: JSON.stringify(payload),
       });
     },
@@ -97,14 +97,17 @@ export function useStudyChat(roomId: number) {
     ): void => {
       if (!socket || !currentUserId) return;
 
-      const formattedContent = `[CODE:${language}] ${description}\nRef: ${ownerName || 'Unknown'} - ${problemTitle || 'Unknown'}\n${code}`;
+      const formattedContent = `[CODE:${language}] ${description}\nRef: ${ownerName || 'Unknown'} - ${problemTitle || 'Unknown'}`;
+      
       const payload = {
-        studyId: roomId,
         content: formattedContent,
+        type: isRealtime ? 'TALK' : 'SUBMISSION',
         parentId: replyingTo?.id,
-        // Optional: if backend accepts metadata separately
         metadata: {
-          code,
+          type: isRealtime ? 'IDE_SHARE' : undefined,
+          targetUserId: isRealtime ? currentUserId : undefined,
+          problemId: undefined, // You might want to pass problemId here if available
+          code: isRealtime ? undefined : code, // Only include code for SUBMISSION snapshots if needed
           language,
           problemTitle,
           ownerName,
@@ -112,7 +115,7 @@ export function useStudyChat(roomId: number) {
       };
 
       socket.publish({
-        destination: '/pub/studies/chat',
+        destination: '/pub/chat/message',
         body: JSON.stringify(payload),
       });
     },

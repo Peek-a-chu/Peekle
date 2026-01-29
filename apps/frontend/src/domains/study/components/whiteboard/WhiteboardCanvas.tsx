@@ -1,26 +1,22 @@
 'use client';
 
-import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
-
-// Predefined colors for different users (excluding black which is for current user)
-const USER_COLORS = [
-  '#E53935', // Red
-  '#1E88E5', // Blue
-  '#43A047', // Green
-  '#FB8C00', // Orange
-  '#8E24AA', // Purple
-  '#00ACC1', // Cyan
-  '#F4511E', // Deep Orange
-  '#3949AB', // Indigo
-  '#7CB342', // Light Green
-  '#C0CA33', // Lime
-];
+import React, {
+  useEffect,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useState,
+  useCallback,
+} from 'react';
+import { USER_COLORS } from '@/lib/constants';
+import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 
 export interface WhiteboardCanvasRef {
   add: (objData: any, senderId?: string) => void;
   modify: (objData: any) => void;
   remove: (objectId: string) => void;
   clear: () => void;
+  handleServerMessage: (message: WhiteboardMessage) => void;
 }
 
 interface WhiteboardCanvasProps {
@@ -50,6 +46,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
     const fabricCanvasRef = useRef<any>(null);
     const fabricRef = useRef<any>(null);
     const [isFabricLoaded, setIsFabricLoaded] = useState(false);
+    const messageQueueRef = useRef<WhiteboardMessage[]>([]);
 
     // Map to track user colors for consistent coloring
     const userColorsRef = useRef<Map<string, string>>(new Map());
@@ -92,64 +89,175 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       return obj.id;
     };
 
-    useImperativeHandle(ref, () => ({
-      add: (objData: any, senderId?: string) => {
+    // 내부 액션 처리 함수 (재사용을 위해 분리)
+    const handleAction = useCallback(
+      (action: string, objectId: string | undefined, data: any, senderId: string | undefined) => {
         if (!fabricCanvasRef.current || !fabricRef.current) return;
+        const canvas = fabricCanvasRef.current;
         const fabric = fabricRef.current;
 
-        // Determine if this is from another user
-        const isOtherUser = senderId && currentUserId && senderId !== currentUserId;
-        const userColor = isOtherUser ? getUserColor(senderId) : null;
+        switch (action) {
+          case 'ADDED':
+            if (data) {
+              const isOtherUser =
+                senderId !== undefined &&
+                senderId !== null &&
+                currentUserId &&
+                String(senderId) !== String(currentUserId);
+              const userColor = isOtherUser ? getUserColor(String(senderId)) : null;
 
-        // Deserialize and add
-        // Note: fabric.util.enlivenObjects usually async
-        fabric.util.enlivenObjects(
-          [objData],
-          (objects: any[]) => {
-            objects.forEach((o) => {
-              // Apply user color if from another user
-              if (userColor) {
-                if (o.type === 'path') {
-                  o.set('stroke', userColor);
-                } else if (o.type === 'rect') {
-                  o.set('stroke', userColor);
-                } else if (o.type === 'i-text' || o.type === 'text') {
-                  o.set('fill', userColor);
-                }
+              // [Critical Fix] Clone data to ensure it's mutable and clean for Fabric
+              const objectData = JSON.parse(JSON.stringify(data));
+
+              const addObjectsToCanvas = (objects: any[]) => {
+                if (!objects || objects.length === 0) return;
+                objects.forEach((o) => {
+                  // [Fix] Restore ID from data as enlivenObjects doesn't auto-restore custom props
+                  if (objectData.id) {
+                    o.id = objectData.id;
+                  }
+
+                  if (userColor) {
+                    if (o.type === 'path' || o.type === 'rect') {
+                      o.set('stroke', userColor);
+                    } else if (o.type === 'i-text' || o.type === 'text') {
+                      o.set('fill', userColor);
+                    }
+                  }
+                  if (senderId !== undefined && senderId !== null) {
+                    o.senderId = senderId;
+                  }
+                  o.setCoords();
+                  // 중복 추가 방지
+                  const exists = canvas.getObjects().find((existing: any) => existing.id === o.id);
+                  if (!exists) {
+                    canvas.add(o);
+                  }
+                });
+                canvas.renderAll();
+              };
+
+              // Handle both Callback (v5) and Promise (v6)
+              const enlivener = fabric.util.enlivenObjects([objectData], addObjectsToCanvas);
+              if (enlivener && typeof enlivener.then === 'function') {
+                enlivener.then(addObjectsToCanvas);
               }
-              // Store senderId on the object for reference
-              if (senderId) {
-                o.senderId = senderId;
+            }
+            break;
+          case 'MODIFIED':
+            if (objectId) {
+              const obj = canvas.getObjects().find((o: any) => o.id === objectId);
+              if (obj) {
+                obj.set(data);
+                obj.setCoords();
+                canvas.requestRenderAll();
               }
-              fabricCanvasRef.current?.add(o);
-            });
-            fabricCanvasRef.current?.requestRenderAll();
-          },
-          'fabric',
-        );
-      },
-      modify: (objData: any) => {
-        if (!fabricCanvasRef.current) return;
-        const canvas = fabricCanvasRef.current;
-        const obj = canvas.getObjects().find((o: any) => o.id === objData.id);
-        if (obj) {
-          obj.set(objData);
-          obj.setCoords();
-          canvas.requestRenderAll();
+            }
+            break;
+          case 'REMOVED':
+            if (objectId) {
+              const obj = canvas.getObjects().find((o: any) => o.id === objectId);
+              if (obj) {
+                canvas.remove(obj);
+                canvas.requestRenderAll();
+              }
+            }
+            break;
+          case 'CLEAR':
+            canvas.clear();
+            break;
         }
       },
-      remove: (objectId: string) => {
-        if (!fabricCanvasRef.current) return;
-        const canvas = fabricCanvasRef.current;
+      [currentUserId],
+    );
 
-        const obj = canvas.getObjects().find((o: any) => o.id === objectId);
-        if (obj) {
-          canvas.remove(obj);
-          canvas.requestRenderAll();
+    const processMessage = useCallback(
+      (message: WhiteboardMessage) => {
+        const { action, objectId, data, senderId } = message;
+        if (action === 'SYNC') {
+          // 초기 동기화: history 배열 처리
+          if (data && Array.isArray(data.history)) {
+            handleAction('CLEAR', undefined, undefined, undefined);
+
+            const history = data.history as WhiteboardMessage[];
+            // ADDED 이벤트와 그 외 이벤트를 분리
+            const addedEvents = history.filter((h) => h.action === 'ADDED' && h.data);
+            const otherEvents = history.filter((h) => h.action !== 'ADDED');
+
+            // 1. 모든 객체를 한 번에 복원 (비동기 순서 보장)
+            if (addedEvents.length > 0 && fabricRef.current) {
+              const fabricDataList = addedEvents.map((h) =>
+                JSON.parse(JSON.stringify(h.data || {})),
+              );
+
+              const addHistoryToCanvas = (objects: any[]) => {
+                const canvas = fabricCanvasRef.current;
+                if (!canvas) return;
+
+                objects.forEach((o, i) => {
+                  const event = addedEvents[i];
+                  const eventData = fabricDataList[i];
+                  // ID 및 속성 복구
+                  if (eventData.id) o.id = eventData.id;
+                  if (event.senderId) o.senderId = event.senderId;
+
+                  // 색상 적용 로직
+                  const isOtherUser =
+                    event.senderId !== undefined &&
+                    event.senderId !== null &&
+                    currentUserId &&
+                    String(event.senderId) !== String(currentUserId);
+                  const userColor = isOtherUser ? getUserColor(String(event.senderId)) : null;
+
+                  if (userColor) {
+                    if (o.type === 'path' || o.type === 'rect') o.set('stroke', userColor);
+                    else if (o.type === 'i-text' || o.type === 'text') o.set('fill', userColor);
+                  }
+                  o.setCoords();
+                  canvas.add(o);
+                });
+
+                // 2. 객체 추가 완료 후 나머지 이벤트(수정, 삭제 등) 처리
+                otherEvents.forEach((msg) => {
+                  handleAction(msg.action, msg.objectId, msg.data, msg.senderId?.toString());
+                });
+                canvas.renderAll();
+              };
+
+              // Handle both Callback (v5) and Promise (v6)
+              const enlivener = fabricRef.current.util.enlivenObjects(
+                fabricDataList,
+                addHistoryToCanvas,
+              );
+              if (enlivener && typeof enlivener.then === 'function') {
+                enlivener.then(addHistoryToCanvas);
+              }
+            } else {
+              // 추가된 객체가 없으면 나머지 이벤트만 처리
+              otherEvents.forEach((msg) => {
+                handleAction(msg.action, msg.objectId, msg.data, msg.senderId?.toString());
+              });
+            }
+          }
+        } else {
+          handleAction(action, objectId, data, senderId?.toString());
         }
       },
-      clear: () => {
-        fabricCanvasRef.current?.clear();
+      [handleAction, currentUserId],
+    );
+
+    useImperativeHandle(ref, () => ({
+      add: (objData: any, senderId?: string) =>
+        handleAction('ADDED', objData.id, objData, senderId),
+      modify: (objData: any) => handleAction('MODIFIED', objData.id, objData, undefined),
+      remove: (objectId: string) => handleAction('REMOVED', objectId, undefined, undefined),
+      clear: () => handleAction('CLEAR', undefined, undefined, undefined),
+      handleServerMessage: (message: WhiteboardMessage) => {
+        if (!isFabricLoaded || !fabricCanvasRef.current) {
+          messageQueueRef.current.push(message);
+          return;
+        }
+        processMessage(message);
       },
     }));
 
@@ -168,6 +276,11 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           if (!isMounted) return;
 
           fabricRef.current = fabric;
+
+          // [Fix] Ensure fabric is available globally for enlivenObjects to work correctly
+          if (typeof window !== 'undefined') {
+            (window as any).fabric = fabric;
+          }
 
           // Initialize fabric canvas
           canvas = new fabric.Canvas(canvasEl.current, {
@@ -218,6 +331,14 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [width, height]);
+
+    // Process queued messages when fabric is loaded
+    useEffect(() => {
+      if (isFabricLoaded && messageQueueRef.current.length > 0) {
+        messageQueueRef.current.forEach((msg) => processMessage(msg));
+        messageQueueRef.current = [];
+      }
+    }, [isFabricLoaded, processMessage]);
 
     // Updates when tool changes
     const mouseDownHandlerRef = useRef<((opt: any) => void) | null>(null);

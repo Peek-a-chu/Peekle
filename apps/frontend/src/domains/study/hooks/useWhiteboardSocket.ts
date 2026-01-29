@@ -3,15 +3,7 @@ import { IMessage } from '@stomp/stompjs';
 import { toast } from 'sonner';
 import { useRoomStore } from './useRoomStore';
 import { useSocketContext } from '@/domains/study/context/SocketContext';
-
-export interface WhiteboardMessage {
-  action: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'START' | 'CLOSE' | 'CLEAR' | 'SYNC';
-  objectId?: string;
-  senderName?: string;
-  senderId?: number;
-  data?: any;
-  roomId?: string; // Include roomId in message for cross-page sharing
-}
+import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 
 export function useWhiteboardSocket(
   roomId: string,
@@ -90,17 +82,17 @@ export function useWhiteboardSocket(
   const sendMessage = useCallback(
     (payload: WhiteboardMessage) => {
       if (client && connected && roomId) {
-        // Always include roomId in message for reliable cross-page sharing
-        const messageWithRoom = { ...payload, roomId };
+        // Headers (studyId) are handled by SocketContext & StompHandler
+        // No need to send studyId in body as WhiteboardRequest doesn't have it
         console.log(
           `[useWhiteboardSocket] Sending:`,
-          messageWithRoom.action,
-          messageWithRoom.objectId || '',
+          payload.action,
+          payload.objectId || '',
           `to room ${roomId}`,
         );
         client.publish({
           destination: '/pub/studies/whiteboard/message',
-          body: JSON.stringify(messageWithRoom),
+          body: JSON.stringify(payload),
         });
       }
     },
