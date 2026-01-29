@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { TimelineItemData } from '../mocks/dashboardMocks';
 import { useTimeline } from '../hooks/useDashboardData';
 import TimelineItem from './TimelineItem';
 
@@ -12,17 +14,26 @@ interface LearningTimelineProps {
   nickname?: string;
 }
 
-const LearningTimeline = ({
-  selectedDate,
-  showHistoryLink = false,
-  nickname,
-}: LearningTimelineProps) => {
+const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: LearningTimelineProps) => {
   const { data } = useTimeline(selectedDate || '');
   const [expanded, setExpanded] = useState(false);
 
-  // 기본 5개, 확장 시 전체
-  const displayedItems = expanded ? data : data.slice(0, 5);
-  const hasMore = data.length > 5;
+  // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
+  const groupedDataMap = data.reduce((acc, item) => {
+    if (!acc[item.problemId]) {
+      acc[item.problemId] = [];
+    }
+    acc[item.problemId].push(item);
+    return acc;
+  }, {} as Record<string, typeof data>);
+
+  const groupedKeys = Object.keys(groupedDataMap);
+
+  const router = useRouter(); // Added router initialization
+
+  // 기본 5개 그룹, 확장 시 전체
+  const displayedKeys = expanded ? groupedKeys : groupedKeys.slice(0, 5);
+  const hasMore = groupedKeys.length > 5;
 
   // 날짜 포맷
   const formatDate = (dateStr: string) => {
@@ -30,8 +41,14 @@ const LearningTimeline = ({
     return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
   };
 
+  const handleSelect = (item: TimelineItemData) => {
+    if (nickname && item.submissionId) {
+      router.push(`/profile/${nickname}/history?submissionId=${item.submissionId}`);
+    }
+  };
+
   return (
-    <div className="p-6 transition-colors duration-300">
+    <div className="p-6 transition-colors duration-300 relative">
       {/* 헤더 */}
       <div className="flex items-center gap-2 mb-4">
         <Clock className="w-5 h-5 text-primary" />
@@ -43,27 +60,30 @@ const LearningTimeline = ({
         </div>
 
         {showHistoryLink && nickname && (
-          <Link
-            href={`/profile/${nickname}/history`}
-            className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1"
-          >
+          <Link href={`/profile/${nickname}/history`} className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1">
             <span className="text-xs font-medium">풀이 내역 조회</span>
             <ChevronRight className="w-5 h-5" />
           </Link>
         )}
       </div>
 
-      {/* 타임라인 목록 */}
-      <div className="divide-y divide-border">
-        {displayedItems.length > 0 ? (
-          displayedItems.map((item, index) => (
-            <TimelineItem key={`${item.problemId}-${index}`} data={item} />
-          ))
-        ) : (
-          <p className="text-center text-muted-foreground py-8">
-            {selectedDate ? '해당 날짜에 풀이한 문제가 없습니다.' : '날짜를 선택해주세요.'}
-          </p>
-        )}
+      <div className="flex gap-6 relative">
+        {/* 타임라인 목록 */}
+        <div className="w-full divide-y divide-border transition-all duration-300">
+          {displayedKeys.length > 0 ? (
+            displayedKeys.map((problemId) => (
+              <TimelineItem
+                key={problemId}
+                items={groupedDataMap[problemId]}
+                onSelect={handleSelect}
+              />
+            ))
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              {selectedDate ? '해당 날짜에 풀이한 문제가 없습니다.' : '날짜를 선택해주세요.'}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* 더보기/접기 버튼 */}
@@ -80,7 +100,7 @@ const LearningTimeline = ({
           ) : (
             <>
               <ChevronDown className="w-4 h-4" />
-              {data.length - 5}개 더 보기
+              {groupedKeys.length - 5}개 더 보기
             </>
           )}
         </button>
