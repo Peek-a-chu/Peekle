@@ -1,80 +1,143 @@
-import { Controller, Get, Post, Body, Param, Query, Delete } from '@nestjs/common';
-import { AppService } from './app.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  Delete,
+} from "@nestjs/common";
+import { AppService } from "./app.service";
+import { SocketService } from "./sockets/socket.service";
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly socketService: SocketService,
+  ) {}
 
   @Get()
   getHello(): string {
     return this.appService.getHello();
   }
 
-  @Get('study/rooms')
-  getStudyRooms() {
-    return [
-      { id: 1, title: 'Test Room 1' },
-      { id: 2, title: 'Test Room 2' },
-    ];
+  // --- A. Study Room Management ---
+
+  @Post("studies")
+  createStudy(@Body() body: { title: string }) {
+    return this.appService.createStudy(body.title);
   }
 
-  @Get('study/:studyId/problems')
-  getProblems(@Param('studyId') studyId: string, @Query('date') date: string) {
-    return this.appService.getProblems(studyId, date);
+  @Post("studies/join")
+  joinStudy(@Body() body: { inviteCode: string }) {
+    // Assuming userId is 1 for now
+    const mockUserId = 1;
+    return this.appService.joinStudy(body.inviteCode, mockUserId);
   }
 
-  @Get('study/:studyId/problems/dates')
-  getProblemDates(@Param('studyId') studyId: string) {
-    return this.appService.getProblemDates(studyId);
+  @Post("studies/:id/invite")
+  createInviteCode(@Param("id") id: string) {
+    return this.appService.createInviteCode(id);
   }
 
-  @Get('study/:studyId/problems/:problemId/submissions')
-  getSubmissions(
-    @Param('studyId') studyId: string,
-    @Param('problemId') problemId: string,
+  @Get("studies")
+  getMyStudies(
+    @Query("page") page: number = 0,
+    @Query("keyword") keyword: string,
   ) {
-    return this.appService.getSubmissions(studyId, problemId);
+    const mockUserId = 1;
+    return this.appService.getMyStudies(mockUserId, page, keyword);
   }
 
-  @Get('study/:studyId/participants')
-  getParticipants(@Param('studyId') studyId: string) {
+  @Get("studies/:id")
+  getStudyDetail(@Param("id") id: string) {
+    return this.appService.getStudyDetail(id);
+  }
+
+  // --- B. Chat ---
+
+  @Get("studies/:id/chats")
+  getChats(@Param("id") id: string, @Query("page") page: number = 0) {
+    return this.appService.getChats(id, page);
+  }
+
+  // --- C. Curriculum ---
+
+  @Get("studies/:id/curriculum/daily")
+  getDailyCurriculum(@Param("id") id: string, @Query("date") date: string) {
+    return this.appService.getDailyCurriculum(id, date);
+  }
+
+  // --- D. Submission ---
+
+  @Post("studies/:studyId/submit")
+  submitSolution(
+    @Param("studyId") studyId: string,
+    @Body() body: { problemId: number; code: string; language: string },
+  ) {
+    const mockUserId = 1;
+    return this.appService.submitSolution(studyId, body, mockUserId);
+  }
+
+  @Get("submissions/study/:studyId/problem/:problemId")
+  getSubmissionList(
+    @Param("studyId") studyId: string,
+    @Param("problemId") problemId: string,
+    @Query("page") page: number = 0,
+    @Query("size") size: number = 5,
+  ) {
+    return this.appService.getSubmissionList(studyId, problemId, page, size);
+  }
+
+  @Get("submissions/:submissionId")
+  getSubmissionDetail(@Param("submissionId") submissionId: string) {
+    return this.appService.getSubmissionDetail(submissionId);
+  }
+
+  // --- Legacy / Helper / Other ---
+
+  @Get("studies/:studyId/participants")
+  getParticipants(@Param("studyId") studyId: string) {
     return this.appService.getParticipants(studyId);
   }
 
-  @Get('study/:studyId/chats')
-  getChats(@Param('studyId') studyId: string) {
-    return this.appService.getChats(studyId);
-  }
-
-  @Get('study/:studyId')
-  getStudyRoom(@Param('studyId') studyId: string) {
-    return this.appService.getStudyRoom(studyId);
-  }
-
-  @Post('study/:studyId/problems')
-  createProblem(
-    @Param('studyId') studyId: string,
+  @Post("studies/:studyId/problems")
+  async createProblem(
+    @Param("studyId") studyId: string,
     @Body() body: { title: string; number: number; tags?: string[] },
   ) {
-    return this.appService.createProblem(studyId, body);
+    const result = await this.appService.createProblem(studyId, body);
+    try {
+      this.socketService.notifyProblemUpdate(studyId);
+    } catch (e) {
+      console.error("Socket notification failed:", e);
+    }
+    return result;
   }
 
-  @Get('external/search')
-  searchExternalProblems(@Query('query') query: string) {
+  @Get("external/search")
+  searchExternalProblems(@Query("query") query: string) {
     return this.appService.searchExternalProblems(query);
   }
 
-  @Delete('study/:studyId/problems/:problemId')
+  @Delete("studies/:studyId/problems/:problemId")
   async deleteProblem(
-    @Param('studyId') studyId: string,
-    @Param('problemId') problemId: string,
+    @Param("studyId") studyId: string,
+    @Param("problemId") problemId: string,
   ) {
     try {
-      return await this.appService.deleteProblem(studyId, problemId);
+      const result = await this.appService.deleteProblem(studyId, problemId);
+      try {
+        this.socketService.notifyProblemUpdate(studyId);
+      } catch (e) {
+        console.error("Socket notification failed:", e);
+      }
+      return result;
     } catch (error) {
       return {
         success: false,
-        message: error.message
+        message: error.message,
       };
     }
   }

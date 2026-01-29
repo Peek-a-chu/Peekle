@@ -96,6 +96,20 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
     }
   };
 
+  const isRefCodeMessage =
+    message.type === 'CODE' &&
+    !!message.metadata?.code &&
+    message.metadata?.isRefChat === true;
+
+  const displayContent =
+    isRefCodeMessage && message.content
+      ? message.content
+          // Strip leading [CODE:lang] prefix
+          .replace(/^\[CODE:[^\]]+\]\s*/i, '')
+          // Strip trailing "Ref: ..." part
+          .replace(/\s*Ref:.*$/i, '')
+      : message.content;
+
   return (
     <div
       id={`chat-msg-${message.id}`}
@@ -111,27 +125,36 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
       <div className="flex items-center gap-2 max-w-full">
         <div
           className={cn(
-            'px-3 py-2 rounded-lg text-sm break-all',
-            isMine
-              ? 'bg-primary text-primary-foreground rounded-tr-none'
-              : 'bg-muted rounded-tl-none',
-            message.type === 'CODE' && 'cursor-pointer',
+            'text-sm break-all',
+            isRefCodeMessage
+              ? 'px-0 py-0'
+              : isMine
+                ? 'px-3 py-2 rounded-2xl bg-primary text-primary-foreground rounded-tr-md'
+                : 'px-3 py-2 rounded-2xl bg-muted text-foreground rounded-tl-md',
+            isRefCodeMessage && 'cursor-pointer',
           )}
-          onClick={message.type === 'CODE' ? handleCodeClick : undefined}
+          onClick={
+            isRefCodeMessage ? handleCodeClick : undefined
+          }
         >
-          {message.type === 'CODE' && message.metadata?.code ? (
-            <div className="flex flex-col gap-2 min-w-[200px]">
+          {isRefCodeMessage && message.metadata ? (
+            <div className="flex flex-col gap-2 min-w-[220px] max-w-md">
               <CodeShareCard
-                code={message.metadata.code}
+                code={message.metadata.code || ''}
                 language={message.metadata.language}
                 problemTitle={message.metadata.problemTitle}
                 ownerName={message.metadata.ownerName}
-                // Removed onClick from here to prevent double triggering with parent div
+                problemId={message.metadata.problemId}
+                onClick={handleCodeClick}
                 className={
                   isMine ? 'bg-primary-foreground/10 border-primary-foreground/20' : 'bg-background'
                 }
               />
-              {message.content && <span>{message.content}</span>}
+              {displayContent && (
+                <span className="text-xs text-muted-foreground whitespace-pre-line">
+                  {displayContent}
+                </span>
+              )}
             </div>
           ) : (
             <div className={cn('markdown-prose', isMine && 'markdown-prose-invert')}>

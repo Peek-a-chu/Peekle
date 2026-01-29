@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import {
   WhiteboardCanvas,
   WhiteboardCanvasRef,
 } from '@/domains/study/components/whiteboard/WhiteboardCanvas';
-import { useWhiteboardSocket, WhiteboardMessage } from '@/domains/study/hooks/useWhiteboardSocket';
+import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
+import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 import { Pencil, Square, Type, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSocketContext } from '@/domains/study/context/SocketContext';
 
 interface WhiteboardPanelProps {
   className?: string;
@@ -23,44 +25,55 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const [activeTool, setActiveTool] = React.useState<'pen' | 'shape' | 'text' | 'eraser'>('pen');
   const canvasRef = useRef<WhiteboardCanvasRef>(null);
+  const { connected } = useSocketContext();
 
   const handleMessage = useCallback((msg: WhiteboardMessage) => {
     console.log(`[WhiteboardOverlay] Received message:`, msg.action, msg.objectId || '');
-    switch (msg.action) {
-      case 'ADDED':
-        // Pass senderId for color differentiation
-        canvasRef.current?.add(msg.data, msg.senderId?.toString());
-        break;
-      case 'MODIFIED':
-        canvasRef.current?.modify(msg.data);
-        break;
-      case 'REMOVED':
-        if (msg.objectId) canvasRef.current?.remove(msg.objectId);
-        break;
-      case 'CLEAR':
-        canvasRef.current?.clear();
-        break;
-      case 'SYNC':
-        console.log(
-          `[WhiteboardOverlay] SYNC received: ${msg.data?.history?.length || 0} objects, isActive: ${msg.data?.isActive}`,
-        );
-        if (msg.data?.history) {
-          canvasRef.current?.clear();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          msg.data.history.forEach((action: any) => {
-            if (action.action === 'ADDED' && action.data) {
-              // Pass senderId from history for color differentiation
-              canvasRef.current?.add(action.data, action.senderId?.toString());
-            }
-          });
-        }
-        break;
-    }
+    canvasRef.current?.handleServerMessage(msg);
   }, []);
 
-  const { sendMessage } = useWhiteboardSocket(roomId as string, handleMessage, {
-    enabled: isWhiteboardOverlayOpen,
-  });
+  const { sendMessage } = useWhiteboardSocket(
+    roomId as string,
+    currentUserId?.toString() || '',
+    handleMessage,
+    {
+      enabled: isWhiteboardOverlayOpen,
+    },
+  );
+
+  const hasJoinedRef = useRef(false);
+
+  // Reset join status when whiteboard is closed
+  useEffect(() => {
+    if (!isWhiteboardOverlayOpen) {
+      // Reset when whiteboard is closed so SYNC will be requested again when reopened
+      hasJoinedRef.current = false;
+    }
+  }, [isWhiteboardOverlayOpen]);
+
+  // Reset join status on disconnect
+  useEffect(() => {
+    if (!connected) {
+      hasJoinedRef.current = false;
+    }
+  }, [connected]);
+
+  // Note:
+  // SYNC 요청은 `useWhiteboardSocket`에서 "구독 완료 후 자동 SYNC"로 처리합니다.
+  // Overlay에서 추가로 setTimeout SYNC를 보내면, overlay on/off 및 재연결 타이밍에서
+  // 세션 종료 후 늦게 publish 되는 레이스로 서버에 "No decoder for session id" 로그가 발생할 수 있어 제거했습니다.
+  const handleCanvasReady = useCallback(() => {
+    console.log('[WhiteboardOverlay] Canvas ready');
+  }, []);
+
+  // [Fix] Request initial state when connected and whiteboard is open
+  useEffect(() => {
+    if (isWhiteboardOverlayOpen && connected && !hasJoinedRef.current) {
+      console.log('[WhiteboardOverlay] Sending JOIN request');
+      sendMessage({ action: 'JOIN' });
+      hasJoinedRef.current = true;
+    }
+  }, [isWhiteboardOverlayOpen, connected, sendMessage]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleObjectAdded = useCallback(
@@ -157,17 +170,25 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
 
       {/* Canvas Area */}
       <div className="flex-1 overflow-auto bg-gray-100 p-2 min-h-0">
+        {!connected && (
+          <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            소켓 연결 중입니다. 연결이 완료되면 자동으로 동기화됩니다.
+          </div>
+        )}
         <div className="flex h-full w-full items-center justify-center">
-          <WhiteboardCanvas
-            ref={canvasRef}
-            width={800}
-            height={600}
-            activeTool={activeTool}
-            currentUserId={currentUserId?.toString()}
-            onObjectAdded={handleObjectAdded}
-            onObjectModified={handleObjectModified}
-            onObjectRemoved={handleObjectRemoved}
-          />
+          <div className={cn(!connected && 'pointer-events-none opacity-60')}>
+            <WhiteboardCanvas
+              ref={canvasRef}
+              width={800}
+              height={600}
+              activeTool={activeTool}
+              currentUserId={currentUserId?.toString()}
+              onObjectAdded={handleObjectAdded}
+              onObjectModified={handleObjectModified}
+              onObjectRemoved={handleObjectRemoved}
+              onReady={handleCanvasReady}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import AIRecommendation from '@/domains/home/components/AIRecommendation';
 import { CCWeeklyScore } from '@/domains/home/components/CCWeeklyScore';
 import LeagueRanking from '@/domains/home/components/LeagueRanking';
 
-import { useAuthStore } from '@/lib/auth-store';
+import { useAuthStore } from '@/store/auth-store';
 
 export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(() => {

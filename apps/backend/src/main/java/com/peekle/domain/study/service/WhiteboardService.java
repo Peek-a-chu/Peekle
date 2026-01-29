@@ -45,6 +45,7 @@ public class WhiteboardService {
         config.put("ownerId", String.valueOf(userId)); // 방장 ID
         config.put("isActive", "true"); // 켜짐 표시
         config.put("status", "UNLOCKED"); // 잠금 해제
+        config.put("revision", "0"); // 이벤트 버전 (누락 감지/재동기화용)
 
         redisTemplate.opsForHash().putAll(key, config);
         redisTemplate.expire(key, Duration.ofHours(24)); // TTL 설정
@@ -58,6 +59,7 @@ public class WhiteboardService {
                 .senderName(nickName)
                 .data("Session Started")
                 .timestamp(LocalDateTime.now())
+                .revision(0L)
                 .build();
 
         String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
@@ -100,26 +102,40 @@ public class WhiteboardService {
         Map<Object, Object> config = redisTemplate.opsForHash().entries(configKey);
 
         boolean isActive = config.containsKey("isActive") && "true".equals(config.get("isActive").toString());
+        Long revision = 0L;
+        if (config.containsKey("revision") && config.get("revision") != null) {
+            try {
+                revision = Long.parseLong(config.get("revision").toString());
+            } catch (Exception ignored) {
+                revision = 0L;
+            }
+        }
 
         // 데이터 구성
         Map<String, Object> stateData = new HashMap<>();
         stateData.put("isActive", isActive);
+        stateData.put("revision", revision);
 
-        if (isActive) {
-            // 활성화 상태라면 이력(History)과 방장 정보도 포함
-            List<Object> history = redisTemplate.opsForList().range(historyKey, 0, -1);
-            stateData.put("history", history);
-            stateData.put("ownerId", config.get("ownerId"));
-            stateData.put("status", config.get("status"));
-        }
+        // NOTE:
+        // - 기존 구현은 isActive=false 일 때 history를 아예 포함하지 않아,
+        //   클라이언트가 SYNC를 요청해도 빈 상태만 받는 문제가 발생할 수 있습니다.
+        // - UI의 "화이트보드 창 ON/OFF"는 세션(isActive)과 별개로 동작할 수 있으므로,
+        //   SYNC 응답에는 history를 항상 포함시켜 복원이 안정적으로 되도록 합니다.
+        List<Object> history = redisTemplate.opsForList().range(historyKey, 0, -1);
+        stateData.put("history", history);
+        // config 값이 있으면 같이 내려줌 (없어도 무방)
+        stateData.put("ownerId", config.get("ownerId"));
+        stateData.put("status", config.get("status"));
 
         // 응답값
         WhiteboardResponse syncMessage = WhiteboardResponse.builder()
                 .action("SYNC")
                 .data(stateData)
                 .timestamp(LocalDateTime.now())
+                .revision(revision)
                 .build();
 
+        // 1) 사용자 전용 토픽으로 전송 (기존 동작)
         String userTopic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD_USER, studyId, userId);
         messagingTemplate.convertAndSend(userTopic, syncMessage);
     }
@@ -138,17 +154,40 @@ public class WhiteboardService {
         String nickName = getUserNickname(userId);
 
         WhiteboardResponse response = WhiteboardResponse.from(request, userId, nickName);
+        // bump revision (atomic)
+        Long newRevision = redisTemplate.opsForHash().increment(configKey, "revision", 1L);
+        response = WhiteboardResponse.builder()
+                .action(response.getAction())
+                .objectId(response.getObjectId())
+                .data(response.getData())
+                .senderId(response.getSenderId())
+                .senderName(response.getSenderName())
+                .timestamp(response.getTimestamp())
+                .revision(newRevision == null ? 0L : newRevision)
+                .build();
 
         // 1. request.getData()만 저장하면 안 됨! -> response 객체 통째로 저장해야 함 (그래야 나중에 action, objectId를 알 수 있음)
         // 2. "CURSOR" (마우스 이동) 이벤트는 저장하지 않음 (DB 부하 방지, 실시간성만 중요)
         if (!"CURSOR".equals(request.getAction())) {
             redisTemplate.opsForList().rightPush(historyKey, response);
+            // Prevent unbounded growth: keep only recent N events to avoid huge SYNC payloads.
+            // (Large SYNC messages can cause client/server instability and reconnect storms.)
+            redisTemplate.opsForList().trim(historyKey, -500, -1);
             redisTemplate.expire(historyKey, Duration.ofHours(24));
         }
 
         // 실시간 알림 전파
         String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
         messagingTemplate.convertAndSend(topic, response);
+
+        // [Consistency] Also broadcast a lightweight "sync trigger" so clients that missed this event
+        // can still converge by requesting SYNC (private topic) even if no further events happen.
+        WhiteboardResponse syncNeeded = WhiteboardResponse.builder()
+                .action("SYNC_NEEDED")
+                .timestamp(LocalDateTime.now())
+                .revision(response.getRevision())
+                .build();
+        messagingTemplate.convertAndSend(topic, syncNeeded);
     }
 
     public void clearWhiteboard(Long studyId, Long userId) {
@@ -176,6 +215,7 @@ public class WhiteboardService {
                 .senderId(userId)
                 .senderName(nickName)
                 .timestamp(LocalDateTime.now())
+                .revision(redisTemplate.opsForHash().increment(configKey, "revision", 1L))
                 .build();
 
         String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);

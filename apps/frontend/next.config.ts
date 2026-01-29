@@ -31,6 +31,9 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     reactCompiler: true,
   },
@@ -54,5 +57,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
-

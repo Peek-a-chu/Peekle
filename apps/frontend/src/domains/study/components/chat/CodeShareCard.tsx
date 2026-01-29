@@ -1,3 +1,4 @@
+import type React from 'react';
 import { cn } from '@/lib/utils';
 import { FileCode2, BookOpen, User } from 'lucide-react';
 
@@ -6,7 +7,8 @@ interface CodeShareCardProps {
   language?: string;
   problemTitle?: string;
   ownerName?: string;
-  onClick?: () => void;
+  problemId?: number;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   className?: string;
 }
 
@@ -15,6 +17,7 @@ export function CodeShareCard({
   language,
   problemTitle,
   ownerName,
+  problemId,
   onClick,
   className,
 }: CodeShareCardProps): React.ReactNode {
@@ -43,7 +46,13 @@ export function CodeShareCard({
       <div className="p-3 flex flex-col gap-1.5">
         <div className="flex items-center gap-2 text-sm font-medium">
           <BookOpen size={16} className="text-primary shrink-0" />
-          <span className="truncate">{problemTitle || 'No Problem Selected'}</span>
+          <span className="truncate">
+            {problemTitle
+              ? problemId
+                ? `${problemId}. ${problemTitle}`
+                : problemTitle
+              : 'No Problem Selected'}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <User size={14} className="shrink-0" />

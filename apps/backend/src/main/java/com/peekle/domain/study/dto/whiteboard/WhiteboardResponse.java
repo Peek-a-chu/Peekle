@@ -30,6 +30,10 @@ public class WhiteboardResponse {
     // 5. 서버 시간 (순서 동기화 참고용)
     private LocalDateTime timestamp;
 
+    // 6. 화이트보드 상태 버전 (이벤트 누락 감지/재동기화용)
+    // 클라이언트는 revision이 끊기면 SYNC를 다시 요청하여 상태를 통일합니다.
+    private Long revision;
+
     // Request -> Response 변환 메서드
     public static WhiteboardResponse from(WhiteboardRequest request, Long userId, String senderName) {
         return WhiteboardResponse.builder()

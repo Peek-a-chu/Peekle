@@ -15,10 +15,16 @@ import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
+import { useAuthStore } from '@/store/auth-store';
+import { useStudyEntry } from '@/domains/study/hooks/useStudyEntry';
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
+  const { user, checkAuth } = useAuthStore();
+
+  // Send ENTER message on socket connect
+  useStudyEntry(studyId);
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   // Ensure we set roomId immediately to store if possible
@@ -75,11 +81,16 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
 
   // API Hooks
-  const { problems, addProblem, removeProblem } = useProblems(studyId, selectedDate);
+  const { problems, addProblem, deleteProblem } = useProblems(studyId);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
+    // Load user if not already available
+    if (!user) {
+      void checkAuth();
+    }
+
     // Ensure roomId is set in store immediately when studyId is available
     if (studyId) {
       setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
@@ -112,8 +123,10 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       )
       .catch((err) => console.error('Failed to fetch participants:', err));
 
-    setCurrentUserId(1);
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId]);
+    if (user) {
+      setCurrentUserId(user.id);
+    }
+  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId, user]);
 
   const handleBack = (): void => {
     router.push('/study');
@@ -185,11 +198,15 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         }
         leftPanel={
           <ProblemListPanel
-            problems={problems}
+            problems={problems.map((p: any) => ({
+              ...p,
+              problemId: p.id ?? p.problemId,
+              solvedMemberCount: p.solvedMemberCount ?? 0,
+            }))}
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
             onAddProblem={addProblem}
-            onRemoveProblem={removeProblem}
+            onRemoveProblem={deleteProblem}
             onSelectProblem={handleSelectProblem}
             selectedProblemId={selectedProblemId ?? undefined}
             onToggleFold={handleToggleLeftPanel}
@@ -225,7 +242,7 @@ export function CCStudyRoomClient(): React.ReactNode {
   // SocketProvider will handle connection updates when currentUserId changes.
 
   return (
-    <SocketProvider roomId={studyId} userId={currentUserId}>
+    <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
       <StudyRoomContent studyId={studyId} />
     </SocketProvider>
   );
