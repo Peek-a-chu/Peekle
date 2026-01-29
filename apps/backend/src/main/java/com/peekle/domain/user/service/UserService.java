@@ -1,6 +1,7 @@
 package com.peekle.domain.user.service;
 
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
+import com.peekle.domain.user.dto.TimelineItemDto;
 import com.peekle.domain.user.dto.UserProfileResponse;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -114,5 +116,124 @@ public class UserService {
         info.put("league", user.getLeague().name());
         info.put("leaguePoint", user.getLeaguePoint());
         return info;
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<com.peekle.domain.user.dto.ActivityStreakDto> getUserActivityStreak(Long userId) {
+        // 1. 유저의 모든 제출 내역 조회 (오래된 순)
+        java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = 
+                submissionLogRepository.findAllByUserIdOrderBySubmittedAtAsc(userId);
+
+        Map<String, Long> dailyCounts = new HashMap<>();
+        
+        // 3. 일별 중복 제거를 위한 Set (하루에 같은 문제 여러 번 푼 경우 제외, 다른 날 풀면 포함)
+        java.util.Set<String> dailySolvedCheck = new java.util.HashSet<>();
+            
+        // 4. 실제 데이터로 업데이트
+        for (com.peekle.domain.submission.entity.SubmissionLog log : logs) {
+            Long problemId = log.getProblem().getId();
+            String date = log.getSubmittedAt().toLocalDate().toString(); // YYYY-MM-DD
+            String uniqueKey = date + ":" + problemId;
+            
+            // 해당 날짜에 아직 안 푼 문제인 경우에만 카운트
+            if (!dailySolvedCheck.contains(uniqueKey)) {
+                dailySolvedCheck.add(uniqueKey);
+                dailyCounts.put(date, dailyCounts.getOrDefault(date, 0L) + 1);
+            }
+        }
+
+        // 5. DTO 변환 (날짜순 정렬)
+        return dailyCounts.entrySet().stream()
+                .map(entry -> new com.peekle.domain.user.dto.ActivityStreakDto(entry.getKey(), entry.getValue()))
+                .sorted(java.util.Comparator.comparing(com.peekle.domain.user.dto.ActivityStreakDto::getDate))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<TimelineItemDto> getDailyTimeline(Long userId, String dateStr) {
+        java.time.LocalDate date = java.time.LocalDate.parse(dateStr);
+        java.time.LocalDateTime startOfDay = date.atStartOfDay();
+        java.time.LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+
+        java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = 
+                submissionLogRepository.findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        userId, startOfDay, endOfDay
+                );
+
+        java.util.List<TimelineItemDto> timeline = new java.util.ArrayList<>();
+        java.util.Set<String> processedKeys = new java.util.HashSet<>();
+
+        for (com.peekle.domain.submission.entity.SubmissionLog log : logs) {
+            com.peekle.domain.problem.entity.Problem problem = log.getProblem();
+            
+            // String tagKey = log.getTag() != null ? log.getTag() : "null";
+            // String uniqueKey = problem.getId() + ":" + tagKey;
+            
+            // if (!processedKeys.contains(uniqueKey)) {
+            //     processedKeys.add(uniqueKey);
+            {
+                
+                // Use denormalized fields from SubmissionLog if available to avoid potential N+1 or extra joins if not fetched
+                // The entity definition shows problemTitle, problemTier, and now externalId exist.
+                String tierStr = log.getProblemTier() != null ? log.getProblemTier().toLowerCase() : "unknown";
+                String title = log.getProblemTitle() != null ? log.getProblemTitle() : problem.getTitle();
+                String problemIdStr = log.getExternalId() != null ? log.getExternalId() : problem.getExternalId();
+                // construct URL manually since it's standard BOJ URL pattern
+                String problemLink = "https://www.acmicpc.net/problem/" + problemIdStr;
+
+                String tierName = "unknown";
+                int tierLevel = 0;
+                
+                String[] parts = tierStr.split(" ");
+                if (parts.length >= 2) {
+                    tierName = parts[0];
+                    try {
+                        tierLevel = Integer.parseInt(parts[1]);
+                    } catch (NumberFormatException e) {
+                        tierLevel = 0;
+                    }
+                } else {
+                    tierName = tierStr;
+                }
+                
+                timeline.add(TimelineItemDto.builder()
+                        .submissionId(log.getId())
+                        .problemId(problemIdStr) 
+                        .title(title)
+                        .tier(tierName) 
+                        .tierLevel(tierLevel) 
+                        .link(problemLink)
+                        .tag(log.getTag()) // Map tag from log
+                        .sourceType(log.getSourceType() != null ? log.getSourceType().name() : "EXTENSION")
+                        .language(log.getLanguage())
+                        .memory(log.getMemory())
+                        .executionTime(log.getExecutionTime())
+                        .submittedAt(log.getSubmittedAt().toString())
+                        .build());
+            }
+        }
+        
+        return timeline;
+    }
+    @Transactional(readOnly = true)
+    public com.peekle.domain.user.dto.ExtensionStatusResponse getExtensionStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // Check if solved today
+        java.time.LocalDateTime startOfDay = java.time.LocalDate.now().atStartOfDay();
+        java.time.LocalDateTime endOfDay = java.time.LocalDate.now().plusDays(1).atStartOfDay();
+        
+        List<com.peekle.domain.submission.entity.SubmissionLog> todayLogs = 
+                submissionLogRepository.findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        userId, startOfDay, endOfDay
+                );
+        
+        boolean isSolvedToday = !todayLogs.isEmpty();
+
+        return com.peekle.domain.user.dto.ExtensionStatusResponse.builder()
+                .streakCurrent(user.getStreakCurrent())
+                .isSolvedToday(isSolvedToday)
+                .build();
     }
 }
