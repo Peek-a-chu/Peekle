@@ -32,9 +32,12 @@ const MyLeagueCard = () => {
   // 상태 매핑
   const getStatus = (status?: string): LeagueInfo['status'] => {
     switch (status) {
-      case 'PROMOTE': return 'promotion';
-      case 'DEMOTE': return 'demotion';
-      default: return 'maintenance';
+      case 'PROMOTE':
+        return 'promotion';
+      case 'DEMOTE':
+        return 'demotion';
+      default:
+        return 'maintenance';
     }
   };
 
@@ -67,7 +70,9 @@ const MyLeagueCard = () => {
         {/* 왼쪽: 티어 이름 + 점수 */}
         <div className="flex flex-col flex-1">
           <span className="text-base font-bold text-foreground">{leagueInfo.tierName}</span>
-          <span className="text-sm text-muted-foreground font-medium">{leagueInfo.score.toLocaleString()}점</span>
+          <span className="text-sm text-muted-foreground font-medium">
+            {leagueInfo.score.toLocaleString()}점
+          </span>
         </div>
 
         {/* 오른쪽: 승급예정 + 순위 */}

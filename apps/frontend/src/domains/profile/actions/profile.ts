@@ -150,6 +150,6 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
       streakMax: 0,
       profileImg: undefined,
       solvedCount: 0,
-    }
+    };
   }
 }

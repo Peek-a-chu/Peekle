@@ -31,7 +31,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     return NextResponse.json({ success: true, data: result.data });
-
   } catch (error) {
     console.error('Error in proxy route:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
