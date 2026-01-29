@@ -1,0 +1,51 @@
+package com.peekle.domain.workbook.dto.response;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.peekle.domain.workbook.entity.Workbook;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Builder
+public class WorkbookListResponse {
+    private Long id;
+    private String title;
+    private String description;
+    private int problemCount;
+    private int bookmarkCount;
+
+    @JsonProperty("isBookmarked")
+    private boolean isBookmarked;
+
+    @JsonProperty("isOwner")
+    private boolean isOwner;
+
+    private LocalDateTime createdAt;
+    private CreatorInfo creator;
+
+    @Getter
+    @Builder
+    public static class CreatorInfo {
+        private Long id;
+        private String nickname;
+    }
+
+    public static WorkbookListResponse of(Workbook workbook, int problemCount, boolean isBookmarked, boolean isOwner) {
+        return WorkbookListResponse.builder()
+                .id(workbook.getId())
+                .title(workbook.getTitle())
+                .description(workbook.getDescription())
+                .problemCount(problemCount)
+                .bookmarkCount(workbook.getBookmarkCount())
+                .isBookmarked(isBookmarked)
+                .isOwner(isOwner)
+                .createdAt(workbook.getCreatedAt())
+                .creator(CreatorInfo.builder()
+                        .id(workbook.getCreator().getId())
+                        .nickname(workbook.getCreator().getNickname())
+                        .build())
+                .build();
+    }
+}
