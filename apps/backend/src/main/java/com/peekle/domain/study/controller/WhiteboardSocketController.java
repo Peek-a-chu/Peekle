@@ -103,11 +103,14 @@ public class WhiteboardSocketController {
         // 화이트보드 토픽 구독 감지 시 현재 상태 전송 (SYNC)
         // 명세표에 따라 사용자별 토픽(/topic/studies/rooms/{id}/whiteboard/{uid}) 구독 시에만 SYNC 전송
         if (destination != null && destination.matches("/topic/studies/rooms/\\d+/whiteboard/[a-zA-Z0-9-]+")) {
-            Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
-            Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+            Map<String, Object> attributes = headerAccessor.getSessionAttributes();
+            if (attributes != null) {
+                Long studyId = (Long) attributes.get("studyId");
+                Long userId = (Long) attributes.get("userId");
 
-            if (studyId != null && userId != null) {
-                whiteboardService.getWhiteboardState(studyId, userId);
+                if (studyId != null && userId != null) {
+                    whiteboardService.getWhiteboardState(studyId, userId);
+                }
             }
         }
         // [New] 채팅방 구독 시 세션에 studyId를 자동으로 저장

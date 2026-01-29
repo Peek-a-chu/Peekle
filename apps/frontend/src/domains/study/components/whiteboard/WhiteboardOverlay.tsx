@@ -170,18 +170,25 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
 
       {/* Canvas Area */}
       <div className="flex-1 overflow-auto bg-gray-100 p-2 min-h-0">
+        {!connected && (
+          <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            소켓 연결 중입니다. 연결이 완료되면 자동으로 동기화됩니다.
+          </div>
+        )}
         <div className="flex h-full w-full items-center justify-center">
-          <WhiteboardCanvas
-            ref={canvasRef}
-            width={800}
-            height={600}
-            activeTool={activeTool}
-            currentUserId={currentUserId?.toString()}
-            onObjectAdded={handleObjectAdded}
-            onObjectModified={handleObjectModified}
-            onObjectRemoved={handleObjectRemoved}
-            onReady={handleCanvasReady}
-          />
+          <div className={cn(!connected && 'pointer-events-none opacity-60')}>
+            <WhiteboardCanvas
+              ref={canvasRef}
+              width={800}
+              height={600}
+              activeTool={activeTool}
+              currentUserId={currentUserId?.toString()}
+              onObjectAdded={handleObjectAdded}
+              onObjectModified={handleObjectModified}
+              onObjectRemoved={handleObjectRemoved}
+              onReady={handleCanvasReady}
+            />
+          </div>
         </div>
       </div>
     </div>

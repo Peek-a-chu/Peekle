@@ -29,6 +29,8 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
   const connectKeyRef = React.useRef<string>('');
   const generationRef = React.useRef(0);
   const shutdownRef = React.useRef<Promise<void> | null>(null);
+  const reconnectAttemptRef = React.useRef(0);
+  const reconnectTimerRef = React.useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,7 +106,11 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
             console.log('[STOMP]', str);
           }
         },
-        reconnectDelay: 5000,
+        // IMPORTANT:
+        // Disable built-in reconnect. When the server closes early (or during rapid toggles),
+        // stompjs can spin up endless SockJS sessions via reconnectDelay.
+        // We'll do our own capped/backoff reconnect below.
+        reconnectDelay: 0,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
       });
@@ -116,6 +122,7 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
           return;
         }
         console.log('[STOMP] Connected');
+        reconnectAttemptRef.current = 0;
         setConnected(true);
       };
 
@@ -127,6 +134,30 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
       stompClient.onWebSocketClose = () => {
         console.log('[STOMP] Connection closed');
         setConnected(false);
+
+        // Clear current client so `run()` will actually reconnect.
+        if (clientRef.current === stompClient) {
+          clientRef.current = null;
+          connectKeyRef.current = '';
+          setClient(null);
+        }
+
+        // Capped reconnect with backoff
+        if (cancelled) return;
+        const maxAttempts = 8;
+        if (reconnectAttemptRef.current >= maxAttempts) {
+          console.warn('[STOMP] Reconnect attempts exceeded. Stop reconnecting.');
+          return;
+        }
+        reconnectAttemptRef.current += 1;
+        const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptRef.current - 1));
+        if (reconnectTimerRef.current) {
+          window.clearTimeout(reconnectTimerRef.current);
+        }
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null;
+          if (!cancelled) void run();
+        }, delay);
       };
 
       // Before activating, ensure we're still the latest run
@@ -147,6 +178,11 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
       cancelled = true;
       console.log('[STOMP] Disconnecting...');
       generationRef.current += 1;
+
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       const current = clientRef.current;
       clientRef.current = null;
       connectKeyRef.current = '';

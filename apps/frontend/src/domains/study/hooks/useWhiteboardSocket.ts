@@ -44,6 +44,7 @@ export function useWhiteboardSocket(
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageQueueRef = useRef<any[]>([]);
+  const lastRevisionRef = useRef<number | null>(null);
 
   // [New] Flush queue when connected
   useEffect(() => {
@@ -99,6 +100,61 @@ export function useWhiteboardSocket(
         const body = JSON.parse(message.body) as WhiteboardMessage;
         console.log(`[useWhiteboardSocket] Received:`, body.action, body.objectId || '');
 
+        // Revision-based consistency:
+        // If we detect a gap in revision numbers, request SYNC to converge state.
+        // (Avoid doing this for SYNC itself.)
+        const incomingRev =
+          typeof body.revision === 'number'
+            ? body.revision
+            : body.action === 'SYNC' && body.data?.revision
+              ? Number(body.data.revision)
+              : null;
+
+        if (incomingRev !== null && !Number.isNaN(incomingRev)) {
+          const prev = lastRevisionRef.current;
+          if (body.action !== 'SYNC' && prev !== null && incomingRev > prev + 1) {
+            // Missed some events -> ask for SYNC (private topic)
+            console.warn('[useWhiteboardSocket] Revision gap detected, requesting SYNC', {
+              prev,
+              incomingRev,
+            });
+            client.publish({
+              destination: '/pub/studies/whiteboard/message',
+              headers: { studyId: studyId || roomId },
+              body: JSON.stringify({ action: 'SYNC' }),
+            });
+          }
+          lastRevisionRef.current = incomingRev;
+        }
+
+        // Lightweight convergence trigger:
+        // If we receive SYNC_NEEDED and we're behind, request SYNC even if we didn't see the missed event.
+        if (body.action === 'SYNC_NEEDED') {
+          const prev = lastRevisionRef.current;
+          if (incomingRev !== null && !Number.isNaN(incomingRev)) {
+            if (prev === null || incomingRev > prev) {
+              console.warn('[useWhiteboardSocket] SYNC_NEEDED received, requesting SYNC', {
+                prev,
+                incomingRev,
+              });
+              client.publish({
+                destination: '/pub/studies/whiteboard/message',
+                headers: { studyId: studyId || roomId },
+                body: JSON.stringify({ action: 'SYNC' }),
+              });
+            }
+          } else {
+            // No revision info -> safest is to request SYNC once
+            console.warn('[useWhiteboardSocket] SYNC_NEEDED received without revision, requesting SYNC');
+            client.publish({
+              destination: '/pub/studies/whiteboard/message',
+              headers: { studyId: studyId || roomId },
+              body: JSON.stringify({ action: 'SYNC' }),
+            });
+          }
+          return; // don't forward to canvas
+        }
+
         // Global Toast Logic
         if (body.action === 'START') {
           toast.info(`${body.senderName || '참여자'}님이 화이트보드를 활성화했습니다!`, {
@@ -147,7 +203,9 @@ export function useWhiteboardSocket(
     }
     
     syncTimeoutRef.current = setTimeout(() => {
-      if (client && connected) {
+      // Only request SYNC once the private user topic subscription exists.
+      // SYNC responses are sent to /topic/.../whiteboard/{userId}.
+      if (client && connected && userTopic) {
         console.log(`[useWhiteboardSocket] Requesting SYNC for room ${roomId} after subscription`);
         client.publish({
           destination: '/pub/studies/whiteboard/message',
@@ -204,7 +262,7 @@ export function useWhiteboardSocket(
 
   // Request sync explicitly (useful after reconnection or manual refresh)
   const requestSync = useCallback(() => {
-    if (client && connected && roomId) {
+    if (client && connected && roomId && userId) {
       console.log(`[useWhiteboardSocket] Manual SYNC request for room ${roomId}`);
       client.publish({
         destination: '/pub/studies/whiteboard/message',
@@ -216,6 +274,7 @@ export function useWhiteboardSocket(
         hasClient: !!client,
         isConnected: connected,
         hasRoomId: !!roomId,
+        hasUserId: !!userId,
       });
     }
   }, [client, connected, roomId, studyId]);

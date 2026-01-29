@@ -50,6 +50,8 @@ export async function apiFetch<T>(
     headers,
   });
 
+  const contentType = response.headers.get('content-type') || '';
+
   if (response.status === 401) {
     // Access token 만료 -> refresh 시도
     const refreshResponse = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
@@ -70,13 +72,31 @@ export async function apiFetch<T>(
       return retryResponse.json() as Promise<ApiResponse<T>>;
     } else {
       // Refresh도 실패 -> 로그인 페이지로
-      window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
       return {
         success: false,
         data: null,
         error: { code: 'UNAUTHORIZED', message: 'Session expired' },
       };
     }
+  }
+
+  // Some backends/security setups may redirect to an HTML login page (200 + text/html),
+  // which would explode with "Unexpected token '<'" when calling response.json().
+  // Detect and surface a clearer error to help debugging.
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    const snippet = text.slice(0, 200).replace(/\s+/g, ' ');
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: 'INVALID_RESPONSE',
+        message: `Expected JSON but got '${contentType || 'unknown'}' (status ${response.status}) from ${url}. Snippet: ${snippet}`,
+      },
+    };
   }
 
   return response.json() as Promise<ApiResponse<T>>;
