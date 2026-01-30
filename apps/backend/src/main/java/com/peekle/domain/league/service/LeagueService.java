@@ -390,4 +390,171 @@ public class LeagueService {
 
         return progressList;
     }
+
+    /**
+     * 현재 시즌 종료 처리
+     * - 각 리그 그룹의 최종 순위 산정
+     * - LeagueHistory에 기록 저장
+     * - 3명 이하 그룹은 스킵 (경쟁 무의미)
+     */
+    public void closeSeason() {
+        int currentSeasonWeek = calculateCurrentSeasonWeek();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+        // 현재 시즌의 모든 그룹 조회
+        List<com.peekle.domain.league.entity.LeagueGroup> groups = leagueGroupRepository
+                .findBySeasonWeek(currentSeasonWeek);
+
+        for (com.peekle.domain.league.entity.LeagueGroup group : groups) {
+            // 그룹 내 모든 유저를 점수 기준으로 정렬
+            List<User> users = userRepository.findByLeagueGroupIdOrderByLeaguePointDesc(group.getId());
+            int groupSize = users.size();
+
+            // 3명 이하 그룹은 스킵 (다음 주 재배정 대기)
+            if (groupSize <= 3) {
+                // 유저들의 그룹만 해제, 티어와 포인트는 유지
+                for (User user : users) {
+                    user.resetForNewSeason(); // leaguePoint=0, leagueGroupId=null
+                }
+                userRepository.saveAll(users);
+                continue; // 히스토리 기록 없이 다음 그룹으로
+            }
+
+            // 4명 이상 그룹: 정상 처리
+            for (int i = 0; i < users.size(); i++) {
+                User user = users.get(i);
+                int rank = i + 1;
+
+                // 승급/강등/유지 판정
+                String result = determineSeasonResult(rank, users.size(), user.getLeague());
+
+                // 히스토리 저장
+                com.peekle.domain.league.entity.LeagueHistory history = com.peekle.domain.league.entity.LeagueHistory
+                        .builder()
+                        .user(user)
+                        .league(user.getLeague())
+                        .finalPoint(user.getLeaguePoint())
+                        .result(result)
+                        .seasonWeek(currentSeasonWeek)
+                        .closedAt(now)
+                        .build();
+
+                leagueHistoryRepository.save(history);
+            }
+        }
+    }
+
+    /**
+     * 신규 시즌 시작
+     * - 모든 유저의 티어 조정 (승급/강등 적용)
+     * - 리그 포인트 초기화
+     * - 새로운 그룹 생성 및 재배정 (4명 이상만)
+     */
+    public void startNewSeason() {
+        int previousSeasonWeek = calculateCurrentSeasonWeek();
+        int newSeasonWeek = previousSeasonWeek + 1; // 다음 주차
+
+        // 1. 모든 유저의 지난 시즌 결과 조회 및 티어 조정
+        List<com.peekle.domain.league.entity.LeagueHistory> histories = leagueHistoryRepository
+                .findBySeasonWeek(previousSeasonWeek);
+
+        for (com.peekle.domain.league.entity.LeagueHistory history : histories) {
+            User user = history.getUser();
+
+            // 승급/강등 적용
+            if ("PROMOTED".equals(history.getResult())) {
+                user.promoteLeague();
+            } else if ("DEMOTED".equals(history.getResult())) {
+                user.demoteLeague();
+            }
+
+            // 리그 포인트 초기화 및 그룹 해제
+            user.resetForNewSeason();
+            userRepository.save(user);
+        }
+
+        // 2. 티어별로 유저를 그룹화하여 새 그룹 생성
+        for (LeagueTier tier : LeagueTier.values()) {
+            // 해당 티어의 모든 유저 조회 (그룹 없는 유저만)
+            List<User> tierUsers = userRepository.findByLeagueAndLeagueGroupIdIsNull(tier);
+
+            // 4명 미만이면 그룹 생성 안 함 (다음 주 대기)
+            if (tierUsers.size() < 4) {
+                continue;
+            }
+
+            // 10명씩 묶어서 그룹 생성, 마지막 그룹은 4-10명
+            for (int i = 0; i < tierUsers.size(); i += 10) {
+                int endIndex = Math.min(i + 10, tierUsers.size());
+                List<User> groupUsers = tierUsers.subList(i, endIndex);
+
+                // 마지막 조각이 4명 미만이면 이전 그룹에 합침
+                if (groupUsers.size() < 4 && i > 0) {
+                    // 이전 그룹의 ID를 가져와서 추가
+                    Long lastGroupId = tierUsers.get(i - 1).getLeagueGroupId();
+                    for (User user : groupUsers) {
+                        user.assignToLeagueGroup(lastGroupId);
+                        userRepository.save(user);
+                    }
+                } else if (groupUsers.size() >= 4) {
+                    // 새 그룹 생성
+                    com.peekle.domain.league.entity.LeagueGroup newGroup = createNewGroup(tier, newSeasonWeek);
+
+                    // 유저들을 새 그룹에 배정
+                    for (User user : groupUsers) {
+                        user.assignToLeagueGroup(newGroup.getId());
+                        userRepository.save(user);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 시즌 종료 시 승급/강등/유지 판정
+     * - 3명 이하: MAINTAINED (closeSeason에서 이미 필터링됨)
+     * - 4-6명: 상위 1명 승급, 하위 1명 강등
+     * - 7-9명: 상위 2명 승급, 하위 2명 강등
+     * - 10명 이상: 30% 승급/강등
+     */
+    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier) {
+        // 안전 장치: 3명 이하는 변동 없음
+        if (totalUsers <= 3) {
+            return "MAINTAINED";
+        }
+
+        int promoteCount;
+        int demoteCount;
+
+        if (totalUsers <= 6) {
+            // 4-6명: 1명씩
+            promoteCount = 1;
+            demoteCount = 1;
+        } else if (totalUsers <= 9) {
+            // 7-9명: 2명씩
+            promoteCount = 2;
+            demoteCount = 2;
+        } else {
+            // 10명 이상: 30% 규칙
+            promoteCount = (int) Math.ceil(totalUsers * (currentTier.getPromotePercent() / 100.0));
+            promoteCount = Math.min(promoteCount, totalUsers - 1);
+
+            demoteCount = (int) Math.ceil(totalUsers * (currentTier.getDemotePercent() / 100.0));
+            demoteCount = Math.min(demoteCount, totalUsers - promoteCount - 1);
+        }
+
+        // 상위 promoteCount명: 승급 (단, 최상위 티어는 제외)
+        if (rank <= promoteCount && currentTier != LeagueTier.RUBY) {
+            return "PROMOTED";
+        }
+
+        // 하위 demoteCount명: 강등 (단, 최하위 티어는 제외)
+        if (rank > (totalUsers - demoteCount) && currentTier != LeagueTier.STONE) {
+            return "DEMOTED";
+        }
+
+        // 나머지: 유지
+        return "MAINTAINED";
+    }
+
 }
