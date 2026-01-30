@@ -76,6 +76,20 @@ public class StudySocketController {
                 headerAccessor.getSessionAttributes().put("userId", userId);
 
                 // 1. Redis Presence
+                // [Access Control] Check if user is already in another study
+                String activeStudyKey = "user:" + userId + ":active_study";
+                Object currentActiveStudy = redisTemplate.opsForValue().get(activeStudyKey);
+
+                if (currentActiveStudy != null && !String.valueOf(studyId).equals(currentActiveStudy.toString())) {
+                        log.warn("User {} is already in study {}", userId, currentActiveStudy);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "이미 다른 스터디에 참여 중입니다."));
+                        return;
+                }
+
+                // Mark as Active
+                redisTemplate.opsForValue().set(activeStudyKey, String.valueOf(studyId));
                 redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
                 // 2. OpenVidu 및 초기화 (Bundled)
@@ -207,6 +221,7 @@ public class StudySocketController {
                 // 1. Redis Presence
                 String onlineKey = "study:" + request.getStudyId() + ":online_users";
                 redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+                redisTemplate.delete("user:" + userId + ":active_study");
 
                 // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
                 Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
@@ -226,6 +241,9 @@ public class StudySocketController {
                                                 .content("님이 퇴장하셨습니다.")
                                                 .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
+
+                // 4. OpenVidu Force Disconnect
+                mediaService.evictUser(request.getStudyId(), userId);
         }
 
         // 스터디 영구 탈퇴 (Quit)
@@ -249,6 +267,7 @@ public class StudySocketController {
                 // 2. Redis Presence
                 String onlineKey = "study:" + request.getStudyId() + ":online_users";
                 redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+                redisTemplate.delete("user:" + userId + ":active_study");
 
                 // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
                 Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
@@ -267,6 +286,9 @@ public class StudySocketController {
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("QUIT", userId));
+
+                // 5. OpenVidu Force Disconnect
+                mediaService.evictUser(request.getStudyId(), userId);
         }
 
         // 강퇴 알림
@@ -287,10 +309,14 @@ public class StudySocketController {
 
                 redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
                                 request.getTargetUserId().toString());
+                redisTemplate.delete("user:" + request.getTargetUserId() + ":active_study");
 
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("KICK", request.getTargetUserId()));
+
+                // OpenVidu Force Disconnect (Kick target)
+                mediaService.evictUser(request.getStudyId(), request.getTargetUserId());
         }
 
         // 스터디 삭제 (방 폭파)
