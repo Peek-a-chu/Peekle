@@ -41,6 +41,7 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
     container_name: peekle-frontend
     env_file:
       - ../apps/frontend/.env
