@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `is_deleted` BOOLEAN DEFAULT FALSE,
     `last_solved_date` DATE,
     `created_at` DATETIME(6) NOT NULL,
-    `modified_at` DATETIME(6) NOT NULL
+    `updated_at` DATETIME(6) NOT NULL
 );
 
 -- ========================================
