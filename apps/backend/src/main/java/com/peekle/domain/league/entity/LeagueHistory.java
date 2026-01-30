@@ -27,13 +27,13 @@ public class LeagueHistory {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private LeagueTier league;
 
     @Column(name = "final_point", nullable = false)
     private Integer finalPoint;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String result; // PROMOTED, DEMOTED, STAY
 
     @Column(name = "season_week", nullable = false)
