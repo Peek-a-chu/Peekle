@@ -2,50 +2,55 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CCVideoGrid } from '../components/CCVideoGrid';
 
-const mockViewRealtimeCode = vi.fn();
-const mockResetToOnlyMine = vi.fn();
+// Use vi.hoisted() to define variables that can be accessed in vi.mock factory
+const { mockViewRealtimeCode, mockResetToOnlyMine, mockState } = vi.hoisted(() => {
+  const mockViewRealtimeCode = vi.fn();
+  const mockResetToOnlyMine = vi.fn();
+  const mockState: any = {
+    participants: [
+      {
+        id: 1,
+        odUid: '1',
+        nickname: 'Me',
+        isOwner: false,
+        isMuted: false,
+        isVideoOff: true,
+        isOnline: true,
+      },
+      {
+        id: 2,
+        odUid: '2',
+        nickname: 'Other',
+        isOwner: false,
+        isMuted: false,
+        isVideoOff: true,
+        isOnline: true,
+      },
+    ],
+    currentUserId: 1,
+    selectedProblemId: null as number | null,
+    isWhiteboardActive: false,
+    viewRealtimeCode: mockViewRealtimeCode,
+    resetToOnlyMine: mockResetToOnlyMine,
+    viewingUser: null,
+  };
+  return { mockViewRealtimeCode, mockResetToOnlyMine, mockState };
+});
 
-const mockState: any = {
-  participants: [
-    {
-      id: 1,
-      odUid: '1',
-      nickname: 'Me',
-      isOwner: false,
-      isMuted: false,
-      isVideoOff: true,
-      isOnline: true,
-    },
-    {
-      id: 2,
-      odUid: '2',
-      nickname: 'Other',
-      isOwner: false,
-      isMuted: false,
-      isVideoOff: true,
-      isOnline: true,
-    },
-  ],
-  currentUserId: 1,
-  selectedProblemId: null as number | null, // important: should still allow split selection
-  isWhiteboardActive: false,
-  viewRealtimeCode: mockViewRealtimeCode,
-  resetToOnlyMine: mockResetToOnlyMine,
-  viewingUser: null,
-};
+vi.mock('../hooks/useRoomStore', () => {
+  const mockUseRoomStore = (selector: any) => {
+    if (typeof selector === 'function') {
+      return selector(mockState);
+    }
+    return mockState;
+  };
 
-const mockUseRoomStore = (selector: any) => {
-  if (typeof selector === 'function') {
-    return selector(mockState);
-  }
-  return mockState;
-};
+  mockUseRoomStore.getState = () => mockState;
 
-mockUseRoomStore.getState = () => mockState;
-
-vi.mock('../hooks/useRoomStore', () => ({
-  useRoomStore: mockUseRoomStore,
-}));
+  return {
+    useRoomStore: mockUseRoomStore,
+  };
+});
 
 describe('CCVideoGrid', () => {
   it('allows selecting another participant when problem is selected (enters split view)', () => {
