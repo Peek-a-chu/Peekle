@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @SpringBootTest
 @ActiveProfiles("test") // h2 or test profile
-@org.springframework.context.annotation.Import(com.peekle.TestConfig.class)
 public class LeagueServiceConcurrencyTest {
 
     @Autowired
