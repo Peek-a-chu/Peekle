@@ -25,6 +25,12 @@ public class ProblemController {
         return ResponseEntity.ok("🚀 Problem sync started from Page " + startPage);
     }
 
+    /**
+     * keyword로 문제 검색 (title 또는 externalId로 검색)
+     * GET /api/problems/search?keyword=1000&limit=10
+     * 또는
+     * GET /api/problems/search?keyword=A+B&limit=10
+     */
     @GetMapping("/search")
     public ResponseEntity<List<ProblemSearchResponse>> searchProblems(
             @RequestParam String keyword,
@@ -44,21 +50,6 @@ public class ProblemController {
             @RequestParam(defaultValue = "BOJ") String source
     ) {
         Map<String, Long> response = problemService.getProblemIdByExternalId(externalId, source);
-        return ApiResponse.success(response);
-    }
-
-    /**
-     * title 또는 externalId로 문제 검색
-     * GET /api/problems/search?query=1000&source=BOJ
-     * 또는
-     * GET /api/problems/search?query=A+B&source=BOJ
-     */
-    @GetMapping("/search")
-    public ApiResponse<List<Map<String, Object>>> searchProblems(
-            @RequestParam String query,
-            @RequestParam(defaultValue = "BOJ") String source
-    ) {
-        List<Map<String, Object>> response = problemService.searchProblems(query, source);
         return ApiResponse.success(response);
     }
 }
