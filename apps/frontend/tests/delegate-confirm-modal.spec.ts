@@ -71,16 +71,28 @@ test.describe('Delegate Confirm Modal', () => {
     // Wait for page to load and API calls to complete
     await page.waitForLoadState('networkidle');
 
-    // 3. Click on "참여자" tab to show participants panel
+    // 3. Check if right panel is folded and unfold it if needed
+    // Look for the "채팅/참여자 펼치기" button (unfold button) or the right panel itself
+    const unfoldButton = page.getByTitle('채팅/참여자 펼치기');
+    const isUnfoldButtonVisible = await unfoldButton.isVisible().catch(() => false);
+    
+    if (isUnfoldButtonVisible) {
+      await unfoldButton.click();
+      // Wait a bit for panel animation
+      await page.waitForTimeout(300);
+    }
+
+    // 4. Click on "참여자" tab to show participants panel
+    // The button text includes count like "참여자 (2/2)", so use partial match
     const participantsTab = page.getByRole('button', { name: /참여자/ });
     await expect(participantsTab).toBeVisible({ timeout: 10000 });
     await participantsTab.click();
 
-    // 4. Wait for TargetUser card to appear in participants panel
+    // 5. Wait for TargetUser card to appear in participants panel
     const targetUserText = page.getByText('TargetUser');
     await expect(targetUserText).toBeVisible({ timeout: 10000 });
 
-    // 5. Click Menu (MoreVertical) button - find it in the same card as TargetUser
+    // 6. Click Menu (MoreVertical) button - find it in the same card as TargetUser
     await targetUserText.evaluate((el) => {
       // Find the card container (has 'group' class or 'rounded-xl')
       let card = el.closest('[class*="group"]') || el.closest('div[class*="rounded-xl"]');
@@ -106,18 +118,18 @@ test.describe('Delegate Confirm Modal', () => {
       throw new Error('Could not find menu button in TargetUser card');
     });
 
-    // 6. Click "방장 넘기기"
+    // 7. Click "방장 넘기기"
     const delegateButton = page.getByRole('button', { name: '방장 넘기기' });
     await expect(delegateButton).toBeVisible();
     await delegateButton.click();
 
-    // 7. Assert Modal Content
+    // 8. Assert Modal Content
     const modal = page.locator('div[role="dialog"]');
     await expect(modal).toBeVisible();
     await expect(modal).toContainText('방장 위임');
     await expect(modal).toContainText('TargetUser님에게 방장을 위임하시겠습니까?');
 
-    // 8. Verify Buttons
+    // 9. Verify Buttons
     await expect(page.getByRole('button', { name: '취소' })).toBeVisible();
     await expect(page.getByRole('button', { name: '위임하기' })).toBeVisible();
   });
