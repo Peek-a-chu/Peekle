@@ -94,7 +94,8 @@ public class StudySocketController {
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
                 } catch (Exception e) {
-                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId, e.getMessage(), e);
+                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId,
+                                        e.getMessage(), e);
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("ERROR", "Init Error: " + e.getMessage()));
@@ -111,7 +112,7 @@ public class StudySocketController {
 
                         // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
-                                                .getDailyProblems(userId, studyId, java.time.LocalDate.now());
+                                        .getDailyProblems(userId, studyId, java.time.LocalDate.now());
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/curriculum/" + userId,
                                         SocketResponse.of("CURRICULUM", curriculum));
@@ -188,7 +189,15 @@ public class StudySocketController {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
                 // 1. Redis Presence
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+                String onlineKey = "study:" + request.getStudyId() + ":online_users";
+                redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+
+                // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+                Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
+                if (remainingUsers != null && remainingUsers == 0) {
+                        log.info("Study Room {} is empty. Scheduling whiteboard cleanup...", request.getStudyId());
+                        whiteboardService.scheduleCleanup(request.getStudyId());
+                }
 
                 // 2. Pub/Sub (LEAVE)
                 redisPublisher.publish(
@@ -222,7 +231,16 @@ public class StudySocketController {
                 studyRoomService.leaveStudyRoom(userId, request.getStudyId());
 
                 // 2. Redis Presence
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+                String onlineKey = "study:" + request.getStudyId() + ":online_users";
+                redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+
+                // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+                Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
+                if (remainingUsers != null && remainingUsers == 0) {
+                        log.info("Study Room {} is empty (Quit). Scheduling whiteboard cleanup...",
+                                        request.getStudyId());
+                        whiteboardService.scheduleCleanup(request.getStudyId());
+                }
 
                 // 3. 세션 정리
                 if (headerAccessor.getSessionAttributes() != null) {
