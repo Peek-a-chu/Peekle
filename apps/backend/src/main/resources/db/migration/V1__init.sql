@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS `tags` (
     `name` VARCHAR(255) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS `problem_tags` (
+    `problem_id` BIGINT NOT NULL,
+    `tag_id` BIGINT NOT NULL,
+    PRIMARY KEY (`problem_id`, `tag_id`),
+    CONSTRAINT `fk_problem_tags_problem` FOREIGN KEY (`problem_id`) REFERENCES `problems` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_problem_tags_tag` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE
+);
+
 -- ========================================
 -- 4. Submission Logs Table
 -- ========================================
@@ -166,6 +174,8 @@ CREATE TABLE IF NOT EXISTS `study_chat_logs` (
     CONSTRAINT `fk_chat_log_parent` FOREIGN KEY (`parent_id`) REFERENCES `study_chat_logs` (`id`)
 );
 
+
+
 -- ========================================
 -- Indexes for Performance
 -- ========================================
@@ -181,3 +191,4 @@ CREATE INDEX `idx_study_member_room` ON `study_members` (`study_room_id`);
 CREATE INDEX `idx_study_member_user` ON `study_members` (`user_id`);
 CREATE INDEX `idx_study_problem_room` ON `study_problems` (`study_room_id`);
 CREATE INDEX `idx_chat_log_room` ON `study_chat_logs` (`study_room_id`);
+CREATE INDEX `idx_problem_tags_tag_id` ON `problem_tags` (`tag_id`);
