@@ -25,9 +25,11 @@ export interface SubmissionSuccessUser {
 
 export interface DailyProblem {
   problemId: number;
+  externalId?: string; // BOJ problem number (e.g. "1000")
   title: string;
   tier: string;
   solvedMemberCount: number;
+  totalMemberCount: number;
 }
 
 export interface StudyMember {
