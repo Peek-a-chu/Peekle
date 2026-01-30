@@ -102,7 +102,7 @@ export async function apiFetch<T>(
           success: retryResponse.ok,
           data: null as any,
           error: retryResponse.ok
-            ? null
+            ? undefined
             : { code: 'EMPTY_RESPONSE', message: 'Empty response body' },
         } as ApiResponse<T>;
       }
@@ -114,7 +114,7 @@ export async function apiFetch<T>(
           return json as ApiResponse<T>;
         }
         // If it's raw data
-        return { success: true, data: json, error: null } as ApiResponse<T>;
+        return { success: true, data: json, error: undefined } as ApiResponse<T>;
       } catch (e: any) {
         return {
           success: false,

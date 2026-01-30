@@ -89,7 +89,7 @@ const DeviceSection = () => {
         analyserRef.current = audioContext.createAnalyser();
         analyserRef.current.fftSize = 256;
         analyserRef.current.smoothingTimeConstant = 0.8;
-        dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+        dataArrayRef.current = new Uint8Array(new ArrayBuffer(analyserRef.current.frequencyBinCount));
       }
 
       const analyser = analyserRef.current;
@@ -102,7 +102,8 @@ const DeviceSection = () => {
       const updateLevel = () => {
         if (!analyser || !dataArray) return;
         
-        analyser.getByteFrequencyData(dataArray);
+        // TypeScript 타입 호환성을 위해 타입 단언 사용
+        analyser.getByteFrequencyData(dataArray as any);
         
         // 평균 레벨 계산
         let sum = 0;

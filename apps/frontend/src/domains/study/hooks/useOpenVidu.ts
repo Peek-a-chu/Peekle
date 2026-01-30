@@ -90,7 +90,8 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     let OV: OpenVidu;
     try {
-      OV = new OpenVidu(openViduUrl);
+      // OpenVidu 2.32+ 버전에서는 생성자가 인자를 받지 않음
+      OV = new OpenVidu();
       OVRef.current = OV;
       console.log('[OpenVidu] OpenVidu client initialized successfully with URL:', openViduUrl);
     } catch (error) {
@@ -99,6 +100,7 @@ export function useOpenVidu(): UseOpenViduReturn {
       return;
     }
 
+    // initSession()은 인자를 받지 않음 (OpenVidu 2.32+)
     const session = OV.initSession();
     sessionRef.current = session;
 
