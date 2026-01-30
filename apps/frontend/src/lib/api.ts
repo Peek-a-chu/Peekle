@@ -1,7 +1,7 @@
 import { ApiResponse } from '@/types/apiUtils';
 
 let BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080';
+  process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환
 if (
@@ -60,6 +60,21 @@ export async function apiFetch<T>(
     });
 
     if (refreshResponse.ok) {
+      // 1. Refresh 성공 시, 새로운 AccessToken 추출 및 저장
+      try {
+        const refreshJson = await refreshResponse.json();
+        if (
+          refreshJson &&
+          refreshJson.success &&
+          refreshJson.data &&
+          refreshJson.data.accessToken
+        ) {
+          setAuthToken(refreshJson.data.accessToken);
+        }
+      } catch (e) {
+        console.error('Failed to parse refresh response', e);
+      }
+
       // 재시도
       const retryResponse = await fetch(url, {
         ...fetchOptions,
@@ -67,9 +82,40 @@ export async function apiFetch<T>(
         headers: {
           'Content-Type': 'application/json',
           ...(fetchOptions.headers as any),
+          Authorization: authToken ? `Bearer ${authToken}` : '',
         },
       });
-      return retryResponse.json() as Promise<ApiResponse<T>>;
+
+      const retryText = await retryResponse.text();
+      if (!retryText) {
+        // Body is empty (e.g. 204 No Content), return generic success if status is OK
+        return {
+          success: retryResponse.ok,
+          data: null as any,
+          error: retryResponse.ok
+            ? null
+            : { code: 'EMPTY_RESPONSE', message: 'Empty response body' },
+        } as ApiResponse<T>;
+      }
+
+      try {
+        const json = JSON.parse(retryText);
+        // If it's the expected structure
+        if (json && typeof json === 'object' && 'success' in json) {
+          return json as ApiResponse<T>;
+        }
+        // If it's raw data
+        return { success: true, data: json, error: null } as ApiResponse<T>;
+      } catch (e: any) {
+        return {
+          success: false,
+          data: null,
+          error: {
+            code: 'INVALID_JSON',
+            message: `Failed to parse retry response: ${e.message}. Status: ${retryResponse.status}`,
+          },
+        };
+      }
     } else {
       // Refresh도 실패 -> 로그인 페이지로
       if (typeof window !== 'undefined') {

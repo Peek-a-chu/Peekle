@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { cn, getBojTierName, getBojTierColorClass } from '@/lib/utils';
-import { ExternalLink, Users, Lightbulb, CheckCircle2, Trash2 } from 'lucide-react';
+import { ExternalLink, Users, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { DailyProblem as Problem } from '@/domains/study/types';
 import { Button } from '@/components/ui/button';
 import { Box } from 'lucide-react';
@@ -47,24 +47,6 @@ export function CCProblemCard({
         className,
       )}
     >
-      {/* Remove Button (Absolute Top-Left or Top-Right next to Hint) */}
-      {onRemove && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-3 right-8 h-5 w-5 hover:bg-red-100 hover:text-red-500 text-muted-foreground z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (confirm('정말로 이 문제를 목록에서 삭제하시겠습니까?')) {
-              onRemove();
-            }
-          }}
-          aria-label="remove problem"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      )}
-
       <Button
         variant="ghost"
         size="icon"

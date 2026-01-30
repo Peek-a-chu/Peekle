@@ -17,6 +17,7 @@ export interface Participant {
 
 export interface TargetSubmission {
   id: number;
+  problemId?: number;
   problemTitle: string;
   username: string;
   language: string;
@@ -66,6 +67,7 @@ export interface RoomState {
     language: string;
     ownerName?: string;
     problemTitle?: string;
+    problemId?: number; // Add problemId
     isRealtime?: boolean;
   } | null;
   replyingTo: {
@@ -93,6 +95,7 @@ export interface RoomActions {
     language: string;
     ownerName: string;
     problemTitle?: string;
+    problemId?: number; // Add problemId
     isRealtime?: boolean;
   }) => void;
   resetToOnlyMine: () => void;
@@ -129,6 +132,7 @@ export interface RoomActions {
       language: string;
       ownerName?: string;
       problemTitle?: string;
+      problemId?: number; // Add problemId
       isRealtime?: boolean;
     } | null,
   ) => void;

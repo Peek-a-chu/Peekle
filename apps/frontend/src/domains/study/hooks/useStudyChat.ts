@@ -123,6 +123,7 @@ export function useStudyChat(roomId: number) {
       ownerName?: string,
       problemTitle?: string,
       isRealtime?: boolean,
+      problemId?: number,
     ): void => {
       if (!socket || !currentUserId) return;
 
@@ -137,7 +138,7 @@ export function useStudyChat(roomId: number) {
           isRefChat: true,
           isRealtime: !!isRealtime,
           targetUserId: isRealtime ? currentUserId : undefined,
-          problemId: selectedProblemId ?? undefined,
+          problemId: problemId,
           code, // Always include code so we can show snapshot or fallback view
           language,
           problemTitle,

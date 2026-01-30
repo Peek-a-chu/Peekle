@@ -26,7 +26,7 @@ export function CCSubmissionViewerModal({
 
   if (!isOpen) return null;
 
-  const filteredSubmissions = submissions.filter((sub) => {
+  const filteredSubmissions = (submissions || []).filter((sub) => {
     // Check if nickname exists before filtering
     const nameToCheck = sub.nickname || '';
     return nameToCheck.toLowerCase().includes(searchTerm.toLowerCase());

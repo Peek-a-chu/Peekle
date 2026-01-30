@@ -74,9 +74,8 @@ export function CCProblemListPanel({
 
     setTargetSubmission({
       id: submission.submissionId!,
-      problemTitle: currentProblem
-        ? `${currentProblem.problemId}. ${currentProblem.title}`
-        : 'Unknown Problem',
+      problemId: currentProblem?.problemId,
+      problemTitle: currentProblem ? currentProblem.title : 'Unknown Problem',
       username: submission.nickname || 'Unknown',
       language: submission.language || 'plaintext',
       memory: submission.memory || 0,
@@ -159,17 +158,17 @@ export function CCProblemListPanel({
                   ? `problem-${problem.problemId}`
                   : `problem-${problem.title || 'unknown'}-${idx}`;
               return (
-              <li key={key}>
-                <CCProblemCard
-                  problem={problem}
-                  isSelected={selectedProblemId === problem.problemId}
-                  onSelect={() => onSelectProblem?.(problem)}
-                  onOpenSubmission={handleOpenSubmission}
-                  onRemove={
-                    onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
-                  }
-                />
-              </li>
+                <li key={key}>
+                  <CCProblemCard
+                    problem={problem}
+                    isSelected={selectedProblemId === problem.problemId}
+                    onSelect={() => onSelectProblem?.(problem)}
+                    onOpenSubmission={handleOpenSubmission}
+                    onRemove={
+                      onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
+                    }
+                  />
+                </li>
               );
             })}
           </ul>

@@ -16,15 +16,19 @@ import { formatDate } from '@/lib/utils';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
 import { useAuthStore } from '@/store/auth-store';
-import { useStudyEntry } from '@/domains/study/hooks/useStudyEntry';
+import {
+  useStudySocketActions,
+  useStudySocketSubscription,
+} from '@/domains/study/hooks/useStudySocket';
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
   const { user, checkAuth } = useAuthStore();
 
-  // Send ENTER message on socket connect
-  useStudyEntry(studyId);
+  // Listen for participant events and Handle Enter/Leave
+  useStudySocketSubscription(studyId);
+  const { updateStatus } = useStudySocketActions();
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   // Ensure we set roomId immediately to store if possible
@@ -79,6 +83,15 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   // Global state for selected problem
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
+  const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
+
+  useEffect(() => {
+    // Reset selected problem and view mode when mounting study room
+    console.log('[StudyRoomClient] Mounting/Effect trigger');
+    // DISABLED AUTO-RESET: Suspected cause of "No Problem Selected" bug
+    // setSelectedProblem(null, null);
+    resetToOnlyMine();
+  }, [setSelectedProblem, resetToOnlyMine]);
 
   // API Hooks
   const { problems, addProblem, deleteProblem } = useProblems(studyId);
@@ -111,7 +124,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       .then((participants) =>
         setParticipants(
           participants.map((p) => ({
-            id: p.userId,
+            id: Number(p.userId),
             odUid: '', // Not available from static list
             nickname: p.nickname,
             isOwner: p.isOwner ?? false,
@@ -151,6 +164,35 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     console.log('Settings clicked');
   };
 
+  const handleMicToggle = (): void => {
+    // Determine new state based on simple toggle
+    // However, ControlBar is stateless now and relies on Store.
+    // So we invoke updateStatus with inverted current state
+    const { currentUserId, participants, updateParticipant } = useRoomStore.getState();
+    const me = participants.find((p) => p.id === currentUserId);
+    if (!me || !currentUserId) return;
+
+    // Optimistic Update
+    const newMuted = !me.isMuted;
+    updateParticipant(currentUserId, { isMuted: newMuted });
+
+    // Toggle Mute
+    updateStatus(newMuted, me.isVideoOff);
+  };
+
+  const handleVideoToggle = (): void => {
+    const { currentUserId, participants, updateParticipant } = useRoomStore.getState();
+    const me = participants.find((p) => p.id === currentUserId);
+    if (!me || !currentUserId) return;
+
+    // Optimistic Update
+    const newVideoOff = !me.isVideoOff;
+    updateParticipant(currentUserId, { isVideoOff: newVideoOff });
+
+    // Toggle Video
+    updateStatus(me.isMuted, newVideoOff);
+  };
+
   // Control Bar button: Toggle whiteboard tile visibility in VideoGrid
   const handleWhiteboardToggle = (): void => {
     if (isWhiteboardActive) {
@@ -171,7 +213,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   };
 
   const handleSelectProblem = (problem: Problem): void => {
-    setSelectedProblem(problem.problemId, problem.title);
+    console.log('[StudyRoomClient] Selecting problem:', problem);
+    // Ensure ID is a valid number
+    const pId = Number(problem.problemId);
+    if (!pId) {
+      console.warn('[StudyRoomClient] Invalid problem ID:', problem.problemId);
+      return;
+    }
+    setSelectedProblem(pId, problem.title);
   };
 
   const handleDateChange = (date: Date): void => {
@@ -218,7 +267,10 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         centerPanel={
           <CenterPanel
             onWhiteboardClick={handleWhiteboardClick}
+            onMicToggle={handleMicToggle}
+            onVideoToggle={handleVideoToggle}
             onWhiteboardToggle={handleWhiteboardToggle}
+            onSettingsClick={handleSettings}
           />
         }
         rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
