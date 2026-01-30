@@ -7,12 +7,27 @@ import { toast } from 'sonner';
 
 // OpenVidu 서버 URL 가져오기
 function getOpenViduUrl(): string {
-  // docker-compose.dev.yml에서 OPENVIDU_PUBLICURL=https://localhost/openvidu로 설정됨
-  // 환경 변수로 설정 가능하도록 함
+  // 환경 변수로 직접 OpenVidu URL 설정 가능
+  if (process.env.NEXT_PUBLIC_OPENVIDU_URL) {
+    const url = process.env.NEXT_PUBLIC_OPENVIDU_URL;
+    console.log('[OpenVidu] Server URL from NEXT_PUBLIC_OPENVIDU_URL:', url);
+    return url;
+  }
+  
+  // 로컬 실행 시 직접 포트로 접근 (nginx 프록시 없이)
+  // Docker 실행 시에는 nginx 프록시를 통해 접근
   const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://localhost';
-  // OpenVidu는 /openvidu 경로로 접근 (nginx 프록시를 통해)
+  
+  // localhost인 경우 직접 포트로 접근 (로컬 실행)
+  if (socketUrl.includes('localhost') || socketUrl.includes('127.0.0.1')) {
+    const openViduUrl = 'https://localhost:8443';
+    console.log('[OpenVidu] Server URL (local):', openViduUrl);
+    return openViduUrl;
+  }
+  
+  // Docker 환경에서는 nginx 프록시를 통해 접근
   const openViduUrl = socketUrl.replace(/\/$/, '') + '/openvidu';
-  console.log('[OpenVidu] Server URL:', openViduUrl, 'from NEXT_PUBLIC_SOCKET_URL:', socketUrl);
+  console.log('[OpenVidu] Server URL (via nginx):', openViduUrl, 'from NEXT_PUBLIC_SOCKET_URL:', socketUrl);
   return openViduUrl;
 }
 
@@ -73,10 +88,9 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     let OV: OpenVidu;
     try {
-      OV = new OpenVidu();
-      // If needed: OV.setAdvancedConfiguration({ ... });
+      OV = new OpenVidu(openViduUrl);
       OVRef.current = OV;
-      console.log('[OpenVidu] OpenVidu client initialized successfully. URL not needed for constructor.');
+      console.log('[OpenVidu] OpenVidu client initialized successfully with URL:', openViduUrl);
     } catch (error) {
       console.error('[OpenVidu] Failed to initialize OpenVidu client:', error);
       toast.error('OpenVidu 클라이언트 초기화에 실패했습니다: ' + (error as Error).message);

@@ -96,9 +96,25 @@ public class StudySocketController {
                 } catch (Exception e) {
                         log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId,
                                         e.getMessage(), e);
+                        String errorMessage = e.getMessage();
+                        if (errorMessage == null || errorMessage.isEmpty()) {
+                                errorMessage = e.getClass().getSimpleName();
+                        }
+                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId, errorMessage, e);
+                        
+                        // 더 명확한 에러 메시지 제공
+                        String userFriendlyMessage = "OpenVidu 서버 연결 실패";
+                        if (errorMessage.contains("Connection") || errorMessage.contains("connect")) {
+                                userFriendlyMessage = "OpenVidu 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+                        } else if (errorMessage.contains("401") || errorMessage.contains("Unauthorized")) {
+                                userFriendlyMessage = "OpenVidu 인증 실패. SECRET 설정을 확인해주세요.";
+                        } else if (errorMessage.contains("404") || errorMessage.contains("Not Found")) {
+                                userFriendlyMessage = "OpenVidu 서버를 찾을 수 없습니다. URL 설정을 확인해주세요.";
+                        }
+                        
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
-                                        SocketResponse.of("ERROR", "Init Error: " + e.getMessage()));
+                                        SocketResponse.of("ERROR", "Init Error: " + userFriendlyMessage));
                         // OpenVidu 실패해도 다른 초기화는 계속 진행
                 }
 

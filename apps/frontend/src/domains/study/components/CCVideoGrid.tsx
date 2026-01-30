@@ -75,7 +75,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   };
 
   return (
-    <div className={cn('flex gap-2 overflow-x-auto border-b border-border bg-card p-3', className)}>
+    <div className={cn('flex gap-2 overflow-x-auto border-b border-border bg-card p-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]', className)}>
       {/* Whiteboard Tile - Always first when active */}
       {isWhiteboardActive && <WhiteboardTile onClick={onWhiteboardClick} />}
 

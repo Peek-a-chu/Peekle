@@ -26,6 +26,10 @@ spring:
   flyway:
     enabled: false # 개발용: Flyway 비활성화
 
+# OpenVidu 설정 (로컬 실행 시 localhost 사용)
+OPENVIDU_URL: ${OPENVIDU_URL:https://localhost:8443}
+OPENVIDU_SECRET: ${OPENVIDU_SECRET:MY_SECRET}
+
 springwolf:
   docket:
     # [필수 1] 스캔할 기본 패키지 경로 (내 프로젝트의 최상단 패키지)

@@ -43,9 +43,6 @@ export function CCVideoTile({
     const handleStreamDestroyed = (event: CustomEvent) => {
       const { userId } = event.detail;
       if (userId === participant.id) {
-        if (streamManagerRef.current && videoRef.current) {
-          streamManagerRef.current.removeVideoElement(videoRef.current);
-        }
         streamManagerRef.current = null;
         if (videoRef.current) {
           videoRef.current.srcObject = null;
@@ -63,9 +60,6 @@ export function CCVideoTile({
 
     const handlePublisherDestroyed = () => {
       if (isCurrentUser) {
-        if (streamManagerRef.current && videoRef.current) {
-          streamManagerRef.current.removeVideoElement(videoRef.current);
-        }
         streamManagerRef.current = null;
         if (videoRef.current) {
           videoRef.current.srcObject = null;
@@ -100,9 +94,10 @@ export function CCVideoTile({
       window.removeEventListener('openvidu-publisher-created', handlePublisherCreated as EventListener);
       window.removeEventListener('openvidu-publisher-destroyed', handlePublisherDestroyed as EventListener);
       
-      if (streamManagerRef.current && videoRef.current) {
-        streamManagerRef.current.removeVideoElement(videoRef.current);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
       }
+      streamManagerRef.current = null;
     };
   }, [participant.id, isCurrentUser]);
 
@@ -117,7 +112,7 @@ export function CCVideoTile({
         }
       }}
       className={cn(
-        'relative flex h-24 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg bg-muted transition-all hover:ring-2 hover:ring-primary/50',
+        'relative flex h-40 w-52 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg bg-muted transition-all hover:ring-2 hover:ring-primary/50 ',
         isBeingViewed && 'ring-2 ring-yellow-400',
         !participant.isOnline && 'opacity-60',
         className,

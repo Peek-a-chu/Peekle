@@ -30,7 +30,38 @@ public class MediaService {
         disableSslVerification();
 
         this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
-        log.info("Connecting to OpenVidu at {}", openViduUrl);
+        log.info("Initializing OpenVidu client at {}", openViduUrl);
+        
+        // 초기화 시 연결 테스트 (비동기로 실행하여 애플리케이션 시작을 막지 않음)
+        testConnection();
+    }
+    
+    /**
+     * OpenVidu 서버 연결 테스트
+     */
+    private void testConnection() {
+        new Thread(() -> {
+            try {
+                // OpenVidu 서버가 준비될 때까지 최대 30초 대기
+                for (int i = 0; i < 30; i++) {
+                    try {
+                        Thread.sleep(1000);
+                        openVidu.fetch();
+                        log.info("✅ Successfully connected to OpenVidu server at {}", openViduUrl);
+                        return;
+                    } catch (Exception e) {
+                        if (i < 5) {
+                            log.debug("Waiting for OpenVidu server... (attempt {}/{})", i + 1, 30);
+                        } else if (i == 5) {
+                            log.warn("OpenVidu server not ready yet, continuing to retry...");
+                        }
+                    }
+                }
+                log.error("❌ Failed to connect to OpenVidu server at {} after 30 attempts", openViduUrl);
+            } catch (Exception e) {
+                log.error("❌ Error testing OpenVidu connection: {}", e.getMessage());
+            }
+        }).start();
     }
 
     /**
@@ -74,12 +105,30 @@ public class MediaService {
      * @return OpenVidu Session ID
      */
     public String getOrCreateSession(String customSessionId) throws OpenViduJavaClientException, OpenViduHttpException {
+        // OpenVidu 클라이언트가 초기화되지 않은 경우 재시도
+        if (openVidu == null) {
+            log.warn("OpenVidu client not initialized, attempting to reinitialize...");
+            try {
+                this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
+                openVidu.fetch();
+                log.info("Successfully reinitialized OpenVidu connection");
+            } catch (OpenViduJavaClientException | OpenViduHttpException e) {
+                log.error("Failed to reinitialize OpenVidu: {}", e.getMessage(), e);
+                throw e;
+            } catch (Exception e) {
+                log.error("Failed to reinitialize OpenVidu: {}", e.getMessage(), e);
+                // 일반 Exception을 OpenViduJavaClientException으로 변환
+                throw new RuntimeException("OpenVidu connection failed: " + e.getMessage(), e);
+            }
+        }
+        
         // 1. 활성 세션 목록 조회
         try {
             openVidu.fetch();
         } catch (OpenViduJavaClientException e) {
             // 연결 실패 시 더 명확한 로그 남기기
             log.error("Failed to fetch OpenVidu sessions. Check URL/Secret or SSL settings. URL: {}", openViduUrl);
+            log.error("Error details: {}", e.getMessage(), e);
             throw e;
         }
 
