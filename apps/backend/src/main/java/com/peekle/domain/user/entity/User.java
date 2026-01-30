@@ -43,12 +43,11 @@ public class User extends BaseTimeEntity {
     @Builder.Default
     private java.time.LocalDateTime extensionTokenUpdatedAt = java.time.LocalDateTime.now();
 
-
     public User(String socialId, String provider, String nickname) {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
-        this.league = LeagueTier.BRONZE;
+        this.league = LeagueTier.STONE;
         this.leaguePoint = 0;
         this.isDeleted = false;
         this.extensionToken = java.util.UUID.randomUUID().toString();
@@ -57,14 +56,13 @@ public class User extends BaseTimeEntity {
         this.streakMax = 0;
     }
 
-
     private String profileImg;
     private String profileImgThumb;
 
     @Builder.Default
     @Column(name = "league")
     @Enumerated(EnumType.STRING)
-    private LeagueTier league = LeagueTier.BRONZE;
+    private LeagueTier league = LeagueTier.STONE;
 
     @Builder.Default
     @Column(name = "league_point")
@@ -77,12 +75,13 @@ public class User extends BaseTimeEntity {
     @Builder.Default
     private Integer streakMax = 0;
 
-    private String maxLeague;
+    @Enumerated(EnumType.STRING)
+    private LeagueTier maxLeague;
 
     @Builder.Default
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
-    
+
     @Column(name = "last_solved_date")
     private java.time.LocalDate lastSolvedDate;
 
@@ -109,5 +108,41 @@ public class User extends BaseTimeEntity {
     public void updateExtensionToken(String extensionToken) {
         this.extensionToken = extensionToken;
         this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
+    }
+
+    public void updateLeagueGroup(Long leagueGroupId) {
+        this.leagueGroupId = leagueGroupId;
+    }
+
+    /**
+     * 승급 - 다음 티어로 이동
+     */
+    public void promoteLeague() {
+        this.league = this.league.next();
+        if (this.maxLeague == null || this.league.ordinal() > this.maxLeague.ordinal()) {
+            this.maxLeague = this.league;
+        }
+    }
+
+    /**
+     * 강등 - 이전 티어로 이동
+     */
+    public void demoteLeague() {
+        this.league = this.league.previous();
+    }
+
+    /**
+     * 새로운 시즌 시작 시 초기화
+     */
+    public void resetForNewSeason() {
+        this.leaguePoint = 0;
+        this.leagueGroupId = null;
+    }
+
+    /**
+     * 리그 그룹 배정
+     */
+    public void assignToLeagueGroup(Long leagueGroupId) {
+        this.leagueGroupId = leagueGroupId;
     }
 }
