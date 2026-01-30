@@ -34,10 +34,12 @@ test.describe('Delegate Confirm Modal', () => {
             description: 'Description',
             inviteCode: 'TEST12',
             managerId: 1, // I am manager
+            role: 'OWNER', // My role
             members: [
-              { userId: 1, nickname: 'OwnerUser', role: 'OWNER', profileImage: null },
-              { userId: 2, nickname: 'TargetUser', role: 'MEMBER', profileImage: null },
+              { userId: 1, nickname: 'OwnerUser', role: 'OWNER', profileImage: null, isOnline: true },
+              { userId: 2, nickname: 'TargetUser', role: 'MEMBER', profileImage: null, isOnline: true },
             ],
+            owner: { id: 1 }, // Owner info
           },
         }),
       });
@@ -66,46 +68,56 @@ test.describe('Delegate Confirm Modal', () => {
     // 2. Navigate to Study Room
     await page.goto('/study/1');
 
-    // 3. Wait for TargetUser card
+    // Wait for page to load and API calls to complete
+    await page.waitForLoadState('networkidle');
+
+    // 3. Click on "참여자" tab to show participants panel
+    const participantsTab = page.getByRole('button', { name: /참여자/ });
+    await expect(participantsTab).toBeVisible({ timeout: 10000 });
+    await participantsTab.click();
+
+    // 4. Wait for TargetUser card to appear in participants panel
     const targetUserText = page.getByText('TargetUser');
     await expect(targetUserText).toBeVisible({ timeout: 10000 });
 
-    // 4. Click Menu (MoreVertical)
-    // Use robust JS traversal to find the menu button associated with this user
+    // 5. Click Menu (MoreVertical) button - find it in the same card as TargetUser
     await targetUserText.evaluate((el) => {
-      let parent = el.parentElement;
-      // Traverse up to find the card container.
-      // We identify it by looking for a button with SVG inside (the menu button)
-      // OR by looking for the 'group' class if present.
-      // Let's go up 6 levels max
-      for (let i = 0; i < 6; i++) {
-        if (!parent) break;
-        // Check if this parent has the menu button
-        const btn = parent.querySelector('button');
+      // Find the card container (has 'group' class or 'rounded-xl')
+      let card = el.closest('[class*="group"]') || el.closest('div[class*="rounded-xl"]');
+      if (!card) {
+        // Traverse up to find card container
+        let parent = el.parentElement;
+        for (let i = 0; i < 6; i++) {
+          if (!parent) break;
+          if (parent.classList.contains('group') || parent.classList.contains('rounded-xl')) {
+            card = parent;
+            break;
+          }
+          parent = parent.parentElement;
+        }
+      }
+      if (card) {
+        const btn = card.querySelector('button[aria-label="메뉴"]');
         if (btn) {
-          // Verify it is the right button (e.g. has SVG or is the only button in this scope)
-          // The menu button is usually the only button in the card in collapsed state
-          // But owner has no other buttons?
-          btn.click();
+          (btn as HTMLButtonElement).click();
           return;
         }
-        parent = parent.parentElement;
       }
-      throw new Error('Could not find menu button in ancestors');
+      throw new Error('Could not find menu button in TargetUser card');
     });
 
-    // 5. Click "방장 넘기기"
+    // 6. Click "방장 넘기기"
     const delegateButton = page.getByRole('button', { name: '방장 넘기기' });
     await expect(delegateButton).toBeVisible();
     await delegateButton.click();
 
-    // 6. Assert Modal Content
+    // 7. Assert Modal Content
     const modal = page.locator('div[role="dialog"]');
     await expect(modal).toBeVisible();
     await expect(modal).toContainText('방장 위임');
     await expect(modal).toContainText('TargetUser님에게 방장을 위임하시겠습니까?');
 
-    // 7. Verify Buttons
+    // 8. Verify Buttons
     await expect(page.getByRole('button', { name: '취소' })).toBeVisible();
     await expect(page.getByRole('button', { name: '위임하기' })).toBeVisible();
   });
