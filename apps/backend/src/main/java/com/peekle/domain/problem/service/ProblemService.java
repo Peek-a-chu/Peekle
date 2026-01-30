@@ -6,6 +6,8 @@ import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.problem.repository.TagRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -122,5 +127,46 @@ public class ProblemService {
             }
         }
         System.out.println("🏁 Sync Loop Finished. Total Saved: " + totalSaved);
+    }
+
+    /**
+     * externalId로 problemId 조회
+     * @param externalId 외부 문제 ID (예: "1000")
+     * @param source 문제 출처 (기본값: "BOJ")
+     * @return problemId를 포함한 Map
+     * @throws BusinessException 문제를 찾을 수 없을 때
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getProblemIdByExternalId(String externalId, String source) {
+        Problem problem = problemRepository.findByExternalIdAndSource(externalId, source)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+        
+        Map<String, Long> response = new HashMap<>();
+        response.put("problemId", problem.getId());
+        return response;
+    }
+
+    /**
+     * title 또는 externalId로 문제 검색
+     * @param query 검색어 (title 또는 externalId)
+     * @param source 문제 출처 (기본값: "BOJ")
+     * @return 검색된 문제 목록 (Map 형태로 변환)
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> searchProblems(String query, String source) {
+        List<Problem> problems = problemRepository.searchByTitleOrExternalId(query, source);
+        
+        return problems.stream()
+                .map(p -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("title", p.getTitle());
+                    item.put("number", Integer.parseInt(p.getExternalId())); // externalId를 number로
+                    item.put("externalId", p.getExternalId());
+                    item.put("problemId", p.getId());
+                    item.put("tier", p.getTier());
+                    item.put("url", p.getUrl());
+                    return item;
+                })
+                .collect(Collectors.toList());
     }
 }
