@@ -77,11 +77,8 @@ public class SecurityConfig {
                                                 .anyRequest().authenticated())
                                 .oauth2Login(oauth2 -> oauth2
                                                 .authorizationEndpoint(auth -> auth
-                                                                .baseUri("/api/oauth2/authorization")
                                                                 .authorizationRequestRepository(
                                                                                 cookieAuthorizationRequestRepository))
-                                                .redirectionEndpoint(redirection -> redirection
-                                                                .baseUri("/api/login/oauth2/code/*"))
                                                 .tokenEndpoint(token -> token
                                                                 .accessTokenResponseClient(accessTokenResponseClient))
                                                 .userInfoEndpoint(userInfo -> userInfo

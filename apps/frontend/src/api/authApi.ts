@@ -41,5 +41,5 @@ export async function refresh(): Promise<ApiResponse<null>> {
 }
 
 export function getOAuthLoginUrl(provider: 'kakao' | 'naver' | 'google'): string {
-  return `${API_BASE_URL}/oauth2/authorization/${provider}`;
+  return `/oauth2/authorization/${provider}`;
 }
