@@ -3,10 +3,27 @@ import { useSocket } from './useSocket';
 import { useRoomStore } from './useRoomStore';
 import { ChatMessage, ChatType } from '../types/chat';
 import { fetchStudyChats } from '../api/studyApi';
+import type { ChatMessageResponse } from '../types';
+
+function normalizeChatType(
+  rawType: ChatMessageResponse['type'] | ChatType | undefined,
+  metadata?: ChatMessage['metadata'],
+): ChatType {
+  // If the backend sends TALK but includes code metadata, treat it as CODE
+  if (metadata?.code) {
+    return 'CODE';
+  }
+
+  if (!rawType) {
+    return 'TALK';
+  }
+
+  return rawType as ChatType;
+}
 
 export function useStudyChat(roomId: number) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const { currentUserId, participants, replyingTo } = useRoomStore();
+  const { currentUserId, participants, replyingTo, selectedProblemId } = useRoomStore();
 
   // Connect to socket if not already connected
   const socket = useSocket(roomId, currentUserId || 0);
@@ -19,17 +36,27 @@ export function useStudyChat(roomId: number) {
     if (roomId) {
       fetchStudyChats(roomId)
         .then((history) => {
+          // Backend returns latest first (Page 0), but UI renders top-to-bottom (oldest first)
+          // So we need to reverse the array.
+          const sortedHistory = [...history].reverse();
+
           setMessages(
-            history.map((msg) => ({
-              id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              roomId: roomId,
-              senderId: 0, // Mock or infer
-              senderName: msg.senderName,
-              content: msg.content,
-              type: msg.type,
-              createdAt: new Date().toISOString(), // Mock
-              parentMessage: undefined,
-            })),
+            sortedHistory.map((msg) => {
+              const metadata = msg.metadata;
+              const type = normalizeChatType(msg.type, metadata);
+
+              return {
+                id: msg.id || `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                roomId: roomId,
+                senderId: msg.senderId,
+                senderName: msg.senderName,
+                content: msg.content,
+                type,
+                createdAt: msg.createdAt,
+                parentMessage: undefined, // API might not return parent details fully yet
+                metadata,
+              } as ChatMessage;
+            }),
           );
         })
         .catch((err) => console.error('Failed to load chat history', err));
@@ -45,6 +72,8 @@ export function useStudyChat(roomId: number) {
       try {
         const body = JSON.parse(message.body);
         const chatData = body.data || body; // Handle SocketResponse<Chat> wrapper
+        const metadata = chatData.metadata;
+        const type = normalizeChatType(chatData.type as ChatType | undefined, metadata);
 
         const alignedMessage: ChatMessage = {
           id: chatData.id || crypto.randomUUID(),
@@ -52,9 +81,9 @@ export function useStudyChat(roomId: number) {
           senderId: Number(chatData.senderId || 0),
           senderName: chatData.senderName || 'Unknown',
           content: chatData.content || '',
-          type: (chatData.type as ChatType) || 'TALK',
+          type,
           parentMessage: chatData.parentMessage || undefined,
-          metadata: chatData.metadata,
+          metadata,
           createdAt: chatData.createdAt || new Date().toISOString(),
         };
         setMessages((prev) => [...prev, alignedMessage]);
@@ -73,13 +102,13 @@ export function useStudyChat(roomId: number) {
       if (!socket || !currentUserId) return;
 
       const payload = {
-        studyId: roomId,
         content: content,
+        type: 'TALK',
         parentId: replyingTo?.id,
       };
 
       socket.publish({
-        destination: '/pub/studies/chat',
+        destination: '/pub/chat/message',
         body: JSON.stringify(payload),
       });
     },
@@ -97,14 +126,19 @@ export function useStudyChat(roomId: number) {
     ): void => {
       if (!socket || !currentUserId) return;
 
-      const formattedContent = `[CODE:${language}] ${description}\nRef: ${ownerName || 'Unknown'} - ${problemTitle || 'Unknown'}\n${code}`;
       const payload = {
-        studyId: roomId,
-        content: formattedContent,
+        // 채팅 본문에는 사용자의 코멘트(설명)만 저장하고,
+        // 문제 번호/제목/언어/소유자는 모두 metadata 기반 카드 UI로 표현한다.
+        content: description,
+        // Use a dedicated CODE type so ChatMessageItem can render CodeShareCard and enable navigation.
+        type: 'CODE',
         parentId: replyingTo?.id,
-        // Optional: if backend accepts metadata separately
         metadata: {
-          code,
+          isRefChat: true,
+          isRealtime: !!isRealtime,
+          targetUserId: isRealtime ? currentUserId : undefined,
+          problemId: selectedProblemId ?? undefined,
+          code, // Always include code so we can show snapshot or fallback view
           language,
           problemTitle,
           ownerName,
@@ -112,11 +146,11 @@ export function useStudyChat(roomId: number) {
       };
 
       socket.publish({
-        destination: '/pub/studies/chat',
+        destination: '/pub/chat/message',
         body: JSON.stringify(payload),
       });
     },
-    [socket, roomId, currentUserId, replyingTo],
+    [socket, roomId, currentUserId, replyingTo, selectedProblemId],
   );
 
   return {

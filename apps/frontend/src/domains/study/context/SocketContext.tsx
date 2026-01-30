@@ -1,165 +1,197 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
-
-const BASE_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8080';
-const BROKER_URL = `${BASE_URL}/ws-stomp`;
 
 interface SocketContextType {
   client: Client | null;
   connected: boolean;
 }
 
-const SocketContext = createContext<SocketContextType>({ client: null, connected: false });
+const SocketContext = createContext<SocketContextType>({
+  client: null,
+  connected: false,
+});
 
 export const useSocketContext = () => useContext(SocketContext);
 
 interface SocketProviderProps {
-  roomId: number | null;
-  userId: number | null;
   children: React.ReactNode;
+  roomId: string | number;
+  userId: number;
 }
 
-export function SocketProvider({ roomId, userId, children }: SocketProviderProps) {
+export function SocketProvider({ children, roomId, userId }: SocketProviderProps) {
+  const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
-  const clientRef = useRef<Client | null>(null);
-
-  // Need to access store actions, but be careful about loops if store depends on this.
-  // Ideally, subscription logic specific to "store updates" should be in the Provider
-  // or a "SocketEffect" component, NOT spread across hooks if we want a single initialization.
-  // HOWEVER, for now, we just want to SHARE the connection.
-  // Subscription management is a separate concern.
-  // Let's keep the GENERAL connection logic here.
-
-  // We can inject store updates here IF they are global (like video token).
-  // Or hooks can access the shared client to subscribe.
-  // The original useSocket had subscriptions inside.
-  // To avoid breaking existing hooks that expect `client` to be returned
-  // and then they do `client.subscribe`, we just provide the shared client.
-
-  // BUT: The original `useSocket` had "auto-subscribe" logic for VideoToken, Watchers, Error.
-  // We should preserve that global setup in the Provider.
-
-  const setVideoToken = useRoomStore((state) => state.setVideoToken);
-  const setWatchers = useRoomStore((state) => state.setWatchers);
+  const clientRef = React.useRef<Client | null>(null);
+  const connectKeyRef = React.useRef<string>('');
+  const generationRef = React.useRef(0);
+  const shutdownRef = React.useRef<Promise<void> | null>(null);
+  const reconnectAttemptRef = React.useRef(0);
+  const reconnectTimerRef = React.useRef<number | null>(null);
 
   useEffect(() => {
-    // Wait for both parameters to start connection
-    if (!roomId) return;
+    let cancelled = false;
 
-    // If userId is missing, we could connect as guest (0) or wait.
-    // Given the requirement for "Enter" with userId, it's better to wait or use 0 explicitly if allowed.
-    // Spec seems to imply userId is required for many actions.
-    // Let's assume we reconnect when userId becomes available.
+    const run = async () => {
+      // Don't connect until we have a valid identity.
+      // Connecting with userId=0 can trigger reconnect loops and "infinite" WS sessions.
+      if (!roomId || !userId) {
+        if (clientRef.current) {
+          const old = clientRef.current;
+          clientRef.current = null;
+          connectKeyRef.current = '';
+          generationRef.current += 1;
+          shutdownRef.current = old.deactivate();
+          await shutdownRef.current.catch(() => undefined);
+          shutdownRef.current = null;
+          if (!cancelled) {
+            setClient(null);
+            setConnected(false);
+          }
+        }
+        return;
+      }
 
-    // Safety check: Avoid creating multiple clients if effect re-runs without cleanup (shouldn't happen with proper cleanup)
-    if (clientRef.current?.active) {
-      // Ideally we trust React's cleanup.
-      // But if we want to be safe against strict mode double-invoke without unmount in between (rare in prod):
-      // clientRef.current.deactivate();
+      // 백엔드 SockJS 엔드포인트 (http 프로토콜 사용)
+      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
+
+    // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환 (SSL 연결 오류 방지)
+    if (
+      baseUrl.startsWith('https://') &&
+      (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))
+    ) {
+      baseUrl = baseUrl.replace('https://', 'http://');
     }
 
-    const uidStr = userId ? String(userId) : '1';
-    console.log(`[SocketProvider] Initializing for Study ${roomId}, User ${uidStr}`);
+      const socketUrl = `${baseUrl}/ws-stomp`;
+      const connectKey = `${socketUrl}|${String(roomId)}|${String(userId)}`;
 
-    const client = new Client({
-      webSocketFactory: () => new SockJS(BROKER_URL),
-      connectHeaders: {
-        userId: uidStr,
-      },
-      reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
+      // If we already have an active client for the same (url, roomId, userId), do nothing.
+      if (clientRef.current && connectKeyRef.current === connectKey) {
+        return;
+      }
 
-      onConnect: () => {
-        setConnected(true);
-        console.log('[SocketProvider] Connected');
-
-        // Global Subscriptions
-        if (userId) {
-          // 1. Video Token
-          client.subscribe(`/topic/studies/${roomId}/video-token/${userId}`, (message) => {
-            try {
-              const body = JSON.parse(message.body);
-              if (body.type === 'VIDEO_TOKEN' && body.data) {
-                setVideoToken(body.data);
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          });
-
-          // 2. Watchers
-          client.subscribe(`/topic/studies/rooms/${roomId}/ide/${userId}/watchers`, (message) => {
-            try {
-              const body = JSON.parse(message.body);
-              if (body && body.data) {
-                const { count, viewers } = body.data;
-                setWatchers(count || 0, viewers || []);
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          });
-
-          // 3. Error
-          client.subscribe(`/topic/studies/rooms/${roomId}/error/${userId}`, (message) => {
-            try {
-              const body = JSON.parse(message.body);
-              if (body && body.error) {
-                console.error('[STOMP] Error Notification:', body.error);
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          });
-
-          // 4. Auto-Enter
-          client.publish({
-            destination: '/pub/studies/enter',
-            body: JSON.stringify({ studyId: roomId, userId: String(userId) }),
-          });
+      // If we have a different client, deactivate it first (and wait).
+      if (clientRef.current) {
+        const old = clientRef.current;
+        clientRef.current = null;
+        connectKeyRef.current = '';
+        generationRef.current += 1;
+        shutdownRef.current = old.deactivate();
+        await shutdownRef.current.catch(() => undefined);
+        shutdownRef.current = null;
+        if (!cancelled) {
+          setClient(null);
+          setConnected(false);
         }
-      },
-      onStompError: (frame) => {
-        console.error('Broker error: ' + frame.headers['message']);
-      },
-      onDisconnect: () => {
-        setConnected(false);
-        console.log('[SocketProvider] Disconnected');
-      },
-    });
+      }
 
-    client.activate();
-    clientRef.current = client;
+      const myGen = (generationRef.current += 1);
+
+      console.log(`[SocketProvider] Connecting to ${socketUrl} (Room: ${roomId}, User: ${userId})`);
+
+      const stompClient = new Client({
+        // SockJS를 팩토리로 주입하여 STOMP 클라이언트 생성
+        webSocketFactory: () => new SockJS(socketUrl),
+
+        connectHeaders: {
+          userId: String(userId),
+          studyId: String(roomId),
+        },
+        debug: (str) => {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[STOMP]', str);
+          }
+        },
+        // IMPORTANT:
+        // Disable built-in reconnect. When the server closes early (or during rapid toggles),
+        // stompjs can spin up endless SockJS sessions via reconnectDelay.
+        // We'll do our own capped/backoff reconnect below.
+        reconnectDelay: 0,
+        heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+      });
+
+      stompClient.onConnect = (frame) => {
+        // Guard against late connects from an old generation (race during toggles)
+        if (generationRef.current !== myGen) {
+          void stompClient.deactivate();
+          return;
+        }
+        console.log('[STOMP] Connected');
+        reconnectAttemptRef.current = 0;
+        setConnected(true);
+      };
+
+    stompClient.onStompError = (frame) => {
+      console.error('[STOMP] Broker error:', frame.headers['message']);
+      console.error('[STOMP] Details:', frame.body);
+    };
+
+      stompClient.onWebSocketClose = () => {
+        console.log('[STOMP] Connection closed');
+        setConnected(false);
+
+        // Clear current client so `run()` will actually reconnect.
+        if (clientRef.current === stompClient) {
+          clientRef.current = null;
+          connectKeyRef.current = '';
+          setClient(null);
+        }
+
+        // Capped reconnect with backoff
+        if (cancelled) return;
+        const maxAttempts = 8;
+        if (reconnectAttemptRef.current >= maxAttempts) {
+          console.warn('[STOMP] Reconnect attempts exceeded. Stop reconnecting.');
+          return;
+        }
+        reconnectAttemptRef.current += 1;
+        const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptRef.current - 1));
+        if (reconnectTimerRef.current) {
+          window.clearTimeout(reconnectTimerRef.current);
+        }
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null;
+          if (!cancelled) void run();
+        }, delay);
+      };
+
+      // Before activating, ensure we're still the latest run
+      if (cancelled || generationRef.current !== myGen) {
+        void stompClient.deactivate();
+        return;
+      }
+
+      clientRef.current = stompClient;
+      connectKeyRef.current = connectKey;
+      stompClient.activate();
+      setClient(stompClient);
+    };
+
+    void run();
 
     return () => {
-      console.log('[SocketProvider] Cleanup/Disconnecting...');
-      if (clientRef.current) {
-        const activeClient = clientRef.current;
-        if (activeClient.connected && roomId && userId) {
-          try {
-            activeClient.publish({
-              destination: '/pub/studies/leave',
-              body: JSON.stringify({ studyId: roomId, userId: String(userId) }),
-            });
-          } catch (e) {}
-        }
-        activeClient.deactivate().catch((err) => console.error(err));
-        clientRef.current = null;
-        setConnected(false);
-      }
-    };
-  }, [roomId, userId, setVideoToken, setWatchers]);
+      cancelled = true;
+      console.log('[STOMP] Disconnecting...');
+      generationRef.current += 1;
 
-  return (
-    <SocketContext.Provider value={{ client: clientRef.current, connected }}>
-      {children}
-    </SocketContext.Provider>
-  );
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      const current = clientRef.current;
+      clientRef.current = null;
+      connectKeyRef.current = '';
+      if (current) {
+        shutdownRef.current = current.deactivate();
+      }
+      setConnected(false);
+    };
+  }, [roomId, userId]);
+
+  return <SocketContext.Provider value={{ client, connected }}>{children}</SocketContext.Provider>;
 }

@@ -1,181 +1,75 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { addProblemAction, deleteProblemAction } from '@/domains/study/actions/problemActions';
+import { apiFetch } from '@/lib/api';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-
-import { DailyProblem } from '../types';
-import { fetchProblems } from '../api/problemApi';
-import { format } from 'date-fns';
-import { useSocket } from './useSocket';
-import { useRoomStore } from './useRoomStore';
-
-interface UseProblemsResult {
-  problems: DailyProblem[];
-  isLoading: boolean;
-  error: Error | null;
-  addProblem: (title: string, number: number, tags?: string[]) => Promise<void>;
-  removeProblem: (problemId: number) => Promise<void>;
-  refresh: () => Promise<void>;
+export interface Problem {
+  id: number;
+  title: string;
+  number: number;
+  tier: string;
+  tags: string[];
+  status: 'success' | 'fail' | 'not_started';
+  participantCount: number;
+  totalParticipants: number;
+  url: string;
+  problemId: number;
+  solvedMemberCount: number;
 }
 
-export function useProblems(studyId: number, date: Date): UseProblemsResult {
-  const [problems, setProblems] = useState<DailyProblem[]>([]);
+export function useProblems(studyId: number) {
+  const [problems, setProblems] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
 
-  const currentUserId = useRoomStore((state) => state.currentUserId);
-  const socket = useSocket(studyId, currentUserId);
-
-  const loadProblems = useCallback(async () => {
+  const fetchProblems = useCallback(async () => {
+    if (!studyId) return;
     setIsLoading(true);
-    setError(null);
     try {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      console.log(`[useProblems] Fetching problems for ${dateStr}`);
-      const data = await fetchProblems(studyId, dateStr);
-      console.log(`[useProblems] Fetched problems: ${data.length}`, data);
-
-      // Merge with existing problems if they were added via socket but not yet in DB?
-      // For now, trust the API as source of truth for "official" list.
-      // But if we just added one, and API is stale, we might lose it.
-      // Optimistic merging is tricky without timestamps.
-      // Let's rely on setProblems(data) and hope 1000ms delay was enough.
-
-      setProblems(data);
-    } catch (err) {
-      console.error('[useProblems] Failed to fetch problems:', err);
-      setError(err as Error);
+      const date = new Date().toISOString().split('T')[0];
+      const res = await apiFetch<any[]>(
+        `/api/studies/${studyId}/curriculum/daily?date=${date}`,
+      );
+      if (res.success && res.data) {
+        setProblems(res.data.map((p) => ({
+          ...p,
+          problemId: p.id,
+          solvedMemberCount: p.participantCount ?? 0,
+          tier: String(p.tier),
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to fetch problems:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [studyId, date]);
+  }, [studyId]);
 
   useEffect(() => {
-    // Initial fetch
-    void loadProblems();
-  }, [loadProblems]);
+    fetchProblems();
+  }, [fetchProblems]);
 
-  // [Realtime] Listen for problem updates
-  useEffect(() => {
-    // Quietly return if socket is not ready yet
-    if (!socket || !socket.connected) {
-      return;
-    }
-
-    console.log(
-      `[useProblems] Subscribing to problems topic: /topic/studies/rooms/${studyId}/problems`,
-    );
-    // Subscribe to curriculum topic: /topic/studies/rooms/{id}/problems
-    const sub = socket.subscribe(`/topic/studies/rooms/${studyId}/problems`, (message) => {
-      try {
-        console.log('[useProblems] Raw message received:', message.body);
-        const body = JSON.parse(message.body);
-        console.log('[useProblems] Parsed body:', body);
-
-        if (body.type === 'CURRICULUM' && body.data) {
-          const { action, problemId, title } = body.data;
-          console.log(`[useProblems] Action: ${action}, ProblemId: ${problemId}`);
-
-          if (action === 'ADD' && problemId) {
-            const pid = Number(problemId);
-            console.warn(`[useProblems] Processing ADD for problem ${pid}`);
-
-            setProblems((prev) => {
-              if (prev.some((p) => p.problemId === pid)) {
-                console.warn('[useProblems] Problem already exists in state:', pid);
-                return prev;
-              }
-              const newProblem: DailyProblem = {
-                problemId: pid,
-                title: title || `Problem ${pid}`,
-                tier: 'Unrated',
-                solvedMemberCount: 0,
-              };
-              const newProblems = [...prev, newProblem];
-              console.warn('[useProblems] Updated problems state:', newProblems);
-              return newProblems;
-            });
-
-            // Fallback refresh to ensure sync with DB - Increased delay to 1000ms
-            setTimeout(() => {
-              console.log('[useProblems] Executing fallback refresh');
-              void loadProblems();
-            }, 1000);
-          } else if (action === 'REMOVE' && problemId) {
-            const pid = Number(problemId);
-            setProblems((prev) => prev.filter((p) => p.problemId !== pid));
-          }
-        }
-      } catch (e) {
-        console.error('[useProblems] Error parsing message:', e);
-      }
-    });
-
-    return () => {
-      console.log('[useProblems] Unsubscribing from problems topic');
-      sub.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, studyId]);
-
-  // STOMP Action for Add
   const addProblem = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    async (title: string, number: number, _tags?: string[]) => {
-      if (!socket) {
-        console.error('Socket instance is null');
-        throw new Error('소켓 연결이 되어있지 않습니다.');
+    async (title: string, number: number, tags?: string[]) => {
+      try {
+        await addProblemAction(studyId, { title, number, tags });
+        fetchProblems();
+      } catch (error) {
+        console.error('Failed to add problem:', error);
       }
-      if (!socket.connected) {
-        throw new Error('서버와 연결되지 않았습니다. 잠시 후 다시 시도해주세요.');
-      }
-
-      console.log(`[useProblems] Sending ADD request for Problem ${number}`);
-
-      // [Optimistic Update] Add to UI immediately
-      setProblems((prev) => {
-        if (prev.some((p) => p.problemId === number)) return prev;
-        const newProblem: DailyProblem = {
-          problemId: number,
-          title: title,
-          tier: 'Unrated',
-          solvedMemberCount: 0,
-        };
-        return [...prev, newProblem];
-      });
-
-      socket.publish({
-        destination: '/pub/studies/problems',
-        body: JSON.stringify({ studyId, action: 'ADD', problemId: number }),
-      });
-      // Optionally trigger local refresh immediately?
-      // void loadProblems();
-      return Promise.resolve();
     },
-    [socket, studyId],
+    [studyId, fetchProblems],
   );
 
-  // STOMP Action for Remove
-  const removeProblem = useCallback(
+  const deleteProblem = useCallback(
     async (problemId: number) => {
-      if (!socket || !socket.connected) {
-        throw new Error('서버와 연결되지 않았습니다.');
+      try {
+        await deleteProblemAction(studyId, problemId);
+        fetchProblems();
+      } catch (error) {
+        console.error('Failed to delete problem:', error);
       }
-      console.log(`[useProblems] Sending REMOVE request for Problem ${problemId}`);
-      socket.publish({
-        destination: '/pub/studies/problems',
-        body: JSON.stringify({ studyId, action: 'REMOVE', problemId }),
-      });
-      return Promise.resolve();
     },
-    [socket, studyId],
+    [studyId, fetchProblems],
   );
 
-  return {
-    problems,
-    isLoading,
-    error,
-    addProblem,
-    removeProblem,
-    refresh: loadProblems,
-  };
+  return { problems, isLoading, addProblem, deleteProblem, refetch: fetchProblems };
 }

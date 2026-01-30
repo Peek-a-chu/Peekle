@@ -53,9 +53,15 @@ export interface StudyListResponse {
 }
 
 export interface ChatMessageResponse {
+  id: string; // Long in DB, but JSON safe often string or number. Backend returns Long. Let's assume number.
+  studyId: number;
+  senderId: number;
   senderName: string;
   content: string;
-  type: 'TALK' | 'ENTER' | 'LEAVE'; // Add other types if needed
+  type: 'TALK' | 'ENTER' | 'LEAVE' | 'SYSTEM' | 'CODE' | 'SUBMISSION';
+  parentId?: number;
+  metadata?: any;
+  createdAt: string;
 }
 
 export interface SubmissionResult {

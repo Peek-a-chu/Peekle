@@ -100,7 +100,7 @@ const CCLeagueMyStatus = () => {
 
   // --- [Dev] 임시 상태 관리 ---
   const [myRank, setMyRank] = useState(rankingData.myRank);
-  const [myScore, setMyScore] = useState(weeklyData.totalScore);
+  const [myScore, setMyScore] = useState(weeklyData?.totalScore ?? 0);
   const [showDev, setShowDev] = useState(false);
 
   // [Dev] 타겟 날짜 강제 설정
@@ -111,8 +111,10 @@ const CCLeagueMyStatus = () => {
   // 데이터 로드 시 초기화
   useEffect(() => {
     setMyRank(rankingData.myRank);
-    setMyScore(weeklyData.totalScore);
-  }, [rankingData.myRank, weeklyData.totalScore]);
+    if (weeklyData) {
+      setMyScore(weeklyData.totalScore);
+    }
+  }, [rankingData.myRank, weeklyData]);
 
   // [Dev] 디버그 모드일 때 1초마다 리렌더링 (시간 확인용)
   useEffect(() => {

@@ -22,7 +22,9 @@ public class SolvedAcLevelUtil {
 
     public static int calculatePoints(int level) {
         if (level == 0) return 0;
-        return level; // 기본: 레벨 = 점수 (Bronze 5 = 1점, Ruby 1 = 30점)
+        // Scale level (1~30) to points (10~50)
+        // Formula: 10 + (level - 1) * (50 - 10) / (30 - 1)
+        return Math.round(10 + (level - 1) * 40 / 29.0f);
     }
 
     public static int getPointFromTier(String tier) {

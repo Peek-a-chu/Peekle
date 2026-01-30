@@ -152,8 +152,14 @@ export function CCProblemListPanel({
           </div>
         ) : (
           <ul className="space-y-3 p-4">
-            {problems.map((problem) => (
-              <li key={problem.problemId}>
+            {problems.map((problem, idx) => {
+              // Some API responses may include duplicate/missing problemId; ensure a stable unique key.
+              const key =
+                typeof problem.problemId === 'number' && Number.isFinite(problem.problemId)
+                  ? `problem-${problem.problemId}`
+                  : `problem-${problem.title || 'unknown'}-${idx}`;
+              return (
+              <li key={key}>
                 <CCProblemCard
                   problem={problem}
                   isSelected={selectedProblemId === problem.problemId}
@@ -164,7 +170,8 @@ export function CCProblemListPanel({
                   }
                 />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
