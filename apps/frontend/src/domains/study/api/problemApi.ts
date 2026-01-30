@@ -77,7 +77,11 @@ export async function fetchSubmissionDetail(
 
 export interface ExternalProblem {
   title: string;
-  number: number;
+  number: number; // externalId를 number로 표시
+  externalId?: string;
+  problemId?: number; // DB의 problemId
+  tier?: string;
+  url?: string;
   tags?: string[];
 }
 
@@ -89,6 +93,22 @@ export async function searchExternalProblems(query: string): Promise<ExternalPro
     throw new Error(res.error?.message || 'Failed to search external problems');
   }
   return res.data;
+}
+
+/**
+ * externalId로 problemId 조회
+ */
+export async function getProblemIdByExternalId(
+  externalId: string,
+  source: string = 'BOJ',
+): Promise<number> {
+  const res = await apiFetch<{ problemId: number }>(
+    `/api/problems/by-external-id?externalId=${encodeURIComponent(externalId)}&source=${encodeURIComponent(source)}`,
+  );
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to get problem ID');
+  }
+  return res.data.problemId;
 }
 
 // deleteProblem was deprecated and removed in favor of WebSocket action

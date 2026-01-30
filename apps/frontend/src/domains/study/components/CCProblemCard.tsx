@@ -26,8 +26,9 @@ export function CCProblemCard({
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
 
-  // Construct URL
-  const problemUrl = `https://www.acmicpc.net/problem/${problem.problemId}`;
+  // Use externalId (BOJ problem number) for display and URL, fallback to problemId
+  const problemNumber = problem.externalId || String(problem.problemId);
+  const problemUrl = `https://www.acmicpc.net/problem/${problemNumber}`;
 
   return (
     <div
@@ -70,7 +71,7 @@ export function CCProblemCard({
         <div className="flex items-start justify-between w-full">
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground text-sm line-clamp-1">
-              {problem.problemId}. {problem.title}
+              {problemNumber}. {problem.title}
             </span>
             {problemUrl && (
               <a
@@ -116,7 +117,9 @@ export function CCProblemCard({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
-            <span>{problem.solvedMemberCount}명 해결</span>
+            <span>
+              {problem.solvedMemberCount ?? 0}명 / 전체 {problem.totalMemberCount ?? 0}명 해결
+            </span>
           </div>
         </div>
       </div>

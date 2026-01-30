@@ -23,7 +23,7 @@ export interface CCProblemListPanelProps {
   isFolded: boolean;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  onAddProblem?: (title: string, number: number, tags?: string[]) => Promise<void>;
+  onAddProblem?: (title: string, number: number, tags?: string[], problemId?: number) => Promise<void>;
   onRemoveProblem?: (problemId: number) => Promise<void>;
   submissions?: Submission[];
   onFetchSubmissions?: (problemId: number) => void;
@@ -86,9 +86,9 @@ export function CCProblemListPanel({
     setSubmissionModalOpen(false);
   };
 
-  const handleAddProblem = async (title: string, number: number, tags?: string[]) => {
+  const handleAddProblem = async (title: string, number: number, tags?: string[], problemId?: number) => {
     if (onAddProblem) {
-      await onAddProblem(title, number, tags);
+      await onAddProblem(title, number, tags, problemId);
     }
   };
 
@@ -189,6 +189,7 @@ export function CCProblemListPanel({
         onClose={() => setAddProblemModalOpen(false)}
         onAdd={handleAddProblem}
         onRemove={handleRemoveProblem}
+        currentProblems={problems}
       />
     </div>
   );

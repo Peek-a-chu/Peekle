@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useSocketContext } from '@/domains/study/context/SocketContext';
 import { useRoomStore, Participant } from '@/domains/study/hooks/useRoomStore';
 import { toast } from 'sonner';
@@ -106,16 +106,43 @@ export const useStudySocketSubscription = (studyId: number) => {
     removeParticipant,
     updateParticipant,
     setRoomInfo,
+    setVideoToken,
     currentUserId,
     participants,
   } = useRoomStore();
 
+  // useRef는 컴포넌트 최상위 레벨에서만 호출 가능
+  const currentUserIdRef = useRef(currentUserId);
+
   useEffect(() => {
     if (!client || !connected || !studyId) return;
 
-    // 1. Enter Study
-    console.log('[StudySocket] Sending ENTER');
-    client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
+    // 1. Enter Study (currentUserId가 있으면 즉시, 없으면 나중에 재시도)
+    const sendEnter = () => {
+      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId });
+      client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
+    };
+
+    // currentUserId가 있으면 즉시 ENTER 전송, 없으면 나중에 재시도
+    if (currentUserId) {
+      sendEnter();
+    } else {
+      // currentUserId가 설정될 때까지 기다렸다가 ENTER 전송
+      const checkAndEnter = () => {
+        const userId = useRoomStore.getState().currentUserId;
+        if (userId) {
+          console.log('[StudySocket] currentUserId available, sending ENTER');
+          sendEnter();
+          clearInterval(enterInterval);
+        }
+      };
+      const enterInterval = setInterval(checkAndEnter, 500);
+      
+      // 5초 후 타임아웃
+      setTimeout(() => {
+        clearInterval(enterInterval);
+      }, 5000);
+    }
 
     // 2. Subscribe Public Room Topic
     const publicTopic = `/topic/studies/rooms/${studyId}`;
@@ -125,23 +152,59 @@ export const useStudySocketSubscription = (studyId: number) => {
       handleSocketMessage(message);
     });
 
+    // 2-1. Subscribe Curriculum Topic (for problem add/remove)
+    const curriculumTopic = `/topic/studies/rooms/${studyId}/problems`;
+    console.log('[StudySocket] Subscribing to Curriculum:', curriculumTopic);
+
+    const curriculumSubscription = client.subscribe(curriculumTopic, (message) => {
+      handleSocketMessage(message);
+    });
+
     // 3. Subscribe Private User Topic (For ROOM_INFO, ERROR etc)
     let privateSubscription: any = null;
-    if (currentUserId) {
-      const privateTopic = `/topic/studies/${studyId}/info/${currentUserId}`;
-      console.log('[StudySocket] Subscribing to Private:', privateTopic);
-      privateSubscription = client.subscribe(privateTopic, (message) => {
-        handleSocketMessage(message);
-      });
-    }
+    let videoTokenSubscription: any = null;
+
+    const subscribeToPrivateTopics = () => {
+      // 기존 구독 해제
+      if (privateSubscription) {
+        privateSubscription.unsubscribe();
+        privateSubscription = null;
+      }
+      if (videoTokenSubscription) {
+        videoTokenSubscription.unsubscribe();
+        videoTokenSubscription = null;
+      }
+
+      // currentUserId가 있으면 구독 생성
+      if (currentUserId) {
+        const privateTopic = `/topic/studies/${studyId}/info/${currentUserId}`;
+        console.log('[StudySocket] Subscribing to Private:', privateTopic);
+        privateSubscription = client.subscribe(privateTopic, (message) => {
+          handleSocketMessage(message);
+        });
+
+        // 4. Subscribe Video Token Topic
+        const videoTokenTopic = `/topic/studies/${studyId}/video-token/${currentUserId}`;
+        console.log('[StudySocket] Subscribing to Video Token:', videoTokenTopic);
+        videoTokenSubscription = client.subscribe(videoTokenTopic, (message) => {
+          handleSocketMessage(message);
+        });
+      }
+    };
+
+    // 초기 구독 시도
+    subscribeToPrivateTopics();
 
     // Helper to handle messages
     const handleSocketMessage = async (message: any) => {
-      if (!message.body) return;
+      if (!message.body) {
+        console.warn('[StudySocket] Message received but body is empty');
+        return;
+      }
       try {
         const payload = JSON.parse(message.body);
         const { type, data } = payload;
-        console.log('[StudySocket] Received:', type, data);
+        console.log('[StudySocket] Received message:', { type, data, fullPayload: payload });
 
         const stateParticipants = useRoomStore.getState().participants;
 
@@ -217,15 +280,93 @@ export const useStudySocketSubscription = (studyId: number) => {
             updateParticipant(userId, { isMuted, isVideoOff });
             break;
           }
+          case 'ADD': {
+            // Problem added - trigger refetch
+            // data is ProblemStatusResponse with problemId, title, tier, etc.
+            if (!data) {
+              console.warn('[StudySocket] ADD event received but data is null/undefined');
+              break;
+            }
+            const addedProblemId = data.problemId;
+            const problemTitle = data.title || data.externalId || `문제 ${addedProblemId}`;
+            const externalId = data.externalId || String(addedProblemId);
+            console.log('[StudySocket] Problem added:', addedProblemId, 'Full data:', data);
+            window.dispatchEvent(
+              new CustomEvent('study-problem-added', {
+                detail: { studyId, problem: data },
+              }),
+            );
+            toast.info(`문제가 추가되었습니다: ${externalId}. ${problemTitle}`);
+            break;
+          }
+          case 'REMOVE': {
+            // Problem removed - trigger refetch
+            // data is ProblemStatusResponse with problemId
+            if (!data) {
+              console.warn('[StudySocket] REMOVE event received but data is null/undefined');
+              break;
+            }
+            const removedProblemId = data.problemId;
+            const problemTitle = data.title || data.externalId || `문제 ${removedProblemId}`;
+            const externalId = data.externalId || String(removedProblemId);
+            console.log('[StudySocket] Problem removed:', removedProblemId, 'Full data:', data);
+            window.dispatchEvent(
+              new CustomEvent('study-problem-removed', {
+                detail: { studyId, problemId: removedProblemId },
+              }),
+            );
+            toast.info(`문제가 삭제되었습니다: ${externalId}. ${problemTitle}`);
+            break;
+          }
+          case 'CURRICULUM': {
+            // Curriculum update - trigger refetch
+            console.log('[StudySocket] Curriculum updated');
+            window.dispatchEvent(
+              new CustomEvent('study-curriculum-updated', {
+                detail: { studyId },
+              }),
+            );
+            break;
+          }
+          case 'VIDEO_TOKEN': {
+            // OpenVidu token received
+            const token = data;
+            console.log('[StudySocket] Received VIDEO_TOKEN');
+            setVideoToken(token);
+            break;
+          }
+          case 'ERROR': {
+            // Error from server
+            const errorMessage = typeof data === 'string' ? data : data?.message || '알 수 없는 오류가 발생했습니다.';
+            toast.error(errorMessage);
+            break;
+          }
         }
       } catch (e) {
         console.error('[StudySocket] Error parsing message', e);
       }
     };
 
+    // currentUserId가 변경될 때마다 private topics 재구독
+    currentUserIdRef.current = currentUserId;
+
+    // currentUserId 변경 감지 및 재구독
+    const checkAndResubscribe = () => {
+      if (currentUserIdRef.current && !privateSubscription) {
+        console.log('[StudySocket] currentUserId available, resubscribing to private topics');
+        subscribeToPrivateTopics();
+      }
+    };
+
+    // 주기적으로 확인 (currentUserId가 나중에 설정될 수 있음)
+    const resubscribeInterval = setInterval(checkAndResubscribe, 1000);
+
     return () => {
+      clearInterval(resubscribeInterval);
       publicSubscription.unsubscribe();
+      curriculumSubscription.unsubscribe();
       if (privateSubscription) privateSubscription.unsubscribe();
+      if (videoTokenSubscription) videoTokenSubscription.unsubscribe();
 
       // 3. Leave Study (Session Exit)
       if (client && client.connected) {
@@ -242,5 +383,7 @@ export const useStudySocketSubscription = (studyId: number) => {
     updateParticipant,
     removeParticipant,
     setRoomInfo,
+    setVideoToken,
+    currentUserId, // currentUserId를 dependency에 추가하여 변경 시 재실행
   ]);
 };

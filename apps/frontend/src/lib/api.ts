@@ -33,7 +33,11 @@ export async function apiFetch<T>(
   options: RequestInit & { skipAuth?: boolean } = {},
 ): Promise<ApiResponse<T>> {
   const { skipAuth, ...fetchOptions } = options;
-  const url = `${BACKEND_URL}${path}`;
+  
+  // If path starts with /api/, use Next.js API route (relative path)
+  // Otherwise, use backend URL directly
+  const isNextApiRoute = path.startsWith('/api/');
+  const url = isNextApiRoute ? path : `${BACKEND_URL}${path}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -54,7 +58,8 @@ export async function apiFetch<T>(
 
   if (response.status === 401) {
     // Access token 만료 -> refresh 시도
-    const refreshResponse = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
+    // Use Next.js API route for refresh
+    const refreshResponse = await fetch('/api/auth/refresh', {
       method: 'POST',
       credentials: 'include',
     });
