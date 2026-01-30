@@ -39,7 +39,9 @@ public class StudyRoomResponse {
         }
     }
 
-    private StudyRoomResponse(StudyRoom studyRoom, List<StudyMemberResponse> members) {
+    private final String role; // "OWNER" or "MEMBER"
+
+    private StudyRoomResponse(StudyRoom studyRoom, List<StudyMemberResponse> members, Long currentUserId) {
         this.id = studyRoom.getId();
         this.title = studyRoom.getTitle();
         this.description = studyRoom.getDescription();
@@ -48,13 +50,21 @@ public class StudyRoomResponse {
         this.isActive = studyRoom.isActive();
         this.createdAt = studyRoom.getCreatedAt();
         this.members = members != null ? members : Collections.emptyList();
+
+        // 권한 결정 로직
+        if (currentUserId != null && studyRoom.getOwner().getId().equals(currentUserId)) {
+            this.role = "OWNER";
+        } else {
+            this.role = "MEMBER";
+        }
     }
 
-    public static StudyRoomResponse from(StudyRoom studyRoom, List<StudyMemberResponse> members) {
-        return new StudyRoomResponse(studyRoom, members);
+    public static StudyRoomResponse from(StudyRoom studyRoom, List<StudyMemberResponse> members, Long currentUserId) {
+        return new StudyRoomResponse(studyRoom, members, currentUserId);
     }
 
-    public static StudyRoomResponse from(StudyRoom studyRoom) {
-        return new StudyRoomResponse(studyRoom, Collections.emptyList());
+    // For cases where members are not loaded yet or simplified view
+    public static StudyRoomResponse from(StudyRoom studyRoom, Long currentUserId) {
+        return new StudyRoomResponse(studyRoom, Collections.emptyList(), currentUserId);
     }
 }

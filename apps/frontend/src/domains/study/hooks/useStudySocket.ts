@@ -117,11 +117,26 @@ export const useStudySocketSubscription = (studyId: number) => {
     console.log('[StudySocket] Sending ENTER');
     client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
 
-    // 2. Subscribe
-    const topic = `/topic/studies/rooms/${studyId}`;
-    console.log('[StudySocket] Subscribing to', topic);
+    // 2. Subscribe Public Room Topic
+    const publicTopic = `/topic/studies/rooms/${studyId}`;
+    console.log('[StudySocket] Subscribing to Public:', publicTopic);
 
-    const subscription = client.subscribe(topic, async (message) => {
+    const publicSubscription = client.subscribe(publicTopic, (message) => {
+      handleSocketMessage(message);
+    });
+
+    // 3. Subscribe Private User Topic (For ROOM_INFO, ERROR etc)
+    let privateSubscription: any = null;
+    if (currentUserId) {
+      const privateTopic = `/topic/studies/${studyId}/info/${currentUserId}`;
+      console.log('[StudySocket] Subscribing to Private:', privateTopic);
+      privateSubscription = client.subscribe(privateTopic, (message) => {
+        handleSocketMessage(message);
+      });
+    }
+
+    // Helper to handle messages
+    const handleSocketMessage = async (message: any) => {
       if (!message.body) return;
       try {
         const payload = JSON.parse(message.body);
@@ -134,17 +149,9 @@ export const useStudySocketSubscription = (studyId: number) => {
           case 'ENTER': {
             // data is userId (number)
             const enteredUserId = data;
-            // Existing user might already be there (reconnect)
-            // But we need to refresh to get details if it's a new user
-            // Optimization: Only fetch if not found, or always fetch to be safe
             try {
-              // Fetch full list to be safe and get nickname/profile
               const members = await fetchStudyParticipants(studyId);
-              // We need to preserve 'isOnline' status of existing members?
-              // fetchStudyParticipants returns fresh status from DB/API?
-              // Actually the API returns what backend thinks.
               setParticipants(members);
-
               const enteredMember = members.find((p) => p.id === enteredUserId);
               if (enteredMember && enteredUserId !== useRoomStore.getState().currentUserId) {
                 toast.info(`${enteredMember.nickname}님이 입장하셨습니다.`);
@@ -155,27 +162,17 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'LEAVE': {
-            // data is userId (number)
             const leftUserId = data;
             updateParticipant(leftUserId, { isOnline: false });
-            const leftMember = stateParticipants.find((p) => p.id === leftUserId);
-            if (leftMember && leftUserId !== useRoomStore.getState().currentUserId) {
-              // Optional: Toast for leaving?
-            }
             break;
           }
           case 'QUIT': {
-            // If backend sends QUIT
             const quitUserId = data;
             removeParticipant(quitUserId);
             break;
           }
           case 'DELEGATE': {
-            // data is newOwnerUserId (number)
             const newOwnerId = data;
-            // Update local state: Set all isOwner=false, then set new and old?
-            // Usually old owner becomes member.
-            // We can just refetch participants to be 100% sure of roles
             try {
               const members = await fetchStudyParticipants(studyId);
               setParticipants(members);
@@ -187,7 +184,6 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'KICK': {
-            // data is kickedUserId (number)
             const kickedUserId = data;
             if (useRoomStore.getState().currentUserId === kickedUserId) {
               toast.error('스터디에서 강퇴되었습니다.');
@@ -200,20 +196,23 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'DELETE': {
-            // Room deleted
             toast.error('방장에 의해 스터디가 삭제되었습니다.');
             router.replace('/home');
             break;
           }
+          case 'ROOM_INFO': {
+            const { title, description, role } = data;
+            setRoomInfo({ roomTitle: title, roomDescription: description, myRole: role });
+            // toast.info('스터디 정보가 갱신되었습니다.');
+            break;
+          }
           case 'INFO': {
-            // data is { title, description }
             const { title, description } = data;
             setRoomInfo({ roomTitle: title, roomDescription: description });
             toast.info('스터디 정보가 변경되었습니다.');
             break;
           }
           case 'STATUS': {
-            // data is { userId, isMuted, isVideoOff }
             const { userId, isMuted, isVideoOff } = data;
             updateParticipant(userId, { isMuted, isVideoOff });
             break;
@@ -222,10 +221,12 @@ export const useStudySocketSubscription = (studyId: number) => {
       } catch (e) {
         console.error('[StudySocket] Error parsing message', e);
       }
-    });
+    };
 
     return () => {
-      subscription.unsubscribe();
+      publicSubscription.unsubscribe();
+      if (privateSubscription) privateSubscription.unsubscribe();
+
       // 3. Leave Study (Session Exit)
       if (client && client.connected) {
         console.log('[StudySocket] Sending LEAVE');

@@ -114,6 +114,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         setRoomInfo({
           roomId: data.id,
           roomTitle: data.title,
+          myRole: data.role,
         }),
       )
       .catch((err) => console.error('Failed to fetch room info:', err));

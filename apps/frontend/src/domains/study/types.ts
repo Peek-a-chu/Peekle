@@ -38,6 +38,7 @@ export interface StudyMember {
 export interface StudyRoomDetail {
   id: number;
   title: string;
+  role: 'OWNER' | 'MEMBER';
   members: StudyMember[];
 }
 

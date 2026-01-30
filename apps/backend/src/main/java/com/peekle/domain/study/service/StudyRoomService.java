@@ -128,7 +128,7 @@ public class StudyRoomService {
 
                 // 이미 멤버라면 스터디 상세 정보 반환 (멤버 목록 포함)
                 if (studyMemberRepository.existsByStudyAndUser_Id(studyRoom, userId)) {
-                        return buildStudyRoomResponse(studyRoom);
+                        return buildStudyRoomResponse(studyRoom, userId);
                 }
 
                 // 멤버가 아니라면 접근 거부
@@ -168,7 +168,7 @@ public class StudyRoomService {
 
                 studyMemberRepository.save(member);
 
-                return buildStudyRoomResponse(studyRoom);
+                return buildStudyRoomResponse(studyRoom, userId);
         }
 
         // 스터디 방 초대코드 생성 (방에 참여한 사람만 가능)
@@ -272,7 +272,7 @@ public class StudyRoomService {
                 studyRoom.delegateOwner(targetMember.getUser());
         }
 
-        private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom) {
+        private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom, Long currentUserId) {
                 // 1. 전체 멤버 조회
                 List<StudyMember> members = studyMemberRepository.findAllByStudy(studyRoom);
 
@@ -291,7 +291,7 @@ public class StudyRoomService {
                                                 finalOnlineUserIds.contains(String.valueOf(member.getUser().getId()))))
                                 .collect(Collectors.toList());
 
-                return StudyRoomResponse.from(studyRoom, memberResponses);
+                return StudyRoomResponse.from(studyRoom, memberResponses, currentUserId);
         }
 
         @Transactional

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRoomStore, Participant } from '@/domains/study/hooks/useRoomStore';
+import { useRoomStore, Participant, selectIsOwner } from '@/domains/study/hooks/useRoomStore';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,7 @@ export function StudyParticipantPanel() {
   const myId = user?.id ? Number(user.id) : -1;
 
   // Find if I am owner
-  const me = participants.find((p) => p.id === myId);
-  const isOwner = me?.isOwner ?? false;
+  const isOwner = useRoomStore(selectIsOwner);
 
   const [kickTarget, setKickTarget] = useState<Participant | null>(null);
   const [delegateTarget, setDelegateTarget] = useState<Participant | null>(null);
@@ -161,9 +160,9 @@ export function StudyParticipantPanel() {
                   isRoomOwner={isOwner}
                   onKick={setKickTarget}
                   onDelegate={setDelegateTarget}
-                  onViewCode={() => {}} // Disabled for offline
+                  onViewCode={() => { }} // Disabled for offline
                   onViewProfile={handleViewProfile}
-                  // Mute/Video actions usually disabled or hidden for offline
+                // Mute/Video actions usually disabled or hidden for offline
                 />
               ))}
             </div>
