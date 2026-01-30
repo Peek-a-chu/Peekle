@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface LeagueHistoryRepository extends JpaRepository<LeagueHistory, Long> {
     List<LeagueHistory> findAllByUserIdOrderBySeasonWeekAsc(Long userId);
+
+    List<LeagueHistory> findBySeasonWeek(int seasonWeek);
 }
