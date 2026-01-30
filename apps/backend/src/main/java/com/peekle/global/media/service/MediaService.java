@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.net.ssl.*;
+import java.security.cert.X509Certificate;
 import java.util.Map;
 
 @Slf4j
@@ -24,8 +26,45 @@ public class MediaService {
 
     @PostConstruct
     public void init() {
+        // 개발 환경용: SSL 인증서 검증 무시 (자체 서명 인증서 사용 시 필요)
+        disableSslVerification();
+
         this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
         log.info("Connecting to OpenVidu at {}", openViduUrl);
+    }
+
+    /**
+     * SSL 인증서 무시 설정 (개발용)
+     * CA 인증서가 없는 OpenVidu 서버(localhost 등) 접속 시 SSL 에러 방지
+     */
+    private void disableSslVerification() {
+        try {
+            TrustManager[] trustAllCerts = new TrustManager[] {
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return null;
+                        }
+
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        }
+
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        }
+                    }
+            };
+
+            SSLContext sc = SSLContext.getInstance("SSL");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+            // 호스트네임 검증 무시
+            HostnameVerifier allHostsValid = (hostname, session) -> true;
+            HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+
+            log.warn("⚠️ SSL Verification has been disabled. Do NOT use this in production!");
+        } catch (Exception e) {
+            log.error("Failed to disable SSL verification", e);
+        }
     }
 
     /**
@@ -36,7 +75,14 @@ public class MediaService {
      */
     public String getOrCreateSession(String customSessionId) throws OpenViduJavaClientException, OpenViduHttpException {
         // 1. 활성 세션 목록 조회
-        openVidu.fetch();
+        try {
+            openVidu.fetch();
+        } catch (OpenViduJavaClientException e) {
+            // 연결 실패 시 더 명확한 로그 남기기
+            log.error("Failed to fetch OpenVidu sessions. Check URL/Secret or SSL settings. URL: {}", openViduUrl);
+            throw e;
+        }
+
         for (Session session : openVidu.getActiveSessions()) {
             if (session.getSessionId().equals(customSessionId)) {
                 log.info("Found existing session: {}", customSessionId);
@@ -45,7 +91,6 @@ public class MediaService {
         }
 
         // 2. 세션 생성
-        // Custom Session ID를 사용하면, OpenVidu Session ID 자체가 우리가 원하는 문자열이 됩니다.
         SessionProperties properties = new SessionProperties.Builder()
                 .customSessionId(customSessionId)
                 .build();

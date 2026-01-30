@@ -1,4 +1,4 @@
-export type ChatType = 'TALK' | 'CODE' | 'SYSTEM' | 'ENTER' | 'LEAVE';
+export type ChatType = 'TALK' | 'CODE' | 'SYSTEM' | 'ENTER' | 'LEAVE' | 'SUBMISSION';
 
 export interface ChatMessage {
   id?: string; // UUID or timestamp based ID
@@ -19,6 +19,10 @@ export interface ChatMessage {
     language?: string;
     problemTitle?: string;
     ownerName?: string;
+    problemId?: number;
+    isRealtime?: boolean;
+    targetUserId?: number;
+    isRefChat?: boolean;
     [key: string]: unknown;
   };
   createdAt: string;
