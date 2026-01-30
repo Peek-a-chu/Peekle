@@ -97,6 +97,13 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const { problems, addProblem, deleteProblem } = useProblems(studyId);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
+  // Set currentUserId when user is available
+  useEffect(() => {
+    if (user?.id) {
+      setCurrentUserId(user.id);
+    }
+  }, [user, setCurrentUserId]);
+
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
     // Load user if not already available
@@ -136,11 +143,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         ),
       )
       .catch((err) => console.error('Failed to fetch participants:', err));
-
-    if (user) {
-      setCurrentUserId(user.id);
-    }
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId, user]);
+  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, checkAuth, user]);
 
   const handleBack = (): void => {
     router.push('/study');
@@ -150,8 +153,9 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     title: string,
     number: number,
     tags?: string[],
+    problemId?: number,
   ): Promise<void> => {
-    await addProblem(title, number, tags);
+    await addProblem(title, number, tags, problemId);
     console.log('Add problem clicked in header');
   };
 
@@ -177,8 +181,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     const newMuted = !me.isMuted;
     updateParticipant(currentUserId, { isMuted: newMuted });
 
-    // Toggle Mute
+    // Toggle Mute (OpenVidu + Socket)
     updateStatus(newMuted, me.isVideoOff);
+    
+    // OpenVidu 오디오 토글도 호출 (useOpenVidu가 CCVideoGrid에서 호출되므로 전역 함수 사용)
+    const toggleAudio = (window as any).__openviduToggleAudio;
+    if (toggleAudio) {
+      toggleAudio();
+    }
   };
 
   const handleVideoToggle = (): void => {
@@ -190,8 +200,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     const newVideoOff = !me.isVideoOff;
     updateParticipant(currentUserId, { isVideoOff: newVideoOff });
 
-    // Toggle Video
+    // Toggle Video (OpenVidu + Socket)
     updateStatus(me.isMuted, newVideoOff);
+    
+    // OpenVidu 비디오 토글도 호출
+    const toggleVideo = (window as any).__openviduToggleVideo;
+    if (toggleVideo) {
+      toggleVideo();
+    }
   };
 
   // Control Bar button: Toggle whiteboard tile visibility in VideoGrid

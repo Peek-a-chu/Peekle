@@ -74,6 +74,9 @@ importers:
       next:
         specifier: ^15.1.6
         version: 15.5.9(@babel/core@7.28.6)(@playwright/test@1.58.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      openvidu-browser:
+        specifier: ^2.32.1
+        version: 2.32.1
       pretendard:
         specifier: ^1.3.9
         version: 1.3.9
@@ -3715,6 +3718,9 @@ packages:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
     engines: {node: '>= 0.6'}
 
+  freeice@2.2.2:
+    resolution: {integrity: sha512-XNoIxDHufqPIBSLpp4IrFPnoc+hv/0RwdOGhIoggIDC2ZKf5r6OoixbeoFJSmZOAq2aYiEUArhuQ8zVVrM5C4w==}
+
   fresh@0.5.2:
     resolution: {integrity: sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==}
     engines: {node: '>= 0.6'}
@@ -3869,6 +3875,9 @@ packages:
     resolution: {integrity: sha512-vafaFqs8MZkRrSX7sFVUdo3ap/eNiLnb4IakshzvP56X5Nr1iGKAIqdX6tMlm6HcNRIkr6AxO5jFEoJzzpT8aQ==}
     engines: {node: '>=0.4.7'}
     hasBin: true
+
+  hark@1.2.3:
+    resolution: {integrity: sha512-u68vz9SCa38ESiFJSDjqK8XbXqWzyot7Cj6Y2b6jk2NJ+II3MY2dIrLMg/kjtIAun4Y1DHF/20hfx4rq1G5GMg==}
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -4432,6 +4441,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  jsnlog@2.30.0:
+    resolution: {integrity: sha512-o3ROQVkhek+dkc7/9TXlB4TNtxUpYsRLOBJHZYk3Vy0B5zRBmfv9tyr56PrjcgEXuy06ARgfLTANY0+ImhzzGA==}
+
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
 
@@ -4928,6 +4940,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  normalice@1.0.1:
+    resolution: {integrity: sha512-wF2/tv9q/K8S+RqCgll5yC6z/zcXNr+rEHfGIw8A6D58vjfJo+kp749MI6cAHv72LE7nwv92Qi6tZhIeMOOJpg==}
+
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
@@ -5009,6 +5024,9 @@ packages:
   onetime@7.0.0:
     resolution: {integrity: sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==}
     engines: {node: '>=18'}
+
+  openvidu-browser@2.32.1:
+    resolution: {integrity: sha512-XNRP5vMveJsbiOhgOP7N5sbRbrWDj1zfVuCvfnUE77ni7zEIb8IEK0pHsGQPCQHqZE5u0cs3hpT+KfxdOEfsfA==}
 
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
@@ -5141,6 +5159,9 @@ packages:
   pkg-dir@4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
     engines: {node: '>=8'}
+
+  platform@1.3.6:
+    resolution: {integrity: sha512-fnWVljUchTro6RiCFvCXBbNhJc2NijN7oIQxbwsyL0buWJPG85v81ehlHI9fXrJsMNgTofEoWIQeClKpgxFLrg==}
 
   playwright-core@1.58.0:
     resolution: {integrity: sha512-aaoB1RWrdNi3//rOeKuMiS65UCcgOVljU46At6eFcOFPFHWtd2weHRRow6z/n+Lec0Lvu0k9ZPKJSjPugikirw==}
@@ -6599,6 +6620,12 @@ packages:
 
   wide-align@1.1.5:
     resolution: {integrity: sha512-eDMORYaPNZ4sQIuuYPDHdQvf4gyCF9rEEV/yPxGfwPkRodwEgiMUUXTx/dex+Me0wxx53S+NgUHaP7y3MGlDmg==}
+
+  wildemitter@1.2.1:
+    resolution: {integrity: sha512-UMmSUoIQSir+XbBpTxOTS53uJ8s/lVhADCkEbhfRjUGFDPme/XGOb0sBWLx5sTz7Wx/2+TlAw1eK9O5lw5PiEw==}
+
+  wolfy87-eventemitter@5.2.9:
+    resolution: {integrity: sha512-P+6vtWyuDw+MB01X7UeF8TaHBvbCovf4HPEMF/SV7BdDc1SMTiBy13SRD71lQh4ExFTG1d/WNzDGDCyOKSMblw==}
 
   word-wrap@1.2.5:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
@@ -10515,6 +10542,10 @@ snapshots:
 
   forwarded@0.2.0: {}
 
+  freeice@2.2.2:
+    dependencies:
+      normalice: 1.0.1
+
   fresh@0.5.2: {}
 
   fs-constants@1.0.0: {}
@@ -10694,6 +10725,10 @@ snapshots:
       wordwrap: 1.0.0
     optionalDependencies:
       uglify-js: 3.19.3
+
+  hark@1.2.3:
+    dependencies:
+      wildemitter: 1.2.1
 
   has-bigints@1.1.0: {}
 
@@ -11536,6 +11571,8 @@ snapshots:
 
   jsesc@3.1.0: {}
 
+  jsnlog@2.30.0: {}
+
   json-buffer@3.0.1: {}
 
   json-parse-even-better-errors@2.3.1: {}
@@ -12163,6 +12200,8 @@ snapshots:
       abbrev: 1.1.1
     optional: true
 
+  normalice@1.0.1: {}
+
   normalize-path@3.0.0: {}
 
   npm-run-path@4.0.1:
@@ -12257,6 +12296,19 @@ snapshots:
   onetime@7.0.0:
     dependencies:
       mimic-function: 5.0.1
+
+  openvidu-browser@2.32.1:
+    dependencies:
+      events: 3.3.0
+      freeice: 2.2.2
+      hark: 1.2.3
+      inherits: 2.0.4
+      jsnlog: 2.30.0
+      mime: 2.6.0
+      platform: 1.3.6
+      semver: 7.7.3
+      uuid: 8.3.2
+      wolfy87-eventemitter: 5.2.9
 
   optionator@0.9.4:
     dependencies:
@@ -12382,6 +12434,8 @@ snapshots:
   pkg-dir@4.2.0:
     dependencies:
       find-up: 4.1.0
+
+  platform@1.3.6: {}
 
   playwright-core@1.58.0: {}
 
@@ -14077,6 +14131,10 @@ snapshots:
     dependencies:
       string-width: 4.2.3
     optional: true
+
+  wildemitter@1.2.1: {}
+
+  wolfy87-eventemitter@5.2.9: {}
 
   word-wrap@1.2.5: {}
 

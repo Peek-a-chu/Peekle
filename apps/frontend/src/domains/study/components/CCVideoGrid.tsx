@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { useOpenVidu } from '@/domains/study/hooks/useOpenVidu';
 import { CCVideoTile as VideoTile } from '@/domains/study/components/CCVideoTile';
 import { CCWhiteboardTile as WhiteboardTile } from '@/domains/study/components/CCWhiteboardTile';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,9 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const viewRealtimeCode = useRoomStore((state) => state.viewRealtimeCode);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
+
+  // OpenVidu 연결 초기화 (비디오 토큰이 있을 때만)
+  useOpenVidu();
 
   const sortedParticipants = useMemo(() => {
     return [...participants].sort((a, b) => {

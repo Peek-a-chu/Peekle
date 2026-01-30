@@ -53,12 +53,15 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - OPENVIDU_URL=https://openvidu:4443
+      - OPENVIDU_SECRET=MY_SECRET
     volumes:
       - h2-data:/app/data
     expose:
       - "8080"
     depends_on:
       - redis
+      - openvidu
     networks:
       - peekle-network-dev
 
@@ -79,6 +82,8 @@ services:
       - OPENVIDU_SECRET=MY_SECRET
       - DOMAIN_OR_PUBLIC_IP=localhost
       - OPENVIDU_PUBLICURL=https://localhost/openvidu
+    expose:
+      - "4443"
     networks:
       - peekle-network-dev
 

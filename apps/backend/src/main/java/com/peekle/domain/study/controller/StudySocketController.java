@@ -93,7 +93,15 @@ public class StudySocketController {
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
+                } catch (Exception e) {
+                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId, e.getMessage(), e);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "Init Error: " + e.getMessage()));
+                        // OpenVidu 실패해도 다른 초기화는 계속 진행
+                }
 
+                try {
                         // 2. Room Info
                         StudyRoomResponse roomInfo = studyRoomService
                                         .getStudyRoom(userId, studyId);
@@ -103,7 +111,7 @@ public class StudySocketController {
 
                         // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
-                                        .getDailyProblems(userId, studyId, java.time.LocalDate.now());
+                                                .getDailyProblems(userId, studyId, java.time.LocalDate.now());
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/curriculum/" + userId,
                                         SocketResponse.of("CURRICULUM", curriculum));
@@ -125,7 +133,6 @@ public class StudySocketController {
                         } catch (Exception e) {
                                 log.error("Whiteboard Restore Failed", e);
                         }
-
                 } catch (Exception e) {
                         log.error("Enter Init Fail", e);
                         messagingTemplate.convertAndSend(
