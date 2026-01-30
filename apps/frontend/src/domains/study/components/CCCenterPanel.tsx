@@ -134,9 +134,14 @@ export function CCCenterPanel({
 
                 if (isViewingOther) {
                   // Smart Ref Chat: Capture other's code
-                  const code = viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode;
+                  const code =
+                    viewMode === 'SPLIT_SAVED'
+                      ? targetSubmission?.code ?? ''
+                      : realtimeCode ?? '';
                   const lang =
-                    viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage;
+                    viewMode === 'SPLIT_SAVED'
+                      ? targetSubmission?.language ?? 'python'
+                      : realtimeLanguage ?? 'python';
 
                   // For bots, we want to include (Bot) and for saved submissions, indicate it's stored code
                   let ownerName =
@@ -148,20 +153,18 @@ export function CCCenterPanel({
                     ownerName = `${targetSubmission.username}${isBot ? ' (Bot)' : ''}의 저장된 코드`;
                   }
 
-                  if (code) {
-                    useRoomStore.getState().setPendingCodeShare({
-                      code,
-                      language: lang || 'python', // Fallback or infer
-                      ownerName: ownerName || 'Unknown',
-                      problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
-                      isRealtime: viewMode === 'SPLIT_REALTIME',
-                    });
-                    useRoomStore.getState().setRightPanelActiveTab('chat');
-                    setTimeout(() => {
-                      const chatInput = document.getElementById('chat-input');
-                      if (chatInput) chatInput.focus();
-                    }, 0);
-                  }
+                  useRoomStore.getState().setPendingCodeShare({
+                    code,
+                    language: lang || 'python', // Fallback or infer
+                    ownerName: ownerName || 'Unknown',
+                    problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
+                    isRealtime: viewMode === 'SPLIT_REALTIME',
+                  });
+                  useRoomStore.getState().setRightPanelActiveTab('chat');
+                  setTimeout(() => {
+                    const chatInput = document.getElementById('chat-input');
+                    if (chatInput) chatInput.focus();
+                  }, 0);
                 } else {
                   // Capture My Code
                   void handleRefChat();

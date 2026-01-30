@@ -37,16 +37,18 @@ public class SubmissionLog {
     @Enumerated(EnumType.STRING)
     private SourceType sourceType;
 
+    @Column(name = "problem_title")
+    private String problemTitle;
+
     @Column(name = "room_id")
     private Long roomId;
 
-    @Column(name = "problem_title")
-    private String problemTitle;
+    @Column(name = "external_id")
+    private String externalId; // BOJ Problem ID (e.g. "1000")
 
     @Column(name = "problem_tier")
     private String problemTier;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String code;
 
@@ -56,20 +58,27 @@ public class SubmissionLog {
     @Column(name = "execution_time")
     private Integer executionTime;
 
+    @Column(name = "tag")
+    private String tag; // e.g. "[팀] 스피드 레이스", "알고리즘 스터디"
+
     private String language;
 
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
     public static SubmissionLog create(User user, Problem problem, SourceType sourceType, 
+                                     String problemTitle, String problemTier, String externalId,
+                                     String tag,
                                      String code, Integer memory, 
                                      Integer executionTime, String language, LocalDateTime submittedAt) {
         SubmissionLog log = new SubmissionLog();
         log.user = user;
         log.problem = problem;
         log.sourceType = sourceType;
-        log.problemTitle = problem.getTitle();
-        log.problemTier = problem.getTier();
+        log.problemTitle = problemTitle;
+        log.externalId = externalId;
+        log.problemTier = problemTier;
+        log.tag = tag;
         log.code = code;
         log.memory = memory;
         log.executionTime = executionTime;

@@ -83,7 +83,7 @@ export function CCMonthlyActivityCard({ onDateSelect }: Props) {
         </div>
 
         {/* The Grid */}
-        <div className="flex gap-1 flex-1 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-1 flex-1 overflow-x-auto pb-2">
           {gridData.map((week, wIdx) => (
             <div key={wIdx} className="flex flex-col gap-1 shrink-0">
               {week.map((level, dIdx) => (

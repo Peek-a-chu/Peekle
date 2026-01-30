@@ -33,9 +33,6 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   }, [participants, currentUserId]);
 
   const handleTileClick = (participantId: number) => {
-    // If no problem is selected, ignore clicks (except maybe to ensure we are in a safe state, but basically disable interaction)
-    if (!selectedProblemId) return;
-
     if (participantId === currentUserId) {
       // Clicking on self returns to "only mine" view
       resetToOnlyMine();

@@ -3,7 +3,6 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, Raw, Like } from "typeorm";
 import { Submission } from "./entities/submission.entity";
 import { AvailableProblem } from "./entities/available-problem.entity";
-import { SocketService } from "./sockets/socket.service";
 import { StudyProblem } from "./entities/study-problem.entity";
 import { StudyProblemParticipant } from "./entities/study-problem-participant.entity";
 
@@ -18,93 +17,123 @@ export class AppService implements OnModuleInit {
     private studyProblemRepository: Repository<StudyProblem>,
     @InjectRepository(StudyProblemParticipant)
     private studyProblemParticipantRepository: Repository<StudyProblemParticipant>,
-    private socketService: SocketService,
   ) {}
 
   getHello(): string {
     return "Hello World From NestJS!";
   }
 
+  // --- Study Room Management ---
+
+  async createStudy(title: string) {
+    // Mock implementation
+    return {
+      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+    };
+  }
+
+  async joinStudy(inviteCode: string, userId: number) {
+    // Mock implementation
+    return {
+      id: 1,
+      title: "Java Algo",
+      ownerId: 100,
+      members: await this.getParticipants("1"),
+    };
+  }
+
+  async createInviteCode(studyId: string) {
+    return {
+      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+    };
+  }
+
+  async getMyStudies(userId: number, page: number, keyword: string) {
+    // Mock
+    return {
+      content: [{ id: 1, title: "Java Algo", memberCount: 3 }],
+      totalPages: 1,
+    };
+  }
+
+  async getStudyDetail(studyId: string) {
+    return {
+      id: Number(studyId),
+      title: "Java Algo",
+      members: await this.getParticipants(studyId),
+    };
+  }
+
+  async getStudyRoom(studyId: string) {
+    return {
+      roomId: Number(studyId),
+      roomTitle: "알고리즘 마스터 스터디",
+      roomDescription: "매주 월/수/금 알고리즘 문제를 함께 풀어요!",
+      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+    };
+  }
+
   async getProblems(studyId: string, date: string): Promise<any[]> {
-        console.log('Getting problems for date: ' + date);
-        
-        // Query StudyProblem with AvailableProblem relation
-        const query = this.studyProblemRepository.createQueryBuilder("sp")
-          .leftJoinAndSelect("sp.problem", "ap")
-          .where("sp.studyId = :studyId", { studyId })
-          .orderBy("sp.createdAt", "DESC");
-    
-        const studyProblems = await query.getMany();
-        console.log('Found ' + studyProblems.length + ' study problems total.');
-    
-        let filtered = studyProblems;
-        if (date) {
-            filtered = studyProblems.filter(p => {
-                 let pDateStr = '';
-                 if (p.createdAt instanceof Date) {
-                     pDateStr = p.createdAt.toISOString().split('T')[0];
-                 } else {
-                     pDateStr = String(p.createdAt).split('T')[0].split(' ')[0];
-                 }
-                 return pDateStr === date;
-            });
-            console.log('Filtered down to ' + filtered.length + ' problems for date ' + date);
+    console.log("Getting problems for date: " + date);
+
+    // Query StudyProblem with AvailableProblem relation
+    const query = this.studyProblemRepository
+      .createQueryBuilder("sp")
+      .leftJoinAndSelect("sp.problem", "ap")
+      .where("sp.studyId = :studyId", { studyId })
+      .orderBy("sp.createdAt", "DESC");
+
+    const studyProblems = await query.getMany();
+    console.log("Found " + studyProblems.length + " study problems total.");
+
+    let filtered = studyProblems;
+    if (date) {
+      filtered = studyProblems.filter((p) => {
+        let pDateStr = "";
+        if (p.createdAt instanceof Date) {
+          pDateStr = p.createdAt.toISOString().split("T")[0];
+        } else {
+          pDateStr = String(p.createdAt).split("T")[0].split(" ")[0];
         }
+        return pDateStr === date;
+      });
+      console.log(
+        "Filtered down to " + filtered.length + " problems for date " + date,
+      );
+    }
     // Map to Frontend Problem Shape
     const totalParticipants = (await this.getParticipants(studyId)).length;
 
-    const enriched = await Promise.all(filtered.map(async (sp) => {
-      const solvedCount = await this.submissionRepository
-        .createQueryBuilder("sub")
-        .where("sub.studyProblemId = :spId", { spId: sp.id })
-        .andWhere("sub.status = :status", { status: 'success' })
-        .select("DISTINCT sub.userId")
-        .getCount();
+    const enriched = await Promise.all(
+      filtered.map(async (sp) => {
+        const solvedCount = await this.submissionRepository
+          .createQueryBuilder("sub")
+          .where("sub.studyProblemId = :spId", { spId: sp.id })
+          .andWhere("sub.status = :status", { status: "success" })
+          .select("DISTINCT sub.userId")
+          .getCount();
 
-      return {
-        id: sp.id, // StudyProblem ID
-        createdAt: sp.createdAt,
-        title: sp.problem.title,
-        number: sp.problem.number,
-        source: sp.problem.source,
-        status: solvedCount > 0 ? 'success' : 'not_started', // Simple heuristic
-        tags: sp.problem.tags,
-        participantCount: solvedCount, 
-        totalParticipants: totalParticipants,
-        url: 'https://www.acmicpc.net/problem/' + sp.problem.number,
-        tier: sp.problem.tier,
-      };
-    }));
+        return {
+          id: sp.id, // StudyProblem ID
+          createdAt: sp.createdAt,
+          title: sp.problem.title,
+          number: sp.problem.number,
+          source: sp.problem.source,
+          status: solvedCount > 0 ? "success" : "not_started", // Simple heuristic
+          tags: sp.problem.tags,
+          participantCount: solvedCount,
+          totalParticipants: totalParticipants,
+          url: "https://www.acmicpc.net/problem/" + sp.problem.number,
+          tier: sp.problem.tier,
+        };
+      }),
+    );
 
     return enriched;
   }
 
-  async getProblemDates(studyId: string): Promise<string[]> {
-    const result = await this.studyProblemRepository
-      .createQueryBuilder("sp")
-      .select("sp.createdAt")
-      .where("sp.studyId = :studyId", { studyId })
-      .getMany();
-
-    const dates = new Set<string>();
-    result.forEach((p) => {
-      if (p.createdAt && p.createdAt instanceof Date) {
-        dates.add(p.createdAt.toISOString().split("T")[0]);
-      } else if (typeof p.createdAt === "string") {
-        dates.add((p.createdAt as string).split("T")[0].split(" ")[0]);
-      }
-    });
-    return Array.from(dates).sort();
-  }
-
-  async getSubmissions(
-    studyId: string,
-    problemId: string, // This is StudyProblem ID
-  ): Promise<Submission[]> {
-    return this.submissionRepository.find({
-      where: { studyProblemId: Number(problemId) },
-      order: { submittedAt: "DESC" },
-    });
+  async getDailyCurriculum(studyId: string, date: string) {
+    return this.getProblems(studyId, date);
   }
 
   async getParticipants(studyId: string) {
@@ -160,16 +189,7 @@ export class AppService implements OnModuleInit {
     ];
   }
 
-  async getStudyRoom(studyId: string) {
-    return {
-      roomId: Number(studyId),
-      roomTitle: "알고리즘 마스터 스터디",
-      roomDescription: "매주 월/수/금 알고리즘 문제를 함께 풀어요!",
-      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-    };
-  }
-
-  async getChats(studyId: string): Promise<any[]> {
+  async getChats(studyId: string, page: number = 0): Promise<any[]> {
     const baseTime = Date.now();
     return [
       {
@@ -195,7 +215,8 @@ export class AppService implements OnModuleInit {
         roomId: Number(studyId),
         senderId: 1,
         senderName: "알고마스터",
-        content: "오늘은 A+B, A-B, 터렛 문제를 풀어볼게요. 터렛이 조금 어려울 수 있어요!",
+        content:
+          "오늘은 A+B, A-B, 터렛 문제를 풀어볼게요. 터렛이 조금 어려울 수 있어요!",
         type: "TALK",
         createdAt: new Date(baseTime - 6600000).toISOString(),
       },
@@ -234,7 +255,8 @@ export class AppService implements OnModuleInit {
         metadata: {
           language: "javascript",
           problemTitle: "A+B",
-          codePreview: "const [a, b] = input.split(' ').map(Number);\nconsole.log(a + b);",
+          codePreview:
+            "const [a, b] = input.split(' ').map(Number);\nconsole.log(a + b);",
         },
         createdAt: new Date(baseTime - 4800000).toISOString(),
       },
@@ -266,7 +288,8 @@ export class AppService implements OnModuleInit {
         roomId: Number(studyId),
         senderId: 3,
         senderName: "PS러버",
-        content: "터렛 문제 조건 분기가 좀 까다롭네요... 경계 조건 처리하는게 핵심인 것 같아요",
+        content:
+          "터렛 문제 조건 분기가 좀 까다롭네요... 경계 조건 처리하는게 핵심인 것 같아요",
         type: "TALK",
         createdAt: new Date(baseTime - 3600000).toISOString(),
       },
@@ -275,7 +298,8 @@ export class AppService implements OnModuleInit {
         roomId: Number(studyId),
         senderId: 4,
         senderName: "백준킹",
-        content: "저도 터렛 풀고 있는데 무한대 출력하는 케이스가 뭔지 모르겠어요 ㅠㅠ",
+        content:
+          "저도 터렛 풀고 있는데 무한대 출력하는 케이스가 뭔지 모르겠어요 ㅠㅠ",
         type: "TALK",
         createdAt: new Date(baseTime - 3000000).toISOString(),
       },
@@ -284,13 +308,15 @@ export class AppService implements OnModuleInit {
         roomId: Number(studyId),
         senderId: 3,
         senderName: "PS러버",
-        content: "두 원이 완전히 겹칠 때요! d=0이고 r1=r2일 때 -1 출력하면 됩니다",
+        content:
+          "두 원이 완전히 겹칠 때요! d=0이고 r1=r2일 때 -1 출력하면 됩니다",
         type: "TALK",
         parentMessage: {
           id: "chat-10",
           senderId: 4,
           senderName: "백준킹",
-          content: "저도 터렛 풀고 있는데 무한대 출력하는 케이스가 뭔지 모르겠어요 ㅠㅠ",
+          content:
+            "저도 터렛 풀고 있는데 무한대 출력하는 케이스가 뭔지 모르겠어요 ㅠㅠ",
           type: "TALK",
         },
         createdAt: new Date(baseTime - 2700000).toISOString(),
@@ -334,54 +360,140 @@ export class AppService implements OnModuleInit {
     ];
   }
 
+  // --- Submission ---
+
+  async submitSolution(
+    studyId: string,
+    data: { problemId: number; code: string; language: string },
+    userId: number,
+  ) {
+    // Find StudyProblem by BOJ number
+    const studyProblem = await this.studyProblemRepository
+      .createQueryBuilder("sp")
+      .leftJoin("sp.problem", "ap")
+      .where("sp.studyId = :studyId", { studyId })
+      .andWhere("ap.number = :number", { number: data.problemId })
+      .getOne();
+
+    if (!studyProblem) {
+      throw new Error("Problem not found in this study");
+    }
+
+    const submission = this.submissionRepository.create({
+      studyId: Number(studyId),
+      studyProblemId: studyProblem.id,
+      userId: userId,
+      username: "User" + userId, // Mock username
+      language: data.language,
+      code: data.code,
+      status: "success", // Mock success
+      memory: 1024,
+      time: 100,
+      submittedAt: new Date().toISOString(),
+    });
+
+    const saved = await this.submissionRepository.save(submission);
+
+    return {
+      success: true,
+      submissionId: saved.id,
+      earnedPoints: 10,
+    };
+  }
+
+  async getSubmissionList(
+    studyId: string,
+    problemId: string,
+    page: number,
+    size: number,
+  ) {
+    const studyProblem = await this.studyProblemRepository
+      .createQueryBuilder("sp")
+      .leftJoin("sp.problem", "ap")
+      .where("sp.studyId = :studyId", { studyId })
+      .andWhere("ap.number = :number", { number: problemId })
+      .getOne();
+
+    if (!studyProblem) return { content: [] };
+
+    const submissions = await this.submissionRepository.find({
+      where: { studyProblemId: studyProblem.id, status: "success" },
+      take: size,
+      skip: page * size,
+      order: { submittedAt: "DESC" },
+    });
+
+    return {
+      content: submissions.map((s) => ({
+        userId: s.userId,
+        nickname: s.username,
+        memory: s.memory,
+        executionTime: s.time,
+      })),
+    };
+  }
+
+  async getSubmissionDetail(submissionId: string) {
+    const sub = await this.submissionRepository.findOne({
+      where: { id: Number(submissionId) },
+    });
+    if (!sub) return null;
+    return {
+      submissionId: sub.id,
+      code: sub.code,
+      language: sub.language,
+    };
+  }
+
   async createProblem(
     studyId: string,
     data: { title: string; number: number; tags?: string[] },
   ): Promise<any> {
     // 1. Find or Create AvailableProblem
-    let available = await this.availableProblemRepository.findOne({ where: { number: data.number } });
-    
+    let available = await this.availableProblemRepository.findOne({
+      where: { number: data.number },
+    });
+
     if (!available) {
-        available = this.availableProblemRepository.create({
-            number: data.number,
-            title: data.title,
-            tags: data.tags,
-            source: 'BOJ',
-            tier: 1
-        });
-        available = await this.availableProblemRepository.save(available);
+      available = this.availableProblemRepository.create({
+        number: data.number,
+        title: data.title,
+        tags: data.tags,
+        source: "BOJ",
+        tier: 1,
+      });
+      available = await this.availableProblemRepository.save(available);
     }
 
     // 2. Check if already added for today
-    const todayStr = new Date().toISOString().split('T')[0];
-    const existing = await this.studyProblemRepository.createQueryBuilder("sp")
-        .where("sp.studyId = :studyId", { studyId })
-        .andWhere("sp.problem.id = :apId", { apId: available.id })
-        .andWhere("sp.createdAt LIKE :date", { date: todayStr + '%' })
-        .getOne();
+    const todayStr = new Date().toISOString().split("T")[0];
+    const existing = await this.studyProblemRepository
+      .createQueryBuilder("sp")
+      .where("sp.studyId = :studyId", { studyId })
+      .andWhere("sp.problem.id = :apId", { apId: available.id })
+      .andWhere("sp.createdAt LIKE :date", { date: todayStr + "%" })
+      .getOne();
 
     if (existing) {
-        console.log("Problem already added for today, returning existing.");
-        return {
-            id: existing.id,
-            createdAt: existing.createdAt,
-            title: available.title,
-            number: available.number,
-            source: available.source,
-            status: 'not_started',
-            tags: available.tags,
-            tier: available.tier
-        };
+      console.log("Problem already added for today, returning existing.");
+      return {
+        id: existing.id,
+        createdAt: existing.createdAt,
+        title: available.title,
+        number: available.number,
+        source: available.source,
+        status: "not_started",
+        tags: available.tags,
+        tier: available.tier,
+      };
     }
 
     // 3. Create StudyProblem
     const studyProblem = this.studyProblemRepository.create({
-        studyId: Number(studyId),
-        problem: available
+      studyId: Number(studyId),
+      problem: available,
     });
     const saved = await this.studyProblemRepository.save(studyProblem);
-
-    this.socketService.notifyProblemUpdate(studyId);
 
     return {
       id: saved.id,
@@ -389,30 +501,30 @@ export class AppService implements OnModuleInit {
       title: available.title,
       number: available.number,
       source: available.source,
-      status: 'not_started',
+      status: "not_started",
       tags: available.tags,
-      tier: available.tier
+      tier: available.tier,
     };
   }
 
   async searchExternalProblems(query: string) {
     const results = await this.availableProblemRepository.find({
       where: [
-        { title: Like('%' + query + '%') },
+        { title: Like("%" + query + "%") },
         {
-          number: Raw((alias) => 'CAST(' + alias + ' AS TEXT) LIKE :q', {
-            q: '%' + query + '%',
+          number: Raw((alias) => "CAST(" + alias + " AS TEXT) LIKE :q", {
+            q: "%" + query + "%",
           }),
         },
       ],
     });
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split("T")[0];
 
     const enrichedResults = await Promise.all(
       results.map(async (p) => {
         // Check generic "today" existence without specific studyId from query
-        // Ideally we need studyId context. 
+        // Ideally we need studyId context.
         // For now, if ANY study problem exists today for this number, we mark it.
         // Or strictly we should assume this API is called in context of a study.
         // But the signature is generic.
@@ -420,28 +532,29 @@ export class AppService implements OnModuleInit {
         // For the "Add Modal" which is inside a Study Room, we usually want to know if it's in THAT room.
         // Current implementation limitation: Without studyId, we can't be perfect.
         // But let's verify against the AvailableProblem only? No, we need `isRegistered`.
-        
+
         // Quick fix: Assume Study 1 for test or generic check.
         // Let's check if there is ANY StudyProblem for this AvailableProblem today.
-        
-        const existingToday = await this.studyProblemRepository.createQueryBuilder("sp")
-            .leftJoin("sp.problem", "ap")
-            .where("ap.number = :number", { number: p.number })
-            .andWhere("sp.createdAt LIKE :date", { date: todayStr + '%' })
-            .getOne();
+
+        const existingToday = await this.studyProblemRepository
+          .createQueryBuilder("sp")
+          .leftJoin("sp.problem", "ap")
+          .where("ap.number = :number", { number: p.number })
+          .andWhere("sp.createdAt LIKE :date", { date: todayStr + "%" })
+          .getOne();
 
         let hasSubmissions = false;
         if (existingToday) {
-            const count = await this.submissionRepository.count({
-                where: { studyProblemId: existingToday.id }
-            });
-            hasSubmissions = count > 0;
+          const count = await this.submissionRepository.count({
+            where: { studyProblemId: existingToday.id },
+          });
+          hasSubmissions = count > 0;
         }
 
         return {
           ...p,
-          url: 'https://www.acmicpc.net/problem/' + p.number,
-          isRegistered: !!existingToday, 
+          url: "https://www.acmicpc.net/problem/" + p.number,
+          isRegistered: !!existingToday,
           registeredId: existingToday ? existingToday.id : null,
           hasSubmissions,
         };
@@ -454,15 +567,16 @@ export class AppService implements OnModuleInit {
   async deleteProblem(studyId: string, problemId: string) {
     // Check if there are any submissions for this study problem
     const submissionCount = await this.submissionRepository.count({
-      where: { studyProblemId: Number(problemId) }
+      where: { studyProblemId: Number(problemId) },
     });
 
     if (submissionCount > 0) {
-      throw new Error("Cannot delete problem because there are active submissions.");
+      throw new Error(
+        "Cannot delete problem because there are active submissions.",
+      );
     }
 
     const result = await this.studyProblemRepository.delete(problemId);
-    this.socketService.notifyProblemUpdate(studyId);
     return result;
   }
 
@@ -484,7 +598,13 @@ export class AppService implements OnModuleInit {
     const mockDb = [
       { number: 1000, title: "A+B", tags: ["Math"], tier: 1, source: "BOJ" },
       { number: 1001, title: "A-B", tags: ["Math"], tier: 1, source: "BOJ" },
-      { number: 2557, title: "Hello World", tags: ["Imp"], tier: 1, source: "BOJ" },
+      {
+        number: 2557,
+        title: "Hello World",
+        tags: ["Imp"],
+        tier: 1,
+        source: "BOJ",
+      },
       // ... (add more if needed)
     ];
 
@@ -495,28 +615,34 @@ export class AppService implements OnModuleInit {
 
   private async seedStudyProblems() {
     // Ensure Available Problems exist
-    const p1000 = await this.availableProblemRepository.findOne({ where: { number: 1000 } });
-    const p2557 = await this.availableProblemRepository.findOne({ where: { number: 2557 } });
+    const p1000 = await this.availableProblemRepository.findOne({
+      where: { number: 1000 },
+    });
+    const p2557 = await this.availableProblemRepository.findOne({
+      where: { number: 2557 },
+    });
 
     if (p1000) {
-        await this.studyProblemRepository.save({ studyId: 1, problem: p1000 });
-        
-        // Seed a submission for p1000
-        const sp = await this.studyProblemRepository.findOne({ where: { problem: { id: p1000.id } } });
-        if (sp) {
-            await this.submissionRepository.save({
-                studyId: 1,
-                studyProblemId: sp.id,
-                userId: 1,
-                username: "SeedUser",
-                language: "Python",
-                memory: 100,
-                time: 100,
-                status: "success",
-                code: "print('Seed')",
-                submittedAt: new Date().toISOString()
-            });
-        }
+      await this.studyProblemRepository.save({ studyId: 1, problem: p1000 });
+
+      // Seed a submission for p1000
+      const sp = await this.studyProblemRepository.findOne({
+        where: { problem: { id: p1000.id } },
+      });
+      if (sp) {
+        await this.submissionRepository.save({
+          studyId: 1,
+          studyProblemId: sp.id,
+          userId: 1,
+          username: "SeedUser",
+          language: "Python",
+          memory: 100,
+          time: 100,
+          status: "success",
+          code: "print('Seed')",
+          submittedAt: new Date().toISOString(),
+        });
+      }
     }
   }
 }

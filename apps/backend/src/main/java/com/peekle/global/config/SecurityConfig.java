@@ -3,6 +3,7 @@ package com.peekle.global.config;
 import com.peekle.global.auth.handler.OAuth2FailureHandler;
 import com.peekle.global.auth.handler.OAuth2SuccessHandler;
 import com.peekle.global.auth.jwt.JwtAuthenticationFilter;
+import com.peekle.global.auth.filter.ExtensionAuthenticationFilter;
 import com.peekle.global.auth.repository.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.peekle.global.auth.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
@@ -31,43 +32,45 @@ public class SecurityConfig {
         private final OAuth2SuccessHandler oAuth2SuccessHandler;
         private final OAuth2FailureHandler oAuth2FailureHandler;
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final ExtensionAuthenticationFilter extensionAuthenticationFilter;
         private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
         private final OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> accessTokenResponseClient;
 
         @Value("${app.frontend-url}")
         private String frontendUrl;
 
-
-
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-                // Auth / OAuth2
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/users/check-nickname").permitAll()
-                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                http
+                                .csrf(AbstractHttpConfigurer::disable)
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                                .authorizeHttpRequests(auth -> auth
+                                                // Auth / OAuth2
+                                                .requestMatchers("/api/auth/**").permitAll()
+                                                .requestMatchers("/api/users/check-nickname").permitAll()
+                                                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
-                // Extension / APIs
-                .requestMatchers("/api/submissions/**").permitAll()
-                .requestMatchers("/api/problems/sync").permitAll()      // 내부 Key 검증
-                .requestMatchers("/api/users/me/**").permitAll()        // Extension token endpoints
+                                                // Extension / APIs
+                                                .requestMatchers("/api/submissions/**").permitAll()
+                                                .requestMatchers("/api/problems/sync").permitAll() // 내부 Key 검증
+                                                // .requestMatchers("/api/users/me/**").permitAll() // Extension token
+                                                // endpoints
 
-                // Dev / Test
-                .requestMatchers("/api/studies/**").permitAll()          // [TEST] 스터디 API
-                .requestMatchers("/api/dev/users/**").permitAll()
+                                                // Dev / Test
+                                                // .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API
+                                                .requestMatchers("/api/dev/users/**").permitAll()
 
-                // WebSocket
-                .requestMatchers("/ws-stomp/**").permitAll()
+                                                // WebSocket
+                                                .requestMatchers("/ws-stomp/**").permitAll()
 
-                // Tools
-                .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/springwolf/**").permitAll()
+                                                // Tools
+                                                .requestMatchers("/h2-console/**").permitAll()
+                                                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**",
+                                                                "/swagger-ui.html")
+                                                .permitAll()
+                                                .requestMatchers("/springwolf/**").permitAll()
 
                 // Default
                 .anyRequest().authenticated()
@@ -82,12 +85,12 @@ public class SecurityConfig {
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
                 )
+                .addFilterBefore(extensionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console iframe 허용
 
-        return http.build();
+                return http.build();
         }
-
 
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {

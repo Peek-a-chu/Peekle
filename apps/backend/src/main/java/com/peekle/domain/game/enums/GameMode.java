@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum GameMode {
-    INDIVIDUAL("개인전"),
-    TEAM("팀전");
+    TIME_ATTACK("타임어택"),
+    SPEED_RACE("스피드 레이스");
 
     private final String description;
 }

@@ -1,5 +1,5 @@
 import { ChatMessageResponse, StudyRoomDetail, StudyMember } from '@/domains/study/types';
-import { handleResponse } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 // Re-export specific types if needed by legacy code, or alias them
 export interface Participant extends StudyMember {
@@ -12,8 +12,6 @@ export interface Participant extends StudyMember {
 }
 
 export type RoomInfo = StudyRoomDetail;
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 // 1. Study Detail (Get Members from here)
 export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
@@ -31,16 +29,21 @@ export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
 }
 
 export async function fetchStudyRoom(studyId: number): Promise<RoomInfo> {
-  const res = await fetch(`/api/studies/${studyId}`);
-  return handleResponse<StudyRoomDetail>(res);
+  const res = await apiFetch<StudyRoomDetail>(`/api/studies/${studyId}`);
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to fetch study room');
+  }
+  return res.data;
 }
 
 // 2. Chat History
 export async function fetchStudyChats(studyId: number): Promise<ChatMessageResponse[]> {
-  const res = await fetch(`/api/studies/${studyId}/chats`);
+  const res = await apiFetch<{ content: ChatMessageResponse[] }>(`/api/studies/${studyId}/chats`);
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to fetch chats');
+  }
   // Spec: Response is { "content": [ ... ] }
-  const data = await handleResponse<{ content: ChatMessageResponse[] }>(res);
-  return data.content || [];
+  return res.data.content || [];
 }
 
 // 3. Study List (My Studies)
@@ -48,36 +51,48 @@ export async function fetchMyStudies(
   page = 0,
   keyword = '',
 ): Promise<{ content: any[]; totalPages: number }> {
-  const res = await fetch(`/api/studies/my?page=${page}&keyword=${encodeURIComponent(keyword)}`);
-  return handleResponse<{ content: any[]; totalPages: number }>(res);
+  const res = await apiFetch<{ content: any[]; totalPages: number }>(
+    `/api/studies/my?page=${page}&keyword=${encodeURIComponent(keyword)}`,
+  );
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to fetch my studies');
+  }
+  return res.data;
 }
 
 // 4. Create Study
 export async function createStudy(title: string): Promise<{ inviteCode: string }> {
-  const res = await fetch(`/api/studies`, {
+  const res = await apiFetch<{ inviteCode: string }>(`/api/studies`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
   });
-  return handleResponse<{ inviteCode: string }>(res);
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to create study');
+  }
+  return res.data;
 }
 
 // 5. Join Study
 export async function joinStudy(
   inviteCode: string,
 ): Promise<StudyRoomDetail & { ownerId?: number }> {
-  const res = await fetch(`/api/studies/join`, {
+  const res = await apiFetch<StudyRoomDetail & { ownerId?: number }>(`/api/studies/join`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ inviteCode }),
   });
-  return handleResponse<StudyRoomDetail & { ownerId?: number }>(res);
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to join study');
+  }
+  return res.data;
 }
 
 // 6. Generate Invite Code
 export async function generateInviteCode(studyId: number): Promise<{ inviteCode: string }> {
-  const res = await fetch(`/api/studies/${studyId}/invite`, {
+  const res = await apiFetch<{ inviteCode: string }>(`/api/studies/${studyId}/invite`, {
     method: 'POST',
   });
-  return handleResponse<{ inviteCode: string }>(res);
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to generate invite code');
+  }
+  return res.data;
 }
