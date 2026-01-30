@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS `point_logs` (
     `description` VARCHAR(255),
     `metadata` TEXT,
     `created_at` DATETIME(6) NOT NULL,
-    `updated_at` DATETIME(6) NOT NULL,
+    `modified_at` DATETIME(6) NOT NULL,
     CONSTRAINT `fk_point_log_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 );
 
