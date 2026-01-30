@@ -20,6 +20,11 @@ spring:
         show_sql: false
     database-platform: org.hibernate.dialect.MySQLDialect
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -29,7 +34,3 @@ spring:
 OPENVIDU_URL: ${OPENVIDU_URL:https://openvidu:4443}
 OPENVIDU_SECRET: ${OPENVIDU_SECRET}
 
-flyway:
-  enabled: true
-  baseline-on-migrate: true
-  validate-on-migrate: true

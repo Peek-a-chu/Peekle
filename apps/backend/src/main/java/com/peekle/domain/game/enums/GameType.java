@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum GameType {
-    TIME_ATTACK("타임어택"),
-    SPEED("스피드");
+    INDIVIDUAL("개인전"),
+    TEAM("팀전");
 
     private final String description;
 }

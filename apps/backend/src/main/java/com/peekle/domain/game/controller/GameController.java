@@ -1,7 +1,7 @@
 package com.peekle.domain.game.controller;
 
-import com.peekle.domain.game.dto.GameCreateRequest;
-import com.peekle.domain.game.dto.GameRoomResponse;
+import com.peekle.domain.game.dto.request.GameCreateRequest;
+import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.service.RedisGameService;
 import com.peekle.global.dto.ApiResponse; // 공통 응답 DTO 있다고 가정
 import lombok.RequiredArgsConstructor;
@@ -17,8 +17,9 @@ public class GameController {
     private final RedisGameService gameService;
 
     @PostMapping
-    public ApiResponse<Long> createRoom(@RequestBody GameCreateRequest request) {
-        Long roomId = gameService.createGameRoom(request);
+    public ApiResponse<Long> createRoom(@RequestBody GameCreateRequest request,
+            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId) {
+        Long roomId = gameService.createGameRoom(request, userId);
         return ApiResponse.success(roomId);
     }
 

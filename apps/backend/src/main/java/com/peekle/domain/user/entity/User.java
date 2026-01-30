@@ -36,7 +36,7 @@ public class User extends BaseTimeEntity {
     @Column(unique = true)
     private String bojId; // 백준 아이디
 
-    @Column(unique = true)
+    @Column(unique = true, length = 100)
     @Builder.Default
     private String extensionToken = java.util.UUID.randomUUID().toString();
 

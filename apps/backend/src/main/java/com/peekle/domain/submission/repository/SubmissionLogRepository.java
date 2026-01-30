@@ -11,9 +11,13 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
         // 특정 유저가 특정 문제에 대해 제출한 기록 개수 조회 (result 컬럼 없음 = 모두 성공)
         long countByUserIdAndProblemId(Long userId, Long problemId);
 
-        // 특정 유저의 총 해결 문제 수 조회 (중복 제거)
-        @Query("SELECT COUNT(DISTINCT s.problem.id) FROM SubmissionLog s WHERE s.user.id = :userId")
-        long countByUserId(Long userId);
+    // 유저가 푼 문제 ID 목록을 한 번에 조회 (N+1 방지)
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT s.problem.id FROM SubmissionLog s WHERE s.user.id = :userId AND s.problem.id IN :problemIds")
+    List<Long> findSolvedProblemIds(@org.springframework.data.repository.query.Param("userId") Long userId, @org.springframework.data.repository.query.Param("problemIds") List<Long> problemIds);
+
+    // 특정 유저의 총 해결 문제 수 조회 (중복 제거)
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(DISTINCT s.problem.id) FROM SubmissionLog s WHERE s.user.id = :userId")
+    long countByUserId(Long userId);
 
         // 스터디 내 특정 문제 풀이 기록 존재 여부 (삭제 시 체크)
         boolean existsByProblemIdAndRoomId(Long problemId, Long roomId);
@@ -35,8 +39,8 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
 
     // [New] 특정 유저의 특정 일자(범위) 제출 기록 조회
     List<SubmissionLog> findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
-            Long userId, 
-            java.time.LocalDateTime start, 
+            Long userId,
+            java.time.LocalDateTime start,
             java.time.LocalDateTime end
     );
 }

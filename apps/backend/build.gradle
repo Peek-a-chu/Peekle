@@ -47,6 +47,10 @@ dependencies {
     // Database
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+    
+    // Flyway (Database Migration)
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
 
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
