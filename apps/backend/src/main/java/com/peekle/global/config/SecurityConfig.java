@@ -54,12 +54,13 @@ public class SecurityConfig {
 
                                                 // Extension / APIs
                                                 .requestMatchers("/api/submissions/**").permitAll()
-                                                .requestMatchers("/api/problems/sync").permitAll() // 내부 Key 검증
-                                                // .requestMatchers("/api/users/me/**").permitAll() // Extension token
-                                                // endpoints
+                                                .requestMatchers("/api/problems/**").permitAll() // 문제 검색/동기화
+                                                .requestMatchers("/api/users/me/**").permitAll() // Extension token
+                                                                                                 // endpoints
 
                                                 // Dev / Test
-                                                // .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API
+                                                .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API
+                                                .requestMatchers("/api/workbooks/**").permitAll() // [TEST] 문제집 API
                                                 .requestMatchers("/api/dev/users/**").permitAll()
 
                                                 // WebSocket
@@ -72,22 +73,23 @@ public class SecurityConfig {
                                                 .permitAll()
                                                 .requestMatchers("/springwolf/**").permitAll()
 
-                // Default
-                .anyRequest().authenticated()
-                )
-                .oauth2Login(oauth2 -> oauth2
-                .authorizationEndpoint(auth -> auth
-                        .authorizationRequestRepository(cookieAuthorizationRequestRepository))
-                .tokenEndpoint(token -> token
-                        .accessTokenResponseClient(accessTokenResponseClient))
-                .userInfoEndpoint(userInfo -> userInfo
-                        .userService(customOAuth2UserService))
-                .successHandler(oAuth2SuccessHandler)
-                .failureHandler(oAuth2FailureHandler)
-                )
-                .addFilterBefore(extensionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console iframe 허용
+                                                // Default
+                                                .anyRequest().authenticated())
+                                .oauth2Login(oauth2 -> oauth2
+                                                .authorizationEndpoint(auth -> auth
+                                                                .authorizationRequestRepository(
+                                                                                cookieAuthorizationRequestRepository))
+                                                .tokenEndpoint(token -> token
+                                                                .accessTokenResponseClient(accessTokenResponseClient))
+                                                .userInfoEndpoint(userInfo -> userInfo
+                                                                .userService(customOAuth2UserService))
+                                                .successHandler(oAuth2SuccessHandler)
+                                                .failureHandler(oAuth2FailureHandler))
+                                .addFilterBefore(extensionAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class)
+                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                                .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console
+                                                                                                     // iframe 허용
 
                 return http.build();
         }

@@ -31,6 +31,80 @@ public class LeagueService {
     private final SubmissionLogRepository submissionLogRepository;
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;
+    private final com.peekle.domain.league.repository.LeagueGroupRepository leagueGroupRepository;
+    private final com.peekle.domain.league.repository.LeagueHistoryRepository leagueHistoryRepository;
+    private final org.redisson.api.RedissonClient redissonClient;
+
+    /**
+     * 신규 유저 리그 배치 (Redisson Lock)
+     */
+    public void assignInitialLeague(User user) {
+        // 이미 그룹이 있다면 스킵
+        if (user.getLeagueGroupId() != null) {
+            return;
+        }
+
+        org.redisson.api.RLock lock = redissonClient.getLock("league:assignment:lock");
+        try {
+            // Wait 5s, Lease 3s (짧게 치고 빠지기)
+            if (lock.tryLock(5, 3, java.util.concurrent.TimeUnit.SECONDS)) {
+                try {
+                    // 1. 현재 주차 계산
+                    int currentSeasonWeek = calculateCurrentSeasonWeek();
+
+                    // 2. STONE 티어의 가장 최근 그룹 조회
+                    com.peekle.domain.league.entity.LeagueGroup group = leagueGroupRepository
+                            .findTopByTierAndSeasonWeekOrderByIdDesc(LeagueTier.STONE, currentSeasonWeek)
+                            .orElse(null);
+
+                    // 3. 그룹이 없거나 꽉 찼으면 새로 생성
+                    if (group == null || isGroupFull(group.getId())) {
+                        group = createNewGroup(LeagueTier.STONE, currentSeasonWeek);
+                    }
+
+                    // 4. 유저에게 그룹 할당 및 저장
+                    user.updateLeagueGroup(group.getId());
+                    userRepository.save(user); // 트랜잭션 내 변경 감지 or 명시적 저장
+
+                    // (옵션) Redis 랭킹 0점으로 초기화
+                    // redisTemplate.opsForZSet().add("league:" + currentSeasonWeek + ":" +
+                    // group.getId() + ":rank", user.getId().toString(), 0);
+
+                } finally {
+                    lock.unlock();
+                }
+            } else {
+                throw new com.peekle.global.exception.BusinessException(
+                        com.peekle.global.exception.ErrorCode.INTERNAL_SERVER_ERROR); // Lock 획득 실패
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new com.peekle.global.exception.BusinessException(
+                    com.peekle.global.exception.ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private int calculateCurrentSeasonWeek() {
+        // 간단하게 현재 날짜 기준 주차 계산 (매주 수요일 06:00 기준)
+        // 편의상 YYYYWW 포맷. 실제 로직은 더 정교할 수 있음.
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
+        return now.getYear() * 100 + now.get(weekFields.weekOfWeekBasedYear());
+    }
+
+    private boolean isGroupFull(Long groupId) {
+        long count = userRepository.countByLeagueGroupId(groupId);
+        return count >= 10;
+    }
+
+    private com.peekle.domain.league.entity.LeagueGroup createNewGroup(LeagueTier tier, int seasonWeek) {
+        com.peekle.domain.league.entity.LeagueGroup group = com.peekle.domain.league.entity.LeagueGroup.builder()
+                .tier(tier)
+                .seasonWeek(seasonWeek)
+                .createdAt(java.time.LocalDateTime.now())
+                .build();
+        return leagueGroupRepository.save(group);
+    }
 
     /**
      * 문제 해결 시 리그 포인트 업데이트
@@ -41,7 +115,7 @@ public class LeagueService {
 
         // 1. 문제 풀이 기본 점수 (최초 1회)
         long successCount = submissionLogRepository.countByUserIdAndProblemId(user.getId(), problem.getId());
-        
+
         if (successCount == 1) {
             int problemPoints = calculateProblemPoint(problem.getTier());
             user.addLeaguePoint(problemPoints);
@@ -50,36 +124,36 @@ public class LeagueService {
             // POINT_LOG 기록
             String desc = String.format("%s (%s)", problem.getTitle(), problem.getTier());
             pointLogRepository.save(new PointLog(user, PointCategory.PROBLEM, problemPoints, desc));
-            
+
             // Streak Logic (기존 유지)
             updateStreak(user);
         }
 
         if (totalEarnedPoints > 0) {
             userRepository.save(user);
-            System.out.println("🏆 League Point Updated! User: " + user.getNickname() + ", Points: +" + totalEarnedPoints);
+            System.out.println(
+                    "🏆 League Point Updated! User: " + user.getNickname() + ", Points: +" + totalEarnedPoints);
         }
-        
+
         return totalEarnedPoints;
     }
 
     private void updateStreak(User user) {
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.LocalDate yesterday = today.minusDays(1);
-        
+
         boolean alreadySolvedToday = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(today);
-        
+
         if (!alreadySolvedToday) {
-             boolean continuesStreak = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(yesterday);
-             user.updateStreak(continuesStreak);
+            boolean continuesStreak = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(yesterday);
+            user.updateStreak(continuesStreak);
         }
     }
 
     public int getUserRank(User user) {
         if (user.getLeagueGroupId() != null) {
             return (int) userRepository.countByLeagueGroupIdAndLeaguePointGreaterThan(
-                    user.getLeagueGroupId(), user.getLeaguePoint()
-            ) + 1;
+                    user.getLeagueGroupId(), user.getLeaguePoint()) + 1;
         } else {
             return (int) userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
         }
@@ -89,39 +163,39 @@ public class LeagueService {
     public LeagueStatusResponse getMyLeagueStatus(User user) {
         int myRank = getUserRank(user);
         int myLeagueMembers = getLeagueUserCount(user.getLeague());
-        
+
         long totalServerUsers = 0;
         Map<LeagueTier, Integer> tierCounts = new EnumMap<>(LeagueTier.class);
-        
+
         // 1. 전체 유저 수 및 티어별 카운트 조회
         for (LeagueTier tier : LeagueTier.values()) {
             int count = getLeagueUserCount(tier);
             tierCounts.put(tier, count);
             totalServerUsers += count;
         }
-        
+
         // 2. 각 티어별 상위 % 계산 (Dto 리스트 생성)
         List<LeagueStatDto> leagueStats = new ArrayList<>();
         long currentUsersAbove = 0;
-        
+
         // 높은 티어부터 순회 (RUBY -> STONE)
         for (int i = LeagueTier.values().length - 1; i >= 0; i--) {
             LeagueTier tier = LeagueTier.values()[i];
             int count = tierCounts.get(tier);
-            
-            double percentile = totalServerUsers > 0 
-                    ? ((double) currentUsersAbove / totalServerUsers) * 100 
+
+            double percentile = totalServerUsers > 0
+                    ? ((double) currentUsersAbove / totalServerUsers) * 100
                     : 0.0;
-            
+
             leagueStats.add(LeagueStatDto.builder()
                     .tier(tier.name().toLowerCase())
                     .count(count)
                     .percentile(percentile)
                     .build());
-                    
+
             currentUsersAbove += count; // 다음(낮은) 티어를 위해 누적
         }
-        
+
         // 3. 내 백분위 계산
         long myUsersAbove = 0;
         for (LeagueTier tier : LeagueTier.values()) {
@@ -129,11 +203,11 @@ public class LeagueService {
                 myUsersAbove += tierCounts.get(tier);
             }
         }
-        
-        double myPercentile = totalServerUsers > 0 
-                ? ((double) (myUsersAbove + myRank) / totalServerUsers) * 100 
+
+        double myPercentile = totalServerUsers > 0
+                ? ((double) (myUsersAbove + myRank) / totalServerUsers) * 100
                 : 0.0;
-                
+
         // 4. 같은 그룹 내 랭킹 조회
         List<User> groupUsers;
         int totalGroupMembers = 0;
@@ -147,14 +221,14 @@ public class LeagueService {
             groupUsers = userRepository.findTop100ByLeagueOrderByLeaguePointDesc(user.getLeague());
             totalGroupMembers = (int) userRepository.countByLeague(user.getLeague());
         }
-        
+
         // 승급/강등 인원 계산
         LeagueTier currentTier = user.getLeague();
         int promoteCount = 0;
         int demoteCount = 0;
-        
+
         if (totalGroupMembers > 1) { // 1명 이하는 변동 없음
-             // 승급 = min( ceil(N * P), N - 1 )
+            // 승급 = min( ceil(N * P), N - 1 )
             promoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getPromotePercent() / 100.0));
             promoteCount = Math.min(promoteCount, totalGroupMembers - 1);
 
@@ -167,7 +241,7 @@ public class LeagueService {
         int currentRank = 1;
         for (User u : groupUsers) {
             com.peekle.domain.league.enums.LeagueStatus status = com.peekle.domain.league.enums.LeagueStatus.STAY;
-            
+
             if (currentRank <= promoteCount) {
                 status = com.peekle.domain.league.enums.LeagueStatus.PROMOTE;
             } else if (currentRank > (totalGroupMembers - demoteCount)) {
@@ -189,14 +263,13 @@ public class LeagueService {
                 user.getLeague(),
                 myRank,
                 user.getLeaguePoint(),
-                user.getMaxLeague(),
+                user.getMaxLeague() != null ? user.getMaxLeague().name() : null,
                 myLeagueMembers,
                 myPercentile,
                 leagueStats,
-                members
-        );
+                members);
     }
-    
+
     private int getLeagueUserCount(LeagueTier tier) {
         String redisKey = "league:count:" + tier.name();
         String cachedCount = redisTemplate.opsForValue().get(redisKey);
@@ -211,44 +284,47 @@ public class LeagueService {
     }
 
     @Transactional(readOnly = true)
-    public com.peekle.domain.league.dto.WeeklyPointSummaryResponse getWeeklyPointSummary(User user, java.time.LocalDate date) {
+    public com.peekle.domain.league.dto.WeeklyPointSummaryResponse getWeeklyPointSummary(User user,
+            java.time.LocalDate date) {
         // Use provided date or default to now
         java.time.ZonedDateTime referenceTime;
         if (date != null) {
-            // If date is provided, use it at current time (or end of day? let's stick to preserving time or just noon)
+            // If date is provided, use it at current time (or end of day? let's stick to
+            // preserving time or just noon)
             // Ideally, we just need a point in time to find the containing "Week"
-            
-            // Note: We need to be careful. The week starts on Wednesday 06:00. 
+
+            // Note: We need to be careful. The week starts on Wednesday 06:00.
             // If user selects Wednesday, does it calculate from that Wednesday 6am?
             // Let's assume the date provided is in KST context.
-            referenceTime = date.atStartOfDay(java.time.ZoneId.of("Asia/Seoul")).plusHours(12); // Noon on that day to be safe
+            referenceTime = date.atStartOfDay(java.time.ZoneId.of("Asia/Seoul")).plusHours(12); // Noon on that day to
+                                                                                                // be safe
         } else {
             referenceTime = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
         }
-        
+
         // Find the start of the current week (Wednesday 06:00 KST)
-        java.time.ZonedDateTime startOfWeek = referenceTime.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.WEDNESDAY))
+        java.time.ZonedDateTime startOfWeek = referenceTime
+                .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.WEDNESDAY))
                 .withHour(6).withMinute(0).withSecond(0).withNano(0);
-        
+
         // If reference time is before Wednesday 06:00, the week started last Wednesday
         if (referenceTime.isBefore(startOfWeek)) {
             startOfWeek = startOfWeek.minusWeeks(1);
         }
-        
+
         java.time.ZonedDateTime endOfWeek = startOfWeek.plusWeeks(1);
-        
+
         // Convert to LocalDateTime for DB query
         java.time.LocalDateTime start = startOfWeek.toLocalDateTime();
         java.time.LocalDateTime end = endOfWeek.toLocalDateTime();
-        
+
         List<PointLog> logs = pointLogRepository.findAllByUserIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-                user.getId(), start, end
-        );
-        
+                user.getId(), start, end);
+
         int totalScore = logs.stream()
                 .mapToInt(PointLog::getAmount)
                 .sum();
-        
+
         List<com.peekle.domain.league.dto.PointActivityDto> activities = logs.stream()
                 .map(log -> com.peekle.domain.league.dto.PointActivityDto.builder()
                         .description(log.getDescription())
@@ -257,7 +333,7 @@ public class LeagueService {
                         .category(log.getCategory())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
-                
+
         return com.peekle.domain.league.dto.WeeklyPointSummaryResponse.builder()
                 .totalScore(totalScore)
                 .startDate(start)
@@ -269,22 +345,21 @@ public class LeagueService {
     private int calculateProblemPoint(String tier) {
         return com.peekle.global.util.SolvedAcLevelUtil.getPointFromTier(tier);
     }
-    
-    private final com.peekle.domain.league.repository.LeagueHistoryRepository leagueHistoryRepository;
 
     @Transactional(readOnly = true)
     public List<com.peekle.domain.league.dto.LeagueProgressResponse> getLeagueProgress(User user) {
         List<com.peekle.domain.league.dto.LeagueProgressResponse> progressList = new ArrayList<>();
-        
+
         // 1. Fetch History
-        List<com.peekle.domain.league.entity.LeagueHistory> histories = leagueHistoryRepository.findAllByUserIdOrderBySeasonWeekAsc(user.getId());
-        
+        List<com.peekle.domain.league.entity.LeagueHistory> histories = leagueHistoryRepository
+                .findAllByUserIdOrderBySeasonWeekAsc(user.getId());
+
         for (com.peekle.domain.league.entity.LeagueHistory h : histories) {
             // closedAt is the END of the week (Wednesday 06:00)
             // Start date would be 7 days before closedAt
             java.time.LocalDate end = h.getClosedAt().toLocalDate();
             java.time.LocalDate start = end.minusDays(7);
-            
+
             progressList.add(com.peekle.domain.league.dto.LeagueProgressResponse.builder()
                     .league(h.getLeague().name().toLowerCase())
                     .score(h.getFinalPoint())
@@ -293,17 +368,18 @@ public class LeagueService {
                     .leagueIndex(h.getLeague().ordinal())
                     .build());
         }
-        
+
         // 2. Append Current Status
         // Current week calculation
         java.time.ZonedDateTime nowKst = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
-        java.time.ZonedDateTime startOfWeek = nowKst.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.WEDNESDAY))
+        java.time.ZonedDateTime startOfWeek = nowKst
+                .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.WEDNESDAY))
                 .withHour(6).withMinute(0).withSecond(0).withNano(0);
         if (nowKst.isBefore(startOfWeek)) {
             startOfWeek = startOfWeek.minusWeeks(1);
         }
         java.time.ZonedDateTime endOfWeek = startOfWeek.plusWeeks(1);
-        
+
         progressList.add(com.peekle.domain.league.dto.LeagueProgressResponse.builder()
                 .league(user.getLeague().name().toLowerCase())
                 .score(user.getLeaguePoint())
@@ -311,7 +387,174 @@ public class LeagueService {
                 .periodEnd(endOfWeek.toLocalDate())
                 .leagueIndex(user.getLeague().ordinal())
                 .build());
-                
+
         return progressList;
     }
+
+    /**
+     * 현재 시즌 종료 처리
+     * - 각 리그 그룹의 최종 순위 산정
+     * - LeagueHistory에 기록 저장
+     * - 3명 이하 그룹은 스킵 (경쟁 무의미)
+     */
+    public void closeSeason() {
+        int currentSeasonWeek = calculateCurrentSeasonWeek();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+        // 현재 시즌의 모든 그룹 조회
+        List<com.peekle.domain.league.entity.LeagueGroup> groups = leagueGroupRepository
+                .findBySeasonWeek(currentSeasonWeek);
+
+        for (com.peekle.domain.league.entity.LeagueGroup group : groups) {
+            // 그룹 내 모든 유저를 점수 기준으로 정렬
+            List<User> users = userRepository.findByLeagueGroupIdOrderByLeaguePointDesc(group.getId());
+            int groupSize = users.size();
+
+            // 3명 이하 그룹은 스킵 (다음 주 재배정 대기)
+            if (groupSize <= 3) {
+                // 유저들의 그룹만 해제, 티어와 포인트는 유지
+                for (User user : users) {
+                    user.resetForNewSeason(); // leaguePoint=0, leagueGroupId=null
+                }
+                userRepository.saveAll(users);
+                continue; // 히스토리 기록 없이 다음 그룹으로
+            }
+
+            // 4명 이상 그룹: 정상 처리
+            for (int i = 0; i < users.size(); i++) {
+                User user = users.get(i);
+                int rank = i + 1;
+
+                // 승급/강등/유지 판정
+                String result = determineSeasonResult(rank, users.size(), user.getLeague());
+
+                // 히스토리 저장
+                com.peekle.domain.league.entity.LeagueHistory history = com.peekle.domain.league.entity.LeagueHistory
+                        .builder()
+                        .user(user)
+                        .league(user.getLeague())
+                        .finalPoint(user.getLeaguePoint())
+                        .result(result)
+                        .seasonWeek(currentSeasonWeek)
+                        .closedAt(now)
+                        .build();
+
+                leagueHistoryRepository.save(history);
+            }
+        }
+    }
+
+    /**
+     * 신규 시즌 시작
+     * - 모든 유저의 티어 조정 (승급/강등 적용)
+     * - 리그 포인트 초기화
+     * - 새로운 그룹 생성 및 재배정 (4명 이상만)
+     */
+    public void startNewSeason() {
+        int previousSeasonWeek = calculateCurrentSeasonWeek();
+        int newSeasonWeek = previousSeasonWeek + 1; // 다음 주차
+
+        // 1. 모든 유저의 지난 시즌 결과 조회 및 티어 조정
+        List<com.peekle.domain.league.entity.LeagueHistory> histories = leagueHistoryRepository
+                .findBySeasonWeek(previousSeasonWeek);
+
+        for (com.peekle.domain.league.entity.LeagueHistory history : histories) {
+            User user = history.getUser();
+
+            // 승급/강등 적용
+            if ("PROMOTED".equals(history.getResult())) {
+                user.promoteLeague();
+            } else if ("DEMOTED".equals(history.getResult())) {
+                user.demoteLeague();
+            }
+
+            // 리그 포인트 초기화 및 그룹 해제
+            user.resetForNewSeason();
+            userRepository.save(user);
+        }
+
+        // 2. 티어별로 유저를 그룹화하여 새 그룹 생성
+        for (LeagueTier tier : LeagueTier.values()) {
+            // 해당 티어의 모든 유저 조회 (그룹 없는 유저만)
+            List<User> tierUsers = userRepository.findByLeagueAndLeagueGroupIdIsNull(tier);
+
+            // 4명 미만이면 그룹 생성 안 함 (다음 주 대기)
+            if (tierUsers.size() < 4) {
+                continue;
+            }
+
+            // 10명씩 묶어서 그룹 생성, 마지막 그룹은 4-10명
+            for (int i = 0; i < tierUsers.size(); i += 10) {
+                int endIndex = Math.min(i + 10, tierUsers.size());
+                List<User> groupUsers = tierUsers.subList(i, endIndex);
+
+                // 마지막 조각이 4명 미만이면 이전 그룹에 합침
+                if (groupUsers.size() < 4 && i > 0) {
+                    // 이전 그룹의 ID를 가져와서 추가
+                    Long lastGroupId = tierUsers.get(i - 1).getLeagueGroupId();
+                    for (User user : groupUsers) {
+                        user.assignToLeagueGroup(lastGroupId);
+                        userRepository.save(user);
+                    }
+                } else if (groupUsers.size() >= 4) {
+                    // 새 그룹 생성
+                    com.peekle.domain.league.entity.LeagueGroup newGroup = createNewGroup(tier, newSeasonWeek);
+
+                    // 유저들을 새 그룹에 배정
+                    for (User user : groupUsers) {
+                        user.assignToLeagueGroup(newGroup.getId());
+                        userRepository.save(user);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 시즌 종료 시 승급/강등/유지 판정
+     * - 3명 이하: MAINTAINED (closeSeason에서 이미 필터링됨)
+     * - 4-6명: 상위 1명 승급, 하위 1명 강등
+     * - 7-9명: 상위 2명 승급, 하위 2명 강등
+     * - 10명 이상: 30% 승급/강등
+     */
+    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier) {
+        // 안전 장치: 3명 이하는 변동 없음
+        if (totalUsers <= 3) {
+            return "MAINTAINED";
+        }
+
+        int promoteCount;
+        int demoteCount;
+
+        if (totalUsers <= 6) {
+            // 4-6명: 1명씩
+            promoteCount = 1;
+            demoteCount = 1;
+        } else if (totalUsers <= 9) {
+            // 7-9명: 2명씩
+            promoteCount = 2;
+            demoteCount = 2;
+        } else {
+            // 10명 이상: 30% 규칙
+            promoteCount = (int) Math.ceil(totalUsers * (currentTier.getPromotePercent() / 100.0));
+            promoteCount = Math.min(promoteCount, totalUsers - 1);
+
+            demoteCount = (int) Math.ceil(totalUsers * (currentTier.getDemotePercent() / 100.0));
+            demoteCount = Math.min(demoteCount, totalUsers - promoteCount - 1);
+        }
+
+        // 상위 promoteCount명: 승급 (단, 최상위 티어는 제외)
+        if (rank <= promoteCount && currentTier != LeagueTier.RUBY) {
+            return "PROMOTED";
+        }
+
+        // 하위 demoteCount명: 강등 (단, 최하위 티어는 제외)
+        if (rank > (totalUsers - demoteCount) && currentTier != LeagueTier.STONE) {
+            return "DEMOTED";
+        }
+
+        // 나머지: 유지
+        return "MAINTAINED";
+    }
+
 }

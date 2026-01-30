@@ -71,6 +71,7 @@ app:
 server:
   port: 8080
   shutdown: graceful
+  forward-headers-strategy: framework
 
 management:
   endpoints:

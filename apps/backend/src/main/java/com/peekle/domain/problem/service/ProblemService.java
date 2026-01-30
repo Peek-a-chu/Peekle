@@ -2,6 +2,7 @@ package com.peekle.domain.problem.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.peekle.domain.problem.dto.ProblemSearchResponse;
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
@@ -10,6 +11,8 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,6 +130,17 @@ public class ProblemService {
             }
         }
         System.out.println("🏁 Sync Loop Finished. Total Saved: " + totalSaved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProblemSearchResponse> searchProblems(String keyword, int limit) {
+        Page<Problem> problems = problemRepository.searchByKeyword(
+                keyword,
+                PageRequest.of(0, limit)
+        );
+        return problems.getContent().stream()
+                .map(ProblemSearchResponse::new)
+                .toList();
     }
 
     /**

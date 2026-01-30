@@ -39,8 +39,9 @@ services:
       context: ../apps/frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io/api
+        - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
     container_name: peekle-frontend
     env_file:
       - ../apps/frontend/.env
@@ -65,8 +66,8 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     depends_on:
       redis:
         condition: service_healthy

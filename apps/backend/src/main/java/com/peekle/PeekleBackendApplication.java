@@ -45,6 +45,7 @@ public class PeekleBackendApplication {
 
     /**
      * 지정된 디렉토리에서 .env 파일을 로드하여 시스템 프로퍼티로 설정합니다.
+     * 
      * @return 로드 성공 여부
      */
     private static boolean loadDotenv(String directory) {

@@ -26,8 +26,8 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
 
     @Override
     public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest,
-                                         HttpServletRequest request,
-                                         HttpServletResponse response) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
         if (authorizationRequest == null) {
             deleteCookie(response, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
             return;
@@ -37,13 +37,14 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         Cookie cookie = new Cookie(OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME, serialized);
         cookie.setPath("/");
         cookie.setHttpOnly(true);
+        cookie.setSecure(true);
         cookie.setMaxAge(COOKIE_EXPIRE_SECONDS);
         response.addCookie(cookie);
     }
 
     @Override
     public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request,
-                                                                  HttpServletResponse response) {
+            HttpServletResponse response) {
         OAuth2AuthorizationRequest authorizationRequest = loadAuthorizationRequest(request);
         if (authorizationRequest != null) {
             deleteCookie(response, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
@@ -52,7 +53,8 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     }
 
     private java.util.Optional<Cookie> getCookie(HttpServletRequest request, String name) {
-        if (request.getCookies() == null) return java.util.Optional.empty();
+        if (request.getCookies() == null)
+            return java.util.Optional.empty();
         for (Cookie cookie : request.getCookies()) {
             if (name.equals(cookie.getName())) {
                 return java.util.Optional.of(cookie);
@@ -71,7 +73,7 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
 
     private String serialize(OAuth2AuthorizationRequest request) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+                ObjectOutputStream oos = new ObjectOutputStream(baos)) {
             oos.writeObject(request);
             return Base64.getUrlEncoder().encodeToString(baos.toByteArray());
         } catch (IOException e) {
@@ -83,7 +85,7 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         try {
             byte[] bytes = Base64.getUrlDecoder().decode(value);
             try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-                 ObjectInputStream ois = new ObjectInputStream(bais)) {
+                    ObjectInputStream ois = new ObjectInputStream(bais)) {
                 return (OAuth2AuthorizationRequest) ois.readObject();
             }
         } catch (IOException | ClassNotFoundException e) {

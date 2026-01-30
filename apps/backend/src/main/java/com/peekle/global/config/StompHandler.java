@@ -25,23 +25,36 @@ public class StompHandler implements ChannelInterceptor {
 
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String userId = accessor.getFirstNativeHeader("userId");
+            if (userId == null) {
+                userId = accessor.getFirstNativeHeader("X-User-Id");
+            }
             String studyId = accessor.getFirstNativeHeader("studyId");
 
             log.info("[StompHandler] Connect request: userId={}, studyId={}", userId, studyId);
 
-            if (userId != null && studyId != null) {
-                Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
-                if (sessionAttributes != null) {
+            Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+            if (sessionAttributes != null) {
+                // 1. User ID 처리
+                if (userId != null) {
                     try {
                         sessionAttributes.put("userId", Long.valueOf(userId));
-                        sessionAttributes.put("studyId", Long.valueOf(studyId));
-                        log.info("[StompHandler] Session attributes set successfully");
+                        log.info("[StompHandler] User ID set: {}", userId);
                     } catch (NumberFormatException e) {
-                        log.error("[StompHandler] Invalid format for userId or studyId");
+                        log.error("[StompHandler] Invalid userId format: {}", userId);
+                    }
+                } else {
+                    log.warn("[StompHandler] Missing 'userId' header");
+                }
+
+                // 2. Study ID 처리 (Optional for Games)
+                if (studyId != null) {
+                    try {
+                        sessionAttributes.put("studyId", Long.valueOf(studyId));
+                        log.info("[StompHandler] Study ID set: {}", studyId);
+                    } catch (NumberFormatException e) {
+                        log.error("[StompHandler] Invalid studyId format: {}", studyId);
                     }
                 }
-            } else {
-                log.warn("[StompHandler] Missing headers in CONNECT frame");
             }
         }
         return message;

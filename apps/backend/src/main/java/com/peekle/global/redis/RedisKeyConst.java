@@ -51,8 +51,14 @@ public class RedisKeyConst {
     public static final String LOCK_GAME_STATUS = "lock:game:room:%d:status";
 
     // Game Topic (Pub/Sub)
-    // /topic/games/rooms/{gameId}
-    public static final String TOPIC_GAME_ROOM = "topic/games/rooms/%d";
+    // /topic/games/{gameId}/room
+    public static final String TOPIC_GAME_ROOM = "topic/games/%d/room";
+
+    // /sub/games/{gameId}/chat/global
+    public static final String TOPIC_GAME_CHAT_GLOBAL = "topic/games/%d/chat/global";
+
+    // /sub/games/{gameId}/chat/team/{teamColor}
+    public static final String TOPIC_GAME_CHAT_TEAM = "topic/games/%d/chat/team/%s";
 
     // Game Room Info (Hash) -> title, password, mode, capacity...
     public static final String GAME_ROOM_INFO = "game:room:%d:info";
@@ -62,4 +68,25 @@ public class RedisKeyConst {
 
     // Game Room ID Generator (Atomic Long)
     public static final String GAME_ROOM_ID_SEQ = "game:room:seq";
+
+    // Game Room Participants (Set) -> game:room:{roomId}:players
+    public static final String GAME_ROOM_PLAYERS = "game:room:%d:players";
+
+    // Game Room Ready Status (Hash) -> game:room:{roomId}:ready : {userId} ->
+    // "true"/"false"
+    public static final String GAME_ROOM_READY_STATUS = "game:room:%d:ready";
+
+    // Game Room Team Info (Hash) -> game:room:{roomId}:teams : {userId} ->
+    // "RED"/"BLUE"
+    public static final String GAME_ROOM_TEAMS = "game:room:%d:teams";
+
+    // Game Code (Value)
+    // game:{gameId}:problem:{problemId}:user:{userId}:code
+    // Changed problemId placeholder to %d
+    public static final String GAME_CODE_KEY = "game:%d:problem:%d:user:%d:code";
+
+    // Game Code Load Topic (Pub/Sub)
+    // /topic/games/code/load/{userId}
+    public static final String TOPIC_GAME_CODE_LOAD = "topic/games/code/load/%d";
+
 }
