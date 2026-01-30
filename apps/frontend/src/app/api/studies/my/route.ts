@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
+/**
+ * Legacy endpoint - redirects to /api/studies
+ * Backend expects /api/studies (not /api/studies/my)
+ */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const queryString = searchParams.toString();
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/studies/my?${queryString}`, {
+    // Backend endpoint is /api/studies, not /api/studies/my
+    const res = await fetch(`${API_BASE_URL}/api/studies?${queryString}`, {
       headers: {
         Cookie: request.headers.get('cookie') || '',
       },
