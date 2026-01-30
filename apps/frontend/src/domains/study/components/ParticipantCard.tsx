@@ -128,6 +128,7 @@ export function ParticipantCard({
               'absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ring-1 ring-background',
               isOnline ? 'bg-green-500' : 'bg-slate-400',
             )}
+            title={isOnline ? '온라인' : '오프라인'}
           />
         </div>
 
@@ -164,6 +165,7 @@ export function ParticipantCard({
             className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100"
             data-state={isMenuOpen ? 'open' : 'closed'}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="메뉴"
           >
             <MoreVertical className="h-4 w-4" />
           </Button>
