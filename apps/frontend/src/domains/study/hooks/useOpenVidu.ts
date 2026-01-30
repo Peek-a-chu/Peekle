@@ -35,6 +35,7 @@ interface UseOpenViduReturn {
   session: Session | null;
   publisher: Publisher | null;
   isConnected: boolean;
+  isConnecting: boolean;
   toggleAudio: () => void;
   toggleVideo: () => void;
 }
@@ -51,6 +52,7 @@ export function useOpenVidu(): UseOpenViduReturn {
   const publisherRef = useRef<Publisher | null>(null);
   const streamManagersRef = useRef<Map<number, StreamManager>>(new Map());
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // connection data에서 userId 추출 헬퍼 함수
   const extractUserId = useCallback((connectionData: string | undefined): number | null => {
@@ -152,10 +154,12 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     // 세션 연결
     console.log('[OpenVidu] Connecting session with token');
+    setIsConnecting(true);
 
     session
       .connect(videoToken, { clientData: JSON.stringify({ userId: currentUserId }) })
       .then(() => {
+        setIsConnecting(false);
         console.log('[OpenVidu] Session connected');
         setIsConnected(true);
 
@@ -196,6 +200,18 @@ export function useOpenVidu(): UseOpenViduReturn {
           );
         });
 
+        // 스트림 속성 변경 이벤트 (비디오/오디오 토글 시 발생)
+        publisher.on('streamPropertyChanged', (event: any) => {
+          console.log('[OpenVidu] Publisher stream property changed:', event.changedProperty, event.newValue);
+          if (event.changedProperty === 'videoActive') {
+            window.dispatchEvent(
+              new CustomEvent('openvidu-publisher-video-changed', {
+                detail: { publisher, videoActive: event.newValue },
+              }),
+            );
+          }
+        });
+
         session.publish(publisher);
         console.log('[OpenVidu] Publisher published');
 
@@ -225,6 +241,7 @@ export function useOpenVidu(): UseOpenViduReturn {
 
         toast.error(errorMessage);
         setIsConnected(false);
+        setIsConnecting(false);
       });
 
     // 정리 함수
@@ -241,6 +258,7 @@ export function useOpenVidu(): UseOpenViduReturn {
       }
       streamManagersRef.current.clear();
       setIsConnected(false);
+      setIsConnecting(false);
     };
   }, [videoToken, currentUserId, updateParticipant, extractUserId]);
 
@@ -265,6 +283,9 @@ export function useOpenVidu(): UseOpenViduReturn {
       if (currentUserId) {
         updateParticipant(currentUserId, { isVideoOff: isVideoEnabled });
       }
+
+      // streamPropertyChanged 이벤트 핸들러에서 이벤트를 발생시키므로
+      // 여기서는 즉시 발생시키지 않음 (스트림이 준비된 후에만 이벤트 발생)
     }
   }, [currentUserId, updateParticipant]);
 
@@ -292,6 +313,7 @@ export function useOpenVidu(): UseOpenViduReturn {
     session: sessionRef.current,
     publisher: publisherRef.current,
     isConnected,
+    isConnecting,
     toggleAudio,
     toggleVideo,
   };
