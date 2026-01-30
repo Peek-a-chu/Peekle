@@ -7,6 +7,7 @@ import { CCVideoTile as VideoTile } from '@/domains/study/components/CCVideoTile
 import { CCWhiteboardTile as WhiteboardTile } from '@/domains/study/components/CCWhiteboardTile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 interface CCVideoGridProps {
   onWhiteboardClick?: () => void;
@@ -22,7 +23,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
 
   // OpenVidu 연결 초기화 (비디오 토큰이 있을 때만)
-  useOpenVidu();
+  const { isConnecting } = useOpenVidu();
 
   const sortedParticipants = useMemo(() => {
     return [...participants].sort((a, b) => {
@@ -76,6 +77,14 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
 
   return (
     <div className={cn('flex gap-2 overflow-x-auto border-b border-border bg-card p-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]', className)}>
+      {/* OpenVidu 연결 중 표시 */}
+      {isConnecting && (
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-xs text-muted-foreground">비디오 연결 중...</span>
+        </div>
+      )}
+
       {/* Whiteboard Tile - Always first when active */}
       {isWhiteboardActive && <WhiteboardTile onClick={onWhiteboardClick} />}
 
