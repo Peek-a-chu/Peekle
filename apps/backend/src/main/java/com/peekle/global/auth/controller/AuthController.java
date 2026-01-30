@@ -25,6 +25,7 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
+    private final com.peekle.domain.league.service.LeagueService leagueService;
 
     @PostMapping("/refresh")
     public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
@@ -96,7 +97,8 @@ public class AuthController {
         if (signupRequest.bojId() != null && !signupRequest.bojId().isBlank()) {
             user.registerBojId(signupRequest.bojId());
         }
-        userRepository.save(user);
+        userRepository.save(user); // 저장 후
+        leagueService.assignInitialLeague(user); // 리그 배정 (트랜잭션 분리되어도 됨, 혹은 여기서 호출)
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());

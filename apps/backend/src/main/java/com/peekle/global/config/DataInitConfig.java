@@ -55,7 +55,7 @@ public class DataInitConfig {
                                                 .socialId("mock_social_2")
                                                 .bojId("newbie_coder")
                                                 .profileImg("https://api.dicebear.com/7.x/avataaars/svg?seed=newbie")
-                                                .league(LeagueTier.BRONZE)
+                                                .league(LeagueTier.STONE)
                                                 .leaguePoint(100)
                                                 .build();
 
