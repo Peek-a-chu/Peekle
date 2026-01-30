@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Mic, MicOff, Video, VideoOff, Pencil, Settings } from 'lucide-react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 
 interface CCControlBarProps {
   onMicToggle?: () => void;
@@ -24,6 +25,7 @@ export function CCControlBar({
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const participants = useRoomStore((state) => state.participants);
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
+  const openSettingsModal = useSettingsStore((state) => state.openModal);
 
   // Derive state from Store
   const me = participants.find((p) => p.id === currentUserId);
@@ -36,6 +38,11 @@ export function CCControlBar({
 
   const handleVideoToggle = () => {
     onVideoToggle?.();
+  };
+
+  const handleSettingsClick = () => {
+    openSettingsModal('device');
+    // onSettingsClick은 호출하지 않음 - SettingsModal만 표시
   };
 
   return (
@@ -86,7 +93,7 @@ export function CCControlBar({
           variant="ghost"
           size="icon"
           className="h-12 w-12 rounded-full bg-[#EDF2F8] hover:bg-[#DFE7F0]"
-          onClick={onSettingsClick}
+          onClick={handleSettingsClick}
           aria-label="설정"
         >
           <Settings className="h-5 w-5" />

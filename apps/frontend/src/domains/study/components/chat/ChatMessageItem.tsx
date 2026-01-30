@@ -57,7 +57,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
         }
 
         viewSharedCode({
-          code: message.metadata.code,
+          code: message.metadata.code || '',
           language: message.metadata.language || 'python',
           ownerName: displayOwnerName,
           problemTitle: message.metadata.problemTitle,
@@ -98,7 +98,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
         }
 
         viewSharedCode({
-          code: message.metadata.code,
+          code: message.metadata.code || '',
           language: message.metadata.language || 'python',
           ownerName: displayOwnerName,
           problemTitle: message.metadata.problemTitle,

@@ -18,8 +18,8 @@ const SettingsModal = () => {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
       <DialogOverlay className="bg-black/40 backdrop-blur-sm z-[100]" />
-      <DialogContent className="max-w-2xl w-[95vw] sm:w-[90vw] p-0 overflow-hidden border border-border shadow-2xl z-[101] bg-card rounded-2xl animate-in zoom-in-95 duration-200">
-        <div className="flex flex-col sm:flex-row h-[600px] sm:h-[550px]">
+      <DialogContent className="max-w-2xl w-[120vw] sm:w-[110vw] p-0 overflow-hidden border border-border shadow-2xl z-[101] bg-card rounded-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex flex-col sm:flex-row h-[800px] sm:h-[750px]">
           {/* 좌측 사이드바 (내비게이션) */}
           <aside className="w-full sm:w-64 bg-muted border-b sm:border-b-0 sm:border-r border-border p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 shrink-0">
             <DialogTitle className="text-lg sm:text-xl font-black text-foreground tracking-tight px-2 sm:px-0">

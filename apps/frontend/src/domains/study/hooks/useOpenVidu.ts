@@ -7,12 +7,27 @@ import { toast } from 'sonner';
 
 // OpenVidu 서버 URL 가져오기
 function getOpenViduUrl(): string {
-  // docker-compose.dev.yml에서 OPENVIDU_PUBLICURL=https://localhost/openvidu로 설정됨
-  // 환경 변수로 설정 가능하도록 함
+  // 환경 변수로 직접 OpenVidu URL 설정 가능
+  if (process.env.NEXT_PUBLIC_OPENVIDU_URL) {
+    const url = process.env.NEXT_PUBLIC_OPENVIDU_URL;
+    console.log('[OpenVidu] Server URL from NEXT_PUBLIC_OPENVIDU_URL:', url);
+    return url;
+  }
+  
+  // 로컬 실행 시 직접 포트로 접근 (nginx 프록시 없이)
+  // Docker 실행 시에는 nginx 프록시를 통해 접근
   const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://localhost';
-  // OpenVidu는 /openvidu 경로로 접근 (nginx 프록시를 통해)
+  
+  // localhost인 경우 직접 포트로 접근 (로컬 실행)
+  if (socketUrl.includes('localhost') || socketUrl.includes('127.0.0.1')) {
+    const openViduUrl = 'https://localhost:8443';
+    console.log('[OpenVidu] Server URL (local):', openViduUrl);
+    return openViduUrl;
+  }
+  
+  // Docker 환경에서는 nginx 프록시를 통해 접근
   const openViduUrl = socketUrl.replace(/\/$/, '') + '/openvidu';
-  console.log('[OpenVidu] Server URL:', openViduUrl, 'from NEXT_PUBLIC_SOCKET_URL:', socketUrl);
+  console.log('[OpenVidu] Server URL (via nginx):', openViduUrl, 'from NEXT_PUBLIC_SOCKET_URL:', socketUrl);
   return openViduUrl;
 }
 
@@ -20,6 +35,7 @@ interface UseOpenViduReturn {
   session: Session | null;
   publisher: Publisher | null;
   isConnected: boolean;
+  isConnecting: boolean;
   toggleAudio: () => void;
   toggleVideo: () => void;
 }
@@ -36,6 +52,7 @@ export function useOpenVidu(): UseOpenViduReturn {
   const publisherRef = useRef<Publisher | null>(null);
   const streamManagersRef = useRef<Map<number, StreamManager>>(new Map());
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // connection data에서 userId 추출 헬퍼 함수
   const extractUserId = useCallback((connectionData: string | undefined): number | null => {
@@ -73,16 +90,17 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     let OV: OpenVidu;
     try {
+      // OpenVidu 2.32+ 버전에서는 생성자가 인자를 받지 않음
       OV = new OpenVidu();
-      // If needed: OV.setAdvancedConfiguration({ ... });
       OVRef.current = OV;
-      console.log('[OpenVidu] OpenVidu client initialized successfully. URL not needed for constructor.');
+      console.log('[OpenVidu] OpenVidu client initialized successfully with URL:', openViduUrl);
     } catch (error) {
       console.error('[OpenVidu] Failed to initialize OpenVidu client:', error);
       toast.error('OpenVidu 클라이언트 초기화에 실패했습니다: ' + (error as Error).message);
       return;
     }
 
+    // initSession()은 인자를 받지 않음 (OpenVidu 2.32+)
     const session = OV.initSession();
     sessionRef.current = session;
 
@@ -138,10 +156,12 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     // 세션 연결
     console.log('[OpenVidu] Connecting session with token');
+    setIsConnecting(true);
 
     session
       .connect(videoToken, { clientData: JSON.stringify({ userId: currentUserId }) })
       .then(() => {
+        setIsConnecting(false);
         console.log('[OpenVidu] Session connected');
         setIsConnected(true);
 
@@ -182,6 +202,18 @@ export function useOpenVidu(): UseOpenViduReturn {
           );
         });
 
+        // 스트림 속성 변경 이벤트 (비디오/오디오 토글 시 발생)
+        publisher.on('streamPropertyChanged', (event: any) => {
+          console.log('[OpenVidu] Publisher stream property changed:', event.changedProperty, event.newValue);
+          if (event.changedProperty === 'videoActive') {
+            window.dispatchEvent(
+              new CustomEvent('openvidu-publisher-video-changed', {
+                detail: { publisher, videoActive: event.newValue },
+              }),
+            );
+          }
+        });
+
         session.publish(publisher);
         console.log('[OpenVidu] Publisher published');
 
@@ -211,6 +243,7 @@ export function useOpenVidu(): UseOpenViduReturn {
 
         toast.error(errorMessage);
         setIsConnected(false);
+        setIsConnecting(false);
       });
 
     // 정리 함수
@@ -227,6 +260,7 @@ export function useOpenVidu(): UseOpenViduReturn {
       }
       streamManagersRef.current.clear();
       setIsConnected(false);
+      setIsConnecting(false);
     };
   }, [videoToken, currentUserId, updateParticipant, extractUserId]);
 
@@ -251,6 +285,9 @@ export function useOpenVidu(): UseOpenViduReturn {
       if (currentUserId) {
         updateParticipant(currentUserId, { isVideoOff: isVideoEnabled });
       }
+
+      // streamPropertyChanged 이벤트 핸들러에서 이벤트를 발생시키므로
+      // 여기서는 즉시 발생시키지 않음 (스트림이 준비된 후에만 이벤트 발생)
     }
   }, [currentUserId, updateParticipant]);
 
@@ -278,6 +315,7 @@ export function useOpenVidu(): UseOpenViduReturn {
     session: sessionRef.current,
     publisher: publisherRef.current,
     isConnected,
+    isConnecting,
     toggleAudio,
     toggleVideo,
   };

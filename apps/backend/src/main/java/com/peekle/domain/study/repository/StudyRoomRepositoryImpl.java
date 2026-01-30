@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 import static com.peekle.domain.study.entity.QStudyMember.studyMember;
 import static com.peekle.domain.study.entity.QStudyRoom.studyRoom;
+import static com.peekle.domain.user.entity.QUser.user;
 
 @RequiredArgsConstructor
 public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
@@ -30,7 +31,8 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
         // 1. 목록 조회
         List<StudyRoom> content = queryFactory
                 .selectFrom(studyRoom)
-                // .leftJoin(studyRoom.owner, user).fetchJoin() // User 엔티티 제거로 인한 조인 불필요
+                .distinct() // 중복 제거
+                .leftJoin(studyRoom.owner, user).fetchJoin() // Owner 정보를 가져오기 위해 fetchJoin 추가
                 .join(studyMember).on(studyMember.study.eq(studyRoom))
                 .where(
                         studyMember.user.id.eq(userId), // 내가 참여한 스터디만 필터링
@@ -92,9 +94,10 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
             return Page.empty(pageable);
         }
 
-        // 조건페이징된 ids로 in 절 조회
+        // 조건페이징된 ids로 in 절 조회 (owner 정보도 함께 가져오기)
         List<StudyRoom> content = queryFactory
                 .selectFrom(studyRoom)
+                .leftJoin(studyRoom.owner, user).fetchJoin() // Owner 정보를 가져오기 위해 fetchJoin 추가
                 .where(studyRoom.id.in(ids))
                 .fetch();
 

@@ -5,12 +5,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:80
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query') || '';
-  const source = searchParams.get('source') || 'BOJ';
+  const limit = searchParams.get('limit') || '10';
 
   try {
-    // 백엔드의 /api/problems/search 엔드포인트로 프록시
+    // 백엔드의 /api/problems/search 엔드포인트로 프록시 (keyword와 limit 사용)
     const res = await fetch(
-      `${API_BASE_URL}/api/problems/search?query=${encodeURIComponent(query)}&source=${encodeURIComponent(source)}`,
+      `${API_BASE_URL}/api/problems/search?keyword=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`,
       {
         headers: {
           Cookie: request.headers.get('cookie') || '',

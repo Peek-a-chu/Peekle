@@ -86,13 +86,29 @@ export interface ExternalProblem {
 }
 
 export async function searchExternalProblems(query: string): Promise<ExternalProblem[]> {
-  const res = await apiFetch<ExternalProblem[]>(
-    '/api/external/search?query=' + encodeURIComponent(query),
-  );
+  const res = await apiFetch<
+    Array<{
+      id: number;
+      externalId: string;
+      title: string;
+      tier: string;
+      url: string;
+      tags: string[];
+    }>
+  >('/api/problems/search?keyword=' + encodeURIComponent(query) + '&limit=20');
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to search external problems');
   }
-  return res.data;
+  // 백엔드 응답을 ExternalProblem 형식으로 변환
+  return res.data.map((item) => ({
+    title: item.title,
+    number: parseInt(item.externalId, 10),
+    externalId: item.externalId,
+    problemId: item.id,
+    tier: item.tier,
+    url: item.url,
+    tags: item.tags || [],
+  }));
 }
 
 /**
