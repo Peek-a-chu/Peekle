@@ -325,6 +325,27 @@ public class RedisGameService {
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("CHAT", chatData));
     }
 
+    // 코드 저장
+    public void updateCode(com.peekle.domain.game.dto.request.GameCodeRequest request, Long userId) {
+        String key = String.format(RedisKeyConst.GAME_CODE_KEY, request.getGameId(), request.getProblemId(), userId);
+        redisTemplate.opsForValue().set(key, request.getCode());
+    }
+
+    // 코드 불러오기
+    public void loadCode(com.peekle.domain.game.dto.request.GameCodeRequest request, Long userId) {
+        String key = String.format(RedisKeyConst.GAME_CODE_KEY, request.getGameId(), request.getProblemId(), userId);
+        String code = (String) redisTemplate.opsForValue().get(key);
+
+        // 개인 채널로 전송 (/topic/games/code/load/{userId})
+        String topic = String.format(RedisKeyConst.TOPIC_GAME_CODE_LOAD, userId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("problemId", request.getProblemId());
+        response.put("language", request.getLanguage());
+        response.put("code", code); // code가 null이면 null 전송 (프론트에서 처리)
+
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("CODE_LOAD", response));
+    }
+
     // 강퇴하기
     public void kickParticipant(Long gameId, Long hostId, Long targetUserId) {
         // 1. 방장 권한 확인
