@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
+import { toast } from 'sonner';
 import type { Publisher } from 'openvidu-browser';
 
 const DeviceSection = () => {
@@ -209,28 +210,43 @@ const DeviceSection = () => {
     try {
       const publisher = (window as any).__openviduPublisher as Publisher | undefined;
       if (!publisher) {
-        console.error('[DeviceSection] Publisher not found');
+        toast.error('OpenVidu 연결을 찾을 수 없습니다. 비디오 세션에 먼저 참여해주세요.');
         return;
       }
 
       const stream = publisher.stream.getMediaStream();
-      const audioTracks = stream.getAudioTracks();
-      
-      if (audioTracks.length === 0 || isMuted) {
-        console.error('[DeviceSection] No audio tracks found or mic is muted');
+      if (!stream) {
+        toast.error('오디오 스트림을 찾을 수 없습니다.');
         return;
       }
 
-      // AudioContext 생성
+      const audioTracks = stream.getAudioTracks();
+      
+      if (audioTracks.length === 0) {
+        toast.error('마이크 트랙을 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.');
+        return;
+      }
+
+      if (isMuted) {
+        toast.error('마이크가 꺼져 있습니다. 마이크를 켜주세요.');
+        return;
+      }
+
+      // AudioContext 생성 및 resume
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
 
       const audioContext = audioContextRef.current;
       
+      // AudioContext가 suspended 상태면 resume
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
       // 마이크 입력을 스피커로 연결
       const source = audioContext.createMediaStreamSource(stream);
-      const destination = audioContext.createMediaStreamAudioDestinationNode();
+      const destination = audioContext.createMediaStreamDestination();
       
       // GainNode로 볼륨 제어 (입력 볼륨 적용)
       const inputGainNode = audioContext.createGain();
@@ -249,14 +265,41 @@ const DeviceSection = () => {
       audio.srcObject = destination.stream;
       audio.volume = 1.0; // 이미 gainNode에서 제어하므로 1.0으로 설정
       
-      await audio.play();
+      // 재생 시도
+      try {
+        await audio.play();
+      } catch (playError: any) {
+        // 재생 실패 시 더 구체적인 에러 메시지
+        console.error('[DeviceSection] Audio play failed:', playError);
+        if (playError.name === 'NotAllowedError') {
+          toast.error('오디오 재생이 차단되었습니다. 브라우저 설정에서 자동 재생을 허용해주세요.');
+        } else if (playError.name === 'NotSupportedError') {
+          toast.error('오디오 형식을 지원하지 않습니다.');
+        } else {
+          toast.error('마이크 테스트를 시작할 수 없습니다. 오디오 재생 오류가 발생했습니다.');
+        }
+        // 정리
+        source.disconnect();
+        inputGainNode.disconnect();
+        outputGainNode.disconnect();
+        destination.disconnect();
+        return;
+      }
       
       micTestDestinationRef.current = destination;
       micTestAudioRef.current = audio;
       toggleMicTest();
-    } catch (error) {
+      toast.success('마이크 테스트가 시작되었습니다.');
+    } catch (error: any) {
       console.error('[DeviceSection] Failed to start mic test:', error);
-      alert('마이크 테스트를 시작할 수 없습니다. 마이크 권한을 확인해주세요.');
+      const errorMessage = error?.message || '알 수 없는 오류';
+      if (errorMessage.includes('permission') || errorMessage.includes('권한')) {
+        toast.error('마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.');
+      } else if (errorMessage.includes('not found') || errorMessage.includes('찾을 수 없')) {
+        toast.error('마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.');
+      } else {
+        toast.error(`마이크 테스트를 시작할 수 없습니다: ${errorMessage}`);
+      }
     }
   };
 
@@ -331,9 +374,12 @@ const DeviceSection = () => {
           toggleSpeakerTest();
         }
       }, 2000);
-    } catch (error) {
+      
+      toast.success('스피커 테스트가 시작되었습니다.');
+    } catch (error: any) {
       console.error('[DeviceSection] Failed to start speaker test:', error);
-      alert('스피커 테스트를 시작할 수 없습니다.');
+      const errorMessage = error?.message || '알 수 없는 오류';
+      toast.error(`스피커 테스트를 시작할 수 없습니다: ${errorMessage}`);
     }
   };
 
