@@ -130,4 +130,37 @@ public class MediaService {
         log.info("Created connection token for session {}", sessionId);
         return connection.getToken();
     }
+
+    /**
+     * 특정 스터디에서 특정 유저를 강제로 연결 해제시킵니다.
+     */
+    public void evictUser(Long studyId, Long userId) {
+        String sessionId = "study_" + studyId;
+        try {
+            openVidu.fetch();
+            Session session = openVidu.getActiveSessions().stream()
+                    .filter(s -> s.getSessionId().equals(sessionId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (session != null) {
+                for (Connection connection : session.getConnections()) {
+                    // clientData에서 userId 확인
+                    // 예: {"userId":123} or "userId=123"
+                    String clientData = connection.getClientData();
+                    if (clientData != null && clientData.contains(String.valueOf(userId))) {
+                        log.info("Force disconnecting user {} from OpenVidu session {}", userId, sessionId);
+                        try {
+                            session.forceDisconnect(connection);
+                        } catch (OpenViduJavaClientException | OpenViduHttpException e) {
+                            log.warn("Failed to force disconnect connection {} for user {}",
+                                    connection.getConnectionId(), userId);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error during evictUser", e);
+        }
+    }
 }
