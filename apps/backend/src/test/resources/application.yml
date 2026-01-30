@@ -68,11 +68,6 @@ jwt:
   access-token-expiry: 1800000
   refresh-token-expiry: 1209600000
 
-# OpenVidu 설정 (테스트용 더미 값)
-openvidu:
-  url: http://localhost:4443
-  secret: MY_SECRET
-
 # Frontend URL
 app:
   frontend-url: http://localhost:3000
@@ -80,3 +75,7 @@ app:
 # Springwolf (AsyncAPI) 설정 - 테스트에서는 비활성화
 springwolf:
   enabled: false
+
+OPENVIDU_URL: https://openvidu:4443
+OPENVIDU_SECRET: sdafdsf
+
