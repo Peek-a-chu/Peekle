@@ -350,4 +350,27 @@ public class StudySocketController {
                                 "/topic/studies/" + request.getStudyId() + "/info/" + userId,
                                 SocketResponse.of("ROOM_INFO", roomInfo));
         }
+
+        // 전체 음소거 (방장 전용)
+        @MessageMapping("/studies/mute-all")
+        public void muteAll(@Payload StudyMuteAllRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // 권한 검증 (Service에 위임하거나 직접 확인)
+                // 여기서는 간단히 Room 정보를 가져와서 Owner 비교
+                StudyRoomResponse roomInfo = studyRoomService.getStudyRoom(userId, request.getStudyId());
+                if (roomInfo.getOwner().getId().equals(userId)) {
+                        // [SYSTEM] 전체 음소거 알림
+                        studyChatService.sendChat(request.getStudyId(), userId,
+                                        ChatMessageRequest.builder()
+                                                        .content("님이 전체 음소거를 실행했습니다.")
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+
+                        // Broadcast MUTE_ALL
+                        redisPublisher.publish(
+                                        new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                        SocketResponse.of("MUTE_ALL", userId)); // senderId
+                }
+        }
 }

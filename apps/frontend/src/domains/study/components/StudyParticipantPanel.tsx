@@ -20,9 +20,7 @@ export function StudyParticipantPanel() {
   const { client } = useSocketContext();
   const viewRealtimeCode = useRoomStore((state) => state.viewRealtimeCode);
 
-  const { kickUser, delegateOwner } = useStudySocketActions();
-
-  const [search, setSearch] = useState('');
+  const { kickUser, delegateOwner, muteAll } = useStudySocketActions();
 
   // My ID from Auth Store
   const myId = user?.id ? Number(user.id) : -1;
@@ -30,6 +28,7 @@ export function StudyParticipantPanel() {
   // Find if I am owner
   const isOwner = useRoomStore(selectIsOwner);
 
+  const [search, setSearch] = useState('');
   const [kickTarget, setKickTarget] = useState<Participant | null>(null);
   const [delegateTarget, setDelegateTarget] = useState<Participant | null>(null);
 
@@ -64,12 +63,13 @@ export function StudyParticipantPanel() {
   };
 
   const handleMuteAll = () => {
-    if (!client || !roomId) return;
-    client.publish({
-      destination: `/pub/studies/${roomId}/mute-all`,
-      body: JSON.stringify({}),
-    });
-    toast.info('전체 음소거를 요청했습니다.');
+    muteAll();
+    // toast handled in action or socket listener? Listener handles "Success/Warning". Action just sends.
+    // We can show toast here for "Request Sent" if we want, but listener 'MUTE_ALL' will confirm it.
+    // The previous code showed "Request Sent". Let's keep minimal or let listener handle it.
+    // The listener only toasts "전체 음소거를 실행했습니다" for the sender. So we can remove duplicate toast here if we want.
+    // But removing toast here might make it feel unresponsive if socket is slow.
+    // However, the action is void.
   };
 
   const handleMuteUser = (p: Participant) => {
