@@ -83,6 +83,10 @@ export const useStudySocketActions = () => {
     [roomId, publish],
   );
 
+  const muteAll = useCallback(() => {
+    if (roomId) publish('/pub/studies/mute-all', { studyId: roomId });
+  }, [roomId, publish]);
+
   return {
     enterStudy,
     exitStudy,
@@ -94,6 +98,7 @@ export const useStudySocketActions = () => {
     addProblem,
     removeProblem,
     updateStatus,
+    muteAll,
   };
 };
 
@@ -116,7 +121,6 @@ export const useStudySocketSubscription = (studyId: number) => {
     // 1. Enter Study
     console.log('[StudySocket] Sending ENTER');
     client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
-
     // 2. Subscribe Public Room Topic
     const publicTopic = `/topic/studies/rooms/${studyId}`;
     console.log('[StudySocket] Subscribing to Public:', publicTopic);
@@ -147,7 +151,8 @@ export const useStudySocketSubscription = (studyId: number) => {
 
         switch (type) {
           case 'ENTER': {
-            // data is userId (number)
+            // ...
+            // Same as before
             const enteredUserId = data;
             try {
               const members = await fetchStudyParticipants(studyId);
@@ -215,6 +220,37 @@ export const useStudySocketSubscription = (studyId: number) => {
           case 'STATUS': {
             const { userId, isMuted, isVideoOff } = data;
             updateParticipant(userId, { isMuted, isVideoOff });
+            break;
+          }
+          case 'MUTE_ALL': {
+            const senderId = data;
+            const { currentUserId, participants } = useRoomStore.getState();
+
+            // 1. Optimistic Update: Mute everyone except the sender
+            // using setParticipants to trigger re-render immediately for everyone
+            setParticipants(participants.map(p => {
+              if (p.id === senderId) return p; // Sender keeps status
+              return { ...p, isMuted: true }; // Everyone else muted locally
+            }));
+
+            // 2. If I am a victim (not sender), report status to server
+            if (currentUserId && currentUserId !== senderId) {
+              toast.warning('방장에 의해 음소거 되었습니다.');
+
+              // Fetch my current video state to preserve it
+              const me = participants.find(p => p.id === currentUserId);
+              const isVideoOff = me?.isVideoOff ?? false;
+
+              if (client && client.connected) {
+                client.publish({
+                  destination: '/pub/studies/status',
+                  body: JSON.stringify({ studyId, isMuted: true, isVideoOff })
+                });
+              }
+            } else {
+              // Sender only
+              toast.info('전체 음소거를 실행했습니다.');
+            }
             break;
           }
         }
