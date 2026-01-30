@@ -28,12 +28,20 @@ export async function handleResponse<T>(res: Response): Promise<T> {
   return json as T;
 }
 
+/*
+   사용자가 로그인을 유지하려면 모든 API 요청이 이 apiFetch를 통과해야합니다.
+   그래야 Access Token이 만료되어도, /refresh로 토큰을 갱신하거든요!
+
+ */
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & { skipAuth?: boolean } = {},
 ): Promise<ApiResponse<T>> {
   const { skipAuth, ...fetchOptions } = options;
-  const url = `${BACKEND_URL}${path}`;
+
+  // 브라우저에서 호출 시 Next.js API route 사용 (상대 경로)
+  // 서버 사이드에서 호출 시 백엔드 URL 직접 사용
+  const url = typeof window !== 'undefined' ? path : `${BACKEND_URL}${path}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -54,7 +62,8 @@ export async function apiFetch<T>(
 
   if (response.status === 401) {
     // Access token 만료 -> refresh 시도
-    const refreshResponse = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
+    const refreshUrl = typeof window !== 'undefined' ? '/api/auth/refresh' : `${BACKEND_URL}/api/auth/refresh`;
+    const refreshResponse = await fetch(refreshUrl, {
       method: 'POST',
       credentials: 'include',
     });

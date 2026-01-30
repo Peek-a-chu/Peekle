@@ -50,8 +50,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-    await fetch(`${BACKEND_URL}/api/auth/logout`, {
+    await fetch('/api/auth/logout', {
       method: 'POST',
       credentials: 'include',
     });
