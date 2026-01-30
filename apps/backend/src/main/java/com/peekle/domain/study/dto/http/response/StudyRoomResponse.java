@@ -31,7 +31,11 @@ public class StudyRoomResponse {
         private OwnerInfo(User user) {
             this.id = user.getId();
             this.nickname = user.getNickname();
-            this.profileImage = user.getProfileImgThumb();
+            String img = user.getProfileImgThumb();
+            if (img == null) {
+                img = user.getProfileImg();
+            }
+            this.profileImage = img;
         }
 
         public static OwnerInfo from(User user) {

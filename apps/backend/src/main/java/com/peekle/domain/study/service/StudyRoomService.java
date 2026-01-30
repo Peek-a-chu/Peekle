@@ -107,11 +107,16 @@ public class StudyRoomService {
                                                         Collections.emptyList());
                                         int memberCount = studyMembers.size();
 
-                                        // 프로필 이미지 (Mock Data) - 최대 3개
+                                        // 프로필 이미지 (실제 데이터 사용) - 최대 3개
                                         List<String> profileImages = studyMembers.stream()
                                                         .limit(3)
-                                                        .map(m -> "https://api.dicebear.com/7.x/avataaars/svg?seed="
-                                                                        + m.getUser().getId()) // 예시용 더미 이미지
+                                                        .map(m -> {
+                                                                String img = m.getUser().getProfileImgThumb();
+                                                                if (img == null) {
+                                                                        img = m.getUser().getProfileImg();
+                                                                }
+                                                                return img;
+                                                        })
                                                         .toList();
 
                                         return StudyRoomListResponse.of(studyRoom, memberCount, profileImages);

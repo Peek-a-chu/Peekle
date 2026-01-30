@@ -1,6 +1,6 @@
 services:
   openvidu-server:
-    image: openvidu/openvidu-dev:2.29.0
+    image: openvidu/openvidu-dev:2.32.1
     container_name: peekle-openvidu
     restart: unless-stopped
     ports:

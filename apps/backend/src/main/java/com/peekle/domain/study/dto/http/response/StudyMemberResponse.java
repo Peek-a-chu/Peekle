@@ -16,10 +16,15 @@ public class StudyMemberResponse {
     private boolean isOnline;
 
     public static StudyMemberResponse of(StudyMember member, boolean isOnline) {
+        String profileImg = member.getUser().getProfileImgThumb();
+        if (profileImg == null) {
+            profileImg = member.getUser().getProfileImg();
+        }
+
         return StudyMemberResponse.builder()
                 .userId(member.getUser().getId())
                 .nickname(member.getUser().getNickname())
-                .profileImg(member.getUser().getProfileImgThumb())
+                .profileImg(profileImg)
                 .role(member.getRole())
                 .isOnline(isOnline)
                 .build();

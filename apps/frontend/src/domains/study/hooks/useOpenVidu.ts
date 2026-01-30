@@ -40,7 +40,7 @@ export function useOpenVidu(): UseOpenViduReturn {
   // connection data에서 userId 추출 헬퍼 함수
   const extractUserId = useCallback((connectionData: string | undefined): number | null => {
     if (!connectionData) return null;
-    
+
     try {
       // JSON 형식인 경우
       if (connectionData.startsWith('{')) {
@@ -70,11 +70,13 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     const openViduUrl = getOpenViduUrl();
     console.log('[OpenVidu] Initializing with URL:', openViduUrl);
-    
+
+    let OV: OpenVidu;
     try {
-      const OV = new OpenVidu(openViduUrl);
+      OV = new OpenVidu();
+      // If needed: OV.setAdvancedConfiguration({ ... });
       OVRef.current = OV;
-      console.log('[OpenVidu] OpenVidu client initialized successfully');
+      console.log('[OpenVidu] OpenVidu client initialized successfully. URL not needed for constructor.');
     } catch (error) {
       console.error('[OpenVidu] Failed to initialize OpenVidu client:', error);
       toast.error('OpenVidu 클라이언트 초기화에 실패했습니다: ' + (error as Error).message);
@@ -88,7 +90,7 @@ export function useOpenVidu(): UseOpenViduReturn {
     session.on('streamCreated', (event) => {
       console.log('[OpenVidu] Stream created:', event.stream.streamId);
       const subscriber = session.subscribe(event.stream, undefined);
-      
+
       // 스트림의 connection data에서 userId 추출
       const connectionData = event.stream.connection?.data;
       const userId = extractUserId(connectionData);
@@ -114,7 +116,7 @@ export function useOpenVidu(): UseOpenViduReturn {
     // 원격 스트림 제거 이벤트
     session.on('streamDestroyed', (event) => {
       console.log('[OpenVidu] Stream destroyed:', event.stream.streamId);
-      
+
       const connectionData = event.stream.connection?.data;
       const userId = extractUserId(connectionData);
 
@@ -136,7 +138,7 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     // 세션 연결
     console.log('[OpenVidu] Connecting session with token');
-    
+
     session
       .connect(videoToken, { clientData: JSON.stringify({ userId: currentUserId }) })
       .then(() => {
@@ -182,7 +184,7 @@ export function useOpenVidu(): UseOpenViduReturn {
 
         session.publish(publisher);
         console.log('[OpenVidu] Publisher published');
-        
+
         // 즉시 이벤트 발생 (이미 생성된 경우)
         window.dispatchEvent(
           new CustomEvent('openvidu-publisher-created', {
@@ -199,14 +201,14 @@ export function useOpenVidu(): UseOpenViduReturn {
           openViduUrl,
           hasToken: !!videoToken,
         });
-        
+
         let errorMessage = '비디오 연결에 실패했습니다.';
         if (error.message?.includes('알려진 호스트') || error.message?.includes('unknown host')) {
           errorMessage = 'OpenVidu 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.';
         } else if (error.message) {
           errorMessage = `비디오 연결 실패: ${error.message}`;
         }
-        
+
         toast.error(errorMessage);
         setIsConnected(false);
       });
@@ -231,9 +233,9 @@ export function useOpenVidu(): UseOpenViduReturn {
   // 오디오 토글
   const toggleAudio = useCallback(() => {
     if (publisherRef.current) {
-      const isAudioEnabled = publisherRef.current.stream.isAudioActive();
+      const isAudioEnabled = publisherRef.current.stream.audioActive;
       publisherRef.current.publishAudio(!isAudioEnabled);
-      
+
       if (currentUserId) {
         updateParticipant(currentUserId, { isMuted: isAudioEnabled });
       }
@@ -243,9 +245,9 @@ export function useOpenVidu(): UseOpenViduReturn {
   // 비디오 토글
   const toggleVideo = useCallback(() => {
     if (publisherRef.current) {
-      const isVideoEnabled = publisherRef.current.stream.isVideoActive();
+      const isVideoEnabled = publisherRef.current.stream.videoActive;
       publisherRef.current.publishVideo(!isVideoEnabled);
-      
+
       if (currentUserId) {
         updateParticipant(currentUserId, { isVideoOff: isVideoEnabled });
       }
