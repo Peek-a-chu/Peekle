@@ -47,7 +47,6 @@ services:
       - ../apps/frontend/.env
     environment:
       - NODE_ENV=production
-      - BACKEND_INTERNAL_URL=http://backend:8080
     expose:
       - "3000"
     restart: unless-stopped
