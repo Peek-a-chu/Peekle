@@ -80,4 +80,13 @@ public class RedisKeyConst {
     // "RED"/"BLUE"
     public static final String GAME_ROOM_TEAMS = "game:room:%d:teams";
 
+    // Game Code (Value)
+    // game:{gameId}:problem:{problemId}:user:{userId}:code
+    // Changed problemId placeholder to %d
+    public static final String GAME_CODE_KEY = "game:%d:problem:%d:user:%d:code";
+
+    // Game Code Load Topic (Pub/Sub)
+    // /topic/games/code/load/{userId}
+    public static final String TOPIC_GAME_CODE_LOAD = "topic/games/code/load/%d";
+
 }

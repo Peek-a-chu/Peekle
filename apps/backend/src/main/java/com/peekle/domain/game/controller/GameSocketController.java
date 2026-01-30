@@ -76,6 +76,26 @@ public class GameSocketController {
         gameService.sendChatMessage(request, userId);
     }
 
+    // 코드 저장
+    @MessageMapping("/games/code/update")
+    public void updateCode(@Payload com.peekle.domain.game.dto.request.GameCodeRequest request,
+            SimpMessageHeaderAccessor headerAccessor) {
+        Long userId = getUserId(headerAccessor);
+        if (userId == null)
+            return;
+        gameService.updateCode(request, userId);
+    }
+
+    // 코드 불러오기
+    @MessageMapping("/games/code/load")
+    public void loadCode(@Payload com.peekle.domain.game.dto.request.GameCodeRequest request,
+            SimpMessageHeaderAccessor headerAccessor) {
+        Long userId = getUserId(headerAccessor);
+        if (userId == null)
+            return;
+        gameService.loadCode(request, userId);
+    }
+
     // 강퇴
     @MessageMapping("/games/kick")
     public void kick(@Payload com.peekle.domain.game.dto.request.GameKickRequest request,
