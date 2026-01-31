@@ -186,6 +186,10 @@ public class RedisGameService {
         // ENTER 이벤트 발행
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("ENTER", userId));
+
+        redisTemplate.opsForValue().set(
+                String.format(RedisKeyConst.USER_CURRENT_GAME, userId),
+                String.valueOf(roomId));
     }
 
     // 팀 변경
@@ -209,6 +213,9 @@ public class RedisGameService {
         // 1. 참여자 목록(Set)에서 제거
         String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
         redisTemplate.opsForSet().remove(playersKey, String.valueOf(userId));
+
+        // 유저의 현재 게임 정보 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, userId));
 
         // 2. 부가 정보 제거 (Ready, Team)
         redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId),
@@ -283,11 +290,14 @@ public class RedisGameService {
             throw new IllegalStateException("방장만 게임을 시작할 수 있습니다.");
         }
 
+        // 방장이 시작을 눌렀다는 건 방장은 준비가 된 것임 (Auto Ready)
+        String readyKey = String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId);
+        redisTemplate.opsForHash().put(readyKey, String.valueOf(userId), "true");
+
         // 2. 참여자 전원 Ready 검증
         String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
         Set<Object> players = redisTemplate.opsForSet().members(playersKey);
 
-        String readyKey = String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId);
         // 모든 플레이어가 Ready인지 확인
         if (players != null) {
             for (Object player : players) {
@@ -297,6 +307,11 @@ public class RedisGameService {
                 }
             }
         }
+
+        // 게임 시작 시간 저장 (점수 계산용)
+        redisTemplate.opsForValue().set(
+                String.format(RedisKeyConst.GAME_START_TIME, roomId),
+                String.valueOf(System.currentTimeMillis()));
 
         // 3. 상태 변경
         updateGameStatus(roomId, GameStatus.PLAYING);
@@ -418,22 +433,81 @@ public class RedisGameService {
                 .mode(GameMode.valueOf((String) info.getOrDefault("mode", "TIME_ATTACK")))
                 .build();
     }
+    // 문제 해결 (SubmissionService에서 호출)
+    public void solveProblem(Long userId, Long gameId, Long problemId) {
 
-    public SubmissionResponse submitGameProblem(Long gameId,
-            SubmissionRequest request) {
-        log.info("Processing Game Submission: GameId={}, ProblemId={}", gameId, request.getProblemId());
+        // 1. 이미 푼 문제인지 체크 (중복 방지)
+        String solvedKey = String.format(RedisKeyConst.GAME_SOLVED_PROBLEM, gameId, problemId);
+        Boolean isAlreadySolved = redisTemplate.opsForSet().isMember(solvedKey, String.valueOf(userId));
 
-        // 1. 일반 제출 저장 (Log & Points)
-        SubmissionResponse response = submissionService.saveGeneralSubmission(request);
-
-        if (response.isSuccess()) {
-            // TODO: 게임에 맞춰서 구현해야함
-            // 2. 게임 상태 업데이트
-            log.info("Game Submission Success. Updating Game State...");
-
+        if (Boolean.TRUE.equals(isAlreadySolved)) {
+            return; // 이미 풀었음
         }
 
-        return response;
+        // 2. 해결 처리 (Set에 추가)
+        redisTemplate.opsForSet().add(solvedKey, String.valueOf(userId));
+
+        // 3. 경과 시간 계산
+        String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, gameId);
+        String startTimeStr = (String) redisTemplate.opsForValue().get(startTimeKey);
+
+        long startTime = (startTimeStr != null) ? Long.parseLong(startTimeStr) : System.currentTimeMillis();
+        long elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000;
+
+        // 4. 개인 기록 업데이트 (Hash: solvedCount, totalTime)
+        String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, userId);
+        redisTemplate.opsForHash().increment(scoreKey, "solvedCount", 1);
+        redisTemplate.opsForHash().increment(scoreKey, "totalTime", elapsedSeconds);
+
+        // 5. 랭킹 점수 계산 & 업데이트 (ZSet)
+        // 공식: (푼 문제 수 * 5000) - 경과 시간
+        Object solvedCountObj = redisTemplate.opsForHash().get(scoreKey, "solvedCount");
+        int solvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 1;
+
+        double score = (solvedCount * 5000) - elapsedSeconds;
+
+        // 팀전 여부 확인 및 팀 점수 반영
+        String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, gameId);
+        String teamTypeStr = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
+        String teamColor = null;
+
+        if ("TEAM".equals(teamTypeStr)) {
+            // 유저의 팀 정보 조회
+            String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, gameId);
+            teamColor = (String) redisTemplate.opsForHash().get(teamsKey, String.valueOf(userId));
+
+            if (teamColor != null) {
+                // 팀 점수 증가 (RED/BLUE) -> ZSet 사용 (Score: Solved Count)
+                String teamRankingKey = String.format(RedisKeyConst.GAME_TEAM_RANKING, gameId);
+                redisTemplate.opsForZSet().incrementScore(teamRankingKey, teamColor, 1);
+            }
+        }
+
+        // 개인 랭킹도 항상 업데이트 (MVP/ACE 산정용)
+        String rankingKey = String.format(RedisKeyConst.GAME_RANKING, gameId);
+        redisTemplate.opsForZSet().add(rankingKey, String.valueOf(userId), score);
+
+        // 6. 이벤트 발행 (누가 풀었니?)
+        String topic = String.format(RedisKeyConst.TOPIC_GAME_SOLVED, gameId);
+        Map<String, Object> solvedData = new HashMap<>();
+        solvedData.put("userId", userId);
+        solvedData.put("problemId", problemId);
+        solvedData.put("teamColor", teamColor);
+        solvedData.put("score", score);
+        solvedData.put("solvedCount", solvedCount);
+
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("SOLVED", solvedData));
+
+        // 7. 랭킹 이벤트 발행 (실시간 랭킹 업데이트용)
+        String rankingTopic = String.format(RedisKeyConst.TOPIC_GAME_RANKING, gameId);
+        Map<String, Object> rankingData = new HashMap<>();
+        rankingData.put("userId", userId);
+        rankingData.put("score", score);
+        rankingData.put("solvedCount", solvedCount);
+        rankingData.put("teamColor", teamColor);
+
+        redisPublisher.publish(new ChannelTopic(rankingTopic), SocketResponse.of("RANKING_UPDATE", rankingData));
+>>>>>>> apps/backend/src/main/java/com/peekle/domain/game/service/RedisGameService.java
     }
 
 }

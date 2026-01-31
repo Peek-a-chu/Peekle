@@ -13,8 +13,10 @@ import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.peekle.domain.game.service.RedisGameService;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ public class SubmissionService {
     private final UserRepository userRepository;
     private final LeagueService leagueService;
     private final SubmissionValidator submissionValidator;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisGameService redisGameService;
 
     @Transactional
     public SubmissionResponse saveGeneralSubmission(SubmissionRequest request) {
@@ -53,7 +57,6 @@ public class SubmissionService {
             }
         }
 
-        // 0. 검증 (Extension 변조 방지)
         // 0. 검증 (Extension 변조 방지)
         if (user.getBojId() != null && !user.getBojId().isEmpty()) {
             try {
@@ -116,12 +119,13 @@ public class SubmissionService {
         // BUT user wanted to use "Extension Data".
         // Request has problemTitle and problemTier?
         // request.getProblemTier() is "11", we convert to "Gold 5".
-        
+
         // Let's ensure we have the correct tier string to pass.
         // If we created a new problem, we have tierStr.
-        // If we found an existing problem, we might want to use the one from DB OR the one from request.
+        // If we found an existing problem, we might want to use the one from DB OR the
+        // one from request.
         // To respect "Extension provided", we should re-calculate tierStr from request.
-        
+
         int reqTierLevel = 0;
         try {
             reqTierLevel = Integer.parseInt(request.getProblemTier());
@@ -134,10 +138,10 @@ public class SubmissionService {
         // 현재는 확장 프로그램에서 직접 호출 시 room 정보가 없을 수 있음.
         // 추후 request에 roomName 등이 포함되거나, roomId로 조회하여 설정 필요.
         // 우선은 null 또는 기본값 설정.
-        String tag = null; 
+        String tag = null;
         if (request.getSourceType() != null && !request.getSourceType().equalsIgnoreCase("EXTENSION")) {
-             // If manual submission from study/game, maybe generate tag here?
-             // For now, simpler to leave null as user said implementations are pending.
+            // If manual submission from study/game, maybe generate tag here?
+            // For now, simpler to leave null as user said implementations are pending.
         }
 
         SubmissionLog log = SubmissionLog.create(
@@ -157,6 +161,20 @@ public class SubmissionService {
         int currentRank = leagueService.getUserRank(user);
 
         System.out.println("✅ Submission saved! ID: " + log.getId());
+
+        // 유저가 게임 중이라면 점수 반영
+        try {
+            String userGameKey = String.format(com.peekle.global.redis.RedisKeyConst.USER_CURRENT_GAME, user.getId());
+            Object gameIdObj = redisTemplate.opsForValue().get(userGameKey);
+
+            if (gameIdObj != null) {
+                Long gameId = Long.parseLong(String.valueOf(gameIdObj));
+                redisGameService.solveProblem(user.getId(), gameId, request.getProblemId());
+                System.out.println("🎮 Game Score Updated for Game ID: " + gameId);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to update game score: " + e.getMessage());
+        }
 
         return SubmissionResponse.builder()
                 .success(true)
