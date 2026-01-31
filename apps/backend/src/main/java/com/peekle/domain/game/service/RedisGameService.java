@@ -6,6 +6,8 @@ import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
 import com.peekle.domain.game.enums.GameType;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -29,6 +31,7 @@ public class RedisGameService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
+    private final com.peekle.domain.submission.service.SubmissionService submissionService;
 
     /**
      * 게임 상태 변경 메서드
@@ -430,7 +433,6 @@ public class RedisGameService {
                 .mode(GameMode.valueOf((String) info.getOrDefault("mode", "TIME_ATTACK")))
                 .build();
     }
-
     // 문제 해결 (SubmissionService에서 호출)
     public void solveProblem(Long userId, Long gameId, Long problemId) {
 
@@ -505,6 +507,7 @@ public class RedisGameService {
         rankingData.put("teamColor", teamColor);
 
         redisPublisher.publish(new ChannelTopic(rankingTopic), SocketResponse.of("RANKING_UPDATE", rankingData));
+>>>>>>> apps/backend/src/main/java/com/peekle/domain/game/service/RedisGameService.java
     }
 
 }
