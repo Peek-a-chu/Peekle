@@ -507,7 +507,6 @@ public class RedisGameService {
         rankingData.put("teamColor", teamColor);
 
         redisPublisher.publish(new ChannelTopic(rankingTopic), SocketResponse.of("RANKING_UPDATE", rankingData));
->>>>>>> apps/backend/src/main/java/com/peekle/domain/game/service/RedisGameService.java
     }
 
 }
