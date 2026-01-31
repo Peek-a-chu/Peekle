@@ -31,7 +31,6 @@ public class RedisGameService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
-    private final com.peekle.domain.submission.service.SubmissionService submissionService;
 
     /**
      * 게임 상태 변경 메서드
