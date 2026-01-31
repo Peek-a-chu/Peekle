@@ -6,6 +6,8 @@ import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
 import com.peekle.domain.game.enums.GameType;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -29,6 +31,7 @@ public class RedisGameService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
+    private final com.peekle.domain.submission.service.SubmissionService submissionService;
 
     /**
      * 게임 상태 변경 메서드
@@ -414,6 +417,23 @@ public class RedisGameService {
                 .teamType(GameType.valueOf((String) info.getOrDefault("type", "INDIVIDUAL")))
                 .mode(GameMode.valueOf((String) info.getOrDefault("mode", "TIME_ATTACK")))
                 .build();
+    }
+
+    public SubmissionResponse submitGameProblem(Long gameId,
+            SubmissionRequest request) {
+        log.info("Processing Game Submission: GameId={}, ProblemId={}", gameId, request.getProblemId());
+
+        // 1. 일반 제출 저장 (Log & Points)
+        SubmissionResponse response = submissionService.saveGeneralSubmission(request);
+
+        if (response.isSuccess()) {
+            // TODO: 게임에 맞춰서 구현해야함
+            // 2. 게임 상태 업데이트
+            log.info("Game Submission Success. Updating Game State...");
+
+        }
+
+        return response;
     }
 
 }

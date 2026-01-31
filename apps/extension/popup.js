@@ -1,8 +1,36 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // [Check Env]
+    let frontendBaseUrl = 'http://localhost:3000'; // Default fallback
+    chrome.runtime.sendMessage({ type: 'CHECK_ENV' }, (response) => {
+        if (response) {
+            if (response.isLocal) {
+                const badge = document.getElementById('local-badge');
+                if (badge) badge.style.display = 'inline-block';
+            }
+            if (response.frontendUrl) {
+                frontendBaseUrl = response.frontendUrl;
+            }
+        }
+    });
+
     const loggedInBtns = document.getElementById('logged-in-btns');
     const loggedOutBtns = document.getElementById('logged-out-btns');
     const nicknameEl = document.getElementById('nickname');
     const statusEl = document.getElementById('status');
+
+    // ... (Existing Code) ...
+
+    // 3. 버튼 이벤트 리스너
+    document.getElementById('link-site-btn').onclick = () => {
+        chrome.tabs.create({ url: `${frontendBaseUrl}/profile/me` });
+    };
+
+    const goSiteBtn = document.getElementById('go-site-btn');
+    if (goSiteBtn) {
+        goSiteBtn.onclick = () => {
+            chrome.tabs.create({ url: `${frontendBaseUrl}/profile/me` });
+        };
+    }
 
     // 0. 테마 적용 (저장된 설정 확인)
     chrome.storage.local.get(['themeSettings'], (result) => {
@@ -54,18 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 3. 버튼 이벤트 리스너
-    document.getElementById('link-site-btn').onclick = () => {
-        chrome.tabs.create({ url: 'http://localhost:3000/profile/me' }); // 연동 페이지 주소
-    };
-
-    const goSiteBtn = document.getElementById('go-site-btn');
-    if (goSiteBtn) {
-        goSiteBtn.onclick = () => {
-            chrome.tabs.create({ url: 'http://localhost:3000/profile/me' });
-        };
-    }
-
+    // 3. 버튼 이벤트 리스너 (Moved to top with dynamic URL)
     document.getElementById('logout-btn').onclick = handleLogout;
 
     // Refresh 버튼 (새로고침)

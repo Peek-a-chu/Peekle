@@ -1,11 +1,31 @@
+// --- Configuration ---
+const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
+// 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
+// Local: Next.js (3000)가 /api/* 요청을 Backend(8080)로 Proxy함 (next.config.ts rewrites 확인됨)
+// Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
+const BASE_URL = IS_LOCAL
+    ? 'http://localhost:3000'
+    : 'https://i14a408.p.ssafy.io';
+
+const API_BASE_URL = BASE_URL; // Alias for compatibility
+const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
+
 // --- Baekjoon Solver Logic ---
 
 const PROCESSED_SUBMISSIONS_KEY = 'processed_submissions';
 const PEEKLE_TOKEN_KEY = 'peekle_token';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'SOLVED') {
+    if (request.type === 'CHECK_ENV') {
+        sendResponse({
+            isLocal: IS_LOCAL,
+            frontendUrl: FRONTEND_BASE_URL,
+            apiUrl: API_BASE_URL
+        });
+        return true;
+    } else if (request.type === 'SOLVED') {
         handleSolvedSubmission(request.payload, sender);
+        return true;
     } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
         console.log('Background: Saving pending submission and opening tab:', request.payload);
         chrome.storage.local.set({
@@ -56,8 +76,8 @@ async function getProblemInfo(problemId) {
 async function sendToBackend(data, studyId = null) {
     try {
         const url = studyId
-            ? `http://localhost:8080/api/studies/${studyId}/submit`
-            : 'http://localhost:8080/api/submissions/';
+            ? `${API_BASE_URL}/api/studies/${studyId}/submit`
+            : `${API_BASE_URL}/api/submissions/`;
 
         console.log(`Sending submission to ${studyId ? 'Study' : 'General'} backend:`, data);
 
