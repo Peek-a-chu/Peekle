@@ -8,6 +8,8 @@ export async function serverFetch<T>(
 ): Promise<{ success: boolean; data?: T; error?: string; status: number }> {
   const cookieStore = await cookies();
   const allCookies = cookieStore.getAll();
+  const accessToken = cookieStore.get('access_token')?.value;
+
   const cookieHeader = allCookies
     .map((c: { name: string; value: string }) => `${c.name}=${c.value}`)
     .join('; ');
@@ -20,6 +22,7 @@ export async function serverFetch<T>(
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookieHeader,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...options.headers,
       },
       // 서버 간 통신이므로 credentials 옵션은 필요 없음 (헤더에 직접 넣었음)
