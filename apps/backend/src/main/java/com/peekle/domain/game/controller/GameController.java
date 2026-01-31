@@ -35,10 +35,4 @@ public class GameController {
         return ApiResponse.success(gameService.getGameRoom(roomId));
     }
 
-    @PostMapping("/{gameId}/submit")
-    public ApiResponse<SubmissionResponse> submitGameProblem(
-            @PathVariable Long gameId,
-            @RequestBody SubmissionRequest request) {
-        return ApiResponse.success(gameService.submitGameProblem(gameId, request));
-    }
 }
