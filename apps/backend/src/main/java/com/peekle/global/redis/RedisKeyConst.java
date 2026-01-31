@@ -89,4 +89,26 @@ public class RedisKeyConst {
     // /topic/games/code/load/{userId}
     public static final String TOPIC_GAME_CODE_LOAD = "topic/games/code/load/%d";
 
+    // 유저의 현재 게임 방 ID (Value: gameId)
+    public static final String USER_CURRENT_GAME = "user:%d:game";
+
+    // 게임 시작 시간(String) -> System.currentTimeMillis()
+    public static final String GAME_START_TIME = "game:%d:start_time";
+
+    // 문제 해결 여부 (Set) -> game:{gameId}:problem:{problemId}:solved
+    public static final String GAME_SOLVED_PROBLEM = "game:%d:problem:%d:solved";
+
+    // 실시간 랭킹(ZSet) -> game:{gameId}:ranking
+    public static final String GAME_RANKING = "game:%d:ranking";
+
+    // 팀 랭킹(ZSet) -> game:{gameId}:team_ranking (Members: "RED", "BLUE")
+    public static final String GAME_TEAM_RANKING = "game:%d:team_ranking";
+
+    // 개인 점수 기록(Hash) -> game:{gameId}:user:{userId}:score
+    public static final String GAME_USER_SCORE = "game:%d:user:%d:score";
+
+    // 토픽 (Pub/Sub)
+    public static final String TOPIC_GAME_SOLVED = "topic/games/%d/solved";
+    public static final String TOPIC_GAME_RANKING = "topic/games/%d/ranking";
+
 }

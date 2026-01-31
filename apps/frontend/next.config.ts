@@ -43,6 +43,14 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: 'http://localhost:8080/api/:path*',
       },
+      {
+        source: '/oauth2/:path*',
+        destination: 'http://localhost:8080/oauth2/:path*',
+      },
+      {
+        source: '/login/oauth2/code/:path*',
+        destination: 'http://localhost:8080/login/oauth2/code/:path*',
+      },
     ];
   },
   webpack: (config) => {
