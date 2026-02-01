@@ -5,11 +5,9 @@ FROM base AS pruner
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.28.1 --activate
-# Install turbo globally
-RUN pnpm install -g turbo
 COPY . .
 # Generate a partial monorepo with only the frontend and its dependencies
-RUN turbo prune frontend --docker
+RUN pnpm dlx turbo prune frontend --docker
 
 # Stage 2: Install dependencies
 FROM base AS deps
