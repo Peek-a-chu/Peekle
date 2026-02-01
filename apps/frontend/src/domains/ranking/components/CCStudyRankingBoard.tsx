@@ -69,45 +69,6 @@ export function CCStudyRankingBoard(): React.ReactNode {
     console.log('Study clicked:', studyId);
   };
 
-  if (isLoading) {
-    return (
-      <div className="w-full max-w-3xl mx-auto space-y-6">
-        {/* Podium Skeleton */}
-        <div className="flex justify-center gap-8 pt-4 pb-8">
-          <div className="mt-8 h-48 w-32 bg-muted/30 rounded-lg animate-pulse" />
-          <div className="h-56 w-32 bg-muted/30 rounded-lg animate-pulse" />
-          <div className="mt-8 h-48 w-32 bg-muted/30 rounded-lg animate-pulse" />
-        </div>
-
-        {/* Search Bar Skeleton */}
-        <div className="h-12 w-full rounded-full bg-muted/30 animate-pulse" />
-
-        {/* Scope Toggle Skeleton */}
-        <div className="flex gap-1.5 p-1">
-          <div className="h-9 w-24 bg-muted/30 rounded-md animate-pulse" />
-          <div className="h-9 w-24 bg-muted/30 rounded-md animate-pulse" />
-        </div>
-
-        {/* List Items Skeleton */}
-        <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-20 w-full bg-muted/30 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-destructive">에러: {error}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-8">
       <StudyRankingList
@@ -115,8 +76,9 @@ export function CCStudyRankingBoard(): React.ReactNode {
         onStudyClick={handleStudyClick}
         scope={scope}
         onScopeChange={handleScopeChange}
+        isLoading={isLoading}
       >
-        {currentPage === 0 && topThreeRankings.length > 0 && (
+        {topThreeRankings.length > 0 && (
           <TopThreePodium rankings={topThreeRankings} onStudyClick={handleStudyClick} />
         )}
       </StudyRankingList>
