@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface ProblemRepository extends JpaRepository<Problem, Long> {
+public interface ProblemRepository extends JpaRepository<Problem, Long>, ProblemRepositoryCustom {
     Optional<Problem> findByExternalIdAndSource(String externalId, String source);
     
     /**

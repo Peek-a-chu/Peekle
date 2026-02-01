@@ -17,8 +17,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.TimeUnit;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,6 +29,7 @@ public class RedisGameService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
+    private final GameService gameService;
 
     /**
      * 게임 상태 변경 메서드
@@ -158,7 +159,14 @@ public class RedisGameService {
 
     // 방 입장
     public void enterGameRoom(Long roomId, Long userId, String password) {
-        // 0. 방 존재 및 비밀번호 확인
+        // 0-1. 중복 참여 방지: 이미 다른 게임에 참여 중인지 확인
+        String userCurrentGameKey = String.format(RedisKeyConst.USER_CURRENT_GAME, userId);
+        Object currentGameId = redisTemplate.opsForValue().get(userCurrentGameKey);
+        if (currentGameId != null) {
+            throw new IllegalStateException("이미 다른 게임에 참여 중입니다. (Game ID: " + currentGameId + ")");
+        }
+
+        // 0-2. 방 존재 및 비밀번호 확인
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
         Map<Object, Object> roomInfo = redisTemplate.opsForHash().entries(infoKey);
 
@@ -430,7 +438,6 @@ public class RedisGameService {
                 .mode(GameMode.valueOf((String) info.getOrDefault("mode", "TIME_ATTACK")))
                 .build();
     }
-
     // 문제 해결 (SubmissionService에서 호출)
     public void solveProblem(Long userId, Long gameId, Long problemId) {
 
@@ -505,6 +512,97 @@ public class RedisGameService {
         rankingData.put("teamColor", teamColor);
 
         redisPublisher.publish(new ChannelTopic(rankingTopic), SocketResponse.of("RANKING_UPDATE", rankingData));
+
+        // 8. 스피드 레이스 종료 조건 체크
+        String modeStr = (String) redisTemplate.opsForHash().get(infoKey, "mode");
+        if ("SPEED_RACE".equals(modeStr)) {
+            checkSpeedRaceEndCondition(gameId, teamColor, teamTypeStr);
+        }
+    }
+
+    /**
+     * 스피드 레이스 종료 조건 체크
+     * - 개인전: 모든 유저가 모든 문제를 풀었을 때
+     * - 팀전: 한 팀이 모든 문제를 풀었을 때
+     */
+    private void checkSpeedRaceEndCondition(Long gameId, String solverTeam, String teamType) {
+        String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, gameId);
+        String problemCountStr = (String) redisTemplate.opsForHash().get(infoKey, "problemCount");
+        int problemCount = (problemCountStr != null) ? Integer.parseInt(problemCountStr) : 10;
+
+        if ("TEAM".equals(teamType) && solverTeam != null) {
+            // 팀전: 해당 팀의 점수(푼 문제 수)가 problemCount 이상인지 확인
+            String teamRankingKey = String.format(RedisKeyConst.GAME_TEAM_RANKING, gameId);
+            Double teamScore = redisTemplate.opsForZSet().score(teamRankingKey, solverTeam);
+            if (teamScore != null && teamScore >= problemCount) {
+                log.info("🏆 Team {} completed all {} problems! Finishing game...", solverTeam, problemCount);
+                finishGame(gameId);
+            }
+        } else {
+            // 개인전: 모든 유저가 모든 문제를 풀었는지 확인
+            String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, gameId);
+            Set<Object> players = redisTemplate.opsForSet().members(playersKey);
+            if (players == null || players.isEmpty())
+                return;
+
+            boolean allCompleted = true;
+            for (Object playerObj : players) {
+                Long playerId = Long.parseLong(String.valueOf(playerObj));
+                String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, playerId);
+                Object solvedCountObj = redisTemplate.opsForHash().get(scoreKey, "solvedCount");
+                int playerSolvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 0;
+                if (playerSolvedCount < problemCount) {
+                    allCompleted = false;
+                    break;
+                }
+            }
+
+            if (allCompleted) {
+                log.info("🏆 All players completed all {} problems! Finishing game...", problemCount);
+                finishGame(gameId);
+            }
+        }
+    }
+
+    /**
+     * 게임 종료 처리
+     * - 상태 변경 (PLAYING -> END)
+     * - GameService.processGameResult 호출 (포인트 지급)
+     * - 참여자들의 USER_CURRENT_GAME 키 삭제
+     */
+    public void finishGame(Long roomId) {
+        // 상태 체크
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
+
+        if (!"PLAYING".equals(currentStatus)) {
+            log.warn("⚠️ Cannot finish game {} - not in PLAYING state (current: {})", roomId, currentStatus);
+            return;
+        }
+
+        log.info("🏁 Finishing game {}", roomId);
+
+        // 상태 변경
+        updateGameStatus(roomId, GameStatus.END);
+
+        // 포인트 지급 (DB 저장)
+        try {
+            gameService.processGameResult(roomId);
+        } catch (Exception e) {
+            log.error("❌ Failed to process game result for Game ID: {}", roomId, e);
+        }
+
+        // 참여자들의 USER_CURRENT_GAME 키 삭제
+        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+        Set<Object> players = redisTemplate.opsForSet().members(playersKey);
+        if (players != null) {
+            for (Object playerObj : players) {
+                Long playerId = Long.parseLong(String.valueOf(playerObj));
+                redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, playerId));
+            }
+        }
+
+        log.info("✅ Game {} finished successfully", roomId);
     }
 
 }
