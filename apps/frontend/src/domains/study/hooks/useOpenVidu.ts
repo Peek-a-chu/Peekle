@@ -13,21 +13,26 @@ function getOpenViduUrl(): string {
     console.log('[OpenVidu] Server URL from NEXT_PUBLIC_OPENVIDU_URL:', url);
     return url;
   }
-  
+
   // 로컬 실행 시 직접 포트로 접근 (nginx 프록시 없이)
   // Docker 실행 시에는 nginx 프록시를 통해 접근
   const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://localhost';
-  
+
   // localhost인 경우 직접 포트로 접근 (로컬 실행)
   if (socketUrl.includes('localhost') || socketUrl.includes('127.0.0.1')) {
     const openViduUrl = 'https://localhost:8443';
     console.log('[OpenVidu] Server URL (local):', openViduUrl);
     return openViduUrl;
   }
-  
+
   // Docker 환경에서는 nginx 프록시를 통해 접근
   const openViduUrl = socketUrl.replace(/\/$/, '') + '/openvidu';
-  console.log('[OpenVidu] Server URL (via nginx):', openViduUrl, 'from NEXT_PUBLIC_SOCKET_URL:', socketUrl);
+  console.log(
+    '[OpenVidu] Server URL (via nginx):',
+    openViduUrl,
+    'from NEXT_PUBLIC_SOCKET_URL:',
+    socketUrl,
+  );
   return openViduUrl;
 }
 
@@ -204,7 +209,11 @@ export function useOpenVidu(): UseOpenViduReturn {
 
         // 스트림 속성 변경 이벤트 (비디오/오디오 토글 시 발생)
         publisher.on('streamPropertyChanged', (event: any) => {
-          console.log('[OpenVidu] Publisher stream property changed:', event.changedProperty, event.newValue);
+          console.log(
+            '[OpenVidu] Publisher stream property changed:',
+            event.changedProperty,
+            event.newValue,
+          );
           if (event.changedProperty === 'videoActive') {
             window.dispatchEvent(
               new CustomEvent('openvidu-publisher-video-changed', {
@@ -267,11 +276,31 @@ export function useOpenVidu(): UseOpenViduReturn {
   // 오디오 토글
   const toggleAudio = useCallback(() => {
     if (publisherRef.current) {
-      const isAudioEnabled = publisherRef.current.stream.audioActive;
-      publisherRef.current.publishAudio(!isAudioEnabled);
+      try {
+        const stream = publisherRef.current.stream;
+        const mediaStream = stream.getMediaStream();
 
-      if (currentUserId) {
-        updateParticipant(currentUserId, { isMuted: isAudioEnabled });
+        if (!mediaStream) {
+          console.warn('[OpenVidu] No media stream available');
+          toast.error('사용 가능한 오디오 장치가 없습니다.');
+          return;
+        }
+
+        if (mediaStream.getAudioTracks().length === 0) {
+          console.warn('[OpenVidu] No audio tracks available');
+          toast.error('마이크가 연결되어 있지 않습니다.');
+          return;
+        }
+
+        const isAudioEnabled = stream.audioActive;
+        publisherRef.current.publishAudio(!isAudioEnabled);
+
+        if (currentUserId) {
+          updateParticipant(currentUserId, { isMuted: isAudioEnabled });
+        }
+      } catch (error) {
+        console.error('[OpenVidu] Failed to toggle audio:', error);
+        toast.error('오디오 설정 변경 중 오류가 발생했습니다.');
       }
     }
   }, [currentUserId, updateParticipant]);
@@ -279,11 +308,31 @@ export function useOpenVidu(): UseOpenViduReturn {
   // 비디오 토글
   const toggleVideo = useCallback(() => {
     if (publisherRef.current) {
-      const isVideoEnabled = publisherRef.current.stream.videoActive;
-      publisherRef.current.publishVideo(!isVideoEnabled);
+      try {
+        const stream = publisherRef.current.stream;
+        const mediaStream = stream.getMediaStream();
 
-      if (currentUserId) {
-        updateParticipant(currentUserId, { isVideoOff: isVideoEnabled });
+        if (!mediaStream) {
+          console.warn('[OpenVidu] No media stream available');
+          toast.error('사용 가능한 비디오 장치가 없습니다.');
+          return;
+        }
+
+        if (mediaStream.getVideoTracks().length === 0) {
+          console.warn('[OpenVidu] No video tracks available');
+          toast.error('카메라가 연결되어 있지 않습니다.');
+          return;
+        }
+
+        const isVideoEnabled = stream.videoActive;
+        publisherRef.current.publishVideo(!isVideoEnabled);
+
+        if (currentUserId) {
+          updateParticipant(currentUserId, { isVideoOff: isVideoEnabled });
+        }
+      } catch (error) {
+        console.error('[OpenVidu] Failed to toggle video:', error);
+        toast.error('비디오 설정 변경 중 오류가 발생했습니다.');
       }
 
       // streamPropertyChanged 이벤트 핸들러에서 이벤트를 발생시키므로
@@ -292,12 +341,15 @@ export function useOpenVidu(): UseOpenViduReturn {
   }, [currentUserId, updateParticipant]);
 
   // 특정 사용자의 StreamManager 가져오기
-  const getStreamManager = useCallback((userId: number): StreamManager | null => {
-    if (userId === currentUserId) {
-      return publisherRef.current;
-    }
-    return streamManagersRef.current.get(userId) || null;
-  }, [currentUserId]);
+  const getStreamManager = useCallback(
+    (userId: number): StreamManager | null => {
+      if (userId === currentUserId) {
+        return publisherRef.current;
+      }
+      return streamManagersRef.current.get(userId) || null;
+    },
+    [currentUserId],
+  );
 
   // 외부에서 사용할 수 있도록 전역 함수로 등록
   useEffect(() => {
