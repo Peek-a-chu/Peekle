@@ -16,14 +16,20 @@ interface CCStudyCardProps {
   rank?: number; // 랭킹 순위 (옵셔널, 없으면 표시 안 함)
 }
 
-export function CCStudyCard({ study, isOwner = false, onClick, className, rank }: CCStudyCardProps) {
+export function CCStudyCard({
+  study,
+  isOwner = false,
+  onClick,
+  className,
+  rank,
+}: CCStudyCardProps) {
   const { user } = useAuthStore();
   const displayRank = rank ?? study.rank;
   const rankingPoint = study.rankingPoint ?? 0;
-  
+
   // 현재 사용자가 방장인지 확인 (owner.id와 현재 사용자 ID 비교)
   const isCurrentUserOwner = user && study.owner && user.id === study.owner.id;
-  
+
   // 디버깅: study 객체 확인
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     console.log('[CCStudyCard] Study data:', {
@@ -49,44 +55,45 @@ export function CCStudyCard({ study, isOwner = false, onClick, className, rank }
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {/* 랭킹 번호 배지 */}
             {displayRank !== undefined && (
-              <Badge className="shrink-0 bg-primary/10 text-primary">
-                #{displayRank}
-              </Badge>
-
+              <Badge className="shrink-0 bg-primary/10 text-primary">#{displayRank}</Badge>
             )}
-          <Badge variant="outline" className="bg-primary/10 text-black font-bold border-primary/20">
-            스터디 점수: {rankingPoint}
-          </Badge>
+            <Badge
+              variant="outline"
+              className="bg-primary/10 text-black font-bold border-primary/20"
+            >
+              스터디 점수: {rankingPoint}
+            </Badge>
           </div>
         </div>
 
         {/* 스터디 점수 배지 */}
         <div className="flex flex-row items-center gap-2 mb-3">
-            <h3 className="font-semibold text-lg text-foreground line-clamp-2 min-w-0">
-              {study.title}
-            </h3>
-             {/* 현재 사용자가 방장인지 확인하고 배지 표시 */}
-            {isCurrentUserOwner && (
-              <Badge variant="secondary" className="shrink-0 gap-1 bg-gray-100 text-black font-bold border-gray-200">
-                <Crown className="h-3 w-3" />
-                방장
-              </Badge>
-            )}
-                    {/* Member Count */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Users className="h-4 w-4" />
-            <span>{study.memberCount}명</span>
+          <h3 className="font-semibold text-sm text-foreground line-clamp-2 min-w-0">
+            {study.title}
+          </h3>
+          {/* 현재 사용자가 방장인지 확인하고 배지 표시 */}
+          {isCurrentUserOwner && (
+            <Badge
+              variant="secondary"
+              className="shrink-0 gap-1 bg-gray-100 text-black font-bold border-gray-200"
+            >
+              <Crown className="h-3 w-3" />
+              방장
+            </Badge>
+          )}
+          {/* Member Count */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" />
+              <span>{study.memberCount}명</span>
+            </div>
           </div>
-        </div>
-
         </div>
 
         {/* Description */}
         {study.description && (
           <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{study.description}</p>
         )}
-
 
         {study.owner && (
           <div className="mb-4 flex items-center gap-2">
