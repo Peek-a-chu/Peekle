@@ -38,7 +38,7 @@ export function CCWorkbookCard({
       className={cn(
         'relative rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md cursor-pointer',
         isSelected
-          ? 'border-pink-500 ring-1 ring-pink-500 bg-pink-50/5'
+          ? 'border ring-1 ring-primary bg-primary/10'
           : 'border-border hover:border-pink-200',
         className,
       )}
@@ -47,7 +47,7 @@ export function CCWorkbookCard({
         {/* 왼쪽: 번호 + 콘텐츠 */}
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {/* 번호 뱃지 */}
-          <div className="shrink-0 w-8 h-8 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">
+          <div className="shrink-0 w-8 h-8 rounded-lg bg-pink-100 text-primary flex items-center justify-center text-sm font-bold">
             {workbook.number}
           </div>
 
@@ -72,7 +72,7 @@ export function CCWorkbookCard({
                   <div
                     className={cn(
                       'h-full rounded-full transition-all',
-                      progress === 100 ? 'bg-green-500' : 'bg-pink-500',
+                      progress === 100 ? 'bg-green-500' : 'bg-primary',
                     )}
                     style={{ width: `${progress}%` }}
                   />

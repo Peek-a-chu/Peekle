@@ -23,7 +23,12 @@ export interface CCProblemListPanelProps {
   isFolded: boolean;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  onAddProblem?: (title: string, number: number, tags?: string[], problemId?: number) => Promise<void>;
+  onAddProblem?: (
+    title: string,
+    number: number,
+    tags?: string[],
+    problemId?: number,
+  ) => Promise<void>;
   onRemoveProblem?: (problemId: number) => Promise<void>;
   submissions?: Submission[];
   onFetchSubmissions?: (problemId: number) => void;
@@ -86,7 +91,12 @@ export function CCProblemListPanel({
     setSubmissionModalOpen(false);
   };
 
-  const handleAddProblem = async (title: string, number: number, tags?: string[], problemId?: number) => {
+  const handleAddProblem = async (
+    title: string,
+    number: number,
+    tags?: string[],
+    problemId?: number,
+  ) => {
     if (onAddProblem) {
       await onAddProblem(title, number, tags, problemId);
     }
@@ -114,7 +124,7 @@ export function CCProblemListPanel({
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setAddProblemModalOpen(true)}
-            className="bg-pink-500 hover:bg-pink-600 text-white h-8 text-xs px-3 shadow-sm"
+            className="bg-primary hover:bg-primary/90 text-white h-8 text-xs px-3 shadow-sm"
           >
             <Plus className="mr-1 h-3 w-3" />
             문제 추가
