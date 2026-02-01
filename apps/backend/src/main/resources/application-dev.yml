@@ -27,7 +27,7 @@ spring:
     enabled: false # 개발용: Flyway 비활성화
 
 # OpenVidu 설정 (로컬 실행 시 localhost 사용)
-OPENVIDU_URL: ${OPENVIDU_URL:https://localhost:8443}
+OPENVIDU_URL: ${OPENVIDU_URL:http://localhost:8443}
 OPENVIDU_SECRET: ${OPENVIDU_SECRET:MY_SECRET}
 
 springwolf:

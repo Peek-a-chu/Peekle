@@ -154,9 +154,9 @@ public class MediaService {
      * 
      * @param sessionId OpenVidu Session ID
      * @param userData  사용자 메타데이터 (JSON String 등)
-     * @return Connection Token
+     * @return Connection 객체 (Token 및 ConnectionId 포함)
      */
-    public String createConnection(String sessionId, Map<String, Object> userData)
+    public Connection createConnection(String sessionId, Map<String, Object> userData)
             throws OpenViduJavaClientException, OpenViduHttpException {
         openVidu.fetch();
         Session session = openVidu.getActiveSessions().stream()
@@ -166,7 +166,12 @@ public class MediaService {
 
         if (session == null) {
             log.warn("Session {} not found active. Re-creating...", sessionId);
-            return getOrCreateSession(sessionId);
+            // 세션 재생성 시도 (재귀 호출 대신 세션 ID만 가져와서 진행)
+            getOrCreateSession(sessionId);
+            session = openVidu.getActiveSessions().stream()
+                    .filter(s -> s.getSessionId().equals(sessionId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Failed to recreate session " + sessionId));
         }
 
         ConnectionProperties properties = new ConnectionProperties.Builder()
@@ -177,7 +182,7 @@ public class MediaService {
 
         Connection connection = session.createConnection(properties);
         log.info("Created connection token for session {}", sessionId);
-        return connection.getToken();
+        return connection;
     }
 
     /**

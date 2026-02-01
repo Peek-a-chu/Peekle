@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -281,6 +282,7 @@ public class StudyRoomService {
                 // 1. 전체 멤버 조회
                 List<StudyMember> members = studyMemberRepository.findAllByStudy(studyRoom);
 
+
                 // 2. Redis Presence 조회
                 String onlineUsersKey = "study:" + studyRoom.getId() + ":online_users";
                 java.util.Set<String> onlineUserIds = redisTemplate.opsForSet().members(onlineUsersKey);
@@ -288,12 +290,17 @@ public class StudyRoomService {
                         onlineUserIds = java.util.Collections.emptySet();
                 }
 
+                // 2-2. Connection IDs 조회
+                String connectionIdsKey = "study:" + studyRoom.getId() + ":connection_ids";
+                Map<Object, Object> connectionIds = redisTemplate.opsForHash().entries(connectionIdsKey);
+
                 final java.util.Set<String> finalOnlineUserIds = onlineUserIds;
 
                 // 3. Response 매핑
                 List<StudyMemberResponse> memberResponses = members.stream()
                                 .map(member -> StudyMemberResponse.of(member,
-                                                finalOnlineUserIds.contains(String.valueOf(member.getUser().getId()))))
+                                                finalOnlineUserIds.contains(String.valueOf(member.getUser().getId())),
+                                                (String) connectionIds.get(String.valueOf(member.getUser().getId()))))
                                 .collect(Collectors.toList());
 
                 return StudyRoomResponse.from(studyRoom, memberResponses, currentUserId);

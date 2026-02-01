@@ -25,4 +25,15 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
 
     @Query("SELECT p FROM Problem p WHERE p.externalId LIKE %:keyword% OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     Page<Problem> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("SELECT DISTINCT p FROM Problem p " +
+           "LEFT JOIN p.tags t " +
+           "WHERE (:keyword IS NULL OR :keyword = '' OR p.externalId LIKE %:keyword% OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+           "AND (:tiers IS NULL OR p.tier IN :tiers) " +
+           "AND (:tagNames IS NULL OR t.name IN :tagNames)")
+    Page<Problem> searchByFilter(
+            @Param("keyword") String keyword,
+            @Param("tiers") List<String> tiers,
+            @Param("tagNames") List<String> tagNames,
+            Pageable pageable);
 }

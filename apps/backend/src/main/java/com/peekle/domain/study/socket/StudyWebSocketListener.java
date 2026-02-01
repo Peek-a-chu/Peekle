@@ -48,6 +48,9 @@ public class StudyWebSocketListener {
             // 1. 스터디 방 온라인 유저 목록에서 제거
             String onlineKey = "study:" + studyId + ":online_users";
             redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+            // 1-2. OpenVidu Connection ID 제거
+            redisTemplate.opsForHash().delete("study:" + studyId + ":connection_ids", userId.toString());
+            
             redisTemplate.delete("user:" + userId + ":active_study");
 
             // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리

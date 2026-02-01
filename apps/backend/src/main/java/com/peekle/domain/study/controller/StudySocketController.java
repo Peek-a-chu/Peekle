@@ -14,6 +14,7 @@ import com.peekle.domain.study.service.*;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
+import io.openvidu.java.client.Connection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -101,7 +102,11 @@ public class StudySocketController {
                         Map<String, Object> userData = new HashMap<>();
                         userData.put("userId", userId);
 
-                        String token = mediaService.createConnection(sessionId, userData);
+                        Connection connection = mediaService.createConnection(sessionId, userData);
+                        String token = connection.getToken();
+
+                        // Connection ID 저장 (Redis Hash)
+                        redisTemplate.opsForHash().put("study:" + studyId + ":connection_ids", userId.toString(), connection.getConnectionId());
 
                         // 1. OpenVidu Token
                         messagingTemplate.convertAndSend(

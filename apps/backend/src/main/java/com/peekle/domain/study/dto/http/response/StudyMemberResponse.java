@@ -14,8 +14,13 @@ public class StudyMemberResponse {
     private String profileImg;
     private StudyRole role;
     private boolean isOnline;
+    private String odUid;
 
     public static StudyMemberResponse of(StudyMember member, boolean isOnline) {
+        return of(member, isOnline, null);
+    }
+
+    public static StudyMemberResponse of(StudyMember member, boolean isOnline, String odUid) {
         String profileImg = member.getUser().getProfileImgThumb();
         if (profileImg == null) {
             profileImg = member.getUser().getProfileImg();
@@ -27,6 +32,7 @@ public class StudyMemberResponse {
                 .profileImg(profileImg)
                 .role(member.getRole())
                 .isOnline(isOnline)
+                .odUid(odUid)
                 .build();
     }
 }
