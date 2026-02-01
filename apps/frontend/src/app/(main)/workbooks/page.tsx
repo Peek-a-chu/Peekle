@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useWorkbooksPageLogic } from '@/domains/workbook/hooks/useWorkbooksPageLogic';
 import {
   WorkbooksHeader,
@@ -11,7 +12,10 @@ import {
 import { WorkbookModal } from '@/domains/workbook/components/WorkbookModal';
 import type { WorkbookProblemItem } from '@/domains/workbook/types';
 
-export default function WorkbooksPage() {
+function WorkbooksContent() {
+  const searchParams = useSearchParams();
+  const initialId = searchParams.get('id');
+
   const {
     tab,
     setTab,
@@ -33,7 +37,7 @@ export default function WorkbooksPage() {
     createWorkbook,
     updateWorkbook,
     deleteWorkbook,
-  } = useWorkbooksPageLogic();
+  } = useWorkbooksPageLogic(initialId);
 
   // 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
@@ -124,5 +128,13 @@ export default function WorkbooksPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function WorkbooksPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-8">Loading...</div>}>
+      <WorkbooksContent />
+    </Suspense>
   );
 }
