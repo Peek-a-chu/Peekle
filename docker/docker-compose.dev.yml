@@ -74,6 +74,17 @@ services:
     networks:
       - peekle-network-dev
 
+  # ChromaDB - Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma-dev
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - peekle-network-dev
+
   # AI Server - FastAPI (Python)
   ai-server:
     build:
@@ -82,12 +93,14 @@ services:
     container_name: peekle-ai-server-dev
     env_file:
       - ../apps/ai-server/.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
     ports:
       - "8000:8000"
-    volumes:
-      - ai-chroma-db:/app/chroma_db
     depends_on:
       - redis
+      - chroma
     networks:
       - peekle-network-dev
 
@@ -111,5 +124,5 @@ volumes:
     driver: local
   nginx-certs:
     driver: local
-  ai-chroma-db:
+  chroma-data:
     driver: local

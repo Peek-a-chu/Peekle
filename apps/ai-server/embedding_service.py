@@ -13,18 +13,23 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     model_name="text-embedding-3-small"
 )
 
-# 2. ChromaDB 클라이언트 및 컬렉션 설정
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+# 2. ChromaDB HTTP 클라이언트 (서버 모드)
+CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_PORT = os.getenv("CHROMA_PORT", "8001")
+
+chroma_client = chromadb.HttpClient(
+    host=CHROMA_HOST,
+    port=int(CHROMA_PORT)
+)
 collection = chroma_client.get_or_create_collection(
     name="problems",
     embedding_function=openai_ef
 )
 
 def index_problems(problems):
-    """문제를 ChromaDB에 저장 (자동 임베딩 방식)"""
+    """문제를 ChromaDB에 저장"""
     ids = [str(p['id']) for p in problems]
     
-    # indexing.py에서 넘겨준 태그 포함 텍스트 사용
     documents = [
         str(p.get('document_content', f"{p.get('title', '')} {p.get('tier', '')}")).strip() 
         for p in problems
@@ -38,7 +43,6 @@ def index_problems(problems):
         for p in problems
     ]
     
-    # embeddings 인자를 따로 주지 않으면 openai_ef가 자동으로 생성
     collection.add(
         ids=ids,
         documents=documents,
@@ -46,8 +50,7 @@ def index_problems(problems):
     )
 
 def search_similar_problems(query_text, n_results=5):
-    """유사 문제 검색 (자동 임베딩 방식)"""
-    # query_texts만 주면 openai_ef가 자동으로 쿼리를 임베딩
+    """유사 문제 검색"""
     results = collection.query(
         query_texts=[query_text],
         n_results=n_results
