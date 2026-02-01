@@ -66,59 +66,63 @@ export default function WorkbooksPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] relative">
-      <div className={`h-full flex flex-col transition-all duration-200 ${selectedWorkbook ? 'pr-[476px]' : ''}`}>
-        {/* 헤더 */}
-        <WorkbooksHeader onCreateClick={handleCreateClick} className="mb-4" />
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-200">
+        <div
+          className={`h-full flex flex-col transition-all duration-200 ${selectedWorkbook ? 'pr-[476px]' : ''}`}
+        >
+          {/* 헤더 */}
+          <WorkbooksHeader onCreateClick={handleCreateClick} className="mb-4" />
 
-        {/* 필터 */}
-        <WorkbooksFilter
-          tab={tab}
-          onTabChange={setTab}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          sortBy={sortBy}
-          onSortChange={setSortBy}
-          tabCounts={tabCounts}
-          className="mb-4"
-        />
-
-        {/* 메인 콘텐츠 */}
-        <div className="flex-1 min-h-0">
-          <WorkbooksLeftPanel
-            workbooks={workbooks}
-            totalCount={totalCount}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onToggleBookmark={toggleBookmark}
-            hasMore={hasMore}
-            isLoading={isLoading}
-            onLoadMore={loadMore}
+          {/* 필터 */}
+          <WorkbooksFilter
+            tab={tab}
+            onTabChange={setTab}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            tabCounts={tabCounts}
+            className="mb-4"
           />
+
+          {/* 메인 콘텐츠 */}
+          <div className="flex-1 min-h-0">
+            <WorkbooksLeftPanel
+              workbooks={workbooks}
+              totalCount={totalCount}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onToggleBookmark={toggleBookmark}
+              hasMore={hasMore}
+              isLoading={isLoading}
+              onLoadMore={loadMore}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* 우측 패널 - 전체 높이 */}
-      {selectedWorkbook && (
-        <WorkbooksRightPanel
-          workbook={selectedWorkbook}
-          problems={selectedProblems}
-          onClose={handleClosePanel}
-          onEdit={handleEditClick}
-          onDelete={() => selectedId && deleteWorkbook(selectedId)}
-          className="fixed top-0 right-0 bottom-0"
+        {/* 우측 패널 - 전체 높이 */}
+        {selectedWorkbook && (
+          <WorkbooksRightPanel
+            workbook={selectedWorkbook}
+            problems={selectedProblems}
+            onClose={handleClosePanel}
+            onEdit={handleEditClick}
+            onDelete={() => selectedId && deleteWorkbook(selectedId)}
+            className="fixed top-0 right-0 bottom-0"
+          />
+        )}
+
+        {/* 문제집 생성/수정 모달 */}
+        <WorkbookModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          mode={modalMode}
+          workbook={modalMode === 'edit' ? selectedWorkbook : null}
+          problems={modalMode === 'edit' ? selectedProblems : []}
+          onSubmit={handleModalSubmit}
         />
-      )}
-
-      {/* 문제집 생성/수정 모달 */}
-      <WorkbookModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        mode={modalMode}
-        workbook={modalMode === 'edit' ? selectedWorkbook : null}
-        problems={modalMode === 'edit' ? selectedProblems : []}
-        onSubmit={handleModalSubmit}
-      />
+      </div>
     </div>
   );
 }
