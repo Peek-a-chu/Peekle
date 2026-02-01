@@ -72,7 +72,8 @@ if [ -n "$BACKEND_CHANGED" ]; then
   echo "\n☕ Backend files changed, running checks..."
   
   echo "• Running tests..."
-  cd apps/backend && ./gradlew test --quiet
+  cd apps/backend && chmod +x gradlew
+  ./gradlew test --quiet
   if [ $? -ne 0 ]; then
     echo "❌ Backend tests failed"
     exit 1
