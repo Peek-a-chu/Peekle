@@ -35,6 +35,7 @@ export function useSearch({
         tags,
       }),
     getNextPageParam: (lastPage) => {
+      if (!lastPage?.pagination) return undefined;
       const { page, totalPages } = lastPage.pagination;
       return page < totalPages - 1 ? page + 1 : undefined;
     },

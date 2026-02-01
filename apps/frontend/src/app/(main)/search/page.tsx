@@ -63,6 +63,7 @@ const getTierStyle = (tierStr?: string) => {
 };
 
 const highlightMatch = (text: string, searchQuery: string): React.JSX.Element => {
+  if (!text) return <></>;
   if (!searchQuery) return <>{text}</>;
 
   // Escape special regex characters
@@ -418,20 +419,22 @@ function SearchPageContent() {
   const currentCategory = isAll ? 'ALL' : (activeTab.toUpperCase() as SearchCategory);
 
   // Unified query for both "All" and specific tabs
-  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useSearch({
-    keyword: query,
-    category: currentCategory,
-    size: isAll ? 20 : 20, // "All"일 때 backend가 적절히 배분하여 반환한다고 가정 (혹은 충분히 큰 수)
-    tiers: activeTiers.length > 0 ? activeTiers : undefined,
-    tags: activeTags.length > 0 ? activeTags : undefined,
-    enabled: !!query && query.trim().length >= MIN_SEARCH_LENGTH, // 검색어가 있을 때만 활성화
-  });
+  const { data, isPending, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useSearch({
+      keyword: query,
+      category: currentCategory,
+      size: isAll ? 20 : 20, // "All"일 때 backend가 적절히 배분하여 반환한다고 가정 (혹은 충분히 큰 수)
+      tiers: activeTiers.length > 0 ? activeTiers : undefined,
+      tags: activeTags.length > 0 ? activeTags : undefined,
+      enabled: !!query && query.trim().length >= MIN_SEARCH_LENGTH, // 검색어가 있을 때만 활성화
+    });
 
   useEffect(() => {
     if (data) {
       console.log('Search Data (first page):', data.pages[0]);
     }
-  }, [data]);
+    console.log('Search State:', { isLoading, error, hasData: !!data, query });
+  }, [data, isLoading, error, query]);
 
   // Infinite scroll using Intersection Observer
   useEffect(() => {
@@ -479,10 +482,11 @@ function SearchPageContent() {
   // Calculate if we have any results to show
   const hasResults = isAll
     ? problemResults.length > 0 || workbookResults.length > 0 || userResults.length > 0
-    : (data?.pages[0]?.pagination.totalElements || 0) > 0;
+    : (data?.pages[0]?.pagination?.totalElements || 0) > 0;
 
-  const totalCount = data?.pages[0]?.pagination.totalElements || 0;
-  const showEmptyState = !isLoading && !error && query && !hasResults;
+  const totalCount = data?.pages[0]?.pagination?.totalElements || 0;
+  const showEmptyState = !isPending && !error && query && !hasResults;
+  const showLoading = isPending && query.trim().length >= MIN_SEARCH_LENGTH;
 
   return (
     <SearchErrorBoundary>
@@ -613,7 +617,7 @@ function SearchPageContent() {
           )}
 
           {/* Loading State (Initial) */}
-          {isLoading && (
+          {showLoading && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="h-10 w-10 animate-spin text-[#E24EA0]" />
               <p className="mt-4 text-sm font-medium text-[#59656E]">열심히 검색하고 있어요...</p>
@@ -649,7 +653,7 @@ function SearchPageContent() {
           )}
 
           {/* Results List */}
-          {!isLoading &&
+          {!showLoading &&
             !error &&
             hasResults &&
             (isAll ? (
