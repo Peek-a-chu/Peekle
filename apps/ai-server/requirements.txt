@@ -1,0 +1,11 @@
+# 1. 서버 실행을 위한 핵심 패키지
+fastapi
+uvicorn
+
+# 2. AI 기능을 위한 패키지
+openai
+chromadb
+
+# 3. 유틸리티
+python-dotenv
+pandas
