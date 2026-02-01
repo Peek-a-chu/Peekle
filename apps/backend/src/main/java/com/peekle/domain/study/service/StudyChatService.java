@@ -71,24 +71,28 @@ public class StudyChatService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // 3. Redis 리스트에 저장 (Right Push)
-        String key = String.format(RedisKeyConst.CHAT_ROOM_LOGS, studyId);
-        try {
-            // 일관된 저장을 위해 JSON으로 직렬화
-            String json = objectMapper.writeValueAsString(response);
-            redisTemplate.opsForList().rightPush(key, json);
-            // 최신 N개만 유지하도록 리스트 정리
-            redisTemplate.opsForList().trim(key, -REDIS_CHAT_CACHE_SIZE, -1);
-        } catch (Exception e) {
-            log.error("Redis Push Failed", e);
+        // 3. Redis 리스트에 저장 (Right Push) - SYSTEM 메시지는 저장 제외
+        if (request.getType() != StudyChatLog.ChatType.SYSTEM) {
+            String key = String.format(RedisKeyConst.CHAT_ROOM_LOGS, studyId);
+            try {
+                // 일관된 저장을 위해 JSON으로 직렬화
+                String json = objectMapper.writeValueAsString(response);
+                redisTemplate.opsForList().rightPush(key, json);
+                // 최신 N개만 유지하도록 리스트 정리
+                redisTemplate.opsForList().trim(key, -REDIS_CHAT_CACHE_SIZE, -1);
+            } catch (Exception e) {
+                log.error("Redis Push Failed", e);
+            }
         }
 
         // 4. Redis 발행 (실시간)
         String topic = String.format(RedisKeyConst.TOPIC_STUDY_CHAT, studyId);
         redisPublisher.publish(new ChannelTopic(topic), com.peekle.global.socket.SocketResponse.of("CHAT", response));
 
-        // 5. 비동기 일괄 저장을 위해 Redis에 버퍼링
-        redisChatBufferService.bufferChat(response);
+        // 5. 비동기 일괄 저장을 위해 Redis에 버퍼링 - SYSTEM 메시지는 저장 제외
+        if (request.getType() != StudyChatLog.ChatType.SYSTEM) {
+            redisChatBufferService.bufferChat(response);
+        }
         // chatPersistenceService.saveChatToDB(studyId, userId, request); // Deprecated
     }
 

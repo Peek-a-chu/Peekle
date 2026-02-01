@@ -3,6 +3,8 @@ package com.peekle.domain.submission.repository;
 import com.peekle.domain.submission.entity.SubmissionLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -43,4 +45,7 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
             java.time.LocalDateTime start,
             java.time.LocalDateTime end
     );
+
+    // [New] 유저의 전체 제출 기록 조회 (페이징)
+    Page<SubmissionLog> findAllByUserIdOrderBySubmittedAtDesc(Long userId, Pageable pageable);
 }

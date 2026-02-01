@@ -19,6 +19,7 @@ import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -52,6 +54,13 @@ public class StudyCurriculumService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
+        // problemId는 이미 프론트엔드에서 변환되어 전달됨
+        Long actualProblemId = request.getProblemId();
+        
+        // problemId가 유효한지 확인
+        Problem problem = problemRepository.findById(actualProblemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+
         // 제약사항 1: 문제 날짜는 오늘이어야 함
         LocalDate targetDate = (request.getProblemDate() != null) ? request.getProblemDate() : LocalDate.now();
         if (!targetDate.equals(LocalDate.now())) {
@@ -59,26 +68,27 @@ public class StudyCurriculumService {
         }
 
         // 제약사항 2: 중복 확인
-        if (studyProblemRepository.existsByStudyAndProblemId(study, request.getProblemId())) {
+        if (studyProblemRepository.existsByStudyAndProblemId(study, actualProblemId)) {
             throw new BusinessException(ErrorCode.PROBLEM_ALREADY_ADDED);
         }
 
         StudyProblem studyProblem = StudyProblem.builder()
                 .study(study)
-                .problemId(request.getProblemId())
+                .problemId(actualProblemId)
                 .problemDate(targetDate)
                 .createdBy(user)
                 .build();
 
         studyProblemRepository.save(studyProblem);
 
-        // 웹소켓을 통해 알림
-        Problem problem = problemRepository.findById(request.getProblemId()).orElse(null);
+        // 웹소켓을 통해 알림 (problem은 이미 위에서 조회됨)
         String title = (problem != null) ? problem.getTitle() : "Unknown";
         String tier = (problem != null) ? problem.getTier() : "Unrated";
+        String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(actualProblemId);
 
         ProblemStatusResponse responseData = ProblemStatusResponse.builder()
-                .problemId(request.getProblemId())
+                .problemId(actualProblemId)
+                .externalId(externalId)
                 .title(title)
                 .tier(tier)
                 .assignedDate(targetDate)
@@ -88,6 +98,8 @@ public class StudyCurriculumService {
                 .build();
 
         String topic = String.format(RedisKeyConst.TOPIC_CURRICULUM, studyId);
+        log.info("Publishing ADD problem event to topic: {}, problemId: {}, externalId: {}", 
+                topic, actualProblemId, externalId);
         redisPublisher.publish(new ChannelTopic(topic),
                 SocketResponse.of("ADD", responseData));
     }
@@ -130,11 +142,25 @@ public class StudyCurriculumService {
         }
 
         Long deletedProblemId = target.getProblemId();
+        
+        // 삭제 전에 문제 정보 조회
+        Problem problem = problemRepository.findById(deletedProblemId).orElse(null);
+        String title = (problem != null) ? problem.getTitle() : "Unknown";
+        String tier = (problem != null) ? problem.getTier() : "Unrated";
+        String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(deletedProblemId);
+        
         studyProblemRepository.delete(target);
 
         // 웹소켓을 통해 알림
         ProblemStatusResponse responseData = ProblemStatusResponse.builder()
                 .problemId(deletedProblemId)
+                .externalId(externalId)
+                .title(title)
+                .tier(tier)
+                .assignedDate(target.getProblemDate())
+                .solvedMemberCount(0)
+                .totalMemberCount(studyMemberRepository.countByStudy_Id(studyId))
+                .isSolvedByMe(false)
                 .build();
 
         String topic = String.format(RedisKeyConst.TOPIC_CURRICULUM, studyId);
@@ -178,6 +204,7 @@ public class StudyCurriculumService {
 
             String title = (problem != null) ? problem.getTitle() : "Unknown";
             String tier = (problem != null) ? problem.getTier() : "Unrated";
+            String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(sp.getProblemId());
 
             List<Long> solvedUsers = solvedUserMap.getOrDefault(sp.getProblemId(), List.of());
             boolean isSolvedByMe = solvedUsers.contains(userId);
@@ -185,6 +212,7 @@ public class StudyCurriculumService {
 
             return ProblemStatusResponse.builder()
                     .problemId(sp.getProblemId())
+                    .externalId(externalId)
                     .title(title)
                     .tier(tier)
                     .assignedDate(sp.getProblemDate())

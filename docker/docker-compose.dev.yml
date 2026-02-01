@@ -53,12 +53,17 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - OPENVIDU_URL=https://openvidu:8443
+      - OPENVIDU_SECRET=MY_SECRET
     volumes:
       - h2-data:/app/data
     expose:
       - "8080"
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+      openvidu:
+        condition: service_healthy
     networks:
       - peekle-network-dev
 
@@ -71,14 +76,53 @@ services:
     networks:
       - peekle-network-dev
 
+  # Coturn Server (TURN/STUN for WebRTC)
+  coturn:
+    image: coturn/coturn:latest
+    container_name: peekle-coturn-dev
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+      - "50000-50050:50000-50050/tcp"
+      - "50000-50050:50000-50050/udp"
+    volumes:
+      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - coturn-logs:/var/log
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    environment:
+      - DETECT_EXTERNAL_IP=yes
+      - DETECT_RELAY_IP=yes
+    networks:
+      - peekle-network-dev
+
   # OpenVidu Server (WebRTC) - Local Dev Mode
   openvidu:
-    image: openvidu/openvidu-dev:2.29.0
+    image: openvidu/openvidu-dev:2.32.1
     container_name: peekle-openvidu-dev
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+      - "4443:4443"
+      - "40000-40050:40000-40050/udp"
+      - "40000-40050:40000-40050/tcp"
     environment:
       - OPENVIDU_SECRET=MY_SECRET
       - DOMAIN_OR_PUBLIC_IP=localhost
       - OPENVIDU_PUBLICURL=https://localhost/openvidu
+      - KMS_MIN_PORT=40000
+      - KMS_MAX_PORT=40050
+    volumes:
+      - openvidu-recordings:/opt/openvidu/recordings
+      - openvidu-log:/var/log/openvidu
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:8443/api/config", "-k", "-u", "OPENVIDUAPP:MY_SECRET"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - peekle-network-dev
 
@@ -90,4 +134,10 @@ volumes:
   h2-data:
     driver: local
   nginx-certs:
+    driver: local
+  openvidu-recordings:
+    driver: local
+  openvidu-log:
+    driver: local
+  coturn-logs:
     driver: local

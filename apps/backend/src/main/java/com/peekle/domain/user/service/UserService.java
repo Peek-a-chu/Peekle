@@ -10,6 +10,11 @@ import com.peekle.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import com.peekle.domain.submission.dto.SubmissionLogResponse;
+import com.peekle.domain.submission.entity.SubmissionLog;
+
 
 import java.util.HashMap;
 import java.util.List;
@@ -235,5 +240,21 @@ public class UserService {
                 .streakCurrent(user.getStreakCurrent())
                 .isSolvedToday(isSolvedToday)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SubmissionLogResponse> getUserSubmissionsByNickname(String nickname, Pageable pageable) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        
+        return getUserSubmissions(user.getId(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SubmissionLogResponse> getUserSubmissions(Long userId, Pageable pageable) {
+        Page<SubmissionLog> logs = 
+                submissionLogRepository.findAllByUserIdOrderBySubmittedAtDesc(userId, pageable);
+        
+        return logs.map(SubmissionLogResponse::from);
     }
 }

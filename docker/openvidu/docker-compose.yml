@@ -1,6 +1,7 @@
 services:
   openvidu-server:
-    image: openvidu/openvidu-dev:2.29.0
+    image: openvidu/openvidu-dev:2.32.1
+    platform: linux/amd64
     container_name: peekle-openvidu
     restart: unless-stopped
     ports:
@@ -11,8 +12,11 @@ services:
     env_file:
       - ../.env
     environment:
-       - KMS_MIN_PORT=40000
-       - KMS_MAX_PORT=40050
+      - OPENVIDU_SECRET=${OPENVIDU_SECRET:-MY_SECRET}
+      - DOMAIN_OR_PUBLIC_IP=localhost
+      - OPENVIDU_PUBLICURL=https://localhost/openvidu
+      - KMS_MIN_PORT=40000
+      - KMS_MAX_PORT=40050
     volumes:
       - openvidu-recordings:/opt/openvidu/recordings
       - openvidu-log:/var/log/openvidu

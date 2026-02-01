@@ -59,7 +59,11 @@ export function useStudyChat(roomId: number) {
             }),
           );
         })
-        .catch((err) => console.error('Failed to load chat history', err));
+        .catch((err) => {
+          console.error('Failed to load chat history', err);
+          // 에러가 발생해도 채팅 기능은 계속 사용 가능하도록 함
+          // (실시간 메시지는 WebSocket을 통해 받을 수 있음)
+        });
     }
   }, [roomId]);
 
@@ -123,6 +127,7 @@ export function useStudyChat(roomId: number) {
       ownerName?: string,
       problemTitle?: string,
       isRealtime?: boolean,
+      problemId?: number,
     ): void => {
       if (!socket || !currentUserId) return;
 
@@ -137,7 +142,7 @@ export function useStudyChat(roomId: number) {
           isRefChat: true,
           isRealtime: !!isRealtime,
           targetUserId: isRealtime ? currentUserId : undefined,
-          problemId: selectedProblemId ?? undefined,
+          problemId: problemId,
           code, // Always include code so we can show snapshot or fallback view
           language,
           problemTitle,

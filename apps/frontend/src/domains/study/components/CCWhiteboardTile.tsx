@@ -34,7 +34,7 @@ export function CCWhiteboardTile({ onClick, className }: CCWhiteboardTileProps) 
         }
       }}
       className={cn(
-        'relative flex h-24 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg transition-all hover:ring-2 hover:ring-rose-400',
+        'relative flex h-40 w-52 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg transition-all hover:ring-2 hover:ring-rose-400',
         isWhiteboardOverlayOpen
           ? 'bg-gradient-to-br from-rose-300 to-rose-400 ring-2 ring-rose-500'
           : 'bg-gradient-to-br from-rose-100 to-rose-200',

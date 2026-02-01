@@ -84,7 +84,7 @@ deploy-production:
     - job: spring-backend-build
   before_script:
     # Install SSH client
-    - apk add --no-cache openssh-client
+    - apk add --no-cache openssh-client curl
     # Setup SSH key (base64 decoded)
     - mkdir -p ~/.ssh
     - echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
@@ -152,6 +152,7 @@ deploy-production:
         echo "=== Deployment Complete ==="
       ENDSSH
   after_script:
+    - apk add --no-cache curl
     - |
       if [ "$CI_JOB_STATUS" == "success" ]; then
         COLOR="#36a64f"

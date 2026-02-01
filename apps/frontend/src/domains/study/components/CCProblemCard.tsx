@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { cn, getBojTierName, getBojTierColorClass } from '@/lib/utils';
-import { ExternalLink, Users, Lightbulb, CheckCircle2, Trash2 } from 'lucide-react';
+import { ExternalLink, Users, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { DailyProblem as Problem } from '@/domains/study/types';
 import { Button } from '@/components/ui/button';
 import { Box } from 'lucide-react';
@@ -26,8 +26,9 @@ export function CCProblemCard({
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
 
-  // Construct URL
-  const problemUrl = `https://www.acmicpc.net/problem/${problem.problemId}`;
+  // Use externalId (BOJ problem number) for display and URL, fallback to problemId
+  const problemNumber = problem.externalId || String(problem.problemId);
+  const problemUrl = `https://www.acmicpc.net/problem/${problemNumber}`;
 
   return (
     <div
@@ -47,24 +48,6 @@ export function CCProblemCard({
         className,
       )}
     >
-      {/* Remove Button (Absolute Top-Left or Top-Right next to Hint) */}
-      {onRemove && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-3 right-8 h-5 w-5 hover:bg-red-100 hover:text-red-500 text-muted-foreground z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (confirm('정말로 이 문제를 목록에서 삭제하시겠습니까?')) {
-              onRemove();
-            }
-          }}
-          aria-label="remove problem"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      )}
-
       <Button
         variant="ghost"
         size="icon"
@@ -88,7 +71,7 @@ export function CCProblemCard({
         <div className="flex items-start justify-between w-full">
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground text-sm line-clamp-1">
-              {problem.problemId}. {problem.title}
+              {problemNumber}. {problem.title}
             </span>
             {problemUrl && (
               <a
@@ -134,7 +117,9 @@ export function CCProblemCard({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
-            <span>{problem.solvedMemberCount}명 해결</span>
+            <span>
+              {problem.solvedMemberCount ?? 0}명 / 전체 {problem.totalMemberCount ?? 0}명 해결
+            </span>
           </div>
         </div>
       </div>

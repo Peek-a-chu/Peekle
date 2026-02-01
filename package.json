@@ -16,16 +16,6 @@
     "turbo": "^2.3.3"
   },
   "packageManager": "pnpm@10.28.1",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sqlite3",
-      "@nestjs/core",
-      "esbuild",
-      "sharp",
-      "unrs-resolver",
-      "canvas"
-    ]
-  },
   "lint-staged": {
     "apps/frontend/**/*.{ts,tsx}": [
       "pnpm --filter frontend exec eslint --fix",

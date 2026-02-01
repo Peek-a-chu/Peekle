@@ -115,7 +115,9 @@ export interface UseWorkbooksPageLogicReturn {
   refresh: () => void;
 }
 
-export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
+export function useWorkbooksPageLogic(
+  initialSelectedId?: string | null,
+): UseWorkbooksPageLogicReturn {
   // 데이터 상태
   const [workbookList, setWorkbookList] = useState<Workbook[]>([]);
   const [totalElements, setTotalElements] = useState(0);
@@ -139,7 +141,14 @@ export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
   const isInitialLoadRef = useRef(true);
 
   // 선택 상태
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId || null);
+
+  // 초기 ID 변경 감지
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedId(initialSelectedId);
+    }
+  }, [initialSelectedId]);
 
   // 탭별 개수 조회
   const fetchCounts = useCallback(async () => {
