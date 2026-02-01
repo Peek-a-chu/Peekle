@@ -69,7 +69,7 @@ export function StudyRankingList({
           <Input
             type="text"
             placeholder="스터디를 검색해보세요."
-            className="pl-10 h-12 rounded-xl border-none bg-white shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-[#E24EA0] text-base placeholder:text-gray-400"
+            className="pl-10 h-12 rounded-xl border-none bg-white shadow-sm ring-1 ring-slate-200 focus:ring-primary text-base placeholder:text-gray-400"
           />
         </div>
 
