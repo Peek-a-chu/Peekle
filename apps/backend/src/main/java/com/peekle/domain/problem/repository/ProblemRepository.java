@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-public interface ProblemRepository extends JpaRepository<Problem, Long> {
+public interface ProblemRepository extends JpaRepository<Problem, Long>, ProblemRepositoryCustom {
     Optional<Problem> findByExternalIdAndSource(String externalId, String source);
 
     @Query("SELECT p FROM Problem p WHERE p.externalId LIKE %:keyword% OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")

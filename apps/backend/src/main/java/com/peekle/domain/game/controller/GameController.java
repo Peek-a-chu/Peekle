@@ -3,9 +3,7 @@ package com.peekle.domain.game.controller;
 import com.peekle.domain.game.dto.request.GameCreateRequest;
 import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.service.RedisGameService;
-import com.peekle.domain.submission.dto.SubmissionRequest;
-import com.peekle.domain.submission.dto.SubmissionResponse;
-import com.peekle.global.dto.ApiResponse; // 공통 응답 DTO 있다고 가정
+import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
