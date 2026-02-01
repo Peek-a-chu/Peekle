@@ -25,9 +25,25 @@ COPY src src
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew bootJar --build-cache --parallel -x test
 
+# Extract layers for optimized docker caching
+RUN java -Djarmode=layertools -jar build/libs/*.jar extract --destination build/extracted
+
 # Stage 2: Runner
 FROM eclipse-temurin:21-jre-alpine AS runner
 WORKDIR /app
+
+# Copy extracted layers
+# 1. Dependencies (libraries) - changing least often
+COPY --from=builder /app/build/extracted/dependencies/ ./
+# 2. Spring Boot Loader
+COPY --from=builder /app/build/extracted/spring-boot-loader/ ./
+# 3. Snapshot Dependencies
+COPY --from=builder /app/build/extracted/snapshot-dependencies/ ./
+# 4. Application Code - changing most often
+COPY --from=builder /app/build/extracted/application/ ./
+
+# Run via JarLauncher for layered jar support
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
 
 # Install su-exec
 RUN apk add --no-cache su-exec
