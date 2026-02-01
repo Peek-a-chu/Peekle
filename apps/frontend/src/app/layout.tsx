@@ -1,8 +1,9 @@
+import './globals.css';
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
-import './globals.css';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 
 export const metadata: Metadata = {
   title: 'Peekle',
@@ -72,11 +73,13 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background">
-        <ThemeProvider>
-          {children}
-          <SettingsModal />
-        </ThemeProvider>
-        <Toaster />
+        <QueryProvider>
+          <ThemeProvider>
+            {children}
+            <SettingsModal />
+          </ThemeProvider>
+          <Toaster />
+        </QueryProvider>
       </body>
     </html>
   );
