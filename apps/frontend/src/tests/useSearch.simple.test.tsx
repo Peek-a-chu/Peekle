@@ -84,9 +84,9 @@ describe('searchApi - API Functions', () => {
     });
 
     expect(result).toHaveProperty('data');
-    expect(result.data.pagination).toBeDefined();
-    expect(result.data.data.problems).toHaveLength(1);
-    expect(result.data.data.problems[0].title).toBe('Test Problem');
+    expect(result.pagination).toBeDefined();
+    expect(result.data.problems).toHaveLength(1);
+    expect(result.data.problems[0].title).toBe('Test Problem');
   });
 
   it('fetchSearchResults passes correct params to api', async () => {

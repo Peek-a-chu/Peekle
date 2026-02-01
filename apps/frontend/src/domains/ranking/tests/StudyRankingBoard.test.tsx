@@ -103,7 +103,8 @@ describe('StudyRankingBoard', () => {
     render(<StudyRankingBoard />);
 
     await waitFor(() => {
-      expect(screen.getByText('다음')).toBeInTheDocument();
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
     });
   });
 });

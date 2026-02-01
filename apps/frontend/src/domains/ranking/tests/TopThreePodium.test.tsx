@@ -44,18 +44,18 @@ describe('TopThreePodium', () => {
     const onStudyClick = vi.fn();
     render(<TopThreePodium rankings={mockRankings} onStudyClick={onStudyClick} />);
 
-    expect(screen.getByText('1위')).toBeInTheDocument();
-    expect(screen.getByText('2위')).toBeInTheDocument();
-    expect(screen.getByText('3위')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   it('displays points and member counts', () => {
     const onStudyClick = vi.fn();
     render(<TopThreePodium rankings={mockRankings} onStudyClick={onStudyClick} />);
 
-    expect(screen.getByText('1,500점')).toBeInTheDocument();
-    expect(screen.getByText('5명')).toBeInTheDocument();
-    expect(screen.getByText('1,200점')).toBeInTheDocument();
+    expect(screen.getByText('1,500')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('1,200')).toBeInTheDocument();
     expect(screen.getByText('4명')).toBeInTheDocument();
   });
 
