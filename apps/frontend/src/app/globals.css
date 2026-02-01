@@ -16,6 +16,9 @@ div[class*='monaco-editor-overlaymessage'],
 }
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -130,7 +133,6 @@ div[class*='monaco-editor-overlaymessage'],
 }
 
 @layer components {
-
   /* Common Markdown Styles */
   .markdown-prose {
     @apply text-sm leading-relaxed break-words;
