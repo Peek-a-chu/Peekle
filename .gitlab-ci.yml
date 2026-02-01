@@ -23,14 +23,9 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
 
 stages:
-  - validate  # MR only: tests, lint
-  - build     # All branches: build artifacts
-  - deploy    # Master only: production
-
-stages:
-  - validate  # MR only: tests, lint
-  - build     # All branches: build artifacts
-  - deploy    # Master only: production
+  - validate # MR only: tests, lint
+  - build # All branches: build artifacts
+  - deploy # Master only: production
 
 # ===========================================
 # VALIDATION STAGE (Merge Requests Only)
@@ -80,11 +75,6 @@ backend-validate:
 # ===========================================
 # BUILD STAGE (Optimized with Caching)
 # ===========================================
-
-# ===========================================
-# BUILD STAGE (Optimized with Caching)
-# ===========================================
-
 frontend-build:
   stage: build
   image: node:20-alpine
@@ -142,6 +132,31 @@ spring-backend-build:
     policy: pull-push
 
 # ===========================================
+# AI Server Pipeline (FastAPI)
+# ===========================================
+
+ai-server-build:
+  stage: build
+  image: python:3.10-slim
+  only:
+    refs:
+      - master
+      - merge_requests
+  before_script:
+    - cd apps/ai-server
+    - pip install uv
+  script:
+    - uv pip install --system --no-cache -r requirements.txt
+    - python -m compileall .
+  cache:
+    key:
+      files:
+        - apps/ai-server/requirements.txt
+    paths:
+      - /root/.cache/pip
+    policy: pull-push
+
+# ===========================================
 # Deploy to EC2 via SSH (Optimized)
 # ===========================================
 
@@ -156,6 +171,7 @@ deploy-production:
   needs:
     - job: frontend-build
     - job: spring-backend-build
+    - job: ai-server-build
   before_script:
     # Install SSH client
     - apk add --no-cache openssh-client curl git
@@ -250,6 +266,15 @@ deploy-production:
         else
           echo "⏭️  Skipping backend build (no changes)"
         fi
+        
+        # AI Server build check
+        AI_CHANGED=$(echo "$CHANGED_FILES" | grep -q "^apps/ai-server/" && echo "yes" || echo "no")
+        if [ "$AI_CHANGED" = "yes" ] || [ "$DOCKER_CHANGED" = "yes" ]; then
+          echo "Building AI server (detected changes)..."
+          docker compose -f docker-compose.prod.yml build ai-server
+        else
+          echo "⏭️  Skipping AI server build (no changes)"
+        fi
 
         # Infrastructure services
         if [ "$DOCKER_CHANGED" = "yes" ]; then
@@ -266,6 +291,10 @@ deploy-production:
 
         if [ "$BACKEND_CHANGED" = "yes" ]; then
           docker compose -f docker-compose.prod.yml up -d --no-deps backend
+        fi
+
+        if [ "$AI_CHANGED" = "yes" ]; then
+          docker compose -f docker-compose.prod.yml up -d --no-deps ai-server
         fi
 
         if [ "$DOCKER_CHANGED" = "yes" ]; then
@@ -293,7 +322,7 @@ deploy-production:
     - |
       # Calculate pipeline duration
       DURATION_MIN=$((CI_JOB_DURATION / 60))
-      
+
       if [ "$CI_JOB_STATUS" == "success" ]; then
         COLOR="#36a64f"
         STATUS="✅ 성공"
