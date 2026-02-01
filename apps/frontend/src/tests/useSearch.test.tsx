@@ -39,7 +39,7 @@ describe.skip('useSearch', () => {
   );
 
   it('returns initial loading state', () => {
-    const { result } = renderHook(() => useSearch({ query: 'test', type: 'problem' }), { wrapper });
+    const { result } = renderHook(() => useSearch('test', 'PROBLEM'), { wrapper });
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.data).toBeUndefined();
@@ -47,7 +47,7 @@ describe.skip('useSearch', () => {
   });
 
   it('fetches search results successfully', async () => {
-    const { result } = renderHook(() => useSearch({ query: 'test', type: 'problem' }), { wrapper });
+    const { result } = renderHook(() => useSearch('test', 'PROBLEM'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -55,18 +55,18 @@ describe.skip('useSearch', () => {
 
     expect(result.current.data).toBeDefined();
     expect(result.current.data?.pages).toHaveLength(1);
-    expect(result.current.data?.pages[0].results).toHaveLength(2);
+    expect(result.current.data?.pages[0].data.data.problems).toHaveLength(2);
   });
 
   it('does not fetch when query is less than minimum length', () => {
-    const { result } = renderHook(() => useSearch({ query: 'a', type: 'problem' }), { wrapper });
+    const { result } = renderHook(() => useSearch('a', 'PROBLEM'), { wrapper });
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.data).toBeUndefined();
   });
 
   it('supports pagination with hasNextPage', async () => {
-    const { result } = renderHook(() => useSearch({ query: 'test', type: 'problem' }), { wrapper });
+    const { result } = renderHook(() => useSearch('test', 'PROBLEM'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -77,7 +77,7 @@ describe.skip('useSearch', () => {
   });
 
   it('can fetch next page', async () => {
-    const { result } = renderHook(() => useSearch({ query: 'test', type: 'problem' }), { wrapper });
+    const { result } = renderHook(() => useSearch('test', 'PROBLEM'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -93,14 +93,14 @@ describe.skip('useSearch', () => {
     });
 
     expect(result.current.data?.pages).toHaveLength(2);
-    expect(result.current.data?.pages[1].results).toHaveLength(2);
+    expect(result.current.data?.pages[1].data.data.problems).toHaveLength(2);
   });
 
   it('uses correct query key based on query and type', async () => {
-    const { result: result1 } = renderHook(() => useSearch({ query: 'test1', type: 'problem' }), {
+    const { result: result1 } = renderHook(() => useSearch('test1', 'PROBLEM'), {
       wrapper,
     });
-    const { result: result2 } = renderHook(() => useSearch({ query: 'test2', type: 'user' }), {
+    const { result: result2 } = renderHook(() => useSearch('test2', 'USER'), {
       wrapper,
     });
 
@@ -114,25 +114,37 @@ describe.skip('useSearch', () => {
   });
 
   it('includes totalCount in result', async () => {
-    const { result } = renderHook(() => useSearch({ query: 'test', type: 'problem' }), { wrapper });
+    const { result } = renderHook(() => useSearch('test', 'PROBLEM'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.data?.pages[0].totalCount).toBe(25);
+    expect(result.current.data?.pages[0].data.pagination.totalElements).toBe(25);
   });
 
   it('handles empty results gracefully', async () => {
     const { fetchSearchResults } = await import('@/api/searchApi');
     vi.mocked(fetchSearchResults).mockResolvedValueOnce({
-      results: [],
-      hasNextPage: false,
-      nextPage: undefined,
-      totalCount: 0,
+      success: true,
+      data: {
+        counts: null,
+        data: {
+          problems: [],
+          workbooks: [],
+          users: [],
+        },
+        pagination: {
+          page: 0,
+          size: 20,
+          totalElements: 0,
+          totalPages: 0,
+        },
+      },
+      error: null,
     });
 
-    const { result } = renderHook(() => useSearch({ query: 'nonexistent', type: 'problem' }), {
+    const { result } = renderHook(() => useSearch('nonexistent', 'PROBLEM'), {
       wrapper,
     });
 
@@ -140,13 +152,13 @@ describe.skip('useSearch', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.data?.pages[0].results).toHaveLength(0);
+    expect(result.current.data?.pages[0].data.data.problems).toHaveLength(0);
     expect(result.current.hasNextPage).toBe(false);
   });
 
   it('refetches when query changes', async () => {
     const { result, rerender } = renderHook(
-      ({ query }: { query: string }) => useSearch({ query, type: 'problem' }),
+      ({ query }: { query: string }) => useSearch(query, 'PROBLEM'),
       {
         wrapper,
         initialProps: { query: 'test1' },
@@ -172,10 +184,10 @@ describe.skip('useSearch', () => {
 
   it('refetches when type filter changes', async () => {
     const { result, rerender } = renderHook(
-      ({ type }: { type: 'problem' | 'user' | 'workbook' }) => useSearch({ query: 'test', type }),
+      ({ type }: { type: 'PROBLEM' | 'USER' | 'WORKBOOK' }) => useSearch('test', type),
       {
         wrapper,
-        initialProps: { type: 'problem' as const },
+        initialProps: { type: 'PROBLEM' as const },
       },
     );
 
@@ -186,7 +198,7 @@ describe.skip('useSearch', () => {
     const firstData = result.current.data;
 
     // Change type
-    rerender({ type: 'user' as const });
+    rerender({ type: 'USER' as const });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);

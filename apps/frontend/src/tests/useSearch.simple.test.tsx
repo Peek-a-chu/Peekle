@@ -40,7 +40,6 @@ describe('searchApi - API Functions', () => {
 
   const mockResponse: SearchResponse = {
     data: {
-      category: 'ALL',
       counts: null,
       data: {
         problems: [
