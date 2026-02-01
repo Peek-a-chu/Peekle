@@ -151,7 +151,7 @@ export function CCProblemListPanel({
 
       {/* Problem List */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {problems.length === 0 ? (
+        {!problems || problems.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
             <FileText className="mb-2 h-10 w-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">아직 추가된 문제가 없습니다</p>
@@ -161,7 +161,7 @@ export function CCProblemListPanel({
           </div>
         ) : (
           <ul className="space-y-3 p-4">
-            {problems.map((problem, idx) => {
+            {(problems || []).map((problem, idx) => {
               // Some API responses may include duplicate/missing problemId; ensure a stable unique key.
               const key =
                 typeof problem.problemId === 'number' && Number.isFinite(problem.problemId)
