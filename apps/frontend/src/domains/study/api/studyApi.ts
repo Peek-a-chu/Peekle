@@ -23,13 +23,12 @@ export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
   return roomData.members.map((m: any) => ({
     ...m,
     id: m.userId, // Map userId to id for Store
-    odUid: String(m.userId), // Mock OpenVidu UID
+    odUid: m.odUid, // Real OpenVidu UID from server
     // Use role from JSON or fallback to ownerId check
     isOwner: m.role === 'OWNER' || (ownerId && m.userId === ownerId),
     isMuted: false,
     isVideoOff: false,
-    isOnline: true,
-    // isOnline: m.online ?? false,
+    isOnline: m.isOnline, // Use real online status
   }));
 }
 
@@ -58,10 +57,7 @@ export async function fetchStudyChats(studyId: number): Promise<ChatMessageRespo
 // 3. Study List (My Studies)
 import type { StudyListResponse, StudyListContent } from '@/domains/study/types';
 
-export async function fetchMyStudies(
-  page = 0,
-  keyword = '',
-): Promise<StudyListResponse> {
+export async function fetchMyStudies(page = 0, keyword = ''): Promise<StudyListResponse> {
   // Backend expects /api/studies (not /api/studies/my)
   // Build query string, only include non-empty parameters
   const params = new URLSearchParams();
@@ -78,17 +74,20 @@ export async function fetchMyStudies(
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to fetch my studies');
   }
-  
+
   // 디버깅: API 응답 로깅
   if (process.env.NODE_ENV === 'development') {
     console.log('[fetchMyStudies] API Response:', JSON.stringify(res.data, null, 2));
   }
-  
+
   return res.data;
 }
 
 // 4. Create Study
-export async function createStudy(title: string, description?: string): Promise<{ inviteCode: string }> {
+export async function createStudy(
+  title: string,
+  description?: string,
+): Promise<{ inviteCode: string }> {
   const res = await apiFetch<{ inviteCode: string }>(`/api/studies`, {
     method: 'POST',
     body: JSON.stringify({ title, description: description || '' }),
