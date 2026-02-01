@@ -69,6 +69,16 @@ export function CCStudyRankingBoard(): React.ReactNode {
     console.log('Study clicked:', studyId);
   };
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-destructive">에러: {error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <StudyRankingList
