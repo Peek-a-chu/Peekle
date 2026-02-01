@@ -48,8 +48,8 @@ const nextConfig: NextConfig = {
         destination: 'http://localhost:8080/oauth2/:path*',
       },
       {
-        source: '/login/oauth2/code/:path*',
-        destination: 'http://localhost:8080/login/oauth2/code/:path*',
+        source: '/login/oauth2/:path*',
+        destination: 'http://localhost:8080/login/oauth2/:path*',
       },
     ];
   },
@@ -60,6 +60,12 @@ const nextConfig: NextConfig = {
       bufferutil: 'commonjs bufferutil',
       'utf-8-validate': 'commonjs utf-8-validate',
     });
+
+    config.module.rules.push({
+      test: /\.svg$/i,
+      use: ['@svgr/webpack'],
+    });
+
     return config;
   },
 };
