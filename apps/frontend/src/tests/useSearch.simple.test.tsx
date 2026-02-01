@@ -39,26 +39,25 @@ describe('searchApi - API Functions', () => {
   });
 
   const mockResponse: SearchResponse = {
+    category: 'PROBLEM',
+    counts: null,
+    pagination: {
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    },
     data: {
-      counts: null,
-      data: {
-        problems: [
-          {
-            problemId: 1,
-            title: 'Test Problem',
-            tier: 'GOLD_1',
-            tags: ['dp'],
-          },
-        ],
-        workbooks: [],
-        users: [],
-      },
-      pagination: {
-        page: 0,
-        size: 20,
-        totalElements: 1,
-        totalPages: 1,
-      },
+      problems: [
+        {
+          problemId: 1,
+          title: 'Test Problem',
+          tier: 'GOLD_1',
+          tags: ['dp'],
+        },
+      ],
+      workbooks: [],
+      users: [],
     },
   };
 
