@@ -31,7 +31,9 @@ type TabKey = (typeof TABS)[keyof typeof TABS];
 
 export function CCProfileView({ user, isMe }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>(TABS.OVERVIEW);
-  const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(
+    new Date().toISOString().split('T')[0],
+  );
   const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
 
   // Extension Check State lifted from CCExtensionGuide
@@ -93,11 +95,10 @@ export function CCProfileView({ user, isMe }: Props) {
   }, [isMe, isInstalled, extensionToken, isChecking]);
 
   return (
-    <div className="max-w-5xl p-6 md:p-10 space-y-8 min-h-screen">
+    <div className="mx-auto max-w-5xl p-6 md:p-10 space-y-8 min-h-screen">
       <div className="p-6 border border-card-border rounded-xl bg-card">
         {/* 1. Header Section */}
         <CCProfileHeader user={user} isMe={isMe} />
-
 
         {/* 3. Stats Row */}
         <CCProfileStatsRow user={user} />
@@ -112,10 +113,11 @@ export function CCProfileView({ user, isMe }: Props) {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabKey)}
-                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
-                  ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
-                  : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  activeTab === tab
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
                 {tab}
               </button>

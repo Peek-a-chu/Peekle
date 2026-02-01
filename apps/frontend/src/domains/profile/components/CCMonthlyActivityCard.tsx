@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useMonthlyStreaks } from '../hooks/useProfileQueries';
+import { subWeeks, startOfWeek, addDays, format, isSameDay } from 'date-fns';
 
 interface Props {
   selectedDate?: Date;
@@ -6,38 +8,73 @@ interface Props {
 }
 
 export function CCMonthlyActivityCard({ onDateSelect }: Props) {
-  // Mock Data: Contribution Graph like structure
-  // This is a simplified version. In real app, calculate exact dates.
-  const weeks = 20; // Show last 20 weeks roughly
-  const days = 7;
+  const { data: streaks } = useMonthlyStreaks();
 
-  // Helper to generate mock data
-  const generateGrid = (): number[][] => {
-    const grid: number[][] = [];
-    for (let w = 0; w < weeks; w++) {
-      const week: number[] = [];
-      for (let d = 0; d < days; d++) {
-        // Random activity level: 0 (none) to 4 (high)
-        week.push(Math.floor(Math.random() * 5));
-      }
-      grid.push(week);
-    }
-    return grid;
-  };
+  // Grid Constants
+  const WEEKS_TO_SHOW = 20;
+  const DAYS_IN_WEEK = 7;
 
-  const generateEmptyGrid = (): number[][] => {
-    const grid: number[][] = [];
-    for (let w = 0; w < weeks; w++) {
-      grid.push(new Array<number>(days).fill(0));
-    }
-    return grid;
-  };
+  // Calculate grid dates
+  // Grid ends at the end of current week or today.
+  // Let's make it end at today's week.
+  const today = new Date();
 
-  const [gridData, setGridData] = useState<number[][]>(generateEmptyGrid());
+  // Generate the dates for the grid (20 columns * 7 rows)
+  // We want the last column to include today.
+  // So start date is roughly 20 weeks ago.
 
-  useEffect(() => {
-    setGridData(generateGrid());
+  // Determine the start date of the grid:
+  // (Today's start of week) - (WEEKS_TO_SHOW - 1) weeks
+  const gridStartDate = useMemo(() => {
+    const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday start
+    return subWeeks(currentWeekStart, WEEKS_TO_SHOW - 1);
   }, []);
+
+  // Helper to get activity level from count
+  const getLevel = (count: number) => {
+    if (count === 0) return 0;
+    if (count <= 1) return 1;
+    if (count <= 3) return 2;
+    if (count <= 5) return 3;
+    return 4;
+  };
+
+  // Convert API data to a Map for O(1) lookup
+  const streakMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (streaks) {
+      streaks.forEach((s) => {
+        map.set(s.date, s.count);
+      });
+    }
+    return map;
+  }, [streaks]);
+
+  // Generate Grid Data: Array of Weeks (each week is Array of Days)
+  // Each cell: { date: Date, level: number, count: number }
+  const grid = useMemo(() => {
+    const result = [];
+    let currentDate = gridStartDate;
+
+    for (let w = 0; w < WEEKS_TO_SHOW; w++) {
+      const week = [];
+      for (let d = 0; d < DAYS_IN_WEEK; d++) {
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        const count = streakMap.get(dateStr) || 0;
+
+        week.push({
+          date: new Date(currentDate),
+          count,
+          level: getLevel(count),
+          dateStr,
+        });
+
+        currentDate = addDays(currentDate, 1);
+      }
+      result.push(week);
+    }
+    return result;
+  }, [gridStartDate, streakMap]);
 
   const getColorClass = (level: number) => {
     switch (level) {
@@ -60,19 +97,19 @@ export function CCMonthlyActivityCard({ onDateSelect }: Props) {
         <h3 className="text-gray-500 text-sm flex items-center gap-1 font-medium">
           <span>🌱</span> 스트릭
         </h3>
-        {/* Year Dropdown Mock */}
+        {/* Year Dropdown Mock - Can be updated if needed */}
         <select className="text-sm border-none bg-transparent font-medium text-gray-600 focus:ring-0 cursor-pointer">
-          <option>2026</option>
-          <option>2025</option>
+          <option>{today.getFullYear()}</option>
         </select>
       </div>
-      {/* Month Labels (Simplified) */}
+      {/* Month Labels (Simplified - Logic can be added to show actual months based on gridStartDate) */}
       <div className="flex ml-8 mb-2 text-xs text-gray-400 gap-12">
-        <span>Jan</span>
-        <span>Feb</span>
-        <span>Mar</span>
-        <span>Apr</span>
-        <span>May</span>
+        {/* Simple static labels for now, or dynamic could be better but simplified requested */}
+        <span>{format(grid[0]?.[0]?.date || new Date(), 'MMM')}</span>
+        <span>{format(grid[4]?.[0]?.date || new Date(), 'MMM')}</span>
+        <span>{format(grid[8]?.[0]?.date || new Date(), 'MMM')}</span>
+        <span>{format(grid[12]?.[0]?.date || new Date(), 'MMM')}</span>
+        <span>{format(grid[16]?.[0]?.date || new Date(), 'MMM')}</span>
       </div>
       <div className="flex gap-2">
         {/* Day Labels */}
@@ -84,14 +121,14 @@ export function CCMonthlyActivityCard({ onDateSelect }: Props) {
 
         {/* The Grid */}
         <div className="flex gap-1 flex-1 overflow-x-auto pb-2">
-          {gridData.map((week, wIdx) => (
+          {grid.map((week, wIdx) => (
             <div key={wIdx} className="flex flex-col gap-1 shrink-0">
-              {week.map((level, dIdx) => (
+              {week.map((dayData, dIdx) => (
                 <div
                   key={dIdx}
-                  onClick={() => onDateSelect(new Date())} // 실제로는 날짜 계산해서 넣어야 함
-                  className={`w-3.5 h-3.5 rounded-sm cursor-pointer transition-transform hover:scale-125 hover:border-black border border-transparent ${getColorClass(level)}`}
-                  title={`Activity Level: ${level}`}
+                  onClick={() => onDateSelect(dayData.date)}
+                  className={`w-3.5 h-3.5 rounded-sm cursor-pointer transition-transform hover:scale-125 hover:border-black border border-transparent ${getColorClass(dayData.level)}`}
+                  title={`${dayData.dateStr}: ${dayData.count} activities`}
                 ></div>
               ))}
             </div>
