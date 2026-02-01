@@ -170,13 +170,12 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
 
     // Navigate based on suggestion type
     if (suggestion.type === 'problem') {
-      router.push(`/search?q=${encodeURIComponent(suggestion.title)}&type=problem`);
+      // Open external link for problems
+      window.open(`https://www.acmicpc.net/problem/${suggestion.id}`, '_blank');
     } else if (suggestion.type === 'user') {
-      router.push(`/search?q=${encodeURIComponent(suggestion.title)}&type=user`);
+      router.push(`/profile/${encodeURIComponent(suggestion.title)}`);
     } else if (suggestion.type === 'workbook') {
-      router.push(
-        `/search?q=${encodeURIComponent(suggestion.title)}&type=workbooknent(suggestion.title)}&type=workbook`,
-      );
+      router.push(`/workbooks?id=${suggestion.id}`);
     }
   };
 
@@ -235,7 +234,7 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
             if (suggestions.length > 0) setIsOpen(true);
           }}
           placeholder="문제, 사용자, 문제집 검색..."
-          className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-10 text-sm outline-none transition-colors focus:border-[#E24EA0] focus:ring-2 focus:ring-[#E24EA0]/20"
+          className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-10 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-[#E24EA0]/20"
         />
         {query && (
           <button
