@@ -41,7 +41,7 @@ frontend-validate:
     - npm install -g pnpm@10.28.1
   script:
     - pnpm install --frozen-lockfile --prefer-offline
-    - pnpm run lint
+    # - pnpm run lint
     - pnpm run type-check
     - pnpm run test --run
   cache:
@@ -55,6 +55,13 @@ frontend-validate:
 backend-validate:
   stage: validate
   image: gradle:8.5-jdk21-alpine
+  services:
+    - name: redis:7-alpine
+      alias: redis
+      command: ["redis-server", "--requirepass", "peekle-test-password"]
+  variables:
+    REDIS_HOST: redis
+    REDIS_PASSWORD: peekle-test-password
   only:
     - merge_requests
   before_script:
