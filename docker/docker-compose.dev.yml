@@ -45,7 +45,7 @@ services:
       dockerfile: Dockerfile
     container_name: peekle-backend-dev
     user: root
-    entrypoint: ["sh", "-c", "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS -jar app.jar"]
+    entrypoint: [ "sh", "-c", "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS -jar app.jar" ]
     env_file:
       - ../apps/backend/.env
     environment:
@@ -53,12 +53,14 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - AI_SERVER_URL=http://ai-server:8000
     volumes:
       - h2-data:/app/data
     expose:
       - "8080"
     depends_on:
       - redis
+      - ai-server
     networks:
       - peekle-network-dev
 
@@ -66,8 +68,26 @@ services:
   redis:
     image: redis:7-alpine
     container_name: peekle-redis-dev
-    expose:
-      - "6379"
+    command: redis-server --requirepass peekle-redis-password
+    ports:
+      - "6379:6379"
+    networks:
+      - peekle-network-dev
+
+  # AI Server - FastAPI (Python)
+  ai-server:
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+    container_name: peekle-ai-server-dev
+    env_file:
+      - ../apps/ai-server/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ai-chroma-db:/app/chroma_db
+    depends_on:
+      - redis
     networks:
       - peekle-network-dev
 
@@ -90,4 +110,6 @@ volumes:
   h2-data:
     driver: local
   nginx-certs:
+    driver: local
+  ai-chroma-db:
     driver: local
