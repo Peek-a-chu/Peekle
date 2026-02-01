@@ -36,9 +36,14 @@ public class PointLog extends BaseTimeEntity {
     private String metadata; // JSON Data
 
     public PointLog(User user, PointCategory category, Integer amount, String description) {
+        this(user, category, amount, description, null);
+    }
+
+    public PointLog(User user, PointCategory category, Integer amount, String description, String metadata) {
         this.user = user;
         this.category = category;
         this.amount = amount;
         this.description = description;
+        this.metadata = metadata;
     }
 }

@@ -35,4 +35,14 @@ public class GameController {
         return ApiResponse.success(gameService.getGameRoom(roomId));
     }
 
+    /**
+     * 게임 종료 API (방장/테스트용)
+     * 게임을 수동으로 종료하고 포인트를 지급합니다.
+     */
+    @PostMapping("/{roomId}/end")
+    public ApiResponse<String> endGame(@PathVariable Long roomId) {
+        gameService.finishGame(roomId);
+        return ApiResponse.success("Game ended successfully");
+    }
+
 }
