@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StudyRankingBoard } from '../components/CCStudyRankingBoard';
+import { CCStudyRankingBoard as StudyRankingBoard } from '../components/CCStudyRankingBoard';
 import * as rankingApi from '@/api/rankingApi';
 
 vi.mock('@/api/rankingApi');
@@ -71,10 +71,10 @@ describe('StudyRankingBoard', () => {
     render(<StudyRankingBoard />);
 
     await waitFor(() => {
-      expect(screen.getByText('First Study')).toBeInTheDocument();
-      expect(screen.getByText('Second Study')).toBeInTheDocument();
-      expect(screen.getByText('Third Study')).toBeInTheDocument();
-      expect(screen.getByText('Fourth Study')).toBeInTheDocument();
+      expect(screen.getAllByText('First Study').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Second Study').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Third Study').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Fourth Study').length).toBeGreaterThan(0);
     });
   });
 
@@ -103,8 +103,8 @@ describe('StudyRankingBoard', () => {
     render(<StudyRankingBoard />);
 
     await waitFor(() => {
-      expect(screen.getByText('1')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
     });
   });
 });

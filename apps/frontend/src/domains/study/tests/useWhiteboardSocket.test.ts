@@ -23,7 +23,7 @@ vi.mock('./useRoomStore', () => ({
   },
 }));
 
-import { useWhiteboardSocket } from './useWhiteboardSocket';
+import { useWhiteboardSocket } from '../hooks/useWhiteboardSocket';
 
 describe('useWhiteboardSocket outbound queue', () => {
   beforeEach(() => {
@@ -55,4 +55,3 @@ describe('useWhiteboardSocket outbound queue', () => {
     expect(publish).toHaveBeenCalledTimes(1);
   });
 });
-

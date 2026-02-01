@@ -1,10 +1,10 @@
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
-import * as React from 'react';
+// import * as React from 'react';
 
 // Ensure React is available globally for tests
-global.React = React;
+// global.React = React;
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {

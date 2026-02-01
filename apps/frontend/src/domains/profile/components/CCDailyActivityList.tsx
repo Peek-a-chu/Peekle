@@ -53,6 +53,7 @@ export function CCDailyActivityList({ date }: Props) {
       problemId: item.problemId,
       type: item.sourceType === 'EXTENSION' ? 'SOLO' : (item.sourceType as ActivityType),
       groupName: item.tag,
+      gameType: item.tag?.includes('팀') ? 'TEAM' : 'INDIVIDUAL', // Infer from tag or default to INDIVIDUAL
       timestamp: new Date(item.submittedAt).toLocaleTimeString('ko-KR', {
         hour: '2-digit',
         minute: '2-digit',
@@ -129,7 +130,7 @@ export function CCDailyActivityList({ date }: Props) {
                         )}
                       </>
                     )}
-                    {(activity.type === 'SOLO' || activity.type === 'EXTENSION') && (
+                    {activity.type === 'SOLO' && (
                       <span className="text-xs text-gray-400">개인 풀이</span>
                     )}
                   </div>
