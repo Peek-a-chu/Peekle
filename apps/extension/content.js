@@ -70,66 +70,70 @@ function scanForSuccess() {
             pendingSubmissions.delete(submitId);
         }
 
-        // 3. Process Success
-        // 결과 텍스트가 "맞았습니다" 혹은 "100점" 혹은 숫자 100점인 경우
-        if (resultText.includes('맞았습니다') || resultText.includes('100점') || (resultText.includes('점') && !resultText.includes('%') && parseInt(resultText) === 100)) {
-            // Process if we were watching it OR if it looks recent
-            if (wasPending || isRecent) {
+        // 3. Process Result (Success or Failure)
+        const resultColor = resultCell.querySelector('.result-text')?.getAttribute('data-color');
+        const isSuccess = resultColor === 'ac';
 
-                // Mark as sent IMMEDIATELY to prevent dupes
-                sentSubmissions.add(submitId);
+        // Filter out if it's not a finished state we care about (partial points might be 'pac'?)
+        // User said: "data-color가 ac인거만 넣으면 될지도? 아무튼 맞았는지 틀렸는지 여부를 체크해서 보내야해"
+        // If it's not pending, we treat it as a result to process.
 
-                const problemId = problemCell.innerText;
-                const memory = row.querySelector('td:nth-child(5)')?.innerText?.trim() || '0';
-                const time = row.querySelector('td:nth-child(6)')?.innerText?.trim() || '0';
-                const language = row.querySelector('td:nth-child(7)')?.innerText?.trim() || '-';
+        if (wasPending || isRecent) {
 
-                // console.log(`[Peekle] Detected Success! ID: ${submitId}, Watcher: ${wasPending}, Recent: ${isRecent}`);
+            // Mark as sent IMMEDIATELY to prevent dupes
+            sentSubmissions.add(submitId);
 
-                // Fetch source code directly from content script (same origin, valid session)
-                fetch(`https://www.acmicpc.net/source/${submitId}`)
-                    .then(res => res.text())
-                    .then(html => {
-                        const doc = new DOMParser().parseFromString(html, 'text/html');
-                        // Code is usually in a textarea with name="source"
-                        const codeElement = doc.querySelector('textarea[name="source"]');
-                        const code = codeElement ? codeElement.value : null;
+            const problemId = problemCell.innerText;
+            const memory = row.querySelector('td:nth-child(5)')?.innerText?.trim() || '0';
+            const time = row.querySelector('td:nth-child(6)')?.innerText?.trim() || '0';
+            const language = row.querySelector('td:nth-child(7)')?.innerText?.trim() || '-';
 
-                        // Send to background safely
-                        try {
-                            chrome.runtime.sendMessage({
-                                type: 'SOLVED',
-                                payload: {
-                                    problemId,
-                                    submitId,
-                                    username,
-                                    timestamp: new Date().toISOString(),
-                                    result: resultText,
-                                    memory,
-                                    time,
-                                    language,
-                                    code
-                                }
-                            });
-                        } catch (e) {
-                            if (observer) observer.disconnect();
-                        }
-                    })
-                    .catch(err => {
-                        // console.error('Failed to fetch source code:', err);
-                        // Send without code if fetch fails
-                        try {
-                            chrome.runtime.sendMessage({
-                                type: 'SOLVED',
-                                payload: {
-                                    problemId,
-                                    submitId, username, timestamp: new Date().toISOString(), result: resultText, memory, time, language,
-                                    code: null
-                                }
-                            });
-                        } catch (e) { }
-                    });
-            }
+            // console.log(`[Peekle] Detected Result! ID: ${submitId}, Success: ${isSuccess}`);
+
+            // Fetch source code directly from content script (same origin, valid session)
+            fetch(`https://www.acmicpc.net/source/${submitId}`)
+                .then(res => res.text())
+                .then(html => {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    // Code is usually in a textarea with name="source"
+                    const codeElement = doc.querySelector('textarea[name="source"]');
+                    const code = codeElement ? codeElement.value : null;
+
+                    // Send to background safely
+                    try {
+                        chrome.runtime.sendMessage({
+                            type: 'SOLVED',
+                            payload: {
+                                problemId,
+                                submitId,
+                                username,
+                                timestamp: new Date().toISOString(),
+                                result: resultText,
+                                isSuccess, // Add success flag
+                                memory,
+                                time,
+                                language,
+                                code
+                            }
+                        });
+                    } catch (e) {
+                        if (observer) observer.disconnect();
+                    }
+                })
+                .catch(err => {
+                    // console.error('Failed to fetch source code:', err);
+                    // Send without code if fetch fails
+                    try {
+                        chrome.runtime.sendMessage({
+                            type: 'SOLVED',
+                            payload: {
+                                problemId,
+                                submitId, username, timestamp: new Date().toISOString(), result: resultText, isSuccess, memory, time, language,
+                                code: null
+                            }
+                        });
+                    } catch (e) { }
+                });
         }
     });
 }

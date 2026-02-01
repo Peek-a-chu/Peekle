@@ -104,7 +104,7 @@ async function sendToBackend(data, studyId = null) {
 }
 
 async function handleSolvedSubmission(payload, sender) {
-    const { submitId, problemId, result, username, memory, time, language, code } = payload;
+    const { submitId, problemId, result, isSuccess, username, memory, time, language, code } = payload;
 
     // Retrieve both processed history and pending context
     chrome.storage.local.get([PROCESSED_SUBMISSIONS_KEY, 'pending_submission'], async (items) => {
@@ -117,7 +117,7 @@ async function handleSolvedSubmission(payload, sender) {
         }
 
         // New submission
-        console.log(`New correct submission: ${problemId} by ${username}`);
+        console.log(`New submission detected: ${problemId} by ${username} (Success: ${isSuccess})`);
 
         // Fetch problem details (tier, title)
         const problemInfo = await getProblemInfo(problemId);
@@ -185,7 +185,8 @@ async function handleSolvedSubmission(payload, sender) {
             code: code,
             memory: memoryInt,
             executionTime: timeInt,
-            // result: result, // Backend assumes success for all received submissions
+            result: result,
+            isSuccess: isSuccess,
             submittedAt: new Date().toISOString(),
             submitId: submitId,
             extensionToken,
