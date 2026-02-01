@@ -6,8 +6,6 @@ import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
 import com.peekle.domain.game.enums.GameType;
-import com.peekle.domain.submission.dto.SubmissionRequest;
-import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -19,8 +17,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.TimeUnit;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +29,6 @@ public class RedisGameService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
-    private final com.peekle.domain.submission.service.SubmissionService submissionService;
 
     /**
      * 게임 상태 변경 메서드
