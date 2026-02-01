@@ -1,5 +1,5 @@
 services:
-  # Nginx Reverse Proxy with SSL (Let's Encrypt / Self-signed)
+  # Nginx Reverse Proxy with SSL (Ler's Encrypt / Self-signed)
   nginx:
     build:
       context: ./nginx
@@ -75,11 +75,14 @@ services:
       - SPRING_DATA_REDIS_HOST=redis
       - OPENVIDU_URL=http://openvidu:4443/
       - OPENVIDU_SECRET=${OPENVIDU_SECRET:-peekle_secret_1234}
+      - AI_SERVER_URL=http://ai-server:8000
     ports:
       - "8080:8080"
     depends_on:
       redis:
         condition: service_healthy
+      ai-server:
+        condition: service_started
     restart: unless-stopped
     networks:
       - peekle-network
@@ -106,6 +109,41 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - peekle-network
+
+  # AI Server - FastAPI (Python)
+  ai-server:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/ai-server:${CI_COMMIT_SHORT_SHA:-latest}
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/ai-server:latest
+    container_name: peekle-ai-server
+    env_file:
+      - ../apps/ai-server/.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+      - chroma
+    restart: unless-stopped
+    networks:
+      - peekle-network
+
+  # ChromaDB - Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma
+    volumes:
+      - chroma-data:/chroma/chroma
+    expose:
+      - "8000"
+    restart: unless-stopped
     networks:
       - peekle-network
 
@@ -163,4 +201,6 @@ volumes:
   nginx-certs:
     driver: local
   certbot-www:
+    driver: local
+  chroma-data:
     driver: local
