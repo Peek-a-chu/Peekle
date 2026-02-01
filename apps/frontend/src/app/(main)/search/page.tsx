@@ -125,7 +125,10 @@ const SearchResultItem = ({
   }
 
   return (
-    <div className="relative flex items-center gap-4 p-4 min-h-[72px]" onClick={onClick}>
+    <div
+      className="relative flex items-center gap-4 p-4 min-h-[72px] cursor-pointer hover:bg-gray-50 transition-colors"
+      onClick={onClick}
+    >
       {/* Left Indicator */}
       <div className="flex-shrink-0 w-16 flex justify-center">
         {isProblem(result) ? (
@@ -235,7 +238,7 @@ const WorkbookGridItem = ({
   return (
     <div
       onClick={onClick}
-      className="flex flex-col p-5 bg-white rounded-2xl border border-[#D8DFE4] h-full"
+      className="flex flex-col p-5 bg-white rounded-2xl border border-[#D8DFE4] h-full hover:border-[#E24EA0] transition-colors cursor-pointer shadow-[0_2px_8px_0_rgba(0,0,0,0.04)]"
     >
       <div className="flex items-center gap-3 mb-3">
         <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
@@ -459,7 +462,13 @@ function SearchPageContent() {
   };
 
   const handleItemClick = (result: SearchResultItemType) => {
-    // 검색 결과 클릭 시 이동 기능 비활성화
+    if (isProblem(result)) {
+      window.open(`https://www.acmicpc.net/problem/${result.problemId}`, '_blank');
+    } else if (isWorkbook(result)) {
+      router.push(`/workbooks?id=${result.workbookId}`);
+    } else if (isUser(result)) {
+      router.push(`/profile/${encodeURIComponent(result.handle)}`);
+    }
   };
 
   // Result calculations
