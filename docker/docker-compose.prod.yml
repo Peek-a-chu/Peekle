@@ -35,13 +35,16 @@ services:
 
   # Frontend - Next.js
   frontend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/frontend:${CI_COMMIT_SHORT_SHA:-latest}
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: apps/frontend/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
     container_name: peekle-frontend
     env_file:
       - ../apps/frontend/.env
@@ -56,9 +59,12 @@ services:
 
   # Backend - Spring Boot
   backend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/backend:${CI_COMMIT_SHORT_SHA:-latest}
     build:
       context: ../apps/backend
       dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/backend:latest
     container_name: peekle-backend
     env_file:
       - ../apps/backend/.env
@@ -67,6 +73,8 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - OPENVIDU_URL=http://openvidu:4443/
+      - OPENVIDU_SECRET=${OPENVIDU_SECRET:-peekle_secret_1234}
     ports:
       - "8080:8080"
     depends_on:
@@ -99,7 +107,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-    - peekle-network
+      - peekle-network
 
   # OpenVidu Server (WebRTC)
   openvidu:
