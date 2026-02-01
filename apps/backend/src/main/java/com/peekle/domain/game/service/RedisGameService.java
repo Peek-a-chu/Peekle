@@ -6,6 +6,8 @@ import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
 import com.peekle.domain.game.enums.GameType;
+import com.peekle.domain.submission.dto.SubmissionRequest;
+import com.peekle.domain.submission.dto.SubmissionResponse;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -438,7 +440,6 @@ public class RedisGameService {
                 .mode(GameMode.valueOf((String) info.getOrDefault("mode", "TIME_ATTACK")))
                 .build();
     }
-
     // 문제 해결 (SubmissionService에서 호출)
     public void solveProblem(Long userId, Long gameId, Long problemId) {
 

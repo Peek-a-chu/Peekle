@@ -94,6 +94,7 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
     const headers: Record<string, string> = {};
     if (accessToken) {
       headers['Cookie'] = `access_token=${accessToken}`;
+      headers['Authorization'] = `Bearer ${accessToken}`; // Bearer Token 추가
     }
 
     // 닉네임은 URL 인코딩 필요
