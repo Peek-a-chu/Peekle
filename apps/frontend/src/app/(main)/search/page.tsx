@@ -347,6 +347,12 @@ function SearchPageContent() {
   const query = searchParams?.get('q') || '';
   const activeTab = (searchParams?.get('type') as SearchType) || 'all';
 
+  const setActiveTab = (tab: SearchType) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    params.set('type', tab);
+    router.push(`/search?${params.toString()}`);
+  };
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Filter states
