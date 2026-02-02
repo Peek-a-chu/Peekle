@@ -37,3 +37,10 @@ test-chat
 test-ide
 
 test-results
+
+# AI Server (Python)
+apps/ai-server/venv/
+apps/ai-server/__pycache__/
+apps/ai-server/*.pyc
+apps/ai-server/chroma_db/
+apps/ai-server/problems.csv
