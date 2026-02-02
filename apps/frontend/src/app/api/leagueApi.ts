@@ -5,7 +5,7 @@ import { LeagueType } from '@/components/LeagueIcon';
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 // Backend DTO matches this structure
-interface BackendRankingMember {
+export interface BackendRankingMember {
   rank: number;
   name: string;
   avatar: string;
@@ -136,6 +136,58 @@ export async function getLeagueProgress(): Promise<LeagueProgressData[]> {
     return json.data || [];
   } catch (error) {
     console.error('Error fetching league progress:', error);
+    return [];
+  }
+}
+export interface LeagueHistoryResponse {
+  id: number;
+  league: LeagueType;
+  finalPoint: number;
+  result: 'PROMOTED' | 'DEMOTED' | 'STAY' | 'MAINTAINED';
+  seasonWeek: number;
+  rank: number;
+  currentLeague: LeagueType;
+}
+
+export async function getUnviewedLeagueHistory(): Promise<LeagueHistoryResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/league/history/unviewed`, {
+      credentials: 'include',
+    });
+    // 404 means no unviewed history, which is fine
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error('Failed to fetch unviewed history');
+
+    const json: ApiResponse<LeagueHistoryResponse> = await res.json();
+    return json.success && json.data ? json.data : null;
+  } catch (error) {
+    console.warn('Checking unviewed history:', error);
+    return null;
+  }
+}
+
+export async function markLeagueHistoryAsViewed(historyId: number): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/league/history/${historyId}/view`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to mark history as viewed');
+  } catch (error) {
+    console.error('Error marking history as viewed:', error);
+  }
+}
+
+export async function getLeagueHistoryRanking(historyId: number): Promise<BackendRankingMember[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/league/history/${historyId}/ranking`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch history ranking');
+    const json: ApiResponse<BackendRankingMember[]> = await res.json();
+    return json.data || [];
+  } catch (error) {
+    console.error('Error fetching history ranking:', error);
     return [];
   }
 }

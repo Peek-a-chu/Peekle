@@ -50,7 +50,10 @@ public enum ErrorCode {
     WHITEBOARD_PERMISSION_DENIED(HttpStatus.FORBIDDEN, "WHITEBOARD_003", "화이트보드 제어 권한이 없습니다."),
 
     // Workbook
-    WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다.");
+    WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다."),
+
+    // League
+    LEAGUE_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "LEAGUE_001", "리그 기록을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
