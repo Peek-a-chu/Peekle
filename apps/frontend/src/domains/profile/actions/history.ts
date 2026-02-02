@@ -24,7 +24,7 @@ interface SubmissionLogResponse {
   sourceType: string;
   sourceDetail: string;
   code: string;
-  isSuccess: boolean;
+  result: string; // 제출 결과
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -74,10 +74,17 @@ export async function getSubmissionHistory(
       else if (item.sourceType === 'GAME') sourceType = 'GAME';
       else if (item.sourceType === 'EXTENSION') sourceType = 'SOLO';
 
-      // Timestamp formatting (Simple replacement)
-      // "2024-02-01T12:00:00" -> "2024.02.01 12:00"
+      // Timestamp formatting - Convert to KST (UTC+9)
       const formattedDate = item.submittedAt
-        ? item.submittedAt.replace('T', ' ').substring(0, 16).replace(/-/g, '.')
+        ? new Date(item.submittedAt).toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'Asia/Seoul',
+        }).replace(/\. /g, '.').replace(/\.$/, '').replace(', ', ' ')
         : '';
 
       return {
@@ -88,7 +95,7 @@ export async function getSubmissionHistory(
         language: item.language || 'Unknown',
         memory: `${item.memory || 0}KB`,
         time: `${item.executionTime || 0}ms`,
-        isSuccess: item.isSuccess ?? true,
+        isSuccess: item.result?.includes('맞았습니다') ?? false, // result로부터 계산
         timestamp: formattedDate,
         sourceType,
         sourceDetail: item.sourceDetail,

@@ -33,10 +33,10 @@ export function useExtensionCheck() {
     // 확인 요청 메시지 발송
     window.postMessage({ type: MSG_CHECK }, '*');
 
-    // 타임아웃 설정 (500ms 동안 응답 없으면 미설치로 간주)
+    // 타임아웃 설정 (2000ms 동안 응답 없으면 미설치로 간주)
     const timer = setTimeout(() => {
       setIsChecking(false);
-    }, 500);
+    }, 2000);
 
     return () => {
       window.removeEventListener('message', handleMessage);

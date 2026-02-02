@@ -1,4 +1,5 @@
-import { ApiResponse } from '@/api/userApi';
+import { ApiResponse } from '@/types/apiUtils';
+import { apiFetch } from '@/lib/api'; // Assuming apiFetch is needed or already used
 import { LeagueRankingData, LeagueRankingMember, LeagueStat } from '@/domains/league/types';
 import { LeagueType } from '@/components/LeagueIcon';
 

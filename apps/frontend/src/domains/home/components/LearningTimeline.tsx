@@ -27,6 +27,24 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: L
     return acc;
   }, {} as Record<string, typeof data>);
 
+  // 각 그룹 내에서 정답(AC)을 최우선으로, 그 다음 최신순으로 정렬
+  Object.keys(groupedDataMap).forEach(problemId => {
+    groupedDataMap[problemId].sort((a, b) => {
+      // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
+      const aIsSuccess = a.result?.includes('맞았습니다') ?? false;
+      const bIsSuccess = b.result?.includes('맞았습니다') ?? false;
+
+      if (aIsSuccess !== bIsSuccess) {
+        return bIsSuccess ? 1 : -1;
+      }
+      // 2. 같은 성공 상태면 최신순으로 정렬
+      if (a.submittedAt && b.submittedAt) {
+        return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+      }
+      return 0;
+    });
+  });
+
   const groupedKeys = Object.keys(groupedDataMap);
 
   const router = useRouter(); // Added router initialization

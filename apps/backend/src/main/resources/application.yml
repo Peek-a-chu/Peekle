@@ -11,6 +11,14 @@ spring:
   # 공통 JPA 설정
   jpa:
     open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Seoul
+
+  # Jackson (JSON) 타임존 설정
+  jackson:
+    time-zone: Asia/Seoul
 
   # 공통 Redis 설정 (필요시 dev/prod 분리 가능)
   data:
@@ -100,3 +108,11 @@ springwolf:
         protocol: ws
         host: localhost:8080
     org.springframework.security.oauth2: DEBUG
+
+# R2 Storage 설정
+r2:
+  account-id: ${R2_ACCOUNT_ID}
+  access-key-id: ${R2_ACCESS_KEY_ID}
+  secret-access-key: ${R2_SECRET_ACCESS_KEY}
+  bucket-name: ${R2_BUCKET_NAME}
+  public-url: ${R2_PUBLIC_URL}

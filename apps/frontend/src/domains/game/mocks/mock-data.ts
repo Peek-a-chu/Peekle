@@ -497,7 +497,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
         nickname: 'SpeedCoder',
         profileImg: '/avatars/default.png',
         isHost: false,
-        status: 'NOT_READY', // 준비 버튼 테스트를 위해 대기 상태로 변경
+        status: 'READY', // 카운트다운 테스트를 위해 READY로 변경
         tier: 'silver3',
       },
     ],

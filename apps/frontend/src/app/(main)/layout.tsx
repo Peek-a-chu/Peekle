@@ -1,14 +1,16 @@
 import Sidebar from '@/domains/lnb/components/Sidebar';
 import LeagueResultModal from '@/domains/league/components/LeagueResultModal';
 
-export default function MainLayout({
+export default async function MainLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>): React.ReactNode {
+}>) {
+  const user = await getMyProfile();
+
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar user={user} />
       <main className="flex-1 ml-[240px] px-8 py-0 w-full">{children}</main>
       <LeagueResultModal />
     </div>

@@ -6,8 +6,13 @@ import { Home, Users, Gamepad2, BookOpen, Trophy, Medal, Search, Settings } from
 import UserProfileSection from './UserProfileSection';
 import SidebarItem from './SidebarItem';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
+import { UserProfile } from '@/domains/profile/types';
 
-const Sidebar = () => {
+interface SidebarProps {
+  user: UserProfile;
+}
+
+const Sidebar = ({ user }: SidebarProps) => {
   const pathname = usePathname();
 
   const navItems = [
@@ -32,7 +37,7 @@ const Sidebar = () => {
     <aside className="w-[240px] h-screen bg-card border-r border-border flex flex-col fixed left-0 top-0 z-50 overflow-y-auto font-sans transition-colors duration-300">
       {/* User Logic Section */}
       <div className="mt-6">
-        <UserProfileSection />
+        <UserProfileSection initialUser={user} />
       </div>
 
       {/* Navigation Section */}

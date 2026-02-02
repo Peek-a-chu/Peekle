@@ -102,6 +102,7 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
               language: item.language,
               memory: item.memory,
               executionTime: item.executionTime,
+              result: item.result, // 제출 결과
               submittedAt: item.submittedAt
             }));
             setData(mappedData);
@@ -155,12 +156,12 @@ export const useWeeklyScore = (date?: string): { data: WeeklyPointSummary | null
 };
 
 // 리그 순위 데이터
-export const useLeagueRanking = (): { data: LeagueRankingData; isLoading: boolean } => {
+export const useLeagueRanking = (refreshInterval = 30000): { data: LeagueRankingData; isLoading: boolean } => {
   const [data, setData] = useState<LeagueRankingData>(DEFAULT_LEAGUE_RANKING);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (isPoll = false) => {
       try {
         const result = await getLeagueStatus();
         if (result) {
@@ -169,12 +170,17 @@ export const useLeagueRanking = (): { data: LeagueRankingData; isLoading: boolea
       } catch (error) {
         console.error('Failed to fetch league ranking:', error);
       } finally {
-        setIsLoading(false);
+        if (!isPoll) setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    fetchData(); // Initial fetch
+
+    // Start polling
+    const intervalId = setInterval(() => fetchData(true), refreshInterval);
+
+    return () => clearInterval(intervalId);
+  }, [refreshInterval]);
 
   return { data, isLoading };
 };
