@@ -11,7 +11,7 @@ import {
 // 현재 사용자 ID (Mock - 실제로는 인증에서 가져옴)
 // room 3에서 테스트하려면 user3 (레드팀 방장)
 // room 2에서 개인전 준비 버튼 테스트하려면 user2 (일반 참여자)
-const CURRENT_USER_ID = 'user2';
+const CURRENT_USER_ID = 'user1';
 
 interface UseGameWaitingRoomReturn {
   room: GameRoomDetail | null;
@@ -19,12 +19,14 @@ interface UseGameWaitingRoomReturn {
   currentUserId: string;
   isHost: boolean;
   isReady: boolean;
+  isCountingDown: boolean;
   inviteModalOpen: boolean;
   isLoading: boolean;
   setInviteModalOpen: (open: boolean) => void;
   sendMessage: (content: string) => void;
   toggleReady: () => void;
   startGame: () => void;
+  onCountdownComplete: () => void;
   leaveRoom: () => void;
   kickParticipant: (participantId: string) => void;
   changeTeam: () => void;
@@ -36,6 +38,7 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
   const [messages, setMessages] = useState<ChatMessage[]>(() => getMockChatMessages(roomId));
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isLoading] = useState(false);
+  const [isCountingDown, setIsCountingDown] = useState(false);
 
   const currentUserId = CURRENT_USER_ID;
 
@@ -78,13 +81,21 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     });
   }, [room, isHost, currentUserId]);
 
-  // 게임 시작 (방장 전용)
+  // 게임 시작 (방장 전용) - 카운트다운 시작
   const startGame = useCallback(() => {
     if (!isHost) return;
     // TODO: 실제 게임 시작 API 호출
-    console.log('게임 시작!');
-    // router.push(`/game/${roomId}/play`)
+    console.log('게임 시작 - 카운트다운 시작!');
+    setIsCountingDown(true);
   }, [isHost]);
+
+  // 카운트다운 완료 후 게임 플레이 화면으로 이동
+  const onCountdownComplete = useCallback(() => {
+    console.log('카운트다운 완료 - 게임 화면으로 이동');
+    setIsCountingDown(false);
+    // TODO: 실제 페이지 이동 구현
+    // router.push(`/game/${roomId}/play`);
+  }, []);
 
   // 방 나가기
   const leaveRoom = useCallback(() => {
@@ -146,12 +157,14 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     currentUserId,
     isHost,
     isReady,
+    isCountingDown,
     inviteModalOpen,
     isLoading,
     setInviteModalOpen,
     sendMessage,
     toggleReady,
     startGame,
+    onCountdownComplete,
     leaveRoom,
     kickParticipant,
     changeTeam,
