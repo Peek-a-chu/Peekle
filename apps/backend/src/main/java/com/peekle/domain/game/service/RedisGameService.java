@@ -236,13 +236,7 @@ public class RedisGameService {
 
         if (remainingCount != null && remainingCount == 0) {
             // A. 남은 사람이 없으면 -> 방 삭제 (Clean Up)
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_STATUS, roomId));
-            redisTemplate.delete(playersKey); // Players Set
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId)); // Ready Hash
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId)); // Teams Hash
-            redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
-            log.info("Game Room {} Deleted (No participants)", roomId);
+            deleteGameRoom(roomId);
         } else {
             // B. 남은 사람이 있으면 -> 방장 위임 체크
             String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
@@ -251,8 +245,6 @@ public class RedisGameService {
             // 나간 사람이 방장이라면?
             if (hostIdStr != null && hostIdStr.equals(String.valueOf(userId))) {
                 // 남은 사람 중 아무나 한 명 선택 (Set이라 순서 랜덤)
-                // pop()은 꺼내버리므로, members()로 조회 후 하나 픽하거나, pop 후 다시 add
-                // 여기서는 간단하게 members() -> iterator().next() 사용
                 Set<Object> members = redisTemplate.opsForSet().members(playersKey);
                 if (members != null && !members.isEmpty()) {
                     Object newHostIdObj = members.iterator().next();
@@ -267,6 +259,28 @@ public class RedisGameService {
                 }
             }
         }
+    }
+
+    /**
+     * 방 삭제 (Clean Up)
+     * 참여자가 없으면 호출
+     */
+    public void deleteGameRoom(Long roomId) {
+        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_STATUS, roomId));
+        redisTemplate.delete(playersKey); // Players Set
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId)); // Ready Hash
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId)); // Teams Hash
+        redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
+
+        // 게임 진행 중 생성된 키들 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_START_TIME, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_RANKING, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId));
+
+        log.info("🗑️ Game Room {} Deleted and Resources Cleaned up.", roomId);
     }
 
     // 준비 토글
@@ -313,15 +327,33 @@ public class RedisGameService {
             }
         }
 
+        // 3. 팀전일 경우 팀 밸런스 검증
+        String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
+        if ("TEAM".equals(teamType)) {
+            String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
+            Map<Object, Object> teams = redisTemplate.opsForHash().entries(teamsKey);
+
+            long redCount = teams.values().stream().filter("RED"::equals).count();
+            long blueCount = teams.values().stream().filter("BLUE"::equals).count();
+
+            if (redCount != blueCount) {
+                throw new IllegalStateException(
+                        "팀 인원이 같아야 시작할 수 있습니다. (RED: " + redCount + ", BLUE: " + blueCount + ")");
+            }
+            if (redCount == 0) {
+                throw new IllegalStateException("각 팀에 최소 1명 이상이 필요합니다.");
+            }
+        }
+
         // 게임 시작 시간 저장 (점수 계산용)
         redisTemplate.opsForValue().set(
                 String.format(RedisKeyConst.GAME_START_TIME, roomId),
                 String.valueOf(System.currentTimeMillis()));
 
-        // 3. 상태 변경
+        // 4. 상태 변경
         updateGameStatus(roomId, GameStatus.PLAYING);
 
-        // STAR 이벤트 발행
+        // START 이벤트 발행
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", roomId));
     }
@@ -352,6 +384,7 @@ public class RedisGameService {
     public void updateCode(com.peekle.domain.game.dto.request.GameCodeRequest request, Long userId) {
         String key = String.format(RedisKeyConst.GAME_CODE_KEY, request.getGameId(), request.getProblemId(), userId);
         redisTemplate.opsForValue().set(key, request.getCode());
+        redisTemplate.expire(key, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
     }
 
     // 코드 불러오기
@@ -438,6 +471,7 @@ public class RedisGameService {
                 .mode(GameMode.valueOf((String) info.getOrDefault("mode", "TIME_ATTACK")))
                 .build();
     }
+
     // 문제 해결 (SubmissionService에서 호출)
     public void solveProblem(Long userId, Long gameId, Long problemId) {
 
@@ -451,6 +485,7 @@ public class RedisGameService {
 
         // 2. 해결 처리 (Set에 추가)
         redisTemplate.opsForSet().add(solvedKey, String.valueOf(userId));
+        redisTemplate.expire(solvedKey, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
 
         // 3. 경과 시간 계산
         String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, gameId);
@@ -463,6 +498,7 @@ public class RedisGameService {
         String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, userId);
         redisTemplate.opsForHash().increment(scoreKey, "solvedCount", 1);
         redisTemplate.opsForHash().increment(scoreKey, "totalTime", elapsedSeconds);
+        redisTemplate.expire(scoreKey, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
 
         // 5. 랭킹 점수 계산 & 업데이트 (ZSet)
         // 공식: (푼 문제 수 * 5000) - 경과 시간
