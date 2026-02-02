@@ -14,6 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
 
     Optional<User> findBySocialIdAndProvider(String socialId, String provider);
 
+    Optional<User> findByBojId(String bojId);
+
     // 랭킹 계산용: 내 점수보다 높은 사람 수 (같은 그룹 내)
     int countByLeagueGroupId(Long leagueGroupId);
 
@@ -43,4 +45,8 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
 
     Page<User> findByNicknameContainingIgnoreCase(String keyword, Pageable pageable);
 
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("UPDATE User u SET u.streakCurrent = 0 WHERE u.streakCurrent > 0 AND (u.lastSolvedDate < :yesterday OR u.lastSolvedDate IS NULL)")
+    void resetBrokenStreaks(
+            @org.springframework.data.repository.query.Param("yesterday") java.time.LocalDate yesterday);
 }

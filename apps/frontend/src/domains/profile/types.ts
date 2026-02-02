@@ -8,6 +8,7 @@ export interface UserProfile {
   streakCurrent: number;
   streakMax: number;
   profileImg?: string;
+  profileImgThumb?: string;
   solvedCount: number;
   isMe?: boolean;
 }

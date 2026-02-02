@@ -14,6 +14,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.boot.test.mock.mockito.MockBean;
+import com.peekle.global.storage.R2StorageService;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,9 +40,13 @@ public class LeaguePromotionIntegrationTest {
     @Autowired
     private LeagueHistoryRepository leagueHistoryRepository;
 
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
     @BeforeEach
     void setUp() {
         // Clean up
+        redisTemplate.delete("league:season:current");
         leagueHistoryRepository.deleteAll();
         leagueGroupRepository.deleteAll();
         userRepository.deleteAll();

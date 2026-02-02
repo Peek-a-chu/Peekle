@@ -92,7 +92,8 @@ public class SecurityConfig {
                                 .addFilterBefore(extensionAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .exceptionHandling(exception -> exception
-                                                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                                                .authenticationEntryPoint(
+                                                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                                 .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console
                                                                                                      // iframe 허용
@@ -105,7 +106,7 @@ public class SecurityConfig {
                 CorsConfiguration configuration = new CorsConfiguration();
 
                 configuration.setAllowedOriginPatterns(List.of(frontendUrl, "chrome-extension://*", "*"));
-                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                 configuration.setAllowedHeaders(List.of("*"));
                 configuration.setAllowCredentials(true);
 

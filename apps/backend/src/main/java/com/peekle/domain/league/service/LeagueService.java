@@ -85,11 +85,21 @@ public class LeagueService {
     }
 
     private int calculateCurrentSeasonWeek() {
-        // 간단하게 현재 날짜 기준 주차 계산 (매주 수요일 06:00 기준)
-        // 편의상 YYYYWW 포맷. 실제 로직은 더 정교할 수 있음.
+        // Redis에서 현재 시즌 주차 관리
+        String key = "league:season:current";
+        String value = redisTemplate.opsForValue().get(key);
+
+        if (value != null) {
+            return Integer.parseInt(value);
+        }
+
+        // 초기값 설정 (최초 실행 시): 날짜 기반
         java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
         java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
-        return now.getYear() * 100 + now.get(weekFields.weekOfWeekBasedYear());
+        int initialWeek = now.getYear() * 100 + now.get(weekFields.weekOfWeekBasedYear());
+
+        redisTemplate.opsForValue().set(key, String.valueOf(initialWeek));
+        return initialWeek;
     }
 
     private boolean isGroupFull(Long groupId) {
@@ -139,14 +149,24 @@ public class LeagueService {
     }
 
     private void updateStreak(User user) {
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.LocalDate yesterday = today.minusDays(1);
+        // KST 기준 현재 시간
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
 
-        boolean alreadySolvedToday = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(today);
+        // 오전 6시 이전이라면 하루 전날로 계산 (solvedDate 기준)
+        if (now.getHour() < 6) {
+            now = now.minusDays(1);
+        }
+
+        java.time.LocalDate todayStreakDate = now.toLocalDate();
+        java.time.LocalDate yesterdayStreakDate = todayStreakDate.minusDays(1);
+
+        boolean alreadySolvedToday = user.getLastSolvedDate() != null
+                && user.getLastSolvedDate().equals(todayStreakDate);
 
         if (!alreadySolvedToday) {
-            boolean continuesStreak = user.getLastSolvedDate() != null && user.getLastSolvedDate().equals(yesterday);
-            user.updateStreak(continuesStreak);
+            boolean continuesStreak = user.getLastSolvedDate() != null
+                    && user.getLastSolvedDate().equals(yesterdayStreakDate);
+            user.updateStreak(continuesStreak, todayStreakDate);
         }
     }
 
@@ -452,6 +472,10 @@ public class LeagueService {
      */
     public void startNewSeason() {
         int previousSeasonWeek = calculateCurrentSeasonWeek();
+
+        // 시즌 증가 (Redis 갱신)
+        redisTemplate.opsForValue().increment("league:season:current");
+
         int newSeasonWeek = previousSeasonWeek + 1; // 다음 주차
 
         // 1. 모든 유저의 지난 시즌 결과 조회 및 티어 조정

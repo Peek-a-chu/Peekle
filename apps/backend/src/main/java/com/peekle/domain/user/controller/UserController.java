@@ -4,18 +4,16 @@ import com.peekle.domain.user.dto.ExtensionStatusResponse;
 import com.peekle.domain.user.dto.TokenValidationRequest;
 import com.peekle.domain.user.dto.TokenValidationResponse;
 import com.peekle.domain.user.dto.UserProfileResponse;
+import com.peekle.domain.user.dto.UserUpdateRequest;
 import com.peekle.domain.user.service.UserService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import com.peekle.domain.submission.dto.SubmissionLogResponse;
 import org.springframework.data.web.PageableDefault;
-
 
 import java.util.HashMap;
 import java.util.Map;
@@ -62,6 +60,25 @@ public class UserController {
         return ApiResponse.success(response);
     }
 
+    @PatchMapping("/me")
+    public ApiResponse<Void> updateProfile(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody UserUpdateRequest request) {
+        userService.updateUserProfile(userId, request);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/me/profile-image/presigned-url")
+    public ApiResponse<Map<String, String>> getProfileImagePresignedUrl(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody Map<String, String> request) {
+        String fileName = request.get("fileName");
+        String contentType = request.get("contentType");
+
+        Map<String, String> urls = userService.getProfileImagePresignedUrl(userId, fileName, contentType);
+        return ApiResponse.success(urls);
+    }
+
     @PostMapping("/me/validate-token")
     public ApiResponse<TokenValidationResponse> validateToken(
             @AuthenticationPrincipal Long userId,
@@ -84,8 +101,7 @@ public class UserController {
         if (!pattern.matcher(nickname).matches()) {
             return ApiResponse.success(Map.of(
                     "available", false,
-                    "message", "닉네임은 2~12자, 한글/영문/숫자만 사용할 수 있습니다."
-            ));
+                    "message", "닉네임은 2~12자, 한글/영문/숫자만 사용할 수 있습니다."));
         }
 
         // 중복 검증
@@ -93,24 +109,23 @@ public class UserController {
         if (exists) {
             return ApiResponse.success(Map.of(
                     "available", false,
-                    "message", "이미 사용중인 닉네임입니다."
-            ));
+                    "message", "이미 사용중인 닉네임입니다."));
         }
 
         return ApiResponse.success(Map.of(
                 "available", true,
-                "message", "사용 가능한 닉네임입니다."
-        ));
+                "message", "사용 가능한 닉네임입니다."));
     }
+
     @GetMapping("/me/timeline")
     public ApiResponse<java.util.List<com.peekle.domain.user.dto.TimelineItemDto>> getDailyTimeline(
             @AuthenticationPrincipal Long userId,
             @RequestParam String date) {
         return ApiResponse.success(userService.getDailyTimeline(userId, date));
     }
-    
+
     @GetMapping("/me/extension-status")
-    public ApiResponse<com.peekle.domain.user.dto.ExtensionStatusResponse> getExtensionStatus(
+    public ApiResponse<ExtensionStatusResponse> getExtensionStatus(
             @AuthenticationPrincipal Long userId) {
         return ApiResponse.success(userService.getExtensionStatus(userId));
     }
@@ -129,4 +144,3 @@ public class UserController {
         return ApiResponse.success(userService.getUserSubmissions(userId, pageable));
     }
 }
-

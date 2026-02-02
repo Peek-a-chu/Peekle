@@ -75,8 +75,9 @@ public class User extends BaseTimeEntity {
     @Builder.Default
     private Integer streakMax = 0;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
-    private LeagueTier maxLeague;
+    private LeagueTier maxLeague = LeagueTier.STONE;
 
     @Builder.Default
     @Column(name = "is_deleted")
@@ -85,7 +86,7 @@ public class User extends BaseTimeEntity {
     @Column(name = "last_solved_date")
     private java.time.LocalDate lastSolvedDate;
 
-    public void updateStreak(boolean increment) {
+    public void updateStreak(boolean increment, java.time.LocalDate streakDate) {
         if (increment) {
             this.streakCurrent++;
         } else {
@@ -94,7 +95,7 @@ public class User extends BaseTimeEntity {
         if (this.streakCurrent > this.streakMax) {
             this.streakMax = this.streakCurrent;
         }
-        this.lastSolvedDate = java.time.LocalDate.now();
+        this.lastSolvedDate = streakDate;
     }
 
     public void addLeaguePoint(int amount) {
@@ -112,6 +113,22 @@ public class User extends BaseTimeEntity {
 
     public void updateLeagueGroup(Long leagueGroupId) {
         this.leagueGroupId = leagueGroupId;
+    }
+
+    public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
+        if (nickname != null)
+            this.nickname = nickname;
+        if (bojId != null)
+            this.bojId = bojId;
+        if (profileImg != null)
+            this.profileImg = profileImg;
+        if (profileImgThumb != null)
+            this.profileImgThumb = profileImgThumb;
+    }
+
+    public void deleteProfileImage() {
+        this.profileImg = null;
+        this.profileImgThumb = null;
     }
 
     /**
