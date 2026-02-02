@@ -58,6 +58,7 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - AI_SERVER_URL=http://ai-server:8000
       - OPENVIDU_URL=https://openvidu:8443
       - OPENVIDU_SECRET=MY_SECRET
       - AI_SERVER_URL=http://ai-server:8000
@@ -67,6 +68,8 @@ services:
       - "8080"
     depends_on:
       redis:
+        condition: service_started
+      ai-server:
         condition: service_started
       openvidu:
         condition: service_healthy
@@ -185,6 +188,8 @@ volumes:
   h2-data:
     driver: local
   nginx-certs:
+    driver: local
+  chroma-data:
     driver: local
   openvidu-recordings:
     driver: local
