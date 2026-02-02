@@ -33,22 +33,20 @@ public class MediaService {
 
     @PostConstruct
     public void init() {
-        // 개발 환경일 경우 로컬호스트 주소 강제 설정
+        // 개발 환경일 경우 SSL 검증 무시 설정 (OpenVidu Self-Signed Cert 지원)
         if ("dev".equals(activeProfile) || "local".equals(activeProfile)) {
-            // Development environment: Force use of localhost HTTPS
-            // The default OpenVidu deployment uses a self-signed certificate on port 8443
-            this.openViduUrl = "http://localhost:8443/";
-            log.info("[Dev Profile] OpenVidu URL forced to: {}", this.openViduUrl);
-            
-            // 개발 환경용: SSL 인증서 검증 무시
+            log.info("[Dev Profile] Disabling SSL Verification for OpenVidu.");
             disableSslVerification();
+            
+            // NOTE: URL overwrite removed to support both Local (bootRun) and Docker scenarios.
+            // Local: application-dev.yml provides "http://localhost:8443"
+            // Docker: env var provides "https://openvidu:8443"
         } else {
-            // Prod 환경: application.yml (System Env from Docker) 값 사용
-            log.info("[Prod Profile] Using Env OpenVidu URL: {}", this.openViduUrl);
+            log.info("[Prod Profile] Using Configured OpenVidu URL");
         }
 
-        this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
         log.info("Initializing OpenVidu client at {}", openViduUrl);
+        this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
         
         // 초기화 시 연결 테스트 (비동기로 실행하여 애플리케이션 시작을 막지 않음)
         testConnection();
