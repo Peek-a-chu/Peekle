@@ -1,13 +1,15 @@
 // --- Configuration ---
 const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
 // 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
-// Local: Next.js (3000)가 /api/* 요청을 Backend(8080)로 Proxy함 (next.config.ts rewrites 확인됨)
+// Local: 확장 프로그램은 Backend(8080)로 직접 연결
 // Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
 const BASE_URL = IS_LOCAL
     ? 'http://localhost:3000'
     : 'https://i14a408.p.ssafy.io';
 
-const API_BASE_URL = BASE_URL; // Alias for compatibility
+const API_BASE_URL = IS_LOCAL
+    ? 'http://localhost:8080'  // 확장 프로그램은 백엔드 직접 연결
+    : BASE_URL;
 const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
 
 // --- Baekjoon Solver Logic ---
@@ -104,7 +106,7 @@ async function sendToBackend(data, studyId = null) {
 }
 
 async function handleSolvedSubmission(payload, sender) {
-    const { submitId, problemId, result, username, memory, time, language, code } = payload;
+    const { submitId, problemId, result, isSuccess, username, memory, time, language, code } = payload;
 
     // Retrieve both processed history and pending context
     chrome.storage.local.get([PROCESSED_SUBMISSIONS_KEY, 'pending_submission'], async (items) => {
@@ -117,7 +119,7 @@ async function handleSolvedSubmission(payload, sender) {
         }
 
         // New submission
-        console.log(`New correct submission: ${problemId} by ${username}`);
+        console.log(`New submission detected: ${problemId} by ${username} (Success: ${isSuccess})`);
 
         // Fetch problem details (tier, title)
         const problemInfo = await getProblemInfo(problemId);
@@ -185,7 +187,8 @@ async function handleSolvedSubmission(payload, sender) {
             code: code,
             memory: memoryInt,
             executionTime: timeInt,
-            // result: result, // Backend assumes success for all received submissions
+            result: result,
+            isSuccess: isSuccess,
             submittedAt: new Date().toISOString(),
             submitId: submitId,
             extensionToken,

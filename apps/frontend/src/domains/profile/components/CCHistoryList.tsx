@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Editor from '@monaco-editor/react';
 import { SubmissionHistory } from '../types';
 
 interface Props {
@@ -116,13 +117,12 @@ export function CCHistoryList({ initialHistory }: Props) {
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold text-white
-                                    ${
-                                      item.tier.includes('Bronze')
-                                        ? 'bg-amber-700'
-                                        : item.tier.includes('Silver')
-                                          ? 'bg-slate-400'
-                                          : 'bg-yellow-500' // Gold etc
-                                    }`}
+                                    ${item.tier.includes('Bronze')
+                          ? 'bg-amber-700'
+                          : item.tier.includes('Silver')
+                            ? 'bg-slate-400'
+                            : 'bg-yellow-500' // Gold etc
+                        }`}
                     >
                       {item.tier}
                     </span>
@@ -180,13 +180,27 @@ export function CCHistoryList({ initialHistory }: Props) {
             </div>
 
             {/* Code Area */}
-            <div className="flex-1 overflow-auto p-0 bg-[#1e1e1e]">
-              <pre className="p-4 text-sm font-mono text-gray-200 leading-relaxed">
-                <code>
-                  {selectedSubmission.code ||
-                    '// 코드를 불러올 수 없습니다.\n// (확장프로그램 설정 확인 필요)'}
-                </code>
-              </pre>
+            <div className="flex-1 overflow-hidden">
+              <Editor
+                height="100%"
+                language={selectedSubmission.language.toLowerCase()}
+                theme="vs-dark"
+                value={selectedSubmission.code || '// 코드를 불러올 수 없습니다.'}
+                options={{
+                  readOnly: true,
+                  fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
+                  fontSize: 14,
+                  minimap: { enabled: false },
+                  wordWrap: 'on',
+                  automaticLayout: true,
+                  scrollBeyondLastLine: false,
+                  contextmenu: false,
+                  lineNumbers: 'on',
+                  renderLineHighlight: 'none',
+                  cursorStyle: 'line',
+                  selectOnLineNumbers: false,
+                }}
+              />
             </div>
 
             {/* Footer */}
