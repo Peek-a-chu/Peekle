@@ -180,12 +180,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 프로필 이미지 표시 (무조건 이미지 사용)
+        // 프로필 이미지 표시 (없으면 DiceBear API 사용)
         const tierIconEl = document.getElementById('tier-icon');
-        // 이미지가 없으면 기본값(예: empty string) 처리 -> onerror로 핸들링하거나 빈 이미지
-        const imgUrl = data.profileImg || data.profileImage || "";
+        const imgUrl = data.profileImg || data.profileImage ||
+            `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(data.nickname || 'user')}`;
 
-        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile Image" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+
     }
 
     // Helper: Get status text

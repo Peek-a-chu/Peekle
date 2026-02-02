@@ -1,4 +1,6 @@
 import { cn } from '@/lib/utils';
+import { UserIcon } from '@/components/UserIcon';
+import Image from 'next/image';
 import { CheckCircle2, Circle, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GameProblem, Team, GamePlayParticipant } from '@/domains/game/mocks/mock-data';
@@ -146,21 +148,17 @@ function SolvedByList({
   const getParticipant = (id: string) => participants.find((p) => p.id === id);
 
   // 아바타 렌더링
-  const renderAvatar = (id: string, sizeClass = 'h-5 w-5') => {
+  const renderUserIcon = (id: string, sizeClass = 'h-5 w-5') => {
     const p = getParticipant(id);
     if (!p) return null;
     return (
-      <div
+      <UserIcon
         key={id}
-        className={cn(
-          'rounded-full border border-background bg-muted flex items-center justify-center text-[9px] font-medium overflow-hidden text-white',
-          sizeClass,
-          p.team === 'RED' ? 'bg-red-400' : p.team === 'BLUE' ? 'bg-blue-400' : 'bg-gray-400',
-        )}
-        title={p.nickname}
-      >
-        {p.nickname[0]}
-      </div>
+        src={p.profileImg}
+        nickname={p.nickname}
+        size={20}
+        className="border-background"
+      />
     );
   };
 
@@ -175,7 +173,7 @@ function SolvedByList({
           <span className="text-[10px] font-semibold text-blue-500">BLUE</span>
           <div className="flex items-center gap-1 h-5">
             {blueSolved.length > 0 ? (
-              <div className="flex -space-x-1.5">{blueSolved.map((s) => renderAvatar(s.id))}</div>
+              <div className="flex -space-x-1.5">{blueSolved.map((s) => renderUserIcon(s.id))}</div>
             ) : (
               <div className="h-5 w-5 rounded-full border border-dashed border-blue-200" />
             )}
@@ -187,7 +185,7 @@ function SolvedByList({
           <span className="text-[10px] font-semibold text-red-500">RED</span>
           <div className="flex items-center gap-1 h-5">
             {redSolved.length > 0 ? (
-              <div className="flex -space-x-1.5">{redSolved.map((s) => renderAvatar(s.id))}</div>
+              <div className="flex -space-x-1.5">{redSolved.map((s) => renderUserIcon(s.id))}</div>
             ) : (
               <div className="h-5 w-5 rounded-full border border-dashed border-red-200" />
             )}
@@ -202,7 +200,7 @@ function SolvedByList({
 
   return (
     <div className="mt-2 flex items-center gap-2">
-      <div className="flex -space-x-1.5">{solvedBy.slice(0, 5).map((s) => renderAvatar(s.id))}</div>
+      <div className="flex -space-x-1.5">{solvedBy.slice(0, 5).map((s) => renderUserIcon(s.id))}</div>
       {solvedBy.length > 5 && (
         <span className="text-[10px] text-muted-foreground">+{solvedBy.length - 5}</span>
       )}

@@ -8,6 +8,7 @@ import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
 import PeopleIcon from '@/assets/icons/people.svg';
 import TrophyIcon from '@/assets/icons/trophy.svg';
 import ZoomIcon from '@/assets/icons/zoom.svg';
+import { UserIcon } from '@/components/UserIcon';
 
 interface StudyRankingListProps {
   rankings: RankResponse[];
@@ -18,30 +19,6 @@ interface StudyRankingListProps {
   isLoading?: boolean;
 }
 
-const MemberAvatars = ({
-  members,
-  limit = 4,
-}: {
-  members: StudyMemberResponse[];
-  limit?: number;
-}): React.ReactNode => (
-  <div className="flex items-center -space-x-2">
-    {members.slice(0, limit).map((m) => (
-      <img
-        key={m.userId}
-        src={m.profileImg || `https://api.dicebear.com/9.x/pixel-art/svg?seed=${m.nickname}`}
-        alt={m.nickname}
-        className="h-7 w-7 rounded-full border-2 border-white bg-slate-100 object-cover ring-1 ring-slate-100"
-        title={m.nickname}
-      />
-    ))}
-    {members.length > limit && (
-      <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-500 ring-1 ring-slate-100">
-        +{members.length - limit}
-      </div>
-    )}
-  </div>
-);
 
 export function StudyRankingList({
   rankings,
@@ -202,13 +179,11 @@ export function StudyRankingList({
                               className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm"
                             >
                               <div className="flex items-center gap-3">
-                                <img
-                                  src={
-                                    member.profileImg ||
-                                    `https://api.dicebear.com/9.x/pixel-art/svg?seed=${member.nickname}`
-                                  }
-                                  alt={member.nickname}
-                                  className="h-10 w-10 rounded-full bg-slate-100 border border-slate-100"
+                                <UserIcon
+                                  src={member.profileImg}
+                                  nickname={member.nickname}
+                                  size={40}
+                                  className="border-slate-100"
                                 />
                                 <div className="flex flex-col">
                                   <span className="font-bold text-slate-700 text-sm">
@@ -309,13 +284,11 @@ export function StudyRankingList({
                               key={member.userId}
                               className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100"
                             >
-                              <img
-                                src={
-                                  member.profileImg ||
-                                  `https://api.dicebear.com/9.x/pixel-art/svg?seed=${member.nickname}`
-                                }
-                                alt={member.nickname}
-                                className="h-10 w-10 rounded-full bg-white border border-slate-200"
+                              <UserIcon
+                                src={member.profileImg}
+                                nickname={member.nickname}
+                                size={40}
+                                className="bg-white border-slate-200"
                               />
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5">

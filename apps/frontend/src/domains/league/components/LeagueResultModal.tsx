@@ -9,6 +9,8 @@ import {
     BackendRankingMember
 } from '@/app/api/leagueApi';
 import LeagueIcon, { LeagueType, LEAGUE_ORDER, LEAGUE_NAMES } from '@/components/LeagueIcon';
+import { motion, AnimatePresence } from 'framer-motion';
+import { UserIcon } from '@/components/UserIcon';
 import Image from 'next/image';
 
 type ModalStep = 'RANKING' | 'RESULT';
@@ -198,15 +200,11 @@ function RankingItem({ member }: { member: BackendRankingMember }) {
             </div>
 
             <div className="mx-3 relative">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-muted border border-border">
-                    <Image
-                        src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
-                        alt={member.name}
-                        width={40}
-                        height={40}
-                        className="w-full h-full object-cover"
-                    />
-                </div>
+                <UserIcon
+                    src={member.profileImgThumb}
+                    nickname={member.name}
+                    size={40}
+                />
                 {isMe && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full"></div>}
             </div>
 

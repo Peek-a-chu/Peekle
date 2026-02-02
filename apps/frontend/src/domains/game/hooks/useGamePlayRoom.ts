@@ -171,7 +171,7 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
         id: `msg-${Date.now()}`,
         senderId: currentUserId,
         senderNickname: '나',
-        senderProfileImg: '/avatars/default.png',
+        senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=me',
         content,
         timestamp: new Date().toISOString(),
       };

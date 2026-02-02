@@ -122,7 +122,7 @@ export function CCStudyCard({
           </div>
         )}
 
-        {/* Avatar Pile - Online Participants */}
+        {/* User Icon Pile - Online Participants */}
         {study.profileImages && study.profileImages.length > 0 && (
           <div className="flex items-center gap-2">
             <div className="flex -space-x-2">

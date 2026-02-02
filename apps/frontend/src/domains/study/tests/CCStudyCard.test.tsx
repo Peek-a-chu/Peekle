@@ -17,7 +17,7 @@ describe('CCStudyCard', () => {
     isActive: true,
     createdAt: '2024-01-01T00:00:00Z',
     memberCount: 5,
-    profileImages: ['/avatar1.jpg', '/avatar2.jpg', '/avatar3.jpg'],
+    profileImages: ['', '', ''],
     rankingPoint: 0,
     owner: {
       id: 1,
@@ -67,7 +67,7 @@ describe('CCStudyCard', () => {
       logout: vi.fn(),
       setUser: vi.fn(),
     } as any);
-    
+
     render(<CCStudyCard {...defaultProps} />);
     expect(screen.getByText(/방장/)).toBeInTheDocument();
   });
@@ -83,7 +83,7 @@ describe('CCStudyCard', () => {
       logout: vi.fn(),
       setUser: vi.fn(),
     } as any);
-    
+
     render(<CCStudyCard {...defaultProps} />);
     expect(screen.queryByText(/방장/)).not.toBeInTheDocument();
   });

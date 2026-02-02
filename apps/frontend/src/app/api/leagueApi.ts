@@ -9,7 +9,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:80
 export interface BackendRankingMember {
   rank: number;
   name: string;
-  avatar: string;
   profileImgThumb: string;
   score: number;
   me: boolean;
@@ -56,7 +55,6 @@ export async function getLeagueStatus(): Promise<LeagueRankingData | null> {
       members: data.members.map((m: BackendRankingMember) => ({
         rank: m.rank,
         name: m.name,
-        avatar: m.avatar,
         profileImgThumb: m.profileImgThumb,
         score: m.score,
         me: m.me,

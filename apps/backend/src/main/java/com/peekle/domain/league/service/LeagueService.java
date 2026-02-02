@@ -16,6 +16,7 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.*;
@@ -52,7 +53,7 @@ public class LeagueService {
             return;
         }
 
-        org.redisson.api.RLock lock = redissonClient.getLock("league:assignment:lock");
+        RLock lock = redissonClient.getLock("league:assignment:lock");
         try {
             // Wait 5s, Lease 3s (짧게 치고 빠지기)
             if (lock.tryLock(5, 3, java.util.concurrent.TimeUnit.SECONDS)) {
@@ -61,7 +62,7 @@ public class LeagueService {
                     int currentSeasonWeek = calculateCurrentSeasonWeek();
 
                     // 2. STONE 티어의 가장 최근 그룹 조회
-                    com.peekle.domain.league.entity.LeagueGroup group = leagueGroupRepository
+                    LeagueGroup group = leagueGroupRepository
                             .findTopByTierAndSeasonWeekOrderByIdDesc(LeagueTier.STONE, currentSeasonWeek)
                             .orElse(null);
 
@@ -102,8 +103,8 @@ public class LeagueService {
         }
 
         // 초기값 설정 (최초 실행 시): 날짜 기반
-        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
-        java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+        WeekFields weekFields = WeekFields.ISO;
         int initialWeek = now.getYear() * 100 + now.get(weekFields.weekOfWeekBasedYear());
 
         redisTemplate.opsForValue().set(key, String.valueOf(initialWeek));
@@ -158,15 +159,15 @@ public class LeagueService {
 
     private void updateStreak(User user) {
         // KST 기준 현재 시간
-        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
 
         // 오전 6시 이전이라면 하루 전날로 계산 (solvedDate 기준)
         if (now.getHour() < 6) {
             now = now.minusDays(1);
         }
 
-        java.time.LocalDate todayStreakDate = now.toLocalDate();
-        java.time.LocalDate yesterdayStreakDate = todayStreakDate.minusDays(1);
+        LocalDate todayStreakDate = now.toLocalDate();
+        LocalDate yesterdayStreakDate = todayStreakDate.minusDays(1);
 
         boolean alreadySolvedToday = user.getLastSolvedDate() != null
                 && user.getLastSolvedDate().equals(todayStreakDate);
@@ -280,7 +281,6 @@ public class LeagueService {
             members.add(LeagueRankingMemberDto.builder()
                     .rank(currentRank++)
                     .name(u.getNickname())
-                    .avatar(u.getProfileImg() != null ? u.getProfileImg() : "/avatars/default.png") // Avatar fallback
                     .profileImgThumb(u.getProfileImgThumb())
                     .score(u.getLeaguePoint())
                     .me(u.getId().equals(user.getId()))
@@ -652,15 +652,13 @@ public class LeagueService {
                     return LeagueRankingMemberDto.builder()
                             .rank(h.getRank() != null ? h.getRank() : 0)
                             .name(h.getUser().getNickname())
-                            .avatar(h.getUser().getProfileImg() != null ? h.getUser().getProfileImg()
-                                    : "/avatars/default.png")
                             .profileImgThumb(h.getUser().getProfileImgThumb())
                             .score(h.getFinalPoint())
                             .me(h.getUser().getId().equals(user.getId()))
                             .status(status)
                             .build();
                 })
-                .collect(Collectors.toList());
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /**
