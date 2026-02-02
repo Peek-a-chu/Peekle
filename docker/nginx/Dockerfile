@@ -1,15 +1,16 @@
 FROM nginx:alpine
 
-# Install openssl
-RUN apk add --no-cache openssl
+# Install certbot and dependencies
+RUN apk add --no-cache certbot certbot-nginx openssl
 
 # Remove default config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Create directory for certificates
+# Create directories for certificates and certbot
 RUN mkdir -p /etc/letsencrypt/live/i14a408.p.ssafy.io
+RUN mkdir -p /var/www/certbot
 
-# Script to generate self-signed cert if not exists
+# Script to handle certificate setup
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

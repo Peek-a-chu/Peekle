@@ -57,7 +57,7 @@ function SortableProblemItem({ item, index, onRemove }: SortableProblemItemProps
       style={style}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 bg-muted/40 rounded-md group',
-        isDragging && 'opacity-50 shadow-lg ring-1 ring-pink-500/30',
+        isDragging && 'opacity-50 shadow-lg ring-1 ring-primary/30',
       )}
     >
       <button
@@ -69,7 +69,7 @@ function SortableProblemItem({ item, index, onRemove }: SortableProblemItemProps
         <GripVertical className="h-4 w-4" />
       </button>
       <span className="text-xs text-muted-foreground w-4 text-right">{index + 1}</span>
-      <span className="font-medium text-pink-500 text-sm w-14">{item.number}</span>
+      <span className="font-medium text-primary text-sm w-14">{item.number}</span>
       <span className="flex-1 text-sm truncate">{item.title}</span>
       <button
         type="button"
@@ -295,7 +295,7 @@ export function WorkbookModal({
                             onClick={() => handleAddProblem(problem)}
                             className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 text-sm transition-colors"
                           >
-                            <span className="font-medium text-pink-500 w-12">
+                            <span className="font-medium text-primary w-12">
                               {problem.externalId}
                             </span>
                             <span className="truncate flex-1">{problem.title}</span>
@@ -369,7 +369,7 @@ export function WorkbookModal({
           <Button
             onClick={handleSubmit}
             disabled={!title.trim()}
-            className="bg-pink-500 hover:bg-pink-600 text-white"
+            className="bg-primary hover:bg-primary text-white"
           >
             {mode === 'create' ? '만들기' : '저장'}
           </Button>

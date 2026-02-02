@@ -12,9 +12,21 @@ describe('CCProblemListPanel keys', () => {
     render(
       <CCProblemListPanel
         problems={[
-          { problemId: 1, title: 'A', tier: 'B5', solvedMemberCount: 0 },
+          {
+            problemId: 1,
+            title: 'A',
+            tier: 'B5',
+            solvedMemberCount: 0,
+            totalMemberCount: 4,
+          },
           // duplicate id (should not cause key warning due to fallback key)
-          { problemId: 1, title: 'A-dup', tier: 'B5', solvedMemberCount: 0 },
+          {
+            problemId: 1,
+            title: 'A-dup',
+            tier: 'B5',
+            solvedMemberCount: 0,
+            totalMemberCount: 4,
+          },
           // @ts-expect-error simulate bad data
           { title: 'MissingId', tier: 'B5', solvedMemberCount: 0 },
         ]}
@@ -31,4 +43,3 @@ describe('CCProblemListPanel keys', () => {
     expect(keyWarnings.length).toBe(0);
   });
 });
-

@@ -1,4 +1,7 @@
 spring:
+  threads:
+    virtual:
+      enabled: true
   profiles:
     active: dev # 기본값: 개발 모드 (H2)
 
@@ -15,8 +18,6 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:peekle-redis-password}
-
-
 
   # OAuth2 설정
   security:

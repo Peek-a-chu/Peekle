@@ -23,7 +23,12 @@ export interface CCProblemListPanelProps {
   isFolded: boolean;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  onAddProblem?: (title: string, number: number, tags?: string[], problemId?: number) => Promise<void>;
+  onAddProblem?: (
+    title: string,
+    number: number,
+    tags?: string[],
+    problemId?: number,
+  ) => Promise<void>;
   onRemoveProblem?: (problemId: number) => Promise<void>;
   submissions?: Submission[];
   onFetchSubmissions?: (problemId: number) => void;
@@ -86,7 +91,12 @@ export function CCProblemListPanel({
     setSubmissionModalOpen(false);
   };
 
-  const handleAddProblem = async (title: string, number: number, tags?: string[], problemId?: number) => {
+  const handleAddProblem = async (
+    title: string,
+    number: number,
+    tags?: string[],
+    problemId?: number,
+  ) => {
     if (onAddProblem) {
       await onAddProblem(title, number, tags, problemId);
     }
@@ -114,7 +124,7 @@ export function CCProblemListPanel({
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setAddProblemModalOpen(true)}
-            className="bg-pink-500 hover:bg-pink-600 text-white h-8 text-xs px-3 shadow-sm"
+            className="bg-primary hover:bg-primary/90 text-white h-8 text-xs px-3 shadow-sm"
           >
             <Plus className="mr-1 h-3 w-3" />
             문제 추가
@@ -141,7 +151,7 @@ export function CCProblemListPanel({
 
       {/* Problem List */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {problems.length === 0 ? (
+        {!problems || problems.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
             <FileText className="mb-2 h-10 w-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">아직 추가된 문제가 없습니다</p>
@@ -151,7 +161,7 @@ export function CCProblemListPanel({
           </div>
         ) : (
           <ul className="space-y-3 p-4">
-            {problems.map((problem, idx) => {
+            {(problems || []).map((problem, idx) => {
               // Some API responses may include duplicate/missing problemId; ensure a stable unique key.
               const key =
                 typeof problem.problemId === 'number' && Number.isFinite(problem.problemId)

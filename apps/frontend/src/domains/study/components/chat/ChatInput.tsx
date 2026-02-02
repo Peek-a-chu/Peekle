@@ -19,6 +19,8 @@ export function ChatInput({ onSend, pendingCodeShare, onCancelShare }: ChatInput
   const [value, setValue] = useState('');
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return;
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();

@@ -20,7 +20,14 @@ function TestWhiteboardContent({ roomId, userId }: { roomId: number; userId: num
     // Force enable whiteboard
     setIsWhiteboardActive(true);
     setWhiteboardOverlayOpen(true);
-  }, [setRoomInfo, setCurrentUserId, setIsWhiteboardActive, setWhiteboardOverlayOpen, roomId, userId]);
+  }, [
+    setRoomInfo,
+    setCurrentUserId,
+    setIsWhiteboardActive,
+    setWhiteboardOverlayOpen,
+    roomId,
+    userId,
+  ]);
 
   return (
     <div className="h-screen w-full flex flex-col bg-gray-100">
@@ -31,7 +38,7 @@ function TestWhiteboardContent({ roomId, userId }: { roomId: number; userId: num
             Room: {roomId} | User: {userId}
           </p>
         </div>
-        <div className="text-sm text-blue-600 font-medium">Standalone Mode</div>
+        <div className="text-sm text-primary font-medium">Standalone Mode</div>
       </div>
       <div className="flex-1 relative overflow-hidden">
         <WhiteboardPanel className="h-full w-full border-none" />

@@ -39,27 +39,25 @@ describe('searchApi - API Functions', () => {
   });
 
   const mockResponse: SearchResponse = {
+    category: 'PROBLEM',
+    counts: null,
+    pagination: {
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    },
     data: {
-      category: 'ALL',
-      counts: null,
-      data: {
-        problems: [
-          {
-            problemId: 1,
-            title: 'Test Problem',
-            tier: 'GOLD_1',
-            tags: ['dp'],
-          },
-        ],
-        workbooks: [],
-        users: [],
-      },
-      pagination: {
-        page: 0,
-        size: 20,
-        totalElements: 1,
-        totalPages: 1,
-      },
+      problems: [
+        {
+          problemId: 1,
+          title: 'Test Problem',
+          tier: 'GOLD_1',
+          tags: ['dp'],
+        },
+      ],
+      workbooks: [],
+      users: [],
     },
   };
 
@@ -72,7 +70,7 @@ describe('searchApi - API Functions', () => {
   it('fetchSearchResults returns expected structure', async () => {
     const { apiFetch } = await import('@/lib/api');
     // @ts-ignore
-    apiFetch.mockResolvedValue({ success: true, data: mockResponse.data });
+    apiFetch.mockResolvedValue({ success: true, data: mockResponse });
 
     const { fetchSearchResults } = await import('@/api/searchApi');
 
@@ -92,7 +90,7 @@ describe('searchApi - API Functions', () => {
   it('fetchSearchResults passes correct params to api', async () => {
     const { apiFetch } = await import('@/lib/api');
     // @ts-ignore
-    apiFetch.mockResolvedValue({ success: true, data: mockResponse.data });
+    apiFetch.mockResolvedValue({ success: true, data: mockResponse });
 
     const { fetchSearchResults } = await import('@/api/searchApi');
 

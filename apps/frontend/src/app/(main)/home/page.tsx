@@ -1,14 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import LeagueProgressChart from '@/domains/home/components/LeagueProgressChart';
-import ActivityStreak from '@/domains/home/components/ActivityStreak';
-import LearningTimeline from '@/domains/home/components/LearningTimeline';
-import AIRecommendation from '@/domains/home/components/AIRecommendation';
-import { CCWeeklyScore } from '@/domains/home/components/CCWeeklyScore';
-import LeagueRanking from '@/domains/home/components/LeagueRanking';
-
+import dynamic from 'next/dynamic';
 import { useAuthStore } from '@/store/auth-store';
+
+const LeagueProgressChart = dynamic(() => import('@/domains/home/components/LeagueProgressChart'), {
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
+});
+
+const ActivityStreak = dynamic(() => import('@/domains/home/components/ActivityStreak'), {
+  loading: () => <div className="h-[200px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
+});
+
+const LearningTimeline = dynamic(() => import('@/domains/home/components/LearningTimeline'), {
+  loading: () => <div className="h-[400px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
+});
+
+const AIRecommendation = dynamic(() => import('@/domains/home/components/AIRecommendation'), {
+  loading: () => <div className="h-[300px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
+});
+
+const LeagueRanking = dynamic(() => import('@/domains/home/components/LeagueRanking'), {
+  loading: () => <div className="h-[400px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
+});
+
+import { CCWeeklyScore } from '@/domains/home/components/CCWeeklyScore';
 
 export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(() => {
@@ -31,7 +48,11 @@ export default function HomePage() {
               <ActivityStreak onDateSelect={setSelectedDate} selectedDate={selectedDate} />
 
               {/* 학습 타임라인 */}
-              <LearningTimeline selectedDate={selectedDate} showHistoryLink={true} nickname={user?.nickname} />
+              <LearningTimeline
+                selectedDate={selectedDate}
+                showHistoryLink={true}
+                nickname={user?.nickname}
+              />
             </div>
             {/* AI 추천 & 주간 점수 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -9,6 +9,7 @@ describe('CCProblemCard', () => {
     title: 'Test Problem',
     tier: 'Bronze 5',
     solvedMemberCount: 2,
+    totalMemberCount: 4,
   };
 
   const defaultProps = {
