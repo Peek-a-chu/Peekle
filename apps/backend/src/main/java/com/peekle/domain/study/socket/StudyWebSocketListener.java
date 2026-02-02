@@ -1,5 +1,6 @@
 package com.peekle.domain.study.socket;
 
+import com.peekle.domain.study.service.WhiteboardService;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -23,6 +24,7 @@ public class StudyWebSocketListener {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
+    private final WhiteboardService whiteboardService;
 
     // 연결 종료 시 스터디 관련 정리
     @EventListener
@@ -44,7 +46,19 @@ public class StudyWebSocketListener {
             log.info("[Study] User disconnected from study. Study ID: {}, User ID: {}", studyId, userId);
 
             // 1. 스터디 방 온라인 유저 목록에서 제거
-            redisTemplate.opsForSet().remove("study:" + studyId + ":online_users", userId.toString());
+            String onlineKey = "study:" + studyId + ":online_users";
+            redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+            // 1-2. OpenVidu Connection ID 제거
+            redisTemplate.opsForHash().delete("study:" + studyId + ":connection_ids", userId.toString());
+            
+            redisTemplate.delete("user:" + userId + ":active_study");
+
+            // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+            Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
+            if (remainingUsers != null && remainingUsers == 0) {
+                log.info("Study Room {} is empty (Disconnect). Scheduling whiteboard cleanup...", studyId);
+                whiteboardService.scheduleCleanup(studyId);
+            }
 
             // 2. 다른 유저들에게 퇴장 알림 전송
             redisPublisher.publish(

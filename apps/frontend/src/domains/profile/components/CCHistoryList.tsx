@@ -17,7 +17,7 @@ export function CCHistoryList({ initialHistory }: Props) {
   useEffect(() => {
     const submissionId = searchParams.get('submissionId');
     if (submissionId) {
-      const target = history.find(h => String(h.id) === submissionId);
+      const target = history.find((h) => String(h.id) === submissionId);
       if (target) {
         setSelectedSubmission(target);
       }
@@ -25,7 +25,7 @@ export function CCHistoryList({ initialHistory }: Props) {
   }, [searchParams, history]);
 
   // Mock Filters
-  const tiers = ['전체', 'Bronze', 'Silver', 'Gold', 'Platinum'];
+  const tiers = ['전체', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ruby'];
   const sources = [
     { label: '전체', value: 'ALL' },
     { label: '스터디', value: 'STUDY' },

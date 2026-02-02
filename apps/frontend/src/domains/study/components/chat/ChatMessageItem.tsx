@@ -10,8 +10,14 @@ interface ChatMessageItemProps {
 }
 
 export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
-  const { viewSharedCode, resetToOnlyMine, participants, viewRealtimeCode, currentUserId } =
-    useRoomStore();
+  const {
+    viewSharedCode,
+    resetToOnlyMine,
+    participants,
+    viewRealtimeCode,
+    currentUserId,
+    setSelectedProblem, // Import
+  } = useRoomStore();
 
   if (message.type === 'SYSTEM') {
     return (
@@ -27,7 +33,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
     if (e) e.stopPropagation();
 
     // Show the shared code in split view
-    if (message.type === 'CODE' && message.metadata?.code) {
+    if (message.type === 'CODE' && message.metadata) {
       const { ownerName } = message.metadata;
 
       // 1. Determine Realtime Intent First
@@ -51,7 +57,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
         }
 
         viewSharedCode({
-          code: message.metadata.code,
+          code: message.metadata.code || '',
           language: message.metadata.language || 'python',
           ownerName: displayOwnerName,
           problemTitle: message.metadata.problemTitle,
@@ -68,6 +74,11 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
       } else {
         // Owner is someone else (by nickname)
         targetParticipant = participants.find((p) => p.nickname === ownerName);
+      }
+
+      // [Feature] Set Selected Problem if metadata has problemId, regardless of target
+      if (message.metadata.problemId) {
+        setSelectedProblem(message.metadata.problemId, message.metadata.problemTitle || '');
       }
 
       // If the target is Me -> Reset to Only Mine
@@ -87,7 +98,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
         }
 
         viewSharedCode({
-          code: message.metadata.code,
+          code: message.metadata.code || '',
           language: message.metadata.language || 'python',
           ownerName: displayOwnerName,
           problemTitle: message.metadata.problemTitle,
@@ -96,10 +107,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
     }
   };
 
-  const isRefCodeMessage =
-    message.type === 'CODE' &&
-    !!message.metadata?.code &&
-    message.metadata?.isRefChat === true;
+  const isRefCodeMessage = message.type === 'CODE' && !!message.metadata;
 
   const displayContent =
     isRefCodeMessage && message.content
@@ -133,9 +141,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
                 : 'px-3 py-2 rounded-2xl bg-muted text-foreground rounded-tl-md',
             isRefCodeMessage && 'cursor-pointer',
           )}
-          onClick={
-            isRefCodeMessage ? handleCodeClick : undefined
-          }
+          onClick={isRefCodeMessage ? handleCodeClick : undefined}
         >
           {isRefCodeMessage && message.metadata ? (
             <div className="flex flex-col gap-2 min-w-[220px] max-w-md">

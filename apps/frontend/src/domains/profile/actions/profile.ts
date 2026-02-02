@@ -15,42 +15,19 @@ interface ProfileApiResponse {
   };
 }
 
-// Mock Data
-const MOCK_ME: UserProfile = {
-  id: '1',
-  nickname: '나의 계정',
-  bojId: 'my_boj_handle',
-  league: 'Silver',
-  leaguePoint: 1250,
-  leagueGroupId: '100',
-  streakCurrent: 5,
-  streakMax: 12,
-  profileImg: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-  solvedCount: 156,
-};
-
-const MOCK_OTHERS: Record<string, UserProfile> = {
-  '1': {
-    id: '2',
-    nickname: '다른 유저',
-    bojId: 'other_boj',
-    league: 'Gold',
-    leaguePoint: 2100,
-    leagueGroupId: '101',
-    streakCurrent: 42,
-    streakMax: 42,
-    profileImg: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
-    solvedCount: 320,
-  },
-};
-
 export async function getMyProfile(): Promise<UserProfile> {
   try {
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('access_token')?.value;
+
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers['Cookie'] = `access_token=${accessToken}`;
+    }
+
     const res = await fetch(`${backendUrl}/api/users/me/profile`, {
-      headers: {
-        'X-Peekle-Token': 'default-token-for-user-1', // 임시 토큰
-      },
+      headers,
       next: { revalidate: 0 },
     });
 
@@ -81,7 +58,20 @@ export async function getMyProfile(): Promise<UserProfile> {
     };
   } catch (e) {
     console.error('Failed to fetch profile:', e);
-    return MOCK_ME;
+    // 에러 발생 시 빈 프로필 반환
+    return {
+      id: '',
+      nickname: '알 수 없음',
+      bojId: null,
+      league: 'Unranked',
+      leaguePoint: 0,
+      leagueGroupId: null,
+      streakCurrent: 0,
+      streakMax: 0,
+      profileImg: undefined,
+      solvedCount: 0,
+      isMe: true,
+    };
   }
 }
 
@@ -94,7 +84,6 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
     const headers: Record<string, string> = {};
     if (accessToken) {
       headers['Cookie'] = `access_token=${accessToken}`;
-      headers['Authorization'] = `Bearer ${accessToken}`; // Bearer Token 추가
     }
 
     // 닉네임은 URL 인코딩 필요
@@ -138,8 +127,6 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
     };
   } catch (e) {
     console.error(`Failed to fetch profile for ${nickname}:`, e);
-    // 에러 발생 시 Mock 데이터 반환 혹은 에러 처리
-    // 여기서는 빈 프로필 반환
     return {
       id: '',
       nickname: nickname,

@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -107,11 +108,16 @@ public class StudyRoomService {
                                                         Collections.emptyList());
                                         int memberCount = studyMembers.size();
 
-                                        // 프로필 이미지 (Mock Data) - 최대 3개
+                                        // 프로필 이미지 (실제 데이터 사용) - 최대 3개
                                         List<String> profileImages = studyMembers.stream()
                                                         .limit(3)
-                                                        .map(m -> "https://api.dicebear.com/7.x/avataaars/svg?seed="
-                                                                        + m.getUser().getId()) // 예시용 더미 이미지
+                                                        .map(m -> {
+                                                                String img = m.getUser().getProfileImgThumb();
+                                                                if (img == null) {
+                                                                        img = m.getUser().getProfileImg();
+                                                                }
+                                                                return img;
+                                                        })
                                                         .toList();
 
                                         return StudyRoomListResponse.of(studyRoom, memberCount, profileImages);
@@ -128,7 +134,7 @@ public class StudyRoomService {
 
                 // 이미 멤버라면 스터디 상세 정보 반환 (멤버 목록 포함)
                 if (studyMemberRepository.existsByStudyAndUser_Id(studyRoom, userId)) {
-                        return buildStudyRoomResponse(studyRoom);
+                        return buildStudyRoomResponse(studyRoom, userId);
                 }
 
                 // 멤버가 아니라면 접근 거부
@@ -168,7 +174,7 @@ public class StudyRoomService {
 
                 studyMemberRepository.save(member);
 
-                return buildStudyRoomResponse(studyRoom);
+                return buildStudyRoomResponse(studyRoom, userId);
         }
 
         // 스터디 방 초대코드 생성 (방에 참여한 사람만 가능)
@@ -272,9 +278,10 @@ public class StudyRoomService {
                 studyRoom.delegateOwner(targetMember.getUser());
         }
 
-        private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom) {
+        private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom, Long currentUserId) {
                 // 1. 전체 멤버 조회
                 List<StudyMember> members = studyMemberRepository.findAllByStudy(studyRoom);
+
 
                 // 2. Redis Presence 조회
                 String onlineUsersKey = "study:" + studyRoom.getId() + ":online_users";
@@ -283,15 +290,20 @@ public class StudyRoomService {
                         onlineUserIds = java.util.Collections.emptySet();
                 }
 
+                // 2-2. Connection IDs 조회
+                String connectionIdsKey = "study:" + studyRoom.getId() + ":connection_ids";
+                Map<Object, Object> connectionIds = redisTemplate.opsForHash().entries(connectionIdsKey);
+
                 final java.util.Set<String> finalOnlineUserIds = onlineUserIds;
 
                 // 3. Response 매핑
                 List<StudyMemberResponse> memberResponses = members.stream()
                                 .map(member -> StudyMemberResponse.of(member,
-                                                finalOnlineUserIds.contains(String.valueOf(member.getUser().getId()))))
+                                                finalOnlineUserIds.contains(String.valueOf(member.getUser().getId())),
+                                                (String) connectionIds.get(String.valueOf(member.getUser().getId()))))
                                 .collect(Collectors.toList());
 
-                return StudyRoomResponse.from(studyRoom, memberResponses);
+                return StudyRoomResponse.from(studyRoom, memberResponses, currentUserId);
         }
 
         @Transactional

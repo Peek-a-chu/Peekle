@@ -7,18 +7,20 @@ import { cn } from '@/lib/utils';
 import { searchExternalProblems, ExternalProblem } from '../api/problemApi';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from 'sonner';
+import { DailyProblem } from '@/domains/study/types';
 
 interface SearchResult extends ExternalProblem {
   isRegistered?: boolean;
   hasSubmissions?: boolean;
-  registeredId?: number;
+  registeredId?: number; // problemId for registered problems
 }
 
 interface CCAddProblemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (title: string, number: number, tags?: string[]) => Promise<void>;
+  onAdd: (title: string, number: number, tags?: string[], problemId?: number) => Promise<void>;
   onRemove: (problemId: number) => Promise<void>;
+  currentProblems?: DailyProblem[]; // 현재 스터디에 추가된 문제 목록
 }
 
 export function CCAddProblemModal({
@@ -26,6 +28,7 @@ export function CCAddProblemModal({
   onClose,
   onAdd,
   onRemove,
+  currentProblems = [],
 }: CCAddProblemModalProps): React.ReactNode {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -45,7 +48,33 @@ export function CCAddProblemModal({
       setIsLoading(true);
       try {
         const data = await searchExternalProblems(debouncedQuery);
-        setResults(data);
+        
+        // 현재 스터디에 추가된 문제와 비교하여 등록 여부 확인
+        const enrichedResults: SearchResult[] = data.map((problem) => {
+          // externalId 또는 problemId로 비교
+          const isRegistered = currentProblems.some(
+            (p) =>
+              p.problemId === problem.problemId ||
+              p.externalId === problem.externalId ||
+              p.externalId === String(problem.number),
+          );
+          
+          const registeredProblem = currentProblems.find(
+            (p) =>
+              p.problemId === problem.problemId ||
+              p.externalId === problem.externalId ||
+              p.externalId === String(problem.number),
+          );
+          
+          return {
+            ...problem,
+            isRegistered,
+            registeredId: registeredProblem?.problemId,
+            hasSubmissions: registeredProblem ? (registeredProblem.solvedMemberCount ?? 0) > 0 : false,
+          };
+        });
+        
+        setResults(enrichedResults);
       } catch (error) {
         console.error('Search failed:', error);
       } finally {
@@ -54,7 +83,7 @@ export function CCAddProblemModal({
     };
 
     void search();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, currentProblems]);
 
   if (!isOpen) return null;
 
@@ -75,7 +104,13 @@ export function CCAddProblemModal({
         await onRemove(selectedProblem.registeredId);
       } else {
         console.log(`[Adding Problem] ${selectedProblem.title} (#${selectedProblem.number})`);
-        await onAdd(selectedProblem.title, selectedProblem.number, selectedProblem.tags);
+        // 검색 결과에서 problemId를 받았으면 직접 사용, 없으면 number(externalId)로 조회
+        await onAdd(
+          selectedProblem.title, 
+          selectedProblem.number, 
+          selectedProblem.tags,
+          selectedProblem.problemId // problemId가 있으면 전달
+        );
       }
       setQuery('');
       setResults([]);

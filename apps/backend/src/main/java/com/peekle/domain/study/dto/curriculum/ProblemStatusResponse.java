@@ -14,6 +14,8 @@ public class ProblemStatusResponse {
 
     private Long problemId;
 
+    private String externalId; // BOJ problem number (e.g. "1000")
+
     private String title;
 
     private String tier;
@@ -30,9 +32,10 @@ public class ProblemStatusResponse {
     // private List<String> solvedMembers;
 
     @Builder
-    public ProblemStatusResponse(Long problemId, String title, String tier, LocalDate assignedDate,
+    public ProblemStatusResponse(Long problemId, String externalId, String title, String tier, LocalDate assignedDate,
             int solvedMemberCount, int totalMemberCount, boolean isSolvedByMe) {
         this.problemId = problemId;
+        this.externalId = externalId;
         this.title = title;
         this.tier = tier;
         this.assignedDate = assignedDate;

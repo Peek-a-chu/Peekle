@@ -14,6 +14,7 @@ import com.peekle.domain.study.service.*;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
+import io.openvidu.java.client.Connection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -76,6 +77,20 @@ public class StudySocketController {
                 headerAccessor.getSessionAttributes().put("userId", userId);
 
                 // 1. Redis Presence
+                // [Access Control] Check if user is already in another study
+                String activeStudyKey = "user:" + userId + ":active_study";
+                Object currentActiveStudy = redisTemplate.opsForValue().get(activeStudyKey);
+
+                if (currentActiveStudy != null && !String.valueOf(studyId).equals(currentActiveStudy.toString())) {
+                        log.warn("User {} is already in study {}", userId, currentActiveStudy);
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "이미 다른 스터디에 참여 중입니다."));
+                        return;
+                }
+
+                // Mark as Active
+                redisTemplate.opsForValue().set(activeStudyKey, String.valueOf(studyId));
                 redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
                 // 2. OpenVidu 및 초기화 (Bundled)
@@ -87,13 +102,42 @@ public class StudySocketController {
                         Map<String, Object> userData = new HashMap<>();
                         userData.put("userId", userId);
 
-                        String token = mediaService.createConnection(sessionId, userData);
+                        Connection connection = mediaService.createConnection(sessionId, userData);
+                        String token = connection.getToken();
+
+                        // Connection ID 저장 (Redis Hash)
+                        redisTemplate.opsForHash().put("study:" + studyId + ":connection_ids", userId.toString(), connection.getConnectionId());
 
                         // 1. OpenVidu Token
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
+                } catch (Exception e) {
+                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId,
+                                        e.getMessage(), e);
+                        String errorMessage = e.getMessage();
+                        if (errorMessage == null || errorMessage.isEmpty()) {
+                                errorMessage = e.getClass().getSimpleName();
+                        }
+                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId, errorMessage, e);
+                        
+                        // 더 명확한 에러 메시지 제공
+                        String userFriendlyMessage = "OpenVidu 서버 연결 실패";
+                        if (errorMessage.contains("Connection") || errorMessage.contains("connect")) {
+                                userFriendlyMessage = "OpenVidu 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+                        } else if (errorMessage.contains("401") || errorMessage.contains("Unauthorized")) {
+                                userFriendlyMessage = "OpenVidu 인증 실패. SECRET 설정을 확인해주세요.";
+                        } else if (errorMessage.contains("404") || errorMessage.contains("Not Found")) {
+                                userFriendlyMessage = "OpenVidu 서버를 찾을 수 없습니다. URL 설정을 확인해주세요.";
+                        }
+                        
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "Init Error: " + userFriendlyMessage));
+                        // OpenVidu 실패해도 다른 초기화는 계속 진행
+                }
 
+                try {
                         // 2. Room Info
                         StudyRoomResponse roomInfo = studyRoomService
                                         .getStudyRoom(userId, studyId);
@@ -125,7 +169,6 @@ public class StudySocketController {
                         } catch (Exception e) {
                                 log.error("Whiteboard Restore Failed", e);
                         }
-
                 } catch (Exception e) {
                         log.error("Enter Init Fail", e);
                         messagingTemplate.convertAndSend(
@@ -181,7 +224,16 @@ public class StudySocketController {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
                 // 1. Redis Presence
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+                String onlineKey = "study:" + request.getStudyId() + ":online_users";
+                redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+                redisTemplate.delete("user:" + userId + ":active_study");
+
+                // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+                Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
+                if (remainingUsers != null && remainingUsers == 0) {
+                        log.info("Study Room {} is empty. Scheduling whiteboard cleanup...", request.getStudyId());
+                        whiteboardService.scheduleCleanup(request.getStudyId());
+                }
 
                 // 2. Pub/Sub (LEAVE)
                 redisPublisher.publish(
@@ -194,6 +246,9 @@ public class StudySocketController {
                                                 .content("님이 퇴장하셨습니다.")
                                                 .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
+
+                // 4. OpenVidu Force Disconnect
+                mediaService.evictUser(request.getStudyId(), userId);
         }
 
         // 스터디 영구 탈퇴 (Quit)
@@ -215,7 +270,17 @@ public class StudySocketController {
                 studyRoomService.leaveStudyRoom(userId, request.getStudyId());
 
                 // 2. Redis Presence
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+                String onlineKey = "study:" + request.getStudyId() + ":online_users";
+                redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+                redisTemplate.delete("user:" + userId + ":active_study");
+
+                // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+                Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
+                if (remainingUsers != null && remainingUsers == 0) {
+                        log.info("Study Room {} is empty (Quit). Scheduling whiteboard cleanup...",
+                                        request.getStudyId());
+                        whiteboardService.scheduleCleanup(request.getStudyId());
+                }
 
                 // 3. 세션 정리
                 if (headerAccessor.getSessionAttributes() != null) {
@@ -226,6 +291,9 @@ public class StudySocketController {
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("QUIT", userId));
+
+                // 5. OpenVidu Force Disconnect
+                mediaService.evictUser(request.getStudyId(), userId);
         }
 
         // 강퇴 알림
@@ -246,10 +314,14 @@ public class StudySocketController {
 
                 redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
                                 request.getTargetUserId().toString());
+                redisTemplate.delete("user:" + request.getTargetUserId() + ":active_study");
 
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("KICK", request.getTargetUserId()));
+
+                // OpenVidu Force Disconnect (Kick target)
+                mediaService.evictUser(request.getStudyId(), request.getTargetUserId());
         }
 
         // 스터디 삭제 (방 폭파)
@@ -342,5 +414,28 @@ public class StudySocketController {
                 messagingTemplate.convertAndSend(
                                 "/topic/studies/" + request.getStudyId() + "/info/" + userId,
                                 SocketResponse.of("ROOM_INFO", roomInfo));
+        }
+
+        // 전체 음소거 (방장 전용)
+        @MessageMapping("/studies/mute-all")
+        public void muteAll(@Payload StudyMuteAllRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // 권한 검증 (Service에 위임하거나 직접 확인)
+                // 여기서는 간단히 Room 정보를 가져와서 Owner 비교
+                StudyRoomResponse roomInfo = studyRoomService.getStudyRoom(userId, request.getStudyId());
+                if (roomInfo.getOwner().getId().equals(userId)) {
+                        // [SYSTEM] 전체 음소거 알림
+                        studyChatService.sendChat(request.getStudyId(), userId,
+                                        ChatMessageRequest.builder()
+                                                        .content("님이 전체 음소거를 실행했습니다.")
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+
+                        // Broadcast MUTE_ALL
+                        redisPublisher.publish(
+                                        new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                        SocketResponse.of("MUTE_ALL", userId)); // senderId
+                }
         }
 }

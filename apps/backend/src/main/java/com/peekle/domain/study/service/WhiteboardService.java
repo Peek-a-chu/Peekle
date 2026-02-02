@@ -8,8 +8,11 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.redis.RedisKeyConst;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -18,11 +21,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WhiteboardService {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
@@ -32,9 +37,9 @@ public class WhiteboardService {
         String key = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
 
         // 이미 화이트보드가 켜져있는지 확인 필요
-        Object activeValue = redisTemplate.opsForHash().get(key, "isActive");
+        Object activeValue = stringRedisTemplate.opsForHash().get(key, "isActive");
 
-        if (activeValue != null && activeValue.toString().equals("true")){
+        if (activeValue != null && activeValue.toString().equals("true")) {
             // 이미 화이트보드 열려있음
             throw new BusinessException(ErrorCode.WHITEBOARD_ALREADY_ACTIVE);
         }
@@ -47,11 +52,10 @@ public class WhiteboardService {
         config.put("status", "UNLOCKED"); // 잠금 해제
         config.put("revision", "0"); // 이벤트 버전 (누락 감지/재동기화용)
 
-        redisTemplate.opsForHash().putAll(key, config);
-        redisTemplate.expire(key, Duration.ofHours(24)); // TTL 설정
+        stringRedisTemplate.opsForHash().putAll(key, config);
+        stringRedisTemplate.expire(key, Duration.ofHours(24)); // TTL 설정
 
         String nickName = getUserNickname(userId);
-
 
         WhiteboardResponse startMessage = WhiteboardResponse.builder()
                 .action("START") // Client가 이 이벤트를 받으면 "시작되었습니다" 토스트 띄움
@@ -67,19 +71,18 @@ public class WhiteboardService {
     }
 
     // 화이트보드 종료
-    public void stopWhiteboard(Long studyId, Long userId){
+    public void stopWhiteboard(Long studyId, Long userId) {
         String configKey = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 권한 확인(주인장만 끌수있음 -> 화이트보드를 킨 사람)
-        Object ownerId = redisTemplate.opsForHash().get(configKey, "ownerId");
-        if(ownerId == null || !String.valueOf(userId).equals(ownerId.toString())) {
+        Object ownerId = stringRedisTemplate.opsForHash().get(configKey, "ownerId");
+        if (ownerId == null || !String.valueOf(userId).equals(ownerId.toString())) {
             throw new BusinessException(ErrorCode.WHITEBOARD_PERMISSION_DENIED);
         }
 
         // 데이터 지우기
-        redisTemplate.delete(List.of(configKey, historyKey));
-
+        stringRedisTemplate.delete(List.of(configKey, historyKey));
 
         // 종료 메시지
         WhiteboardResponse closeMessage = WhiteboardResponse.builder()
@@ -99,7 +102,7 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // Reids 정보 조회
-        Map<Object, Object> config = redisTemplate.opsForHash().entries(configKey);
+        Map<Object, Object> config = stringRedisTemplate.opsForHash().entries(configKey);
 
         boolean isActive = config.containsKey("isActive") && "true".equals(config.get("isActive").toString());
         Long revision = 0L;
@@ -118,9 +121,9 @@ public class WhiteboardService {
 
         // NOTE:
         // - 기존 구현은 isActive=false 일 때 history를 아예 포함하지 않아,
-        //   클라이언트가 SYNC를 요청해도 빈 상태만 받는 문제가 발생할 수 있습니다.
+        // 클라이언트가 SYNC를 요청해도 빈 상태만 받는 문제가 발생할 수 있습니다.
         // - UI의 "화이트보드 창 ON/OFF"는 세션(isActive)과 별개로 동작할 수 있으므로,
-        //   SYNC 응답에는 history를 항상 포함시켜 복원이 안정적으로 되도록 합니다.
+        // SYNC 응답에는 history를 항상 포함시켜 복원이 안정적으로 되도록 합니다.
         List<Object> history = redisTemplate.opsForList().range(historyKey, 0, -1);
         stateData.put("history", history);
         // config 값이 있으면 같이 내려줌 (없어도 무방)
@@ -145,8 +148,8 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 활성화 상태 확인
-        Object isActive = redisTemplate.opsForHash().get(configKey, "isActive");
-        if(isActive == null || !isActive.toString().equals("true")) {
+        Object isActive = stringRedisTemplate.opsForHash().get(configKey, "isActive");
+        if (isActive == null || !isActive.toString().equals("true")) {
             throw new BusinessException(ErrorCode.WHITEBOARD_NOT_FOUND);
         }
 
@@ -155,7 +158,7 @@ public class WhiteboardService {
 
         WhiteboardResponse response = WhiteboardResponse.from(request, userId, nickName);
         // bump revision (atomic)
-        Long newRevision = redisTemplate.opsForHash().increment(configKey, "revision", 1L);
+        Long newRevision = stringRedisTemplate.opsForHash().increment(configKey, "revision", 1L);
         response = WhiteboardResponse.builder()
                 .action(response.getAction())
                 .objectId(response.getObjectId())
@@ -166,12 +169,15 @@ public class WhiteboardService {
                 .revision(newRevision == null ? 0L : newRevision)
                 .build();
 
-        // 1. request.getData()만 저장하면 안 됨! -> response 객체 통째로 저장해야 함 (그래야 나중에 action, objectId를 알 수 있음)
+        // 1. request.getData()만 저장하면 안 됨! -> response 객체 통째로 저장해야 함 (그래야 나중에 action,
+        // objectId를 알 수 있음)
         // 2. "CURSOR" (마우스 이동) 이벤트는 저장하지 않음 (DB 부하 방지, 실시간성만 중요)
         if (!"CURSOR".equals(request.getAction())) {
             redisTemplate.opsForList().rightPush(historyKey, response);
-            // Prevent unbounded growth: keep only recent N events to avoid huge SYNC payloads.
-            // (Large SYNC messages can cause client/server instability and reconnect storms.)
+            // Prevent unbounded growth: keep only recent N events to avoid huge SYNC
+            // payloads.
+            // (Large SYNC messages can cause client/server instability and reconnect
+            // storms.)
             redisTemplate.opsForList().trim(historyKey, -500, -1);
             redisTemplate.expire(historyKey, Duration.ofHours(24));
         }
@@ -180,8 +186,10 @@ public class WhiteboardService {
         String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
         messagingTemplate.convertAndSend(topic, response);
 
-        // [Consistency] Also broadcast a lightweight "sync trigger" so clients that missed this event
-        // can still converge by requesting SYNC (private topic) even if no further events happen.
+        // [Consistency] Also broadcast a lightweight "sync trigger" so clients that
+        // missed this event
+        // can still converge by requesting SYNC (private topic) even if no further
+        // events happen.
         WhiteboardResponse syncNeeded = WhiteboardResponse.builder()
                 .action("SYNC_NEEDED")
                 .timestamp(LocalDateTime.now())
@@ -195,14 +203,14 @@ public class WhiteboardService {
         String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
 
         // 활성화 여부 확인
-        Object isActive = redisTemplate.opsForHash().get(configKey, "isActive");
+        Object isActive = stringRedisTemplate.opsForHash().get(configKey, "isActive");
         if (isActive == null || !isActive.toString().equals("true")) {
             throw new BusinessException(ErrorCode.WHITEBOARD_NOT_FOUND);
         }
 
         // 권한 확인(주인장만 전체 지우기 권한 주기)
-        Object ownerId = redisTemplate.opsForHash().get(configKey, "ownerId");
-        if(ownerId == null || !String.valueOf(userId).equals(ownerId.toString())) {
+        Object ownerId = stringRedisTemplate.opsForHash().get(configKey, "ownerId");
+        if (ownerId == null || !String.valueOf(userId).equals(ownerId.toString())) {
             throw new BusinessException(ErrorCode.WHITEBOARD_PERMISSION_DENIED);
         }
 
@@ -215,7 +223,7 @@ public class WhiteboardService {
                 .senderId(userId)
                 .senderName(nickName)
                 .timestamp(LocalDateTime.now())
-                .revision(redisTemplate.opsForHash().increment(configKey, "revision", 1L))
+                .revision(stringRedisTemplate.opsForHash().increment(configKey, "revision", 1L))
                 .build();
 
         String topic = String.format("/" + RedisKeyConst.TOPIC_WHITEBOARD, studyId);
@@ -228,5 +236,38 @@ public class WhiteboardService {
         return userRepository.findById(userId)
                 .map(User::getNickname)
                 .orElse("Unknown");
+    }
+
+    // [System] 강제 종료 (참여자 0명일 때 자동 호출)
+    public void forceFinish(Long studyId) {
+        String configKey = String.format(RedisKeyConst.WHITEBOARD_CONFIG, studyId);
+        String historyKey = String.format(RedisKeyConst.WHITEBOARD_HISTORY, studyId);
+
+        // 데이터 삭제 (알림 X)
+        stringRedisTemplate.delete(List.of(configKey, historyKey));
+        log.info("[Whiteboard] Data cleared for study {}", studyId);
+    }
+
+    // [System] Graceful Cleanup (15초 지연 후 재검사)
+    @Async
+    public void scheduleCleanup(Long studyId) {
+        log.info("[Whiteboard] Scheduling cleanup for study {} in 15 seconds...", studyId);
+        try {
+            Thread.sleep(15000); // 15s Grace Period
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        // 재검사
+        String onlineKey = "study:" + studyId + ":online_users";
+        Long remainingUsers = redisTemplate.opsForSet().size(onlineKey);
+
+        if (remainingUsers != null && remainingUsers == 0) {
+            log.info("[Whiteboard] 15s passed, still empty. Executing cleanup for study {}", studyId);
+            forceFinish(studyId);
+        } else {
+            log.info("[Whiteboard] Cleanup aborted for study {}. Users detected: {}", studyId, remainingUsers);
+        }
     }
 }

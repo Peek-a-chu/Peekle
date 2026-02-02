@@ -7,6 +7,8 @@ import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.problem.repository.TagRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -127,14 +131,38 @@ public class ProblemService {
         System.out.println("🏁 Sync Loop Finished. Total Saved: " + totalSaved);
     }
 
-    @Transactional(readOnly = true)
-    public List<ProblemSearchResponse> searchProblems(String keyword, int limit) {
-        Page<Problem> problems = problemRepository.searchByKeyword(
-                keyword,
-                PageRequest.of(0, limit)
-        );
-        return problems.getContent().stream()
-                .map(ProblemSearchResponse::new)
-                .toList();
-    }
+        /**
+         * externalId로 problemId 조회
+         * @param externalId 외부 문제 ID (예: "1000")
+         * @param source 문제 출처 (기본값: "BOJ")
+         * @return problemId를 포함한 Map
+         * @throws BusinessException 문제를 찾을 수 없을 때
+         */
+        @Transactional(readOnly = true)
+        public Map<String, Long> getProblemIdByExternalId(String externalId, String source) {
+            Problem problem = problemRepository.findByExternalIdAndSource(externalId, source)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+            
+            Map<String, Long> response = new HashMap<>();
+            response.put("problemId", problem.getId());
+            return response;
+        }
+
+        /**
+         * keyword로 문제 검색 (title 또는 externalId로 검색)
+         * @param keyword 검색어 (title 또는 externalId)
+         * @param limit 최대 결과 개수
+         * @return 검색된 문제 목록
+         */
+        @Transactional(readOnly = true)
+        public List<ProblemSearchResponse> searchProblems(String keyword, int limit) {
+            Page<Problem> problems = problemRepository.searchByKeyword(
+                    keyword,
+                    PageRequest.of(0, limit)
+            );
+            return problems.getContent().stream()
+                    .map(ProblemSearchResponse::new)
+                    .toList();
+        }
+    
 }

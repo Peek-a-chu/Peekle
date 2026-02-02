@@ -23,7 +23,7 @@ export interface CCProblemListPanelProps {
   isFolded: boolean;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  onAddProblem?: (title: string, number: number, tags?: string[]) => Promise<void>;
+  onAddProblem?: (title: string, number: number, tags?: string[], problemId?: number) => Promise<void>;
   onRemoveProblem?: (problemId: number) => Promise<void>;
   submissions?: Submission[];
   onFetchSubmissions?: (problemId: number) => void;
@@ -74,9 +74,8 @@ export function CCProblemListPanel({
 
     setTargetSubmission({
       id: submission.submissionId!,
-      problemTitle: currentProblem
-        ? `${currentProblem.problemId}. ${currentProblem.title}`
-        : 'Unknown Problem',
+      problemId: currentProblem?.problemId,
+      problemTitle: currentProblem ? currentProblem.title : 'Unknown Problem',
       username: submission.nickname || 'Unknown',
       language: submission.language || 'plaintext',
       memory: submission.memory || 0,
@@ -87,9 +86,9 @@ export function CCProblemListPanel({
     setSubmissionModalOpen(false);
   };
 
-  const handleAddProblem = async (title: string, number: number, tags?: string[]) => {
+  const handleAddProblem = async (title: string, number: number, tags?: string[], problemId?: number) => {
     if (onAddProblem) {
-      await onAddProblem(title, number, tags);
+      await onAddProblem(title, number, tags, problemId);
     }
   };
 
@@ -159,17 +158,17 @@ export function CCProblemListPanel({
                   ? `problem-${problem.problemId}`
                   : `problem-${problem.title || 'unknown'}-${idx}`;
               return (
-              <li key={key}>
-                <CCProblemCard
-                  problem={problem}
-                  isSelected={selectedProblemId === problem.problemId}
-                  onSelect={() => onSelectProblem?.(problem)}
-                  onOpenSubmission={handleOpenSubmission}
-                  onRemove={
-                    onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
-                  }
-                />
-              </li>
+                <li key={key}>
+                  <CCProblemCard
+                    problem={problem}
+                    isSelected={selectedProblemId === problem.problemId}
+                    onSelect={() => onSelectProblem?.(problem)}
+                    onOpenSubmission={handleOpenSubmission}
+                    onRemove={
+                      onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
+                    }
+                  />
+                </li>
               );
             })}
           </ul>
@@ -190,6 +189,7 @@ export function CCProblemListPanel({
         onClose={() => setAddProblemModalOpen(false)}
         onAdd={handleAddProblem}
         onRemove={handleRemoveProblem}
+        currentProblems={problems}
       />
     </div>
   );

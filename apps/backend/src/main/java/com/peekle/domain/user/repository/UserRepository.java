@@ -4,6 +4,8 @@ import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
@@ -37,6 +39,8 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
     @Query("SELECT u FROM User u WHERE u.isDeleted = false")
     java.util.List<User> findAllActiveUsers();
 
-    // 리그 그룹 미배정 유저 조회
-    java.util.List<User> findByLeagueAndLeagueGroupIdIsNull(LeagueTier league);
+    java.util.List<User> findByLeagueAndLeagueGroupIdIsNull(LeagueTier tier);
+
+    Page<User> findByNicknameContainingIgnoreCase(String keyword, Pageable pageable);
+
 }

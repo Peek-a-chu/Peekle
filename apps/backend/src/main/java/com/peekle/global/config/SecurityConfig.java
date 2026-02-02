@@ -17,8 +17,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
@@ -63,6 +65,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/games/**").permitAll() // [TEST] 게임 API
                                                 .requestMatchers("/api/workbooks/**").permitAll() // [TEST] 문제집 API
                                                 .requestMatchers("/api/dev/users/**").permitAll()
+                                                .requestMatchers("/api/ranks/**").permitAll()
 
                                                 // WebSocket
                                                 .requestMatchers("/ws-stomp/**").permitAll()
@@ -88,6 +91,8 @@ public class SecurityConfig {
                                                 .failureHandler(oAuth2FailureHandler))
                                 .addFilterBefore(extensionAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
+                                .exceptionHandling(exception -> exception
+                                                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                                 .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console
                                                                                                      // iframe 허용
