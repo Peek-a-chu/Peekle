@@ -105,6 +105,30 @@ public class StudySocketController {
                         Connection connection = mediaService.createConnection(sessionId, userData);
                         String token = connection.getToken();
 
+                        // Fix OpenVidu Token for Nginx Proxy (Protocol, Domain, Trailing Slash)
+                        if (token.startsWith("ws://")) {
+                            token = token.replace("ws://", "wss://");
+                        }
+                        
+                        // Remove port 4443 to route through Nginx standard HTTPS port
+                        if (token.contains(":4443")) {
+                            token = token.replace(":4443", "");
+                        }
+
+                        // Ensure path starts with /openvidu/ to match Nginx location and avoid redirects
+                        if (!token.contains("/openvidu")) {
+                             token = token.replace("?sessionId=", "/openvidu/?sessionId=");
+                        } else if (token.contains("/openvidu?")) {
+                             token = token.replace("/openvidu?", "/openvidu/?");
+                        }
+                        
+                        // Validates domain if localhost (fallback)
+                        if (token.contains("localhost")) {
+                             token = token.replace("localhost", "i14a408.p.ssafy.io");
+                        }
+
+                        log.info("Modified OpenVidu token for Client: {}", token);
+
                         // Connection ID 저장 (Redis Hash)
                         redisTemplate.opsForHash().put("study:" + studyId + ":connection_ids", userId.toString(), connection.getConnectionId());
 
