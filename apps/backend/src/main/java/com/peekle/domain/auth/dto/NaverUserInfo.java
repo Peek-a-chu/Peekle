@@ -1,23 +1,23 @@
-package com.peekle.global.auth.dto;
+package com.peekle.domain.auth.dto;
 
 import java.util.Map;
 
-public class GoogleUserInfo implements OAuth2UserInfo {
+public class NaverUserInfo implements OAuth2UserInfo {
 
     private final Map<String, Object> attributes;
 
-    public GoogleUserInfo(Map<String, Object> attributes) {
-        this.attributes = attributes;
+    public NaverUserInfo(Map<String, Object> attributes) {
+        this.attributes = (Map<String, Object>) attributes.get("response");
     }
 
     @Override
     public String getSocialId() {
-        return (String) attributes.get("sub");
+        return (String) attributes.get("id");
     }
 
     @Override
     public String getProvider() {
-        return "GOOGLE";
+        return "NAVER";
     }
 
     @Override
@@ -27,6 +27,6 @@ public class GoogleUserInfo implements OAuth2UserInfo {
 
     @Override
     public String getProfileImage() {
-        return (String) attributes.get("picture");
+        return (String) attributes.get("profile_image");
     }
 }

@@ -1,4 +1,4 @@
-package com.peekle.global.auth.jwt;
+package com.peekle.domain.auth.jwt;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

@@ -1,4 +1,4 @@
-package com.peekle.global.auth.repository;
+package com.peekle.domain.auth.repository;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,9 +1,9 @@
-package com.peekle.global.auth.handler;
+package com.peekle.domain.auth.handler;
 
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
-import com.peekle.global.auth.jwt.JwtTokenProvider;
-import com.peekle.global.auth.service.RefreshTokenService;
+import com.peekle.domain.auth.jwt.JwtTokenProvider;
+import com.peekle.domain.auth.service.RefreshTokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
