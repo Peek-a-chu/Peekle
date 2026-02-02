@@ -14,6 +14,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.boot.test.mock.mockito.MockBean;
+import com.peekle.global.storage.R2StorageService;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,6 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @Transactional
 public class LeaguePromotionIntegrationTest {
+
+    @MockBean
+    private R2StorageService r2StorageService;
 
     @Autowired
     private LeagueService leagueService;

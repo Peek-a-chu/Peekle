@@ -11,11 +11,14 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * Cloudflare R2 스토리지 설정
  * R2는 S3 호환 API를 제공하므로 AWS S3 SDK를 사용
  */
 @Configuration
+@Profile("!test")
 @RequiredArgsConstructor
 public class R2StorageConfig {
 

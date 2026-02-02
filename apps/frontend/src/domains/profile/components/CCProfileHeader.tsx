@@ -16,7 +16,7 @@ interface Props {
   editNickname?: string;
   setEditNickname?: (value: string) => void;
   nicknameValidation?: {
-    status: 'idle' | 'checking' | 'valid' | 'invalid';
+    status: 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
     message: string;
   };
   editBojId?: string;
@@ -33,7 +33,8 @@ export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCanc
     if (!nicknameValidation) return '';
     switch (nicknameValidation.status) {
       case 'valid': return 'text-green-500';
-      case 'invalid': return 'text-red-500';
+      case 'invalid':
+      case 'error': return 'text-red-500';
       case 'checking': return 'text-slate-400';
       default: return 'text-slate-400';
     }
@@ -43,7 +44,8 @@ export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCanc
     if (!nicknameValidation) return 'border-primary/50';
     switch (nicknameValidation.status) {
       case 'valid': return 'border-green-500 focus:border-green-500';
-      case 'invalid': return 'border-red-500 focus:border-red-500';
+      case 'invalid':
+      case 'error': return 'border-red-500 focus:border-red-500';
       default: return 'border-primary/50 focus:border-primary';
     }
   };
