@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { X, ExternalLink, CheckCircle2, Circle, User, Calendar, Pencil, Trash2 } from 'lucide-react';
+import {
+  X,
+  ExternalLink,
+  CheckCircle2,
+  Circle,
+  User,
+  Calendar,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +55,7 @@ export function WorkbooksRightPanel({
       className={cn(
         'w-[460px] flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200',
         'border-l bg-card shadow-lg',
-        className
+        className,
       )}
     >
       {/* 헤더 */}
@@ -54,7 +63,7 @@ export function WorkbooksRightPanel({
         {/* 상단: workbook #번호 | X */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-pink-500">workbook</span>
+            <span className="text-sm font-semibold text-primary">workbook</span>
             <span className="text-sm font-medium text-muted-foreground">#{workbook.number}</span>
           </div>
           <button
@@ -67,9 +76,7 @@ export function WorkbooksRightPanel({
 
         {/* 문제집 이름 */}
         <div className="flex items-center gap-1 mb-3">
-          <h2 className="font-bold text-xl text-foreground leading-tight">
-            {workbook.title}
-          </h2>
+          <h2 className="font-bold text-xl text-foreground leading-tight">{workbook.title}</h2>
           {workbook.isOwner && (
             <>
               {onEdit && (
@@ -104,7 +111,7 @@ export function WorkbooksRightPanel({
           <div className="flex items-center gap-1.5">
             <Calendar className="h-4 w-4" />
             <span>Last Updated {(() => {
-              const d = new Date(workbook.createdAt);
+              const d = new Date(workbook.updatedAt);
               const yyyy = d.getFullYear();
               const mm = String(d.getMonth() + 1).padStart(2, '0');
               const dd = String(d.getDate()).padStart(2, '0');
@@ -144,7 +151,7 @@ export function WorkbooksRightPanel({
             {/* 문제 정보 */}
             <div className="flex-1 min-w-0">
               <span className="text-sm text-foreground">
-                <span className="font-medium text-pink-500 mr-1.5">{problem.number}</span>
+                <span className="font-medium text-primary mr-1.5">{problem.number}</span>
                 <span className="truncate">{problem.title}</span>
               </span>
             </div>

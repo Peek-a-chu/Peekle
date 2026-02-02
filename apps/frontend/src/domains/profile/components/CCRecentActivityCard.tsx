@@ -64,7 +64,7 @@ export function CCRecentActivityCard() {
                 )}
               </p>
               {item.type === 'game' && (
-                <span className="text-pink-500 text-xs font-bold">+25 LP</span>
+                <span className="text-primary text-xs font-bold">+25 LP</span>
               )}
               <p className="text-xs text-gray-400 mt-1">{item.timeAgo}</p>
             </div>

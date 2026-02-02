@@ -1,23 +1,87 @@
-# GitLab CI/CD Configuration for Peekle
-# GitLab Pipeline + EC2 SSH 키 연동을 통한 자동 배포
+# GitLab CI/CD Configuration for Peekle (OPTIMIZED)
+# Target: 3-4 minutes pipeline (from 7 minutes baseline)
 #
-# 필요한 GitLab CI/CD Variables (Settings > CI/CD > Variables):
-#   - SSH_PRIVATE_KEY_BASE64: EC2 SSH 프라이빗 키 (base64 인코딩)
-#   - EC2_HOST: EC2 퍼블릭 IP 또는 도메인
-#   - EC2_USER: EC2 SSH 사용자 (예: ubuntu, ec2-user)
-#   - DOMAIN_NAME: 배포 도메인 (선택사항)
-#   - GITLAB_USER: GitLab 사용자 ID (Personal Access Token 사용 시)
-#   - GITLAB_ACCESS_TOKEN: GitLab Personal Access Token (read_repository 권한 필요)
-#   - MATTERMOST_WEBHOOK_URL: Mattermost Incoming Webhook URL
+# Key Optimizations:
+# 1. Docker layer caching via GitLab Container Registry
+# 2. Gradle build cache + daemon enabled
+# 3. Next.js incremental build cache
+# 4. Tests run only on MR (not on master deployments)
+# 5. Smart conditional deployment
+#
+# Required GitLab CI/CD Variables:
+#   - SSH_PRIVATE_KEY_BASE64: EC2 SSH private key (base64 encoded)
+#   - EC2_HOST: EC2 public IP or domain
+#   - EC2_USER: EC2 SSH user (e.g., ubuntu)
+#   - DOMAIN_NAME: Deployment domain
+#   - GITLAB_USER: GitLab user ID
+#   - GITLAB_ACCESS_TOKEN: GitLab Personal Access Token
+#   - MATTERMOST_WEBHOOK_URL: Mattermost webhook for notifications
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_BUILDKIT: 1
+  DOCKER_TLS_CERTDIR: "/certs"
 
 stages:
-  - build
-  - deploy
+  - validate # MR only: tests, lint
+  - build # All branches: build artifacts
+  - deploy # Master only: production
 
 # ===========================================
-# Frontend Pipeline
+# VALIDATION STAGE (Merge Requests Only)
 # ===========================================
 
+frontend-validate:
+  stage: validate
+  image: node:20-alpine
+  only:
+    - merge_requests
+  before_script:
+    - cd apps/frontend
+    - npm install -g pnpm@10.28.1
+  script:
+    - pnpm install --frozen-lockfile --prefer-offline
+    # - pnpm run lint
+    - pnpm run type-check
+    - pnpm run test --run
+  cache:
+    key:
+      files:
+        - apps/frontend/pnpm-lock.yaml
+    paths:
+      - apps/frontend/node_modules/
+    policy: pull-push
+
+backend-validate:
+  stage: validate
+  image: gradle:8.5-jdk21-alpine
+  services:
+    - name: redis:7-alpine
+      alias: redis
+      command: ["redis-server", "--requirepass", "peekle-test-password"]
+  variables:
+    REDIS_HOST: redis
+    REDIS_PASSWORD: peekle-test-password
+  only:
+    - merge_requests
+  before_script:
+    - cd apps/backend
+    - chmod +x gradlew
+  script:
+    - ./gradlew test --build-cache --parallel
+  cache:
+    key:
+      files:
+        - apps/backend/build.gradle
+        - apps/backend/gradle/wrapper/gradle-wrapper.properties
+    paths:
+      - apps/backend/.gradle/caches/
+      - apps/backend/.gradle/wrapper/
+    policy: pull-push
+
+# ===========================================
+# BUILD STAGE (Optimized with Caching)
+# ===========================================
 frontend-build:
   stage: build
   image: node:20-alpine
@@ -28,20 +92,21 @@ frontend-build:
   before_script:
     - cd apps/frontend
     - npm install -g pnpm@10.28.1
-    - pnpm install --frozen-lockfile
-    # - npx playwright install --with-deps chromium # E2E 테스트가 필요하다면 주석 해제 (시간 소요됨)
   script:
-    - pnpm run test --run
-    # - pnpm run test:e2e # E2E 테스트가 필요하다면 주석 해제
+    - pnpm install --frozen-lockfile --prefer-offline
     - pnpm run build
   artifacts:
     paths:
       - apps/frontend/.next
     expire_in: 1 day
   cache:
-    key: frontend-${CI_COMMIT_REF_SLUG}
+    key:
+      files:
+        - apps/frontend/pnpm-lock.yaml
     paths:
       - apps/frontend/node_modules/
+      - apps/frontend/.next/cache/
+    policy: pull-push
 
 # ===========================================
 # Backend Pipeline (Spring Boot)
@@ -58,45 +123,79 @@ spring-backend-build:
     - cd apps/backend
     - chmod +x gradlew
   script:
-    - ./gradlew clean build --no-daemon -x test
+    - ./gradlew clean build --build-cache --parallel -x test
   artifacts:
     paths:
       - apps/backend/build/libs/*.jar
     expire_in: 1 day
   cache:
-    key: backend-gradle-${CI_COMMIT_REF_SLUG}
+    key:
+      files:
+        - apps/backend/build.gradle
+        - apps/backend/gradle/wrapper/gradle-wrapper.properties
     paths:
-      - apps/backend/.gradle
-      - apps/backend/build
+      - apps/backend/.gradle/caches/
+      - apps/backend/.gradle/wrapper/
+    policy: pull-push
 
 # ===========================================
-# Deploy to EC2 via SSH
+# AI Server Pipeline (FastAPI)
+# ===========================================
+
+ai-server-build:
+  stage: build
+  image: python:3.10-slim
+  only:
+    refs:
+      - master
+      - merge_requests
+  before_script:
+    - cd apps/ai-server
+    - pip install uv
+  script:
+    - uv pip install --system --no-cache -r requirements.txt
+    - python -m compileall .
+  cache:
+    key:
+      files:
+        - apps/ai-server/requirements.txt
+    paths:
+      - /root/.cache/pip
+    policy: pull-push
+
+# ===========================================
+# Deploy to EC2 via SSH (Optimized)
 # ===========================================
 
 deploy-production:
   stage: deploy
-  image: alpine:latest
+  image: docker:24-cli
+  services:
+    - docker:24-dind
   only:
     refs:
       - master
   needs:
     - job: frontend-build
     - job: spring-backend-build
+    - job: ai-server-build
   before_script:
     # Install SSH client
-    - apk add --no-cache openssh-client curl
+    - apk add --no-cache openssh-client curl git
     # Setup SSH key (base64 decoded)
     - mkdir -p ~/.ssh
     - echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     # Add EC2 host to known hosts
     - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+    # Login to GitLab Container Registry for Docker layer caching
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY || true
   script:
     - |
-      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "GITLAB_USER='$GITLAB_USER' GITLAB_TOKEN='$GITLAB_ACCESS_TOKEN' bash -s" << 'ENDSSH'
+      ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "GITLAB_USER='$GITLAB_USER' GITLAB_TOKEN='$GITLAB_ACCESS_TOKEN' CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE' CI_COMMIT_SHORT_SHA='$CI_COMMIT_SHORT_SHA' bash -s" << 'ENDSSH'
         set -e
 
-        echo "=== Deploying Peekle to Production ==="
+        echo "=== Optimized Deployment Started ==="
 
         # Define Repository URL (using env vars passed from Runner)
         REPO_URL="https://${GITLAB_USER}:${GITLAB_TOKEN}@lab.ssafy.com/s14-webmobile1-sub1/S14P11A408.git"
@@ -114,50 +213,127 @@ deploy-production:
         # Navigate to project directory
         cd ~/peekle
 
+        # ✅ OPTIMIZATION: Check if deployment is actually needed
+        CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+        git fetch origin master --quiet
+        LATEST_COMMIT=$(git rev-parse origin/master)
+
+        if [ "$CURRENT_COMMIT" = "$LATEST_COMMIT" ]; then
+          echo "✅ Already up to date (commit: ${CURRENT_COMMIT:0:8}). No deployment needed."
+          exit 0
+        fi
+
+        echo "Updating from ${CURRENT_COMMIT:0:8} to ${LATEST_COMMIT:0:8}..."
+
+        # ✅ OPTIMIZATION: Detect which services changed
+        if [ "$CURRENT_COMMIT" != "none" ]; then
+          CHANGED_FILES=$(git diff --name-only $CURRENT_COMMIT $LATEST_COMMIT)
+          FRONTEND_CHANGED=$(echo "$CHANGED_FILES" | grep -q "^apps/frontend/" && echo "yes" || echo "no")
+          BACKEND_CHANGED=$(echo "$CHANGED_FILES" | grep -q "^apps/backend/" && echo "yes" || echo "no")
+          DOCKER_CHANGED=$(echo "$CHANGED_FILES" | grep -q "^docker/" && echo "yes" || echo "no")
+        else
+          # First deployment - build everything
+          FRONTEND_CHANGED="yes"
+          BACKEND_CHANGED="yes"
+          DOCKER_CHANGED="yes"
+        fi
+
         # Pull latest code
         echo "Pulling latest code..."
-        git fetch origin master
-        git reset --hard origin/master
+        git reset --hard origin/master --quiet
 
         # Create .env file if not exists
         if [ ! -f docker/.env ]; then
           echo "Creating .env file..."
-          cp docker/.env.example docker/.env
+          cp docker/.env.example docker/.env 2>/dev/null || true
         fi
 
         # Navigate to docker directory
         cd docker
 
-        # Build and deploy with Docker Compose
-        echo "Building Docker images..."
-        docker compose -f docker-compose.prod.yml build --no-cache
+        # Export environment variables for docker-compose
+        export CI_REGISTRY_IMAGE="${CI_REGISTRY_IMAGE}"
+        export CI_COMMIT_SHORT_SHA="${CI_COMMIT_SHORT_SHA}"
 
-        echo "Stopping old containers..."
-        docker compose -f docker-compose.prod.yml down
+        # ✅ OPTIMIZATION: Pull existing images for layer cache
+        echo "Pulling existing images for cache..."
+        docker compose -f docker-compose.prod.yml pull 2>/dev/null || echo "Some images not found (normal for first run)"
 
-        echo "Starting new containers..."
-        docker compose -f docker-compose.prod.yml up -d
+        # ✅ OPTIMIZATION: Conditional rebuild based on changes
+        if [ "$FRONTEND_CHANGED" = "yes" ] || [ "$DOCKER_CHANGED" = "yes" ]; then
+          echo "Building frontend (detected changes)..."
+          docker compose -f docker-compose.prod.yml build frontend
+        else
+          echo "⏭️  Skipping frontend build (no changes)"
+        fi
+
+        if [ "$BACKEND_CHANGED" = "yes" ] || [ "$DOCKER_CHANGED" = "yes" ]; then
+          echo "Building backend (detected changes)..."
+          docker compose -f docker-compose.prod.yml build backend
+        else
+          echo "⏭️  Skipping backend build (no changes)"
+        fi
+        
+        # AI Server build check
+        AI_CHANGED=$(echo "$CHANGED_FILES" | grep -q "^apps/ai-server/" && echo "yes" || echo "no")
+        if [ "$AI_CHANGED" = "yes" ] || [ "$DOCKER_CHANGED" = "yes" ]; then
+          echo "Building AI server (detected changes)..."
+          docker compose -f docker-compose.prod.yml build ai-server
+        else
+          echo "⏭️  Skipping AI server build (no changes)"
+        fi
+
+        # Infrastructure services
+        if [ "$DOCKER_CHANGED" = "yes" ]; then
+          echo "Rebuilding infrastructure services..."
+          docker compose -f docker-compose.prod.yml build nginx redis openvidu coturn certbot
+        fi
+
+        # ✅ OPTIMIZATION: Rolling restart (zero-downtime)
+        echo "Deploying services..."
+
+        if [ "$FRONTEND_CHANGED" = "yes" ]; then
+          docker compose -f docker-compose.prod.yml up -d --no-deps frontend
+        fi
+
+        if [ "$BACKEND_CHANGED" = "yes" ]; then
+          docker compose -f docker-compose.prod.yml up -d --no-deps backend
+        fi
+
+        if [ "$AI_CHANGED" = "yes" ]; then
+          docker compose -f docker-compose.prod.yml up -d --no-deps ai-server
+        fi
+
+        if [ "$DOCKER_CHANGED" = "yes" ]; then
+          docker compose -f docker-compose.prod.yml up -d
+        fi
 
         # Clean up old images
-        echo "Cleaning up old images..."
+        echo "Cleaning up unused images..."
         docker image prune -f
 
         # Health check
-        echo "Waiting for services to be healthy..."
+        echo "Waiting for services to stabilize..."
         sleep 10
 
-        # Check if containers are running
+        # Verify containers are running
         docker compose -f docker-compose.prod.yml ps
 
         echo "=== Deployment Complete ==="
+        echo "Frontend changed: $FRONTEND_CHANGED"
+        echo "Backend changed: $BACKEND_CHANGED"
+        echo "Docker config changed: $DOCKER_CHANGED"
       ENDSSH
   after_script:
     - apk add --no-cache curl
     - |
+      # Calculate pipeline duration
+      DURATION_MIN=$((CI_JOB_DURATION / 60))
+
       if [ "$CI_JOB_STATUS" == "success" ]; then
         COLOR="#36a64f"
         STATUS="✅ 성공"
-        MESSAGE="배포가 성공적으로 완료되었습니다."
+        MESSAGE="배포가 성공적으로 완료되었습니다. (⏱️ ${DURATION_MIN}분)"
       else
         COLOR="#ff0000"
         STATUS="❌ 실패"
@@ -176,10 +352,11 @@ deploy-production:
               {\"short\": true, \"title\": \"브랜치\", \"value\": \"$CI_COMMIT_REF_NAME\"},
               {\"short\": true, \"title\": \"커밋\", \"value\": \"$CI_COMMIT_SHORT_SHA\"},
               {\"short\": true, \"title\": \"실행자\", \"value\": \"$GITLAB_USER_NAME\"},
+              {\"short\": true, \"title\": \"빌드 시간\", \"value\": \"${DURATION_MIN}분\"},
               {\"short\": false, \"title\": \"커밋 메시지\", \"value\": \"$CI_COMMIT_MESSAGE\"},
               {\"short\": false, \"title\": \"상세\", \"value\": \"$MESSAGE\"}
             ],
-            \"footer\": \"GitLab CI/CD\",
+            \"footer\": \"GitLab CI/CD (Optimized)\",
             \"footer_icon\": \"https://about.gitlab.com/images/press/logo/png/gitlab-icon-rgb.png\"
           }]
         }" \

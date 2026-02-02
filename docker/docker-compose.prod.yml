@@ -1,5 +1,5 @@
 services:
-  # Nginx Reverse Proxy with SSL (Let's Encrypt / Self-signed)
+  # Nginx Reverse Proxy with SSL (Ler's Encrypt / Self-signed)
   nginx:
     build:
       context: ./nginx
@@ -14,7 +14,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
       - nginx-certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot:ro
+      - certbot-www:/var/www/certbot
     depends_on:
       - frontend
       - backend
@@ -35,13 +35,16 @@ services:
 
   # Frontend - Next.js
   frontend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/frontend:${CI_COMMIT_SHORT_SHA:-latest}
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: apps/frontend/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
     container_name: peekle-frontend
     env_file:
       - ../apps/frontend/.env
@@ -56,9 +59,12 @@ services:
 
   # Backend - Spring Boot
   backend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/backend:${CI_COMMIT_SHORT_SHA:-latest}
     build:
       context: ../apps/backend
       dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/backend:latest
     container_name: peekle-backend
     env_file:
       - ../apps/backend/.env
@@ -67,11 +73,16 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - OPENVIDU_URL=http://openvidu:4443/
+      - OPENVIDU_SECRET=${OPENVIDU_SECRET:-peekle_secret_1234}
+      - AI_SERVER_URL=http://ai-server:8000
     ports:
       - "8080:8080"
     depends_on:
       redis:
         condition: service_healthy
+      ai-server:
+        condition: service_started
     restart: unless-stopped
     networks:
       - peekle-network
@@ -99,7 +110,42 @@ services:
       timeout: 5s
       retries: 5
     networks:
-    - peekle-network
+      - peekle-network
+
+  # AI Server - FastAPI (Python)
+  ai-server:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/ai-server:${CI_COMMIT_SHORT_SHA:-latest}
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/ai-server:latest
+    container_name: peekle-ai-server
+    env_file:
+      - ../apps/ai-server/.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+      - chroma
+    restart: unless-stopped
+    networks:
+      - peekle-network
+
+  # ChromaDB - Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma
+    volumes:
+      - chroma-data:/chroma/chroma
+    expose:
+      - "8000"
+    restart: unless-stopped
+    networks:
+      - peekle-network
 
   # OpenVidu Server (WebRTC)
   openvidu:
@@ -155,4 +201,6 @@ volumes:
   nginx-certs:
     driver: local
   certbot-www:
+    driver: local
+  chroma-data:
     driver: local

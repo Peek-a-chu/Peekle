@@ -35,6 +35,7 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
     createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
     creator: {
       id: String(item.creator.id),
       nickname: item.creator.nickname || '알 수 없음',
@@ -55,6 +56,7 @@ function mapWorkbookResponseToWorkbook(item: WorkbookResponse): Workbook {
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
     createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
     creator: {
       id: String(item.creator.id),
       nickname: item.creator.nickname || '알 수 없음',

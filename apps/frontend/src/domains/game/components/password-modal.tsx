@@ -83,7 +83,7 @@ export function PasswordModal({ open, onOpenChange, roomTitle, onSubmit }: Passw
           <Button variant="outline" onClick={() => handleClose(false)}>
             취소
           </Button>
-          <Button onClick={handleSubmit} className="bg-pink-500 hover:bg-pink-600">
+          <Button onClick={handleSubmit} className="bg-primary hover:bg-primary/90">
             입장하기
           </Button>
         </DialogFooter>
