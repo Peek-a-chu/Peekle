@@ -99,18 +99,19 @@ const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) =>
       {isExpanded && hasMultiple && (
         <div className="border-t border-border bg-muted/10 animate-in slide-in-from-top-1 duration-200">
           <div className="w-full text-sm">
-            <div className="grid grid-cols-[1fr_80px_80px_80px_140px_40px] gap-2 px-4 py-2 border-b border-border/50 text-muted-foreground text-xs font-medium">
+            <div className="grid grid-cols-[1fr_80px_80px_80px_100px_140px_40px] gap-2 px-4 py-2 border-b border-border/50 text-muted-foreground text-xs font-medium">
               <div>태그/출처</div>
               <div>언어</div>
               <div>메모리</div>
               <div>시간</div>
+              <div>결과</div>
               <div>제출일시</div>
               <div className="text-center">상세</div>
             </div>
             {items.map((item, idx) => (
               <div
                 key={idx}
-                className={`grid grid-cols-[1fr_80px_80px_80px_140px_40px] gap-2 px-4 py-2.5 items-center hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0
+                className={`grid grid-cols-[1fr_80px_80px_80px_100px_140px_40px] gap-2 px-4 py-2.5 items-center hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0
                             ${selectedItemId === item.submittedAt ? 'bg-primary/5' : ''}
                         `}
               >
@@ -134,6 +135,17 @@ const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) =>
 
                 {/* 시간 */}
                 <div className="text-xs">{item.executionTime ? `${item.executionTime}ms` : '-'}</div>
+
+                {/* 결과 */}
+                <div className="text-xs font-medium">
+                  {item.result ? (
+                    <span className={`${item.result.includes('맞았습니다') ? 'text-green-600' : 'text-red-600'}`}>
+                      {item.result}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </div>
 
                 {/* 제출일시 */}
                 <div className="text-xs text-muted-foreground">{formatDateTime(item.submittedAt)}</div>

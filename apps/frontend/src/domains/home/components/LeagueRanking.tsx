@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import LeagueIcon, { LEAGUE_NAMES, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { useLeagueRanking } from '../hooks/useDashboardData';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+// import defaultProfileImg from '@/assets/icons/profile.png';
 
 const LeagueRanking = () => {
   const { data } = useLeagueRanking();
@@ -153,20 +155,21 @@ const RankingItem = ({ member }: { member: any }) => {
         <div
           className={`w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center border shrink-0 ${isMe ? 'border-primary/30' : 'border-border'}`}
         >
-          {member.avatar || member.profileImgThumb ? (
-            <Image
-              src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
-              alt={member.name}
-              width={24}
-              height={24}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-              }}
-            />
-          ) : null}
-          {!member.avatar && !member.profileImgThumb && <div className="w-full h-full bg-muted" />}
+          <Image
+            src={member.profileImgThumb || member.avatar || getDefaultAvatarUrl(member.name)}
+            alt={member.name}
+            width={24}
+            height={24}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // If error, maybe fallback to default or hide. 
+              const target = e.target as HTMLImageElement;
+              const defaultAvatar = getDefaultAvatarUrl(member.name);
+              target.srcset = defaultAvatar;
+              target.src = defaultAvatar;
+            }}
+            unoptimized={!member.profileImgThumb && !member.avatar}
+          />
         </div>
 
         <div className="flex items-center min-w-0 justify-center gap-1">

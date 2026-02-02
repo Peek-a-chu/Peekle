@@ -64,15 +64,15 @@ const generateStreakData = (): ActivityStreakData[] => {
     const randomVal = seededRandom(seed);
     const randomCountVal = seededRandom(seed + 9999);
 
-        // 랜덤 문제 풀이 수 (0~8)
-        const count = randomVal > 0.3 ? Math.floor(randomCountVal * 8) : 0;
+    // 랜덤 문제 풀이 수 (0~8)
+    const count = randomVal > 0.3 ? Math.floor(randomCountVal * 8) : 0;
 
-        // 희소 데이터: 0이 아닌 경우에만 추가
-        if (count > 0) {
-            data.push({ date: dateStr, count });
-        }
+    // 희소 데이터: 0이 아닌 경우에만 추가
+    if (count > 0) {
+      data.push({ date: dateStr, count });
     }
-    return data;
+  }
+  return data;
 };
 
 export const MOCK_ACTIVITY_STREAK: ActivityStreakData[] = generateStreakData();
@@ -101,21 +101,22 @@ export const BOJ_TIER_COLORS: Record<BojTier, string> = {
 
 // 학습 타임라인 아이템
 export interface TimelineItemData {
-    submissionId?: number;
-    problemId: string;
-    title: string;
-    tier: BojTier;
-    tierLevel: BojTierLevel;
-    link: string;
-    sources: string[]; // 다중 태그 지원을 위해 배열로 변경
-    sourceType: 'study' | 'game' | 'problem';
-    tag?: string; // [팀] 게임방 이름 등 (서버에서 받은 태그)
-    gameType?: 'team' | 'personal'; // 게임일 경우 팀전/개인전 구분
-    language?: string;
-    memory?: number;
-    executionTime?: number;
-    code?: string;
-    submittedAt?: string;
+  submissionId?: number;
+  problemId: string;
+  title: string;
+  tier: BojTier;
+  tierLevel: BojTierLevel;
+  link: string;
+  sources: string[]; // 다중 태그 지원을 위해 배열로 변경
+  sourceType: 'study' | 'game' | 'problem';
+  tag?: string; // [팀] 게임방 이름 등 (서버에서 받은 태그)
+  gameType?: 'team' | 'personal'; // 게임일 경우 팀전/개인전 구분
+  language?: string;
+  memory?: number;
+  executionTime?: number;
+  code?: string;
+  submittedAt?: string;
+  result?: string; // 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등)
 }
 
 export const MOCK_TIMELINE: TimelineItemData[] = [
