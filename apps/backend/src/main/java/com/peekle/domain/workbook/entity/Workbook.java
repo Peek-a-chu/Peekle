@@ -70,6 +70,7 @@ public class Workbook {
         if (description != null) {
             this.description = description;
         }
+        this.updatedAt = LocalDateTime.now();
     }
 
     public void deactivate() {

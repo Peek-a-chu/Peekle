@@ -9,6 +9,7 @@ export interface Workbook {
   isBookmarked: boolean;
   isOwner: boolean;
   createdAt: string;
+  updatedAt: string;
   creator: {
     id: string;
     nickname: string;
