@@ -3,9 +3,28 @@
  * Detects correct submissions on the status page.
  */
 
+
 let observer = null;
 const pendingSubmissions = new Set(); // Track IDs that are currently being judged
 const sentSubmissions = new Set(); // Track IDs already sent to backend to prevent duplicates
+
+// Theme color mapping (matches frontend theme colors)
+const THEME_COLORS = {
+    'blue': '#3B82F6',
+    'skyblue': '#00B8D4',
+    'orange': '#FF9500',
+    'pink': '#E24EA0',
+    'green': '#2E7D32',
+    'lime': '#66BB6A'
+};
+
+function getThemeColor(accentColor, customColor) {
+    if (accentColor === 'custom' && customColor) {
+        return customColor;
+    }
+    return THEME_COLORS[accentColor] || THEME_COLORS['pink'];
+}
+
 
 function getUsername() {
     // Try to find username in the top login bar
@@ -44,13 +63,16 @@ function scanForSuccess() {
         // Skip if already sent in this session
         if (sentSubmissions.has(submitId)) return;
 
-        // 1. Check if it's a Pending Status (Judging, Waiting, etc.)
-        // "채점 준비중", "채점 중 (1%)", "재채점 대기 중" etc.
-        const isPending = resultText.includes('채점') || resultText.includes('%') || resultText.includes('대기');
+        // Get the result color (more accurate than text parsing)
+        const resultColor = resultCell.querySelector('.result-text')?.getAttribute('data-color');
+
+        // 1. Check if it's a Pending Status using data-color
+        // Pending states: 'wait', 'compile', 'judging'
+        const isPending = ['wait', 'compile', 'judging'].includes(resultColor);
 
         if (isPending) {
             if (!pendingSubmissions.has(submitId)) {
-                // console.log(`[Peekle] Now watching submission: ${submitId} (${resultText})`);
+                // console.log(`[Peekle] Now watching submission: ${submitId} (${resultColor})`);
                 pendingSubmissions.add(submitId);
             }
             return; // It's still pending, nothing to do yet
@@ -70,13 +92,16 @@ function scanForSuccess() {
             pendingSubmissions.delete(submitId);
         }
 
-        // 3. Process Result (Success or Failure)
-        const resultColor = resultCell.querySelector('.result-text')?.getAttribute('data-color');
-        const isSuccess = resultColor === 'ac';
+        // 3. Filter: Only process finished states (exclude 'ce' - compile error)
+        // Send: ac, wa, rte, tle, mle, ole (맞았습니다, 틀렸습니다, 런타임 에러, 시간 초과, 메모리 초과, 출력 초과)
+        const finishedStates = ['ac', 'wa', 'rte', 'tle', 'mle', 'ole'];
+        if (!finishedStates.includes(resultColor)) {
+            // Unknown, partial state, or compile error - skip it
+            return;
+        }
 
-        // Filter out if it's not a finished state we care about (partial points might be 'pac'?)
-        // User said: "data-color가 ac인거만 넣으면 될지도? 아무튼 맞았는지 틀렸는지 여부를 체크해서 보내야해"
-        // If it's not pending, we treat it as a result to process.
+        // 4. Determine success
+        const isSuccess = resultColor === 'ac';
 
         if (wasPending || isRecent) {
 
@@ -235,6 +260,12 @@ function showToast(data) {
         return;
     }
 
+    // If it's a failed submission (WA, RTE, TLE, etc.), show Failed Toast
+    if (data.message && (data.message.includes('틀렸습니다') || data.message.includes('런타임') || data.message.includes('시간') || data.message.includes('메모리') || data.message.includes('출력'))) {
+        showFailedToast(data);
+        return;
+    }
+
     // Fallback for Errors / Others (Simple Toast)
     const toastId = 'peekle-toast-' + Date.now();
     const toast = document.createElement('div');
@@ -304,17 +335,29 @@ function showToast(data) {
 
     setTimeout(() => {
         toast.style.animation = 'peekleSlideOut 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards';
-        setTimeout(() => toast.remove(), 50000);
-    }, 40000);
+        setTimeout(() => toast.remove(), 5000);
+    }, 4000);
 }
 
-function showSuccessToast(data) {
+
+async function showSuccessToast(data) {
     const toastId = 'peekle-success-toast-' + Date.now();
     const container = document.createElement('div');
     container.id = toastId;
 
+    // Get theme settings from storage
+    let primaryColor = '#E24EA0'; // Default pink
+    try {
+        const result = await chrome.storage.local.get(['themeSettings']);
+        if (result.themeSettings) {
+            const { accentColor, customColor } = result.themeSettings;
+            primaryColor = getThemeColor(accentColor, customColor);
+        }
+    } catch (e) {
+        console.warn('[Peekle] Failed to load theme settings:', e);
+    }
+
     // Define colors and styles
-    const primaryColor = '#E24EA0';
     const secondaryColor = '#FFF0F7'; // Light pink background for icon
 
     // Inject distinct styles for this toast
@@ -525,7 +568,7 @@ function showSuccessToast(data) {
     document.body.appendChild(container);
 
     // Logic: Confetti
-    const confettiColors = ['#E24EA0', '#FFD700', '#00C2FF', '#FF4D4D', '#16A34A'];
+    const confettiColors = [primaryColor, '#FFD700', '#00C2FF', '#FF4D4D', '#16A34A'];
     const confettiContainer = document.getElementById(`${toastId}-confetti`);
 
     // Spawn particles
@@ -551,10 +594,10 @@ function showSuccessToast(data) {
     // Stop confetti after 2s (remove node to cleanup)
     setTimeout(() => {
         if (confettiContainer) confettiContainer.remove();
-    }, 200000);
+    }, 2000);
 
     // Auto-Close after 6s (bit longer to admire)
-    const closeTimer = setTimeout(closeToast, 60000);
+    const closeTimer = setTimeout(closeToast, 6000);
 
     // Manual Close
     function closeToast() {
@@ -571,6 +614,190 @@ function showSuccessToast(data) {
         closeToast();
     };
 }
+
+function showFailedToast(data) {
+    const toastId = 'peekle-failed-toast-' + Date.now();
+    const container = document.createElement('div');
+    container.id = toastId;
+
+    // Define colors
+    const failColor = '#EF4444'; // Red-500
+
+    // Inject styles if not present (reuse existing styles)
+    const styleId = 'peekle-toast-styles';
+    if (!document.getElementById(styleId)) {
+        const css = `
+            .peekle-toast-container {
+                position: fixed;
+                top: 80px;
+                right: 25px;
+                width: 380px;
+                background: white;
+                color: #171717;
+                box-shadow: 8px 8px 0px rgba(239,68,68,0.08), 0 5px 10px rgba(0,0,0,0.05);
+                border: 1px solid #E4E4E7;
+                z-index: 2147483647;
+                font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+                overflow: hidden;
+                pointer-events: auto;
+                animation: peekleSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+            
+            .peekle-toast-container.exiting {
+                animation: peekleSlideOut 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+
+            @keyframes peekleSlideIn {
+                from { transform: translateX(120%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes peekleSlideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(120%); opacity: 0; }
+            }
+
+            .peekle-header-line {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 4px;
+            }
+
+            .peekle-content {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                position: relative;
+                z-index: 10;
+                padding: 12px 24px 0 24px;
+            }
+
+            .peekle-icon-box {
+                flex-shrink: 0;
+                width: 80px;
+                height: 80px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .peekle-text-col {
+                display: flex;
+                flex-direction: column;
+                flex: 1;
+            }
+
+            .peekle-title {
+                font-size: 18px;
+                font-weight: 900;
+                letter-spacing: -0.05em;
+                font-style: italic;
+                margin: 0;
+                line-height: 1.2;
+            }
+
+            .peekle-close-btn {
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: #D4D4D8;
+                transition: color 0.2s, transform 0.2s;
+                padding: 4px;
+                position: absolute;
+                top: 20px;
+                right: 20px;
+            }
+
+            .peekle-footer {
+                margin-top: 8px;
+                padding: 16px 24px;
+                border-top: 1px solid #F4F4F5;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            .peekle-footer-total {
+                color: #71717A;
+            }
+            .peekle-footer-total span {
+                color: #000;
+                font-weight: 900;
+                margin-left: 4px;
+            }
+
+            .peekle-rank-badge {
+                background-color: rgba(239, 68, 68, 0.05);
+                padding: 2px 8px;
+                border: 1px solid rgba(239, 68, 68, 0.1);
+                border-radius: 10px !important;
+                font-size: 11px;
+            }
+        `;
+        const s = document.createElement('style');
+        s.id = styleId;
+        s.textContent = css;
+        document.head.appendChild(s);
+    }
+
+    container.className = 'peekle-toast-container';
+
+    // HTML Structure
+    container.innerHTML = `
+        <div class="peekle-header-line" style="background-color: ${failColor};"></div>
+        
+        <button class="peekle-close-btn" id="${toastId}-close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+        </button>
+
+        <div class="peekle-content">
+            <div class="peekle-icon-box">
+                <img src="${chrome.runtime.getURL('icons/wrong.svg')}" alt="Wrong" style="width: 100%; height: 100%; object-fit: contain;">
+            </div>
+            <div class="peekle-text-col">
+                <h3 class="peekle-title" style="color: ${failColor} !important;">Try Again!</h3>
+                <div style="margin-top: 4px;">
+                    <span style="font-size:14px; color:#71717A; font-weight:600;">${data.message || '틀렸습니다'}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="peekle-footer">
+            <div class="peekle-footer-total">
+                현재 총점: <span>${data.totalPoints || 0}점</span>
+            </div>
+            <div class="peekle-rank-badge" style="color: ${failColor};">
+                ${data.currentLeague || ''} · 그룹 ${data.currentRank || '-'}위
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(container);
+
+    // Auto-Close after 5s
+    const closeTimer = setTimeout(closeToast, 5000);
+
+    // Manual Close
+    function closeToast() {
+        container.classList.add('exiting');
+        setTimeout(() => {
+            if (container && container.parentNode) {
+                container.remove();
+            }
+        }, 600);
+    }
+
+    document.getElementById(`${toastId}-close`).onclick = () => {
+        clearTimeout(closeTimer);
+        closeToast();
+    };
+}
+
 
 // --- Extension Detection for Peekle Frontend ---
 window.addEventListener('message', async (event) => {
@@ -600,11 +827,16 @@ window.addEventListener('message', async (event) => {
         const token = event.data.token;
         try {
             if (token) {
-                await chrome.storage.local.set({ 'peekle_token': token });
-                console.log('[Peekle] Token saved:', token);
+                const storageData = { 'peekle_token': token };
+                // 사용자 정보도 같이 저장 (이미지 포함)
+                if (event.data.user) {
+                    storageData['userData'] = event.data.user;
+                }
+                await chrome.storage.local.set(storageData);
+                console.log('[Peekle] Token and UserData saved:', token);
             } else {
-                await chrome.storage.local.remove('peekle_token');
-                console.log('[Peekle] Token removed.');
+                await chrome.storage.local.remove(['peekle_token', 'userData']);
+                console.log('[Peekle] Token and UserData removed.');
             }
         } catch (e) {
             console.error('[Peekle] Failed to access storage:', e);

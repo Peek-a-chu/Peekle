@@ -1,13 +1,15 @@
 // --- Configuration ---
 const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
 // 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
-// Local: Next.js (3000)가 /api/* 요청을 Backend(8080)로 Proxy함 (next.config.ts rewrites 확인됨)
+// Local: 확장 프로그램은 Backend(8080)로 직접 연결
 // Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
 const BASE_URL = IS_LOCAL
     ? 'http://localhost:3000'
     : 'https://i14a408.p.ssafy.io';
 
-const API_BASE_URL = BASE_URL; // Alias for compatibility
+const API_BASE_URL = IS_LOCAL
+    ? 'http://localhost:8080'  // 확장 프로그램은 백엔드 직접 연결
+    : BASE_URL;
 const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
 
 // --- Baekjoon Solver Logic ---
