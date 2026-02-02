@@ -17,7 +17,7 @@ describe('CCStudyCard', () => {
     isActive: true,
     createdAt: '2024-01-01T00:00:00Z',
     memberCount: 5,
-    profileImages: ['', '', ''],
+    profileImages: ['/user1.png', '/user2.png', '/user3.png'],
     rankingPoint: 0,
     owner: {
       id: 1,
