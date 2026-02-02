@@ -3,6 +3,7 @@ package com.peekle.domain.user.repository;
 import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -35,6 +36,10 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
 
     // Season management
     java.util.List<User> findByLeagueGroupIdOrderByLeaguePointDesc(Long leagueGroupId);
+
+    // AI 추천용 활성 유저 조회
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false")
+    java.util.List<User> findAllActiveUsers();
 
     java.util.List<User> findByLeagueAndLeagueGroupIdIsNull(LeagueTier tier);
 

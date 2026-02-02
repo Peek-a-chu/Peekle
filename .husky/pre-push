@@ -43,6 +43,13 @@ fi
 if [ -n "$FRONTEND_CHANGED" ]; then
   echo "\n📦 Frontend files changed, running checks..."
 
+  echo "• Running type check..."
+  pnpm --filter frontend type-check
+  if [ $? -ne 0 ]; then
+    echo "❌ Frontend type check failed"
+    exit 1
+  fi
+
   echo "• Running unit tests (vitest)..."
   pnpm --filter frontend test --run
   if [ $? -ne 0 ]; then

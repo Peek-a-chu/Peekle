@@ -43,8 +43,8 @@ export function CCProblemCard({
       className={cn(
         'relative rounded-xl border bg-card p-3 shadow-sm transition-all hover:shadow-md cursor-pointer group',
         isSelected
-          ? 'border-pink-500 ring-1 ring-pink-500 bg-pink-50/10'
-          : 'border-border hover:border-pink-200',
+          ? 'border-primary ring-1 ring-primary bg-primary/10'
+          : 'border-border hover:border-primary/20',
         className,
       )}
     >

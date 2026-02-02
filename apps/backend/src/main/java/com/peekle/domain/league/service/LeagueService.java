@@ -500,7 +500,9 @@ public class LeagueService {
         // 2. 티어별로 유저를 그룹화하여 새 그룹 생성
         for (LeagueTier tier : LeagueTier.values()) {
             // 해당 티어의 모든 유저 조회 (그룹 없는 유저만)
-            List<User> tierUsers = userRepository.findByLeagueAndLeagueGroupIdIsNull(tier);
+            List<User> tierUsers = userRepository
+
+                    .findByLeagueAndLeagueGroupIdIsNull(tier);
 
             // 4명 미만이면 그룹 생성 안 함 (다음 주 대기)
             if (tierUsers.size() < 4) {

@@ -24,6 +24,7 @@ export interface WorkbookResponse {
   isBookmarked: boolean;
   isOwner: boolean;
   createdAt: string;
+  updatedAt: string;
   creator: WorkbookCreator;
   problems?: WorkbookProblemResponse[];
 }
@@ -38,6 +39,7 @@ export interface WorkbookListResponse {
   isBookmarked: boolean;
   isOwner: boolean;
   createdAt: string;
+  updatedAt: string;
   creator: WorkbookCreator;
 }
 
