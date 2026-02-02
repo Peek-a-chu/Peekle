@@ -1,5 +1,6 @@
 package com.peekle.domain.user.service;
 
+import com.peekle.domain.league.service.LeagueService;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.dto.TimelineItemDto;
 import com.peekle.domain.user.dto.UserProfileResponse;
@@ -27,6 +28,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final SubmissionLogRepository submissionLogRepository;
     private final com.peekle.global.storage.R2StorageService r2StorageService;
+    private final LeagueService leagueService;
 
     @Transactional
     public String generateExtensionToken(Long userId, boolean forceRegenerate) {
@@ -241,9 +243,14 @@ public class UserService {
 
         boolean isSolvedToday = !todayLogs.isEmpty();
 
+        // 그룹 내 순위 및 상태 계산 (LeagueService 활용)
+        com.peekle.domain.league.dto.UserLeagueStatusDto statusDto = leagueService.getUserLeagueStatus(user);
+
         return com.peekle.domain.user.dto.ExtensionStatusResponse.builder()
                 .streakCurrent(user.getStreakCurrent())
                 .isSolvedToday(isSolvedToday)
+                .groupRank(statusDto.getGroupRank())
+                .leagueStatus(statusDto.getLeagueStatus())
                 .build();
     }
 

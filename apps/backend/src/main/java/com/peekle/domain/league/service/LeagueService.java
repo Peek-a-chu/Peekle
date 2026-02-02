@@ -327,7 +327,7 @@ public class LeagueService {
             // If user selects Wednesday, does it calculate from that Wednesday 6am?
             // Let's assume the date provided is in KST context.
             referenceTime = date.atStartOfDay(ZoneId.of("Asia/Seoul")).plusHours(12); // Noon on that day to
-                                                                                                // be safe
+                                                                                      // be safe
         } else {
             referenceTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         }
@@ -632,7 +632,6 @@ public class LeagueService {
                     ErrorCode.ACCESS_DENIED);
         }
 
-
         if (history.getLeagueGroupId() == null) {
             return new ArrayList<>();
         }
@@ -662,6 +661,88 @@ public class LeagueService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 사용자의 현재 리그 상태 (순위, 승급/강등 상태, 점수 차이) 계산
+     * SubmissionService, ExtensionStatus 등에서 재사용
+     */
+    public UserLeagueStatusDto getUserLeagueStatus(User user) {
+        int groupRank = 1;
+        LeagueStatus leagueStatus = LeagueStatus.STAY;
+        Integer pointsToPromotion = null;
+        Integer pointsToMaintenance = null;
+
+        if (user.getLeagueGroupId() != null) {
+            // 그룹 내 순위 계산
+            groupRank = (int) userRepository.countByLeagueGroupIdAndLeaguePointGreaterThan(
+                    user.getLeagueGroupId(), user.getLeaguePoint()) + 1;
+
+            // 그룹 총 인원
+            int totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
+
+            // 승급/강등 인원 계산
+            LeagueTier currentTier = user.getLeague();
+            if (totalGroupMembers > 1) {
+                int promoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getPromotePercent() / 100.0));
+                promoteCount = Math.min(promoteCount, totalGroupMembers - 1);
+
+                int demoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getDemotePercent() / 100.0));
+                demoteCount = Math.min(demoteCount, totalGroupMembers - promoteCount - 1);
+
+                // 상태 결정
+                if (groupRank <= promoteCount) {
+                    leagueStatus = LeagueStatus.PROMOTE;
+                } else if (groupRank > (totalGroupMembers - demoteCount)) {
+                    leagueStatus = LeagueStatus.DEMOTE;
+                }
+
+                // 점수 차이 계산을 위해 그룹 유저 조회
+                List<User> groupUsers = userRepository
+                        .findTop100ByLeagueGroupIdOrderByLeaguePointDesc(user.getLeagueGroupId());
+
+                // 승급권/유지권 분류
+                List<User> promoters = new ArrayList<>();
+                List<User> maintainers = new ArrayList<>();
+
+                for (int i = 0; i < groupUsers.size(); i++) {
+                    int rank = i + 1;
+                    if (rank <= promoteCount) {
+                        promoters.add(groupUsers.get(i));
+                    } else if (rank <= (totalGroupMembers - demoteCount)) {
+                        maintainers.add(groupUsers.get(i));
+                    }
+                }
+
+                // 점수 차이 계산
+                if (leagueStatus == LeagueStatus.PROMOTE) {
+                    pointsToPromotion = 0; // 이미 승급권
+                } else if (leagueStatus == LeagueStatus.DEMOTE) {
+                    // 유지권으로 올라가기 위한 점수
+                    if (!maintainers.isEmpty()) {
+                        User lowestMaintainer = maintainers.get(maintainers.size() - 1);
+                        pointsToMaintenance = Math.max(0,
+                                lowestMaintainer.getLeaguePoint() - user.getLeaguePoint() + 1);
+                    }
+                } else {
+                    // 승급권으로 올라가기 위한 점수
+                    if (!promoters.isEmpty()) {
+                        User lowestPromoter = promoters.get(promoters.size() - 1);
+                        pointsToPromotion = Math.max(0, lowestPromoter.getLeaguePoint() - user.getLeaguePoint() + 1);
+                    }
+                }
+            }
+        } else {
+            // 그룹이 없는 경우 전체 리그 순위
+            groupRank = getUserRank(user);
+        }
+
+        return UserLeagueStatusDto.builder()
+                .groupRank(groupRank)
+                .leagueStatus(leagueStatus)
+                .pointsToPromotion(pointsToPromotion)
+                .pointsToMaintenance(pointsToMaintenance)
+                .build();
     }
 
     private User getUser(Long userId) {
