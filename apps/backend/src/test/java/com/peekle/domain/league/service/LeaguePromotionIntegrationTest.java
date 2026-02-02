@@ -43,9 +43,13 @@ public class LeaguePromotionIntegrationTest {
     @Autowired
     private LeagueHistoryRepository leagueHistoryRepository;
 
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
     @BeforeEach
     void setUp() {
         // Clean up
+        redisTemplate.delete("league:season:current");
         leagueHistoryRepository.deleteAll();
         leagueGroupRepository.deleteAll();
         userRepository.deleteAll();
