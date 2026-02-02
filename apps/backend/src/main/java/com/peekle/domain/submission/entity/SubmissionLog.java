@@ -32,7 +32,6 @@ public class SubmissionLog {
     @JoinColumn(name = "problem_id", nullable = false)
     private Problem problem;
 
-
     @Column(name = "source_type")
     @Enumerated(EnumType.STRING)
     private SourceType sourceType;
@@ -52,7 +51,6 @@ public class SubmissionLog {
     @Column(columnDefinition = "TEXT")
     private String code;
 
-
     private Integer memory;
 
     @Column(name = "execution_time")
@@ -61,16 +59,19 @@ public class SubmissionLog {
     @Column(name = "tag")
     private String tag; // e.g. "[팀] 스피드 레이스", "알고리즘 스터디"
 
+    @Column(name = "result", length = 50)
+    private String result; // e.g. "맞았습니다", "틀렸습니다", "런타임 에러"
+
     private String language;
 
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
-    public static SubmissionLog create(User user, Problem problem, SourceType sourceType, 
-                                     String problemTitle, String problemTier, String externalId,
-                                     String tag,
-                                     String code, Integer memory, 
-                                     Integer executionTime, String language, LocalDateTime submittedAt) {
+    public static SubmissionLog create(User user, Problem problem, SourceType sourceType,
+            String problemTitle, String problemTier, String externalId,
+            String tag, String result,
+            String code, Integer memory,
+            Integer executionTime, String language, LocalDateTime submittedAt) {
         SubmissionLog log = new SubmissionLog();
         log.user = user;
         log.problem = problem;
@@ -79,6 +80,7 @@ public class SubmissionLog {
         log.externalId = externalId;
         log.problemTier = problemTier;
         log.tag = tag;
+        log.result = result;
         log.code = code;
         log.memory = memory;
         log.executionTime = executionTime;
