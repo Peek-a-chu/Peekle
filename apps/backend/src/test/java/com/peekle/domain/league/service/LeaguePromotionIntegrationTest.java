@@ -28,9 +28,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 public class LeaguePromotionIntegrationTest {
 
-    @MockBean
-    private R2StorageService r2StorageService;
-
     @Autowired
     private LeagueService leagueService;
 

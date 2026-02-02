@@ -12,7 +12,10 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 
 import java.time.Duration;
 
+import org.springframework.context.annotation.Profile;
+
 @Service
+@Profile("!test")
 @RequiredArgsConstructor
 public class R2StorageService {
 
