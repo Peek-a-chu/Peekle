@@ -76,18 +76,18 @@ export function CCSubmissionViewerModal({
               <p className="text-sm font-bold text-foreground">실시간 코드를 보고 싶다면?</p>
 
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold text-[11px]">
                   방법 1
                 </span>
                 <span>상단 캠 영역의 참여자 타일을 선택하세요.</span>
               </div>
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold text-[11px]">
                   방법 2
                 </span>
                 <span className="leading-snug">
                   참여자 타일을 찾기 어렵다면, 참여자 목록에서 온라인 참가자 프로필 우측 클릭 메뉴의{' '}
-                  <span className="font-semibold text-pink-600">&apos;실시간 코드 확인&apos;</span>{' '}
+                  <span className="font-semibold text-primary">&apos;실시간 코드 확인&apos;</span>{' '}
                   버튼을 클릭해주세요.
                 </span>
               </div>
@@ -151,7 +151,7 @@ export function CCSubmissionViewerModal({
                   </div>
 
                   <Button
-                    className="h-9 px-4 rounded-full border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 hover:border-pink-300 shadow-sm transition-all text-sm font-medium group-hover:bg-pink-500 group-hover:text-white group-hover:border-pink-500 disabled:opacity-50"
+                    className="h-9 px-4 rounded-full border border-primary bg-white text-primary hover:bg-primary/10 hover:border-primary/20 shadow-sm transition-all text-sm font-medium group-hover:bg-primary group-hover:text-white group-hover:border-primary disabled:opacity-50"
                     disabled={!sub.submissionId}
                     onClick={() => sub.submissionId && onViewCode(sub.submissionId)}
                   >

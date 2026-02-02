@@ -111,6 +111,7 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     // 원격 스트림 생성 이벤트
     session.on('streamCreated', (event) => {
+      if (!event?.stream) return;
       console.log('[OpenVidu] Stream created:', event.stream.streamId);
       const subscriber = session.subscribe(event.stream, undefined);
 
@@ -138,6 +139,7 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     // 원격 스트림 제거 이벤트
     session.on('streamDestroyed', (event) => {
+      if (!event?.stream) return;
       console.log('[OpenVidu] Stream destroyed:', event.stream.streamId);
 
       const connectionData = event.stream.connection?.data;
@@ -165,73 +167,90 @@ export function useOpenVidu(): UseOpenViduReturn {
 
     session
       .connect(videoToken, { clientData: JSON.stringify({ userId: currentUserId }) })
-      .then(() => {
+      .then(async () => {
         setIsConnecting(false);
         console.log('[OpenVidu] Session connected');
         setIsConnected(true);
 
-        // 로컬 스트림 발행
-        const publisher = OV.initPublisher(undefined, {
-          audioSource: undefined, // 기본 마이크
-          videoSource: undefined, // 기본 카메라
-          publishAudio: true,
-          publishVideo: true,
-          resolution: '640x480',
-          frameRate: 30,
-          insertMode: 'APPEND',
-          mirror: true,
-        });
+        try {
+          // 로컬 스트림 발행 (비동기 초기화 및 에러 핸들링)
+          const publisher = await OV.initPublisherAsync(undefined, {
+            audioSource: undefined, // 기본 마이크
+            videoSource: undefined, // 기본 카메라
+            publishAudio: true,
+            publishVideo: true,
+            resolution: '640x480',
+            frameRate: 30,
+            insertMode: 'APPEND',
+            mirror: true,
+          });
 
-        publisherRef.current = publisher;
+          publisherRef.current = publisher;
 
-        // 발행자를 전역에 등록 (CCVideoTile에서 접근 가능하도록)
-        (window as any).__openviduPublisher = publisher;
+          // 발행자를 전역에 등록 (CCVideoTile에서 접근 가능하도록)
+          (window as any).__openviduPublisher = publisher;
 
-        // 발행자 이벤트
-        publisher.on('streamCreated', () => {
-          console.log('[OpenVidu] Publisher stream created');
+          // 발행자 이벤트
+          publisher.on('streamCreated', () => {
+            console.log('[OpenVidu] Publisher stream created');
+            window.dispatchEvent(
+              new CustomEvent('openvidu-publisher-created', {
+                detail: { publisher },
+              }),
+            );
+          });
+
+          publisher.on('streamDestroyed', () => {
+            console.log('[OpenVidu] Publisher stream destroyed');
+            delete (window as any).__openviduPublisher;
+            window.dispatchEvent(
+              new CustomEvent('openvidu-publisher-destroyed', {
+                detail: {},
+              }),
+            );
+          });
+
+          // 스트림 속성 변경 이벤트 (비디오/오디오 토글 시 발생)
+          publisher.on('streamPropertyChanged', (event: any) => {
+            console.log(
+              '[OpenVidu] Publisher stream property changed:',
+              event.changedProperty,
+              event.newValue,
+            );
+            if (event.changedProperty === 'videoActive') {
+              window.dispatchEvent(
+                new CustomEvent('openvidu-publisher-video-changed', {
+                  detail: { publisher, videoActive: event.newValue },
+                }),
+              );
+            }
+          });
+
+          await session.publish(publisher);
+          console.log('[OpenVidu] Publisher published');
+
+          // 즉시 이벤트 발생 (이미 생성된 경우)
           window.dispatchEvent(
             new CustomEvent('openvidu-publisher-created', {
               detail: { publisher },
             }),
           );
-        });
-
-        publisher.on('streamDestroyed', () => {
-          console.log('[OpenVidu] Publisher stream destroyed');
-          delete (window as any).__openviduPublisher;
-          window.dispatchEvent(
-            new CustomEvent('openvidu-publisher-destroyed', {
-              detail: {},
-            }),
-          );
-        });
-
-        // 스트림 속성 변경 이벤트 (비디오/오디오 토글 시 발생)
-        publisher.on('streamPropertyChanged', (event: any) => {
-          console.log(
-            '[OpenVidu] Publisher stream property changed:',
-            event.changedProperty,
-            event.newValue,
-          );
-          if (event.changedProperty === 'videoActive') {
-            window.dispatchEvent(
-              new CustomEvent('openvidu-publisher-video-changed', {
-                detail: { publisher, videoActive: event.newValue },
-              }),
-            );
+        } catch (error: any) {
+          // 기기 없음 에러 핸들링
+          if (
+            error.name === 'INPUT_VIDEO_DEVICE_NOT_FOUND' ||
+            error.name === 'INPUT_AUDIO_DEVICE_NOT_FOUND' ||
+            error.name === 'NotFoundError' ||
+            error.message?.includes('device not found')
+          ) {
+            console.warn('[OpenVidu] Media devices not found, entering subscriber-only mode.');
+            toast.warning('카메라 또는 마이크를 찾을 수 없어 뷰어 모드로 참여합니다.');
+            // 연결은 유지하되 퍼블리싱은 하지 않음
+          } else {
+            console.error('[OpenVidu] Publisher initialization failed:', error);
+            toast.error(`방송 시작 실패: ${error.message || '알 수 없는 오류'}`);
           }
-        });
-
-        session.publish(publisher);
-        console.log('[OpenVidu] Publisher published');
-
-        // 즉시 이벤트 발생 (이미 생성된 경우)
-        window.dispatchEvent(
-          new CustomEvent('openvidu-publisher-created', {
-            detail: { publisher },
-          }),
-        );
+        }
       })
       .catch((error) => {
         console.error('[OpenVidu] Connection error:', error);
@@ -260,14 +279,27 @@ export function useOpenVidu(): UseOpenViduReturn {
       console.log('[OpenVidu] Cleaning up');
       delete (window as any).__openviduPublisher;
       if (publisherRef.current) {
-        sessionRef.current?.unpublish(publisherRef.current);
+        // Handle unpublish safely
+        try {
+          if (sessionRef.current && sessionRef.current.connection) {
+            sessionRef.current.unpublish(publisherRef.current);
+          }
+        } catch (e) {
+          console.warn('[OpenVidu] Error unpublishing:', e);
+        }
         publisherRef.current = null;
       }
       if (sessionRef.current) {
-        sessionRef.current.disconnect();
+        try {
+          sessionRef.current.disconnect();
+        } catch (e) {
+          console.warn('[OpenVidu] Error disconnecting:', e);
+        }
         sessionRef.current = null;
       }
-      streamManagersRef.current.clear();
+      if (streamManagersRef.current) {
+        streamManagersRef.current.clear();
+      }
       setIsConnected(false);
       setIsConnecting(false);
     };

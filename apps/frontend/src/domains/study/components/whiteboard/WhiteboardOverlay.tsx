@@ -114,7 +114,7 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
               onClick={() => setActiveTool('pen')}
               className={cn(
                 'rounded p-1.5 transition-colors hover:bg-gray-100',
-                activeTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-gray-600',
+                activeTool === 'pen' ? 'bg-primary/10 text-primary' : 'text-gray-600',
               )}
               aria-label="펜"
               title="펜"

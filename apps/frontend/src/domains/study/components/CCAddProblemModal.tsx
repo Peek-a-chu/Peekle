@@ -48,7 +48,7 @@ export function CCAddProblemModal({
       setIsLoading(true);
       try {
         const data = await searchExternalProblems(debouncedQuery);
-        
+
         // 현재 스터디에 추가된 문제와 비교하여 등록 여부 확인
         const enrichedResults: SearchResult[] = data.map((problem) => {
           // externalId 또는 problemId로 비교
@@ -58,22 +58,24 @@ export function CCAddProblemModal({
               p.externalId === problem.externalId ||
               p.externalId === String(problem.number),
           );
-          
+
           const registeredProblem = currentProblems.find(
             (p) =>
               p.problemId === problem.problemId ||
               p.externalId === problem.externalId ||
               p.externalId === String(problem.number),
           );
-          
+
           return {
             ...problem,
             isRegistered,
             registeredId: registeredProblem?.problemId,
-            hasSubmissions: registeredProblem ? (registeredProblem.solvedMemberCount ?? 0) > 0 : false,
+            hasSubmissions: registeredProblem
+              ? (registeredProblem.solvedMemberCount ?? 0) > 0
+              : false,
           };
         });
-        
+
         setResults(enrichedResults);
       } catch (error) {
         console.error('Search failed:', error);
@@ -106,10 +108,10 @@ export function CCAddProblemModal({
         console.log(`[Adding Problem] ${selectedProblem.title} (#${selectedProblem.number})`);
         // 검색 결과에서 problemId를 받았으면 직접 사용, 없으면 number(externalId)로 조회
         await onAdd(
-          selectedProblem.title, 
-          selectedProblem.number, 
+          selectedProblem.title,
+          selectedProblem.number,
           selectedProblem.tags,
-          selectedProblem.problemId // problemId가 있으면 전달
+          selectedProblem.problemId, // problemId가 있으면 전달
         );
       }
       setQuery('');
@@ -248,7 +250,7 @@ export function CCAddProblemModal({
             variant={selectedProblem?.isRegistered ? 'destructive' : 'default'}
             className={cn(
               'text-white',
-              !selectedProblem?.isRegistered && 'bg-pink-500 hover:bg-pink-600',
+              !selectedProblem?.isRegistered && 'bg-primary hover:bg-primary/90',
             )}
           >
             {isSubmitting

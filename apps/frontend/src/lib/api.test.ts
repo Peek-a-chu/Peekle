@@ -16,8 +16,8 @@ describe('apiFetch', () => {
       },
     });
 
-    // @ts-expect-error override global fetch for test
-    global.fetch = fetchMock;
+    // override global fetch for test
+    global.fetch = fetchMock as any;
 
     const res = await apiFetch('/api/studies/1');
     expect(res.success).toBe(false);
@@ -25,4 +25,3 @@ describe('apiFetch', () => {
     expect(res.error?.message).toContain('Expected JSON');
   });
 });
-
