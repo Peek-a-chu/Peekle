@@ -169,7 +169,7 @@ ai-server-build:
 
 deploy-production:
   stage: deploy
-  image: docker:24-alpine
+  image: docker:24-cli
   services:
     - docker:24-dind
   only:
