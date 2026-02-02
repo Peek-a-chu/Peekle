@@ -1,9 +1,9 @@
 package com.peekle.domain.auth.controller;
 
 import com.peekle.domain.user.entity.User;
-import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.domain.auth.dto.SignupRequest;
 import com.peekle.domain.auth.jwt.JwtTokenProvider;
+import com.peekle.domain.auth.service.AuthService;
 import com.peekle.domain.auth.service.RefreshTokenService;
 import com.peekle.global.dto.ApiResponse;
 import jakarta.servlet.http.Cookie;
@@ -24,8 +24,7 @@ public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
-    private final UserRepository userRepository;
-    private final com.peekle.domain.league.service.LeagueService leagueService;
+    private final AuthService authService;
 
     @PostMapping("/refresh")
     public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
@@ -85,20 +84,15 @@ public class AuthController {
         String socialId = (String) signupInfo.get("socialId");
         String provider = (String) signupInfo.get("provider");
 
-        if (userRepository.findBySocialIdAndProvider(socialId, provider).isPresent()) {
+        if (authService.existsBySocialIdAndProvider(socialId, provider)) {
             return ApiResponse.error("USER_ALREADY_EXISTS", "User already registered");
         }
 
-        if (userRepository.findByNickname(signupRequest.nickname()).isPresent()) {
+        if (authService.existsByNickname(signupRequest.nickname())) {
             return ApiResponse.error("NICKNAME_DUPLICATE", "Nickname already in use");
         }
 
-        User user = new User(socialId, provider, signupRequest.nickname());
-        if (signupRequest.bojId() != null && !signupRequest.bojId().isBlank()) {
-            user.registerBojId(signupRequest.bojId());
-        }
-        userRepository.save(user); // 저장 후
-        leagueService.assignInitialLeague(user); // 리그 배정 (트랜잭션 분리되어도 됨, 혹은 여기서 호출)
+        User user = authService.signup(socialId, provider, signupRequest);
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());

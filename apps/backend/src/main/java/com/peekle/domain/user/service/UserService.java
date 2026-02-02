@@ -109,6 +109,10 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
     }
 
+    public boolean existsByNickname(String nickname) {
+        return userRepository.findByNickname(nickname).isPresent();
+    }
+
     public Map<String, Object> getUserInfo(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
