@@ -70,7 +70,7 @@ describe('searchApi - API Functions', () => {
   it('fetchSearchResults returns expected structure', async () => {
     const { apiFetch } = await import('@/lib/api');
     // @ts-ignore
-    apiFetch.mockResolvedValue({ success: true, data: mockResponse.data });
+    apiFetch.mockResolvedValue({ success: true, data: mockResponse });
 
     const { fetchSearchResults } = await import('@/api/searchApi');
 
@@ -90,7 +90,7 @@ describe('searchApi - API Functions', () => {
   it('fetchSearchResults passes correct params to api', async () => {
     const { apiFetch } = await import('@/lib/api');
     // @ts-ignore
-    apiFetch.mockResolvedValue({ success: true, data: mockResponse.data });
+    apiFetch.mockResolvedValue({ success: true, data: mockResponse });
 
     const { fetchSearchResults } = await import('@/api/searchApi');
 
