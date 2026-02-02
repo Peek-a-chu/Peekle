@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { UserProfile } from '../types';
-import { getDefaultAvatarUrl } from '@/lib/utils';
+import { UserIcon } from '@/components/UserIcon';
 
 // import defaultProfileImg from '@/assets/icons/profile.png'; // Remove static import
 
@@ -27,7 +27,6 @@ export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCanc
   const isExtensionLinked = !!user.bojId;
 
   // 기본 이미지 생성
-  const defaultAvatarUrl = getDefaultAvatarUrl(user.nickname);
 
   const getValidationColor = () => {
     if (!nicknameValidation) return '';
@@ -53,17 +52,15 @@ export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCanc
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-6">
-        {/* Avatar (Placeholder based on nickname) */}
+        {/* Profile Image (Placeholder based on nickname) */}
         <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-primary/10 flex items-center justify-center text-4xl font-bold text-primary shrink-0 border-4 border-background shadow-lg overflow-hidden group">
           {/* 프로필 상세 페이지에서는 항상 고해상도 이미지(profileImg)를 우선 사용 */}
           {/* profileImg가 없으면 썸네일(profileImgThumb) -> 둘 다 없으면 기본 이미지(DiceBear) */}
-          <Image
-            src={user.profileImg || user.profileImgThumb || defaultAvatarUrl}
-            alt={user.nickname}
-            fill
-            sizes="(max-width: 768px) 96px, 112px"
-            className="object-cover"
-            unoptimized={!user.profileImg && !user.profileImgThumb} // 외부 URL(DiceBear) 사용 시 최적화 제외 (SVG라 굳이 필요없음)
+          <UserIcon
+            src={user.profileImg || user.profileImgThumb}
+            nickname={user.nickname}
+            size={80}
+            className="ring-4 ring-background border-2 border-primary/20"
           />
 
           {/* Edit Overlay */}

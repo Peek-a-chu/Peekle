@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (statusJson.success && statusJson.data) {
                             userData.streakCurrent = statusJson.data.streakCurrent;
                             userData.isSolvedToday = statusJson.data.isSolvedToday;
+                            userData.groupRank = statusJson.data.groupRank;
+                            userData.leagueStatus = statusJson.data.leagueStatus;
                         }
                     }
 
@@ -151,7 +153,17 @@ document.addEventListener('DOMContentLoaded', () => {
         nicknameEl.innerText = data.nickname || "알 수 없음";
         document.getElementById('league-name').innerText = data.leagueName || "Unranked";
         document.getElementById('user-score').innerText = (data.score || 0) + "점";
-        document.getElementById('user-rank').innerText = (data.rank ? data.rank + "위" : "-");
+
+        // 순위와 상태 함께 표시
+        const rankEl = document.getElementById('user-rank');
+        if (data.groupRank) {
+            const statusText = getStatusText(data.leagueStatus);
+            rankEl.innerHTML = `<span style="font-weight: 700;">${data.groupRank}위</span> <span style="font-size: 10px; color: ${getStatusColor(data.leagueStatus)};">${statusText}</span>`;
+        } else if (data.rank) {
+            rankEl.innerText = data.rank + "위";
+        } else {
+            rankEl.innerText = "-";
+        }
 
         // [New] 스트릭 및 오늘 문제 상태
         const streakEl = document.getElementById('user-streak');
@@ -168,12 +180,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 프로필 이미지 표시 (무조건 이미지 사용)
+        // 프로필 이미지 표시 (없으면 DiceBear API 사용)
         const tierIconEl = document.getElementById('tier-icon');
-        // 이미지가 없으면 기본값(예: empty string) 처리 -> onerror로 핸들링하거나 빈 이미지
-        const imgUrl = data.profileImg || data.profileImage || "";
+        const imgUrl = data.profileImg || data.profileImage ||
+            `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(data.nickname || 'user')}`;
 
-        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile Image" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+
+    }
+
+    // Helper: Get status text
+    function getStatusText(status) {
+        const statusMap = {
+            'PROMOTE': '승급예정',
+            'STAY': '유지',
+            'DEMOTE': '강등위기'
+        };
+        return statusMap[status] || '';
+    }
+
+    // Helper: Get status color
+    function getStatusColor(status) {
+        const colorMap = {
+            'PROMOTE': 'var(--primary)',
+            'STAY': 'var(--muted-foreground)',
+            'DEMOTE': '#ef4444'
+        };
+        return colorMap[status] || 'var(--muted-foreground)';
     }
 
     // 테마 적용 헬퍼

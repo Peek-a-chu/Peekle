@@ -8,7 +8,7 @@ import { logout } from '@/api/authApi';
 import { useAuthStore } from '@/store/auth-store';
 
 import { UserProfile } from '@/domains/profile/types';
-import { getDefaultAvatarUrl } from '@/lib/utils';
+import { UserIcon } from '@/components/UserIcon';
 // import defaultProfileImg from '@/assets/icons/profile.png';
 
 interface UserProfileSectionProps {
@@ -26,8 +26,6 @@ const UserProfileSection = ({ initialUser }: UserProfileSectionProps) => {
   // Use store user if available (client-side update), otherwise fallback to initialUser (SSR)
   const user = storeUser || initialUser;
 
-  // Default avatar
-  const defaultAvatar = getDefaultAvatarUrl(user.nickname);
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -60,15 +58,12 @@ const UserProfileSection = ({ initialUser }: UserProfileSectionProps) => {
     <div className="px-5 py-1">
       <div className="relative mb-6" ref={dropdownRef}>
         <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center gap-3 group">
-          <div className="relative w-11 h-11 shrink-0 rounded-full bg-muted overflow-hidden border border-border">
-            <Image
-              src={user.profileImgThumb || user.profileImg || defaultAvatar}
-              alt={user.nickname}
-              fill
-              className="object-cover"
-              unoptimized={!user.profileImg && !user.profileImgThumb}
-            />
-          </div>
+          <UserIcon
+            src={user.profileImgThumb || user.profileImg}
+            nickname={user.nickname}
+            size={32}
+            className="border-primary/20"
+          />
           <span className="flex-1 font-semibold text-sm text-foreground truncate group-hover:text-primary text-left transition-colors">
             {user.nickname}
           </span>

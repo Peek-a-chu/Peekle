@@ -14,6 +14,7 @@ import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.domain.game.service.RedisGameService;
+import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -162,13 +163,15 @@ public class SubmissionService {
 
         // 5. 리그 포인트 & 랭킹 계산
         int earnedPoints = leagueService.updateLeaguePointForSolvedProblem(user, problem);
-        int currentRank = leagueService.getUserRank(user);
+
+        // 그룹 내 순위 및 상태 계산 (LeagueService 활용)
+        com.peekle.domain.league.dto.UserLeagueStatusDto statusDto = leagueService.getUserLeagueStatus(user);
 
         System.out.println("✅ Submission saved! ID: " + log.getId());
 
         // 유저가 게임 중이라면 점수 반영
         try {
-            String userGameKey = String.format(com.peekle.global.redis.RedisKeyConst.USER_CURRENT_GAME, user.getId());
+            String userGameKey = String.format(RedisKeyConst.USER_CURRENT_GAME, user.getId());
             Object gameIdObj = redisTemplate.opsForValue().get(userGameKey);
 
             if (gameIdObj != null) {
@@ -191,8 +194,11 @@ public class SubmissionService {
                     .firstSolve(earnedPoints > 0)
                     .earnedPoints(earnedPoints)
                     .totalPoints(user.getLeaguePoint())
-                    .currentRank(currentRank)
+                    .currentRank(statusDto.getGroupRank())
                     .currentLeague(user.getLeague())
+                    .leagueStatus(statusDto.getLeagueStatus())
+                    .pointsToPromotion(statusDto.getPointsToPromotion())
+                    .pointsToMaintenance(statusDto.getPointsToMaintenance())
                     .message(earnedPoints > 0 ? "Problem Solved! (+" + earnedPoints + ")" : "Already Solved.")
                     .build();
         } else {
@@ -201,8 +207,11 @@ public class SubmissionService {
                     .success(false) // 실패 토스트 표시용
                     .submissionId(log.getId())
                     .totalPoints(user.getLeaguePoint())
-                    .currentRank(currentRank)
+                    .currentRank(statusDto.getGroupRank())
                     .currentLeague(user.getLeague())
+                    .leagueStatus(statusDto.getLeagueStatus())
+                    .pointsToPromotion(statusDto.getPointsToPromotion())
+                    .pointsToMaintenance(statusDto.getPointsToMaintenance())
                     .message(request.getResult()) // "틀렸습니다", "런타임 에러" 등
                     .build();
         }

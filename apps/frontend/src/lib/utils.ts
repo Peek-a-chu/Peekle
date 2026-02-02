@@ -81,7 +81,7 @@ export function hexToHsl(hex: string): string {
 /**
  * 사용자 닉네임 기반으로 기본 아바타 (DiceBear Bottts Neutral) URL을 생성합니다.
  */
-export function getDefaultAvatarUrl(nickname?: string): string {
-  const seed = nickname ? encodeURIComponent(nickname) : 'peekle';
-  return `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${seed}`;
+export function getDefaultProfileImgUrl(nickname?: string): string {
+  const seed = nickname || 'peekle';
+  return `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(seed)}`;
 }

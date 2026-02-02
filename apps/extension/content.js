@@ -339,6 +339,32 @@ function showToast(data) {
     }, 4000);
 }
 
+// Helper function to render status badge text
+function renderStatusBadge(status) {
+    if (!status) return '';
+
+    const statusMap = {
+        'PROMOTE': '승급예정',
+        'STAY': '유지',
+        'DEMOTE': '강등위기'
+    };
+
+    return statusMap[status] || '';
+}
+
+// Helper function to render point gap text
+function renderPointGap(status, pointsToPromotion, pointsToMaintenance) {
+    if (!status) return '';
+
+    if (status === 'PROMOTE') {
+        return ''; // 승급권은 표시 안함
+    } else if (status === 'DEMOTE' && pointsToMaintenance != null && pointsToMaintenance > 0) {
+        return `<br><span style="font-size: 9px; opacity: 0.8;">유지까지 ${pointsToMaintenance}점</span>`;
+    } else if (status === 'STAY' && pointsToPromotion != null && pointsToPromotion > 0) {
+        return `<br><span style="font-size: 9px; opacity: 0.8;">승급까지 ${pointsToPromotion}점</span>`;
+    }
+    return '';
+}
 
 async function showSuccessToast(data) {
     const toastId = 'peekle-success-toast-' + Date.now();
@@ -560,7 +586,8 @@ async function showSuccessToast(data) {
                 현재 총점: <span>${data.totalPoints || 0}점</span>
             </div>
             <div class="peekle-rank-badge">
-                ${data.currentLeague || ''} · 그룹 ${data.currentRank || '-'}위
+                ${data.currentLeague || ''} ${renderStatusBadge(data.leagueStatus)} · 그룹 ${data.currentRank || '-'}위
+                ${renderPointGap(data.leagueStatus, data.pointsToPromotion, data.pointsToMaintenance)}
             </div>
         </div>
     `;
@@ -772,7 +799,8 @@ function showFailedToast(data) {
                 현재 총점: <span>${data.totalPoints || 0}점</span>
             </div>
             <div class="peekle-rank-badge" style="color: ${failColor};">
-                ${data.currentLeague || ''} · 그룹 ${data.currentRank || '-'}위
+                ${data.currentLeague || ''} ${renderStatusBadge(data.leagueStatus)} · 그룹 ${data.currentRank || '-'}위
+                ${renderPointGap(data.leagueStatus, data.pointsToPromotion, data.pointsToMaintenance)}
             </div>
         </div>
     `;

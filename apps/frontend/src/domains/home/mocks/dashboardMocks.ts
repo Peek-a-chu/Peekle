@@ -299,7 +299,6 @@ export const MOCK_WEEKLY_SCORE = MOCK_WEEKLY_SCORES[0];
 export interface LeagueRankingMember {
   rank: number;
   name: string;
-  avatar: string;
   score: number;
   isMe?: boolean;
 }
@@ -361,15 +360,15 @@ export const MOCK_LEAGUE_RANKING: LeagueRankingData = {
   maxLeague: 'diamond',
   maxScore: 230,
   members: [
-    { rank: 1, name: 'user_1', avatar: '/avatars/default.png', score: 970 },
-    { rank: 2, name: '꿈꾸며유영', avatar: '/avatars/default.png', score: 880 },
-    { rank: 3, name: '심도랑하이', avatar: '/avatars/default.png', score: 850, isMe: true }, // 나 (승급권)
-    { rank: 4, name: 'user_4', avatar: '/avatars/default.png', score: 720 },
-    { rank: 5, name: 'user_5', avatar: '/avatars/default.png', score: 680 },
-    { rank: 6, name: 'user_6', avatar: '/avatars/default.png', score: 650 },
-    { rank: 7, name: 'user_7', avatar: '/avatars/default.png', score: 620 },
-    { rank: 8, name: 'user_8', avatar: '/avatars/default.png', score: 580 },
-    { rank: 9, name: 'user_9', avatar: '/avatars/default.png', score: 480 },
-    { rank: 10, name: 'user_10', avatar: '/avatars/default.png', score: 430 },
+    { rank: 1, name: 'user_1', score: 970 },
+    { rank: 2, name: '꿈꾸며유영', score: 880 },
+    { rank: 3, name: '심도랑하이', score: 850, isMe: true }, // 나 (승급권)
+    { rank: 4, name: 'user_4', score: 720 },
+    { rank: 5, name: 'user_5', score: 680 },
+    { rank: 6, name: 'user_6', score: 650 },
+    { rank: 7, name: 'user_7', score: 620 },
+    { rank: 8, name: 'user_8', score: 580 },
+    { rank: 9, name: 'user_9', score: 480 },
+    { rank: 10, name: 'user_10', score: 430 },
   ],
 };

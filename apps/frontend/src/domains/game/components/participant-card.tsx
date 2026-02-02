@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { UserIcon } from '@/components/UserIcon';
 import type { Participant } from '@/domains/game/mocks/mock-data';
 
 interface ParticipantCardProps {
@@ -55,19 +56,12 @@ export function ParticipantCard({ participant, isEmpty = false }: ParticipantCar
         </div>
       )}
 
-      {/* 프로필 이미지 */}
-      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-purple-500 text-base font-medium text-white">
-        {participant.profileImg && participant.profileImg !== '/avatars/default.png' ? (
-          <Image
-            src={participant.profileImg}
-            alt={participant.nickname}
-            fill
-            className="rounded-full object-cover"
-          />
-        ) : (
-          participant.nickname.charAt(0).toUpperCase()
-        )}
-      </div>
+      <UserIcon
+        src={participant.profileImg}
+        nickname={participant.nickname}
+        size={40}
+        className="from-primary to-purple-500 text-white border-none"
+      />
 
       {/* 닉네임 */}
       <span className="mt-1 text-xs font-medium text-foreground">{participant.nickname}</span>

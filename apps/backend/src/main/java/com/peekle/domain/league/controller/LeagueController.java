@@ -1,18 +1,16 @@
 package com.peekle.domain.league.controller;
 
-import com.peekle.domain.league.dto.LeagueStatusResponse;
+import com.peekle.domain.league.dto.*;
+import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.league.service.LeagueService;
-import com.peekle.domain.user.entity.User;
-import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,56 +19,73 @@ import java.util.Map;
 public class LeagueController {
 
     private final LeagueService leagueService;
-    private final UserRepository userRepository;
+    // UserRepository is no longer needed
 
     @GetMapping("/my-status")
     public ApiResponse<LeagueStatusResponse> getMyLeagueStatus(@AuthenticationPrincipal Long userId) {
         if (userId == null) {
             throw new IllegalArgumentException("User ID from token is null");
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-                
-        LeagueStatusResponse response = leagueService.getMyLeagueStatus(user);
-        return ApiResponse.success(response);
+        return ApiResponse.success(leagueService.getMyLeagueStatus(userId));
     }
+
     @GetMapping("/rules")
     public ApiResponse<Map<String, Map<String, Integer>>> getLeagueRules() {
-        Map<String, Map<String, Integer>> rules = java.util.Arrays.stream(com.peekle.domain.league.enums.LeagueTier.values())
+        Map<String, Map<String, Integer>> rules = java.util.Arrays
+                .stream(LeagueTier.values())
                 .collect(java.util.stream.Collectors.toMap(
                         tier -> tier.name().toLowerCase(),
                         tier -> java.util.Map.of(
                                 "promotePercent", tier.getPromotePercent(),
-                                "demotePercent", tier.getDemotePercent()
-                        )
-                ));
+                                "demotePercent", tier.getDemotePercent())));
         return ApiResponse.success(rules);
     }
 
     @GetMapping("/weekly-summary")
-    public ApiResponse<com.peekle.domain.league.dto.WeeklyPointSummaryResponse> getWeeklyPointSummary(
+    public ApiResponse<WeeklyPointSummaryResponse> getWeeklyPointSummary(
             @AuthenticationPrincipal Long userId,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) 
-            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) 
-            java.time.LocalDate date
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         if (userId == null) {
             throw new IllegalArgumentException("User ID from token is null");
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-                
-        return ApiResponse.success(leagueService.getWeeklyPointSummary(user, date));
+        return ApiResponse.success(leagueService.getWeeklyPointSummary(userId, date));
     }
-    
+
     @GetMapping("/progress")
-    public ApiResponse<java.util.List<com.peekle.domain.league.dto.LeagueProgressResponse>> getLeagueProgress(@AuthenticationPrincipal Long userId) {
+    public ApiResponse<List<LeagueProgressResponse>> getLeagueProgress(
+            @AuthenticationPrincipal Long userId) {
         if (userId == null) {
             throw new IllegalArgumentException("User ID from token is null");
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
-        return ApiResponse.success(leagueService.getLeagueProgress(user));
+        return ApiResponse.success(leagueService.getLeagueProgress(userId));
+    }
+
+    @GetMapping("/history/unviewed")
+    public ApiResponse<LeagueHistoryResponse> getUnviewedHistory(
+            @AuthenticationPrincipal Long userId) {
+        if (userId == null)
+            throw new IllegalArgumentException("User ID from token is null");
+
+        return ApiResponse.success(leagueService.getUnviewedHistory(userId));
+    }
+
+    @PostMapping("/history/{historyId}/view")
+    public ApiResponse<Void> markHistoryAsViewed(@AuthenticationPrincipal Long userId,
+            @PathVariable Long historyId) {
+        if (userId == null)
+            throw new IllegalArgumentException("User ID from token is null");
+
+        leagueService.markHistoryAsViewed(historyId, userId);
+        return ApiResponse.success(null);
+    }
+
+    @GetMapping("/history/{historyId}/ranking")
+    public ApiResponse<List<LeagueRankingMemberDto>> getHistoryRanking(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long historyId) {
+        if (userId == null)
+            throw new IllegalArgumentException("User ID from token is null");
+
+        return ApiResponse.success(leagueService.getLeagueHistoryRanking(historyId, userId));
     }
 }

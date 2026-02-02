@@ -1,5 +1,5 @@
 import Sidebar from '@/domains/lnb/components/Sidebar';
-import { LeaguePromotionModal } from '@/domains/league/components/LeaguePromotionModal';
+import LeagueResultModal from '@/domains/league/components/LeagueResultModal';
 import { getMyProfile } from '@/domains/profile/actions/profile';
 
 export default async function MainLayout({
@@ -13,7 +13,7 @@ export default async function MainLayout({
     <div className="flex min-h-screen">
       <Sidebar user={user} />
       <main className="flex-1 ml-[240px] px-8 py-0 w-full">{children}</main>
-      <LeaguePromotionModal />
+      <LeagueResultModal />
     </div>
   );
 }

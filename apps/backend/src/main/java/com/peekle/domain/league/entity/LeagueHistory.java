@@ -42,7 +42,17 @@ public class LeagueHistory {
     @Column(name = "closed_at", nullable = false)
     private LocalDateTime closedAt;
 
+    @Column(name = "rank_value")
+    private Integer rank;
+
+    @Column(name = "league_group_id")
+    private Long leagueGroupId;
+
     @Column(name = "is_viewed", nullable = false)
     @Builder.Default
     private Boolean isViewed = false;
+
+    public void markAsViewed() {
+        this.isViewed = true;
+    }
 }

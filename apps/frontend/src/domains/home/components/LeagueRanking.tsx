@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import LeagueIcon, { LEAGUE_NAMES, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { useLeagueRanking } from '../hooks/useDashboardData';
-import { getDefaultAvatarUrl } from '@/lib/utils';
+import { UserIcon } from '@/components/UserIcon';
 // import defaultProfileImg from '@/assets/icons/profile.png';
 
 const LeagueRanking = () => {
@@ -152,25 +152,12 @@ const RankingItem = ({ member }: { member: any }) => {
 
       {/* 2. 아바타 & 닉네임 */}
       <div className="flex-1 flex items-center gap-2 ml-1 min-w-0">
-        <div
-          className={`w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center border shrink-0 ${isMe ? 'border-primary/30' : 'border-border'}`}
-        >
-          <Image
-            src={member.profileImgThumb || member.avatar || getDefaultAvatarUrl(member.name)}
-            alt={member.name}
-            width={24}
-            height={24}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // If error, maybe fallback to default or hide. 
-              const target = e.target as HTMLImageElement;
-              const defaultAvatar = getDefaultAvatarUrl(member.name);
-              target.srcset = defaultAvatar;
-              target.src = defaultAvatar;
-            }}
-            unoptimized={!member.profileImgThumb && !member.avatar}
-          />
-        </div>
+        <UserIcon
+          src={member.profileImgThumb}
+          nickname={member.name}
+          size={24}
+          className={isMe ? 'border-primary/30' : 'border-border'}
+        />
 
         <div className="flex items-center min-w-0 justify-center gap-1">
           <span
