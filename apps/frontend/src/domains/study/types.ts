@@ -25,9 +25,11 @@ export interface SubmissionSuccessUser {
 
 export interface DailyProblem {
   problemId: number;
+  externalId?: string; // BOJ problem number (e.g. "1000")
   title: string;
   tier: string;
   solvedMemberCount: number;
+  totalMemberCount: number;
 }
 
 export interface StudyMember {
@@ -38,13 +40,25 @@ export interface StudyMember {
 export interface StudyRoomDetail {
   id: number;
   title: string;
+  role: 'OWNER' | 'MEMBER';
   members: StudyMember[];
 }
 
 export interface StudyListContent {
   id: number;
   title: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
   memberCount: number;
+  profileImages: string[];
+  rankingPoint: number; // 스터디 그룹 랭킹 포인트
+  owner?: {
+    id: number;
+    nickname: string;
+    profileImage?: string;
+  };
+  rank?: number; // 랭킹 순위 (프론트엔드에서 계산, 옵셔널)
 }
 
 export interface StudyListResponse {

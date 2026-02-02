@@ -11,6 +11,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import com.peekle.domain.submission.dto.SubmissionLogResponse;
+import org.springframework.data.web.PageableDefault;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -108,6 +113,20 @@ public class UserController {
     public ApiResponse<com.peekle.domain.user.dto.ExtensionStatusResponse> getExtensionStatus(
             @AuthenticationPrincipal Long userId) {
         return ApiResponse.success(userService.getExtensionStatus(userId));
+    }
+
+    @GetMapping("/{nickname}/history")
+    public ApiResponse<Page<SubmissionLogResponse>> getUserSubmissionsByNickname(
+            @PathVariable String nickname,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ApiResponse.success(userService.getUserSubmissionsByNickname(nickname, pageable));
+    }
+
+    @GetMapping("/me/history")
+    public ApiResponse<Page<SubmissionLogResponse>> getMySubmissions(
+            @AuthenticationPrincipal Long userId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ApiResponse.success(userService.getUserSubmissions(userId, pageable));
     }
 }
 

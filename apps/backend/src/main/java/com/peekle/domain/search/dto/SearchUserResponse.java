@@ -14,13 +14,13 @@ public class SearchUserResponse {
     private Long userId;
     private String nickname;
     private String profileImg;
-    private String tier;
+    private String league;
     public static SearchUserResponse from(User user) {
         return SearchUserResponse.builder()
                 .userId(user.getId())
                 .nickname(user.getNickname())
                 .profileImg(user.getProfileImg())
-                .tier(user.getLeague().name())
+                .league(user.getLeague().name())
                 .build();
     }
 }

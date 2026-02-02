@@ -17,6 +17,15 @@ public class SubmissionLogResponse {
     private Integer executionTime;
     private String language;
     private LocalDateTime submittedAt;
+    
+    // Added fields for detailed history
+    private String problemId; // BOJ ID (externalId)
+    private String problemTitle;
+    private String tier;
+    private String sourceType;
+    private String sourceDetail;
+    private String code;
+    private Boolean isSuccess;
 
     // 코드 확인을 위한 상세 내용은 별도 조회하거나,
     // 리스트에서 바로 보여주고 싶다면 여기에 code 필드를 추가할 수도 있음.
@@ -33,6 +42,14 @@ public class SubmissionLogResponse {
                 .executionTime(log.getExecutionTime())
                 .language(log.getLanguage())
                 .submittedAt(log.getSubmittedAt())
+                // Mapping new fields
+                .problemId(log.getExternalId())
+                .problemTitle(log.getProblemTitle())
+                .tier(log.getProblemTier())
+                .sourceType(log.getSourceType() != null ? log.getSourceType().name() : "SOLO")
+                .sourceDetail(log.getTag())
+                .code(log.getCode())
+                .isSuccess(true) // Assuming all logs are successful for now 
                 .build();
     }
 }

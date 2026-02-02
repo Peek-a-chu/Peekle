@@ -17,6 +17,7 @@ export interface Participant {
 
 export interface TargetSubmission {
   id: number;
+  problemId?: number;
   problemTitle: string;
   username: string;
   language: string;
@@ -32,6 +33,7 @@ export interface RoomState {
   roomDescription: string;
   inviteCode: string;
   currentDate: string;
+  myRole: 'OWNER' | 'MEMBER' | null;
 
   // View state
   viewMode: ViewMode;
@@ -66,6 +68,7 @@ export interface RoomState {
     language: string;
     ownerName?: string;
     problemTitle?: string;
+    problemId?: number; // Add problemId
     isRealtime?: boolean;
   } | null;
   replyingTo: {
@@ -80,7 +83,7 @@ export interface RoomState {
 export interface RoomActions {
   // Room info actions
   setRoomInfo: (
-    info: Partial<Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode'>>,
+    info: Partial<Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode' | 'myRole'>>,
   ) => void;
   setCurrentDate: (date: string) => void;
 
@@ -93,6 +96,7 @@ export interface RoomActions {
     language: string;
     ownerName: string;
     problemTitle?: string;
+    problemId?: number; // Add problemId
     isRealtime?: boolean;
   }) => void;
   resetToOnlyMine: () => void;
@@ -129,6 +133,7 @@ export interface RoomActions {
       language: string;
       ownerName?: string;
       problemTitle?: string;
+      problemId?: number; // Add problemId
       isRealtime?: boolean;
     } | null,
   ) => void;
@@ -152,6 +157,7 @@ const initialState: RoomState = {
   roomDescription: '',
   inviteCode: '',
   currentDate: '',
+  myRole: null,
 
   viewMode: 'ONLY_MINE',
   targetSubmission: null,
@@ -261,6 +267,7 @@ export const selectOnlineCount = (state: RoomState): number =>
   state.participants.filter((p) => p.isOnline).length;
 
 export const selectIsOwner = (state: RoomState): boolean => {
+  if (state.myRole === 'OWNER') return true; // Priority internal state
   if (!state.currentUserId) return false;
   const me = state.participants.find((p) => p.id === state.currentUserId);
   return me?.isOwner || false;

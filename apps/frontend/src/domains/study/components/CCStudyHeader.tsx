@@ -58,12 +58,16 @@ export function CCStudyHeader({
           초대하기
         </Button>
 
-        {isOwner && (
-          <Button variant="outline" size="sm" onClick={onSettings} className="gap-2 font-normal">
-            <Settings className="h-4 w-4" />
-            스터디 설정
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSettings}
+          className="gap-2 font-normal"
+          title={isOwner ? '스터디 설정' : '스터디 정보'}
+        >
+          <Settings className="h-4 w-4" />
+          {isOwner ? '스터디 설정' : '정보'}
+        </Button>
       </div>
 
       {/* Modals */}

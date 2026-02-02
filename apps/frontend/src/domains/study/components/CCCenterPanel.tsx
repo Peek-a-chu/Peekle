@@ -136,28 +136,40 @@ export function CCCenterPanel({
                   // Smart Ref Chat: Capture other's code
                   const code =
                     viewMode === 'SPLIT_SAVED'
-                      ? targetSubmission?.code ?? ''
-                      : realtimeCode ?? '';
+                      ? (targetSubmission?.code ?? '')
+                      : (realtimeCode ?? '');
                   const lang =
                     viewMode === 'SPLIT_SAVED'
-                      ? targetSubmission?.language ?? 'python'
-                      : realtimeLanguage ?? 'python';
+                      ? (targetSubmission?.language ?? 'python')
+                      : (realtimeLanguage ?? 'python');
 
                   // For bots, we want to include (Bot) and for saved submissions, indicate it's stored code
                   let ownerName =
                     viewMode === 'SPLIT_SAVED' ? targetSubmission?.username : viewingUser?.nickname;
+
+                  let resolvedProblemTitle = currentSelectedProblemTitle || 'Unknown Problem';
+                  let resolvedProblemId = useRoomStore.getState().selectedProblemId ?? undefined;
+
                   if (viewMode === 'SPLIT_SAVED' && targetSubmission) {
                     const isBot =
                       targetSubmission.username === 'PS러버' ||
                       targetSubmission.username === 'CodeNinja';
                     ownerName = `${targetSubmission.username}${isBot ? ' (Bot)' : ''}의 저장된 코드`;
+
+                    if (targetSubmission.problemTitle) {
+                      resolvedProblemTitle = targetSubmission.problemTitle;
+                    }
+                    if (targetSubmission.problemId) {
+                      resolvedProblemId = targetSubmission.problemId;
+                    }
                   }
 
                   useRoomStore.getState().setPendingCodeShare({
                     code,
                     language: lang || 'python', // Fallback or infer
                     ownerName: ownerName || 'Unknown',
-                    problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
+                    problemTitle: resolvedProblemTitle,
+                    problemId: resolvedProblemId,
                     isRealtime: viewMode === 'SPLIT_REALTIME',
                   });
                   useRoomStore.getState().setRightPanelActiveTab('chat');
@@ -176,6 +188,7 @@ export function CCCenterPanel({
                       useRoomStore.getState().setPendingCodeShare({
                         ...currentPending,
                         problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
+                        problemId: useRoomStore.getState().selectedProblemId ?? undefined,
                         isRealtime: true, // Own code is treated as realtime capable
                       });
                     }

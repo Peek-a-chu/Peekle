@@ -28,6 +28,7 @@ export function StudyChatPanel() {
         pendingCodeShare.ownerName,
         pendingCodeShare.problemTitle,
         pendingCodeShare.isRealtime,
+        pendingCodeShare.problemId,
       );
       setPendingCodeShare(null);
     } else {
@@ -44,7 +45,10 @@ export function StudyChatPanel() {
 
   return (
     <div className="flex flex-col h-full ">
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" ref={scrollRef}>
+      <div
+        className="flex-1 overflow-y-auto p-4 flex flex-col [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        ref={scrollRef}
+      >
         {messages.map((msg) => (
           <ChatMessageItem key={msg.id} message={msg} isMine={msg.senderId === currentUserId} />
         ))}

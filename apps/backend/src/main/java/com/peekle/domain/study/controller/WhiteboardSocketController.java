@@ -77,13 +77,6 @@ public class WhiteboardSocketController {
                 case "MODIFIED": // 도형 변형 (이동, 크기조절 등)
                 case "REMOVED":  // 도형 삭제
                     whiteboardService.saveDrawEvent(studyId, userId, request);
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("action", request.getAction());
-                    response.put("objectId", request.getObjectId());
-                    response.put("data", request.getData());
-                    response.put("senderId", userId);
-                    messagingTemplate.convertAndSend("/topic/studies/rooms/" + studyId + "/whiteboard", response);
                     break;
 
                 default:
@@ -91,7 +84,7 @@ public class WhiteboardSocketController {
             }
         } catch (Exception e) {
             // 비즈니스 로직 에러(권한 없음 등)는 로그만 남기고, 소켓 연결은 끊지 않음
-            log.error("Whiteboard Error [User: {}]: {}", userId, e.getMessage());
+            log.error("Whiteboard Error [User: {}]", userId, e);
         }
     }
 

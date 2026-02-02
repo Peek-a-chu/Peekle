@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 import { StudyChatPanel } from './chat/StudyChatPanel';
+import { StudyParticipantPanel } from './StudyParticipantPanel';
 
 interface CCRightPanelProps {
   chatContent?: ReactNode;
@@ -69,39 +70,9 @@ export function CCRightPanel({
         {activeTab === 'chat' ? (
           <div className="h-full">{chatContent ?? <StudyChatPanel />}</div>
         ) : (
-          <div className="h-full">{participantsContent ?? <ParticipantsPlaceholder />}</div>
+          <div className="h-full">{participantsContent ?? <StudyParticipantPanel />}</div>
         )}
       </div>
-    </div>
-  );
-}
-
-function ParticipantsPlaceholder() {
-  const participants = useRoomStore((state) => state.participants);
-
-  return (
-    <div className="p-4">
-      {participants.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground">참여자가 없습니다</p>
-      ) : (
-        <ul className="space-y-2">
-          {participants.map((participant) => (
-            <li
-              key={participant.id}
-              className="flex items-center gap-3 rounded-md border border-border p-3"
-            >
-              <div
-                className={cn(
-                  'h-2 w-2 rounded-full',
-                  participant.isOnline ? 'bg-green-500' : 'bg-gray-400',
-                )}
-              />
-              <span className="flex-1 text-sm font-medium">{participant.nickname}</span>
-              {participant.isOwner && <span className="text-xs text-yellow-500">👑</span>}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

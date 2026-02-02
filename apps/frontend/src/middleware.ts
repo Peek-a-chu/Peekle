@@ -5,7 +5,6 @@ const protectedRoutes = ['/profile', '/study'];
 const authRoutes = ['/login', '/signup'];
 
 export function middleware(request: NextRequest) {
-  return NextResponse.next();
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get('access_token')?.value;
 

@@ -3,6 +3,8 @@ package com.peekle.domain.user.repository;
 import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
@@ -33,4 +35,6 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
     java.util.List<User> findByLeagueGroupIdOrderByLeaguePointDesc(Long leagueGroupId);
 
     java.util.List<User> findByLeagueAndLeagueGroupIdIsNull(LeagueTier tier);
+
+    Page<User> findByNicknameContainingIgnoreCase(String keyword, Pageable pageable);
 }

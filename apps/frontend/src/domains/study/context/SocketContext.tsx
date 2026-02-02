@@ -38,7 +38,7 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
     const run = async () => {
       // Don't connect until we have a valid identity.
       // Connecting with userId=0 can trigger reconnect loops and "infinite" WS sessions.
-      if (!roomId || !userId) {
+      if (!roomId || !userId || String(userId) === 'null' || String(userId) === 'undefined') {
         if (clientRef.current) {
           const old = clientRef.current;
           clientRef.current = null;
@@ -56,15 +56,15 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
       }
 
       // 백엔드 SockJS 엔드포인트 (http 프로토콜 사용)
-      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
+      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-    // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환 (SSL 연결 오류 방지)
-    if (
-      baseUrl.startsWith('https://') &&
-      (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))
-    ) {
-      baseUrl = baseUrl.replace('https://', 'http://');
-    }
+      // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환 (SSL 연결 오류 방지)
+      if (
+        baseUrl.startsWith('https://') &&
+        (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))
+      ) {
+        baseUrl = baseUrl.replace('https://', 'http://');
+      }
 
       const socketUrl = `${baseUrl}/ws-stomp`;
       const connectKey = `${socketUrl}|${String(roomId)}|${String(userId)}`;
@@ -126,10 +126,10 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
         setConnected(true);
       };
 
-    stompClient.onStompError = (frame) => {
-      console.error('[STOMP] Broker error:', frame.headers['message']);
-      console.error('[STOMP] Details:', frame.body);
-    };
+      stompClient.onStompError = (frame) => {
+        console.error('[STOMP] Broker error:', frame.headers['message']);
+        console.error('[STOMP] Details:', frame.body);
+      };
 
       stompClient.onWebSocketClose = () => {
         console.log('[STOMP] Connection closed');
