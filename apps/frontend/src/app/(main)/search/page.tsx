@@ -144,7 +144,7 @@ const SearchResultItem = ({
           </div>
         ) : isUser(result) ? (
           <UserIcon
-            src={result.profileImage}
+            src={result.profileImg}
             nickname={result.handle}
             size={40}
             className="border-border"
@@ -198,7 +198,7 @@ const UserGridItem = ({
       className="flex items-center p-5 bg-card rounded-2xl border border-border h-[132px] hover:border-primary transition-colors cursor-pointer gap-4 shadow-[0_2px_8px_0_rgba(0,0,0,0.04)]"
     >
       <UserIcon
-        src={result.profileImage}
+        src={result.profileImg}
         nickname={result.handle}
         size={48}
         className="border-border"
