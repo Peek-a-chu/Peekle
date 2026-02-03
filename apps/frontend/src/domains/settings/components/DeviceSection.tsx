@@ -238,23 +238,33 @@ const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectio
         if (audioContext.state === 'suspended') await audioContext.resume();
 
         const source = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        // Initialize gain from current micVolume (0-100 -> 0.0-1.0)
+        gainNode.gain.value = useSettingsStore.getState().micVolume / 100;
+        gainNodeRef.current = gainNode;
+
         const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
+        analyser.fftSize = 2048; // Larger FFT size for better resolution if time domain
+
+        source.connect(gainNode);
+        gainNode.connect(analyser);
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         const updateLevel = () => {
           if (stopped) return;
-          analyser.getByteFrequencyData(dataArray);
+          analyser.getByteTimeDomainData(dataArray);
 
+          // Calculate RMS (Root Mean Square) for volume
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
+            const value = dataArray[i] - 128; // Center at 0
+            sum += value * value;
           }
-          const average = sum / dataArray.length;
+          const rms = Math.sqrt(sum / dataArray.length);
 
-          const level = Math.min(100, (average / 128) * 100 * 1.5);
+          // Normalize to 0-100 (RMS usually peaks around 60-80 for loud speech)
+          const level = Math.min(100, (rms / 50) * 100);
           setMicLevel(level);
 
           animationFrameRef.current = requestAnimationFrame(updateLevel);
@@ -270,6 +280,7 @@ const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectio
 
     return () => {
       stopped = true;
+      gainNodeRef.current = null; // Clear ref
       if (localStream) {
         localStream.getTracks().forEach((t) => t.stop());
       }
@@ -277,7 +288,7 @@ const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectio
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isMuted, micVolume, selectedMicId, localParticipant]);
+  }, [isMuted, selectedMicId, localParticipant]);
 
   useEffect(() => {
     if (gainNodeRef.current) {
@@ -471,8 +482,36 @@ const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectio
     }
   };
 
+  const handleRequestPermissions = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      stream.getTracks().forEach((t) => t.stop());
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setVideoDevices(devices.filter((device) => device.kind === 'videoinput'));
+      setAudioDevices(devices.filter((device) => device.kind === 'audioinput'));
+      setAudioOutputDevices(devices.filter((device) => device.kind === 'audiooutput'));
+
+      toast.success('장치 권한이 갱신되었습니다.');
+    } catch (e) {
+      console.warn('Permission request failed', e);
+      toast.error('권한 요청 실패. 브라우저 주소창의 자물쇠 아이콘을 눌러 권한을 허용해주세요.');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRequestPermissions}
+          className="text-xs h-7"
+        >
+          장치 권한 재요청
+        </Button>
+      </div>
+
       {/* 카메라 섹션 */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
