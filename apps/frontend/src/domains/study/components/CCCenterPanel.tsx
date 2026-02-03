@@ -272,7 +272,6 @@ export function CCCenterPanel({
               )}
             </div>
           )}
-          handleWhiteboardToggleWrapper
         </div>
       </div>
 
@@ -280,7 +279,7 @@ export function CCCenterPanel({
       <ControlBar
         onMicToggle={onMicToggle}
         onVideoToggle={onVideoToggle}
-        onWhiteboardToggle={onWhiteboardToggle}
+        onWhiteboardToggle={handleWhiteboardToggleWrapper}
         onSettingsClick={onSettingsClick}
       />
     </div>
