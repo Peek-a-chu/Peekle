@@ -58,13 +58,7 @@ describe('StudyRankingList', () => {
 
   it('expands to show members when expandedIds includes the id', () => {
     // Render with ID 4 pre-expanded
-    render(
-      <StudyRankingList
-        rankings={mockRankings}
-        {...defaultProps}
-        expandedIds={[4]}
-      />,
-    );
+    render(<StudyRankingList rankings={mockRankings} {...defaultProps} expandedIds={[4]} />);
 
     // Initial state: members visible for ID 4
     expect(screen.getByText('스터디 멤버')).toBeInTheDocument();
