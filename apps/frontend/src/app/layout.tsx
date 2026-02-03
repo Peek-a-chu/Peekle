@@ -76,7 +76,7 @@ export default function RootLayout({
         <QueryProvider>
           <ThemeProvider>
             {children}
-            <SettingsModal />
+            <SettingsModal isGlobal={true} />
           </ThemeProvider>
           <Toaster />
         </QueryProvider>
