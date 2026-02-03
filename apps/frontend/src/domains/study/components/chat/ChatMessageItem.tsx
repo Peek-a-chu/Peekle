@@ -97,6 +97,9 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
           language: message.metadata.language || 'python',
           ownerName: displayOwnerName,
           problemTitle: message.metadata.problemTitle,
+          problemId: message.metadata.problemId,
+          externalId: message.metadata.externalId,
+          isRealtime: false,
         });
         return;
       }
@@ -187,6 +190,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
                 problemTitle={message.metadata.problemTitle}
                 ownerName={message.metadata.ownerName}
                 problemId={message.metadata.problemId}
+                externalId={message.metadata.externalId}
                 onClick={handleCodeClick}
                 className={
                   isMine ? 'bg-primary-foreground/10 border-primary-foreground/20' : 'bg-background'

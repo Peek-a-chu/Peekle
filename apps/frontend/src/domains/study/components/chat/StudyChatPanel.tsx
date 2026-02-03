@@ -29,6 +29,7 @@ export function StudyChatPanel() {
         pendingCodeShare.problemTitle,
         pendingCodeShare.isRealtime,
         pendingCodeShare.problemId,
+        pendingCodeShare.externalId,
       );
       setPendingCodeShare(null);
     } else {
