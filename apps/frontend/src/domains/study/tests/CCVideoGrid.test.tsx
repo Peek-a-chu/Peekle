@@ -2,6 +2,16 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CCVideoGrid } from '../components/CCVideoGrid';
 
+// Mock LiveKit components and hooks
+vi.mock('@livekit/components-react', () => ({
+  useParticipants: () => [
+    { identity: '1', name: 'Me', isLocal: true, isMicrophoneEnabled: false },
+    { identity: '2', name: 'Other', isLocal: false, isMicrophoneEnabled: false },
+  ],
+  useParticipantTracks: () => [],
+  VideoTrack: () => <div data-testid="video-track" />,
+}));
+
 // Use vi.hoisted() to define variables that can be accessed in vi.mock factory
 const { mockViewRealtimeCode, mockResetToOnlyMine, mockState } = vi.hoisted(() => {
   const mockViewRealtimeCode = vi.fn();
@@ -32,6 +42,7 @@ const { mockViewRealtimeCode, mockResetToOnlyMine, mockState } = vi.hoisted(() =
     isWhiteboardActive: false,
     viewRealtimeCode: mockViewRealtimeCode,
     resetToOnlyMine: mockResetToOnlyMine,
+    setWhiteboardOverlayOpen: vi.fn(),
     viewingUser: null,
   };
   return { mockViewRealtimeCode, mockResetToOnlyMine, mockState };
