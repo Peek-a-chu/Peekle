@@ -26,7 +26,6 @@ const UserProfileSection = ({ initialUser }: UserProfileSectionProps) => {
   // Use store user if available (client-side update), otherwise fallback to initialUser (SSR)
   const user = storeUser || initialUser;
 
-
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -95,10 +94,7 @@ const UserProfileSection = ({ initialUser }: UserProfileSectionProps) => {
         )}
       </div>
 
-      <MyLeagueCard
-        initialTier={user.league}
-        initialScore={user.leaguePoint}
-      />
+      <MyLeagueCard initialTier={user.league} initialScore={user.leaguePoint} />
     </div>
   );
 };
