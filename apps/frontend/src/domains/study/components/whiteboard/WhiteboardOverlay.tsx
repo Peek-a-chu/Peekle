@@ -22,6 +22,7 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const selectedProblemExternalId = useRoomStore((state) => state.selectedProblemExternalId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const [activeTool, setActiveTool] = React.useState<'pen' | 'shape' | 'text' | 'eraser'>('pen');
   const canvasRef = useRef<WhiteboardCanvasRef>(null);
@@ -160,7 +161,9 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
         {/* Selected Problem Info */}
         {selectedProblemId && selectedProblemTitle && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-gray-200 shadow-sm">
-            <span className="text-sm font-medium text-blue-600">#{selectedProblemId}</span>
+            <span className="text-sm font-medium text-blue-600">
+              #{selectedProblemExternalId || selectedProblemId}
+            </span>
             <span className="text-sm text-gray-700 truncate max-w-[200px]">
               {selectedProblemTitle}
             </span>
