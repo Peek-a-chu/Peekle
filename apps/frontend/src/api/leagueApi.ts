@@ -6,12 +6,11 @@ import {
   LeagueStat,
   WeeklyPointSummary,
   LeagueProgressData,
-  PointActivity
+  PointActivity,
 } from '@/domains/league/types';
 import { LeagueType } from '@/components/LeagueIcon';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
-
 
 // Backend DTO matches this structure
 export interface BackendRankingMember {
@@ -97,7 +96,6 @@ export async function getLeagueRules(): Promise<LeagueRulesMap | null> {
   }
 }
 
-
 export async function getWeeklyPointSummary(date?: string): Promise<WeeklyPointSummary | null> {
   try {
     const query = date ? `?date=${date}` : '';
@@ -113,10 +111,7 @@ export async function getWeeklyPointSummary(date?: string): Promise<WeeklyPointS
   }
 }
 
-
-
 // Server-side exports
-
 
 export async function getLeagueProgress(): Promise<LeagueProgressData[]> {
   try {

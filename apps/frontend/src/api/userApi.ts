@@ -15,7 +15,9 @@ export interface UserInfo {
 }
 
 export async function checkNickname(nickname: string): Promise<ApiResponse<CheckNicknameResponse>> {
-  return await apiFetch<CheckNicknameResponse>(`/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`);
+  return await apiFetch<CheckNicknameResponse>(
+    `/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`,
+  );
 }
 
 export interface CheckBojIdResponse {
@@ -24,14 +26,22 @@ export interface CheckBojIdResponse {
 }
 
 export async function checkBojId(bojId: string): Promise<ApiResponse<CheckBojIdResponse>> {
-  return await apiFetch<CheckBojIdResponse>(`/api/users/check-boj-id?bojId=${encodeURIComponent(bojId)}`);
+  return await apiFetch<CheckBojIdResponse>(
+    `/api/users/check-boj-id?bojId=${encodeURIComponent(bojId)}`,
+  );
 }
 
-export async function getPresignedUrl(fileName: string, contentType: string): Promise<ApiResponse<{ presignedUrl: string; publicUrl: string }>> {
-  return await apiFetch<{ presignedUrl: string; publicUrl: string }>(`/api/users/me/profile-image/presigned-url`, {
-    method: 'POST',
-    body: JSON.stringify({ fileName, contentType }),
-  });
+export async function getPresignedUrl(
+  fileName: string,
+  contentType: string,
+): Promise<ApiResponse<{ presignedUrl: string; publicUrl: string }>> {
+  return await apiFetch<{ presignedUrl: string; publicUrl: string }>(
+    `/api/users/me/profile-image/presigned-url`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ fileName, contentType }),
+    },
+  );
 }
 
 export async function updateUserProfile(data: any): Promise<ApiResponse<void>> {
@@ -46,4 +56,3 @@ export async function getMe(): Promise<ApiResponse<UserInfo>> {
 }
 
 // Server-side exports
-
