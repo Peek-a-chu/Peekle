@@ -30,14 +30,22 @@ const MemberAvatars = ({
   <div className="flex items-center -space-x-2">
     {members.slice(0, limit).map((m) => {
       const displayImg = m.profileImgThumb || m.profileImg;
-      return (
+      return displayImg ? (
         <img
           key={m.userId}
-          src={displayImg ? encodeURI(displayImg) : '/avatars/default.png'}
+          src={encodeURI(displayImg)}
           alt={m.nickname}
           className="h-7 w-7 rounded-full border-2 border-white bg-slate-100 object-cover ring-1 ring-slate-100"
           title={m.nickname}
         />
+      ) : (
+        <div
+          key={m.userId}
+          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-500 ring-1 ring-slate-100"
+          title={m.nickname}
+        >
+          {m.nickname.charAt(0)}
+        </div>
       );
     })}
     {members.length > limit && (
@@ -201,11 +209,17 @@ export function StudyRankingList({
                               className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm"
                             >
                               <div className="flex items-center gap-3">
-                                <img
-                                  src={displayImg ? encodeURI(displayImg) : '/avatars/default.png'}
-                                  alt={member.nickname}
-                                  className="h-10 w-10 rounded-full bg-slate-100 border border-slate-100"
-                                />
+                                {displayImg ? (
+                                  <img
+                                    src={encodeURI(displayImg)}
+                                    alt={member.nickname}
+                                    className="h-10 w-10 rounded-full bg-slate-100 border border-slate-100"
+                                  />
+                                ) : (
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 border border-slate-100 text-sm font-bold text-slate-500">
+                                    {member.nickname.charAt(0)}
+                                  </div>
+                                )}
                               <div className="flex flex-col">
                                 <span className="font-bold text-slate-700 text-sm">
                                   {member.nickname}

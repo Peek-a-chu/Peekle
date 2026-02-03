@@ -20,14 +20,22 @@ const MemberAvatars = ({
   <div className="flex items-center justify-center -space-x-2">
     {members.slice(0, limit).map((m) => {
       const displayImg = m.profileImgThumb || m.profileImg;
-      return (
+      return displayImg ? (
         <img
           key={m.userId}
-          src={displayImg ? encodeURI(displayImg) : '/avatars/default.png'}
+          src={encodeURI(displayImg)}
           alt={m.nickname}
           className="h-6 w-6 rounded-full border-2 border-background bg-muted"
           title={m.nickname}
         />
+      ) : (
+        <div
+          key={m.userId}
+          className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold text-slate-500"
+          title={m.nickname}
+        >
+          {m.nickname.charAt(0)}
+        </div>
       );
     })}
     {members.length > limit && (
