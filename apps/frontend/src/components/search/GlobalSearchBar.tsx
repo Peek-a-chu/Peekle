@@ -19,6 +19,7 @@ interface SearchSuggestion {
   title: string;
   type: 'problem' | 'user' | 'workbook';
   tier?: string;
+  externalId?: string;
 }
 
 interface GlobalSearchBarProps {
@@ -70,6 +71,7 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
             title: p.title,
             type: 'problem',
             tier: p.tier,
+            externalId: p.externalId,
           }),
         );
 
@@ -270,7 +272,14 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
                 >
                   <span className="flex-shrink-0">{getSuggestionIcon(suggestion.type)}</span>
                   <div className="flex-1">
-                    <div className="font-medium">{suggestion.title}</div>
+                    <div className="font-medium">
+                      {suggestion.type === 'problem' && suggestion.externalId && (
+                        <span className="text-[#E24EA0] mr-1.5 break-normal">
+                          #{suggestion.externalId}
+                        </span>
+                      )}
+                      {suggestion.title}
+                    </div>
                     <div className="text-xs text-gray-500">
                       {getSuggestionTypeLabel(suggestion.type)}
                       {suggestion.tier && ` · ${suggestion.tier}`}
