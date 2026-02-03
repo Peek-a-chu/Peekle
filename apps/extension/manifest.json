@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Peekle: Baekjoon Submit Tracker",
-    "version": "0.0.3",
+    "name": "Peekle: Baekjoon Track Submission",
+    "version": "0.0.4",
     "description": "힐끔힐끔코딩 - 백준 문제 풀이 자동 기록 및 알림",
     "permissions": [
         "storage"
