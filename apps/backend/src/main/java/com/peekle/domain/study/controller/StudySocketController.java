@@ -107,26 +107,38 @@ public class StudySocketController {
                         String token = connection.getToken();
 
                         // Fix OpenVidu Token for Nginx Proxy (Protocol, Domain, Trailing Slash)
+                        
+                        // 1. Always upgrade to WSS (OpenVidu is HTTPS)
                         if (token.startsWith("ws://")) {
                             token = token.replace("ws://", "wss://");
                         }
-                        
-                        // Remove port 4443 to route through Nginx standard HTTPS port
-                        if (token.contains(":4443")) {
-                            token = token.replace(":4443", "");
-                        }
 
-                        // Ensure path starts with /openvidu/ to match Nginx location and avoid redirects
-                        if (!token.contains("/openvidu")) {
-                             token = token.replace("?sessionId=", "/openvidu/?sessionId=");
-                        } else if (token.contains("/openvidu?")) {
-                             token = token.replace("/openvidu?", "/openvidu/?");
+                        // 2. Production/Nginx specific adjustments (Skip for localhost)
+                        if (!token.contains("localhost")) {
+                                // Remove port 4443 to route through Nginx standard HTTPS port
+                                if (token.contains(":4443")) {
+                                    token = token.replace(":4443", "");
+                                }
+
+                                // Ensure path starts with /openvidu/ to match Nginx location and avoid redirects
+                                if (!token.contains("/openvidu")) {
+                                     token = token.replace("?sessionId=", "/openvidu/?sessionId=");
+                                } else if (token.contains("/openvidu?")) {
+                                     token = token.replace("/openvidu?", "/openvidu/?");
+                                }
+                        } else {
+                                // Localhost Adjustment: 
+                                // Backend connects via HTTP:4443 (ws://), but Browser needs HTTPS:4443 (wss://)
+                                if (token.contains(":4443")) {
+                                    token = token.replace(":4443", ":4443");
+                                }
                         }
                         
                         // Validates domain if localhost (fallback)
-                        if (token.contains("localhost")) {
-                             token = token.replace("localhost", "i14a408.p.ssafy.io");
-                        }
+                        // Localhost 연결 지원을 위해 주석 처리
+                         if (token.contains("localhost")) {
+                              // token = token.replace("localhost", "i14a408.p.ssafy.io");
+                         }
 
                         log.info("Modified OpenVidu token for Client: {}", token);
 

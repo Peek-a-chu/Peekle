@@ -59,7 +59,7 @@ services:
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
       - AI_SERVER_URL=http://ai-server:8000
-      - OPENVIDU_URL=https://openvidu:8443
+      - OPENVIDU_URL=https://openvidu:4443
       - OPENVIDU_SECRET=MY_SECRET
       - AI_SERVER_URL=http://ai-server:8000
     volumes:
@@ -116,7 +116,6 @@ services:
     container_name: peekle-openvidu-dev
     restart: unless-stopped
     ports:
-      - "8443:8443"
       - "4443:4443"
       - "40000-40050:40000-40050/udp"
       - "40000-40050:40000-40050/tcp"
@@ -135,7 +134,7 @@ services:
           "CMD",
           "curl",
           "-f",
-          "https://localhost:8443/api/config",
+          "http://localhost:4443/api/config",
           "-k",
           "-u",
           "OPENVIDUAPP:MY_SECRET",

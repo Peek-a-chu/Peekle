@@ -35,22 +35,19 @@ public class MediaService {
     public void init() {
         // 개발 환경일 경우 SSL 검증 무시 설정 (OpenVidu Self-Signed Cert 지원)
         if ("dev".equals(activeProfile) || "local".equals(activeProfile)) {
-            // Development environment: Force use of localhost HTTPS
-            // The default OpenVidu deployment uses a self-signed certificate on port 8443
-            this.openViduUrl = "http://localhost:8443/";
-            log.info("[Dev Profile] OpenVidu URL forced to: {}", this.openViduUrl);
-
             // 개발 환경용: SSL 인증서 검증 무시
             disableSslVerification();
-            
-            // NOTE: URL overwrite removed to support both Local (bootRun) and Docker scenarios.
-            // Local: application-dev.yml provides "http://localhost:8443"
-            // Docker: env var provides "https://openvidu:8443"
         } else {
             log.info("[Prod Profile] Using Configured OpenVidu URL");
         }
 
         log.info("Initializing OpenVidu client at {}", openViduUrl);
+
+        try {
+            this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
+        } catch (Exception e) {
+            log.error("Failed to initialize OpenVidu client", e);
+        }
 
         // 초기화 시 연결 테스트 (비동기로 실행하여 애플리케이션 시작을 막지 않음)
         testConnection();
@@ -73,13 +70,13 @@ public class MediaService {
                         if (i < 5) {
                             log.debug("Waiting for OpenVidu server... (attempt {}/{})", i + 1, 30);
                         } else if (i == 5) {
-                            log.warn("OpenVidu server not ready yet, continuing to retry...");
+                            log.warn("OpenVidu server not ready yet, continuing to retry... Last error: {}", e.getMessage());
                         }
                     }
                 }
                 log.error("❌ Failed to connect to OpenVidu server at {} after 30 attempts", openViduUrl);
             } catch (Exception e) {
-                log.error("❌ Error testing OpenVidu connection: {}", e.getMessage());
+                log.error("❌ Error testing OpenVidu connection: {}", e.getMessage(), e);
             }
         }).start();
     }
@@ -104,8 +101,13 @@ public class MediaService {
                     }
             };
 
-            SSLContext sc = SSLContext.getInstance("SSL");
+            // Force TLSv1.2 as it's the most widely supported and safe default
+            SSLContext sc = SSLContext.getInstance("TLSv1.2");
             sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            
+            // Set Default SSLContext for HttpClient (Java 11+)
+            SSLContext.setDefault(sc);
+            
             HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
             // 호스트네임 검증 무시
