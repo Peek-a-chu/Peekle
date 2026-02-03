@@ -18,15 +18,18 @@ const MemberAvatars = ({
   limit?: number;
 }): React.ReactNode => (
   <div className="flex items-center justify-center -space-x-2">
-    {members.slice(0, limit).map((m) => (
-      <img
-        key={m.userId}
-        src={m.profileImg || `https://api.dicebear.com/9.x/pixel-art/svg?seed=${m.nickname}`}
-        alt={m.nickname}
-        className="h-6 w-6 rounded-full border-2 border-background bg-muted"
-        title={m.nickname}
-      />
-    ))}
+    {members.slice(0, limit).map((m) => {
+      const displayImg = m.profileImgThumb || m.profileImg;
+      return (
+        <img
+          key={m.userId}
+          src={displayImg ? encodeURI(displayImg) : '/avatars/default.png'}
+          alt={m.nickname}
+          className="h-6 w-6 rounded-full border-2 border-background bg-muted"
+          title={m.nickname}
+        />
+      );
+    })}
     {members.length > limit && (
       <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold">
         +{members.length - limit}
