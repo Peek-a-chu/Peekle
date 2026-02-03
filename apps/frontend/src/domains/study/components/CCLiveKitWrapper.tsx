@@ -15,17 +15,17 @@ export function CCLiveKitWrapper({ studyId, children }: CCLiveKitWrapperProps) {
   // const [token, setToken] = useState<string>(''); // Managed in store now
   const user = useAuthStore((state) => state.user);
   const token = useRoomStore((state) => state.videoToken);
-  
-  // Use env var for LiveKit URL, fallback to localhost. 
+
+  // Use env var for LiveKit URL, fallback to localhost.
   // For dev/docker, it's usually ws://localhost:7880 or wss://...
   const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || 'ws://localhost:7880';
 
   if (!token) {
     return (
-       <div className="flex h-full w-full items-center justify-center">
-          <Loader2 className="animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">미디어 서버 연결 중...</span>
-       </div>
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">미디어 서버 연결 중...</span>
+      </div>
     );
   }
 

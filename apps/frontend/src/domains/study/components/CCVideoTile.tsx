@@ -19,17 +19,17 @@ export function CCVideoTile({ participant, className, onClick, isCurrentUser }: 
   const isAudioEnabled = participant.isMicrophoneEnabled;
 
   return (
-    <div 
+    <div
       className={cn(
-        "relative aspect-video w-48 shrink-0 overflow-hidden rounded-lg border border-border bg-muted",
-        "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all",
-        isCurrentUser && "ring-2 ring-primary",
-        className
-      )} 
+        'relative aspect-video w-48 shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+        'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all',
+        isCurrentUser && 'ring-2 ring-primary',
+        className,
+      )}
       onClick={onClick}
     >
       {isVideoEnabled ? (
-        <VideoTrack 
+        <VideoTrack
           trackRef={{
             participant,
             source: Track.Source.Camera,
@@ -39,15 +39,15 @@ export function CCVideoTile({ participant, className, onClick, isCurrentUser }: 
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gray-900 text-muted-foreground">
-           <User className="h-10 w-10" />
+          <User className="h-10 w-10" />
         </div>
       )}
 
       {/* Overlays */}
       <div className="absolute bottom-1 left-2 max-w-[80%]">
-         <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
-           {participant.name || participant.identity} {isCurrentUser && "(나)"}
-         </span>
+        <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
+          {participant.name || participant.identity} {isCurrentUser && '(나)'}
+        </span>
       </div>
 
       {!isAudioEnabled && (

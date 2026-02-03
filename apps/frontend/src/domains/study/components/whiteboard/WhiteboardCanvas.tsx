@@ -134,7 +134,9 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
               const normalizedSenderId =
                 senderId !== undefined && senderId !== null ? String(senderId) : null;
               const normalizedCurrentUserId =
-                currentUserId !== undefined && currentUserId !== null ? String(currentUserId) : null;
+                currentUserId !== undefined && currentUserId !== null
+                  ? String(currentUserId)
+                  : null;
 
               // If currentUserId is unknown, treat sender as "other" so we still color remote objects.
               const isSelf =
@@ -204,9 +206,12 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           case 'CLEAR':
             // [Fix] Use manual cleanup instead of canvas.clear() to avoid 'fire' undefined error
             canvas.discardActiveObject();
-            canvas.getObjects().slice().forEach((obj: any) => {
-              canvas.remove(obj);
-            });
+            canvas
+              .getObjects()
+              .slice()
+              .forEach((obj: any) => {
+                canvas.remove(obj);
+              });
             canvas.backgroundImage = null;
             canvas.overlayImage = null;
             canvas.setBackgroundColor('#ffffff', () => canvas.renderAll());
@@ -225,10 +230,11 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
             handleAction('CLEAR', undefined, undefined, undefined);
 
             const history = data.history as WhiteboardMessage[];
-            
+
             // [Fix] Handle history with CLEAR events: only process events after the last CLEAR
-            const lastClearIndex = history.map(h => h.action).lastIndexOf('CLEAR');
-            const effectiveHistory = lastClearIndex !== -1 ? history.slice(lastClearIndex + 1) : history;
+            const lastClearIndex = history.map((h) => h.action).lastIndexOf('CLEAR');
+            const effectiveHistory =
+              lastClearIndex !== -1 ? history.slice(lastClearIndex + 1) : history;
 
             // ADDED 이벤트와 그 외 이벤트를 분리
             const addedEvents = effectiveHistory.filter((h) => h.action === 'ADDED' && h.data);
@@ -267,7 +273,9 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                       ? String(event.senderId)
                       : null;
                   const normalizedCurrentUserId =
-                    currentUserId !== undefined && currentUserId !== null ? String(currentUserId) : null;
+                    currentUserId !== undefined && currentUserId !== null
+                      ? String(currentUserId)
+                      : null;
                   const isSelf =
                     normalizedSenderId &&
                     normalizedCurrentUserId &&
@@ -277,7 +285,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
                   applyUserColorToObject(o, userColor);
                   o.setCoords();
-                  
+
                   // [Fix] Prevent duplicates
                   const exists = canvas.getObjects().find((existing: any) => existing.id === o.id);
                   if (!exists) {
@@ -338,7 +346,9 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                       ? String(objectSenderId)
                       : null;
                   const normalizedCurrentUserId =
-                    currentUserId !== undefined && currentUserId !== null ? String(currentUserId) : null;
+                    currentUserId !== undefined && currentUserId !== null
+                      ? String(currentUserId)
+                      : null;
                   const isSelf =
                     normalizedSenderId &&
                     normalizedCurrentUserId &&
@@ -354,7 +364,10 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                 canvas.requestRenderAll();
               };
 
-              const enlivener = fabricRef.current.util.enlivenObjects(objectsData, addObjectsToCanvas);
+              const enlivener = fabricRef.current.util.enlivenObjects(
+                objectsData,
+                addObjectsToCanvas,
+              );
               if (enlivener && typeof enlivener.then === 'function') {
                 enlivener.then(addObjectsToCanvas);
               }
@@ -403,7 +416,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           console.log('[WhiteboardCanvas] Starting fabric init...');
           const mod = await import('fabric');
           console.log('[WhiteboardCanvas] Fabric module loaded');
-          
+
           // fabric v5 compatibility: handle different export styles
           const fabric = mod.fabric || mod.default || mod;
 
@@ -423,9 +436,9 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
             height,
             backgroundColor: '#ffffff',
           });
-          
+
           if (typeof window !== 'undefined') {
-             (window as any).fabricCanvas = canvas;
+            (window as any).fabricCanvas = canvas;
           }
 
           fabricCanvasRef.current = canvas;
@@ -454,7 +467,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
           // Initial State - don't set isDrawingMode here, let the tool effect handle it
           setIsFabricLoaded(true);
-          
+
           // Notify parent that canvas is ready
           if (onReadyRef.current) {
             onReadyRef.current();
@@ -514,7 +527,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       canvas.renderAll();
 
       let handler: ((opt: any) => void) | null = null;
-      
+
       // Determine user color
       const myColor = currentUserId ? getUserColor(String(currentUserId)) : '#000000';
 

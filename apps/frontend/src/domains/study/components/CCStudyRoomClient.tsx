@@ -25,14 +25,35 @@ import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
 
+function StudySocketInitiator({ studyId }: { studyId: number }) {
+  const { user, checkAuth } = useAuthStore();
+  const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
+
+  // 1. Ensure Auth & Sync User ID
+  useEffect(() => {
+    if (!user) {
+      void checkAuth();
+    }
+    if (user?.id) {
+      setCurrentUserId(user.id);
+    }
+  }, [user, checkAuth, setCurrentUserId]);
+
+  // 2. Manage Socket Subscription (This will connect socket -> send Enter -> get Token)
+  useStudySocketSubscription(studyId);
+
+  return null;
+}
+
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
-  const { user, checkAuth } = useAuthStore();
+  const { user } = useAuthStore();
   const { localParticipant } = useLocalParticipant();
 
   // Listen for participant events and Handle Enter/Leave
-  useStudySocketSubscription(studyId);
+  // MOVED TO StudySocketInitiator
+  // useStudySocketSubscription(studyId);   <-- REMOVED
   const { updateStatus } = useStudySocketActions();
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
@@ -62,7 +83,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   // User asked "Make modal also not appear" likely referring to this one in context of access denied.
   // We can make it dependent on success of fetchStudyRoom or similar state.
   // But strictly speaking, we can just remove it from here and let user open it manually or put it in .then() of fetchStudyRoom.
-  
+
   // However, usually we want it on entry.
   // Let's add a state `isAccessGranted` and only open if granted.
 
@@ -73,7 +94,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       openSettingsModal('device');
     }
   }, [openSettingsModal, isAccessGranted]);
-
 
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
@@ -121,21 +141,10 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const { problems, addProblem, deleteProblem } = useProblems(studyId);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
-  // Set currentUserId when user is available
-  useEffect(() => {
-    if (user?.id) {
-      setCurrentUserId(user.id);
-    }
-  }, [user, setCurrentUserId]);
-
   // Initialize room data (in real app, fetch from API)
   useEffect(() => {
-    // Load user if not already available
-    if (!user) {
-      void checkAuth();
-    }
-
     // Ensure roomId is set in store immediately when studyId is available
+
     if (studyId) {
       setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
     }
@@ -172,7 +181,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         ),
       )
       .catch((err) => console.error('Failed to fetch participants:', err));
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, checkAuth, user]);
+  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, user]);
 
   const handleBack = (): void => {
     router.push('/study');
@@ -200,31 +209,31 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   const handleMicToggle = async (): Promise<void> => {
     if (localParticipant) {
-       const targetEnabled = !localParticipant.isMicrophoneEnabled;
-       await localParticipant.setMicrophoneEnabled(targetEnabled);
-       
-       const { currentUserId, updateParticipant } = useRoomStore.getState();
-       if (currentUserId) {
-          updateParticipant(currentUserId, { isMuted: !targetEnabled });
-          const { participants } = useRoomStore.getState();
-          const me = participants.find((p) => p.id === currentUserId);
-          updateStatus(!targetEnabled, me?.isVideoOff ?? false);
-       }
+      const targetEnabled = !localParticipant.isMicrophoneEnabled;
+      await localParticipant.setMicrophoneEnabled(targetEnabled);
+
+      const { currentUserId, updateParticipant } = useRoomStore.getState();
+      if (currentUserId) {
+        updateParticipant(currentUserId, { isMuted: !targetEnabled });
+        const { participants } = useRoomStore.getState();
+        const me = participants.find((p) => p.id === currentUserId);
+        updateStatus(!targetEnabled, me?.isVideoOff ?? false);
+      }
     }
   };
 
   const handleVideoToggle = async (): Promise<void> => {
     if (localParticipant) {
-       const targetEnabled = !localParticipant.isCameraEnabled;
-       await localParticipant.setCameraEnabled(targetEnabled);
+      const targetEnabled = !localParticipant.isCameraEnabled;
+      await localParticipant.setCameraEnabled(targetEnabled);
 
-       const { currentUserId, updateParticipant } = useRoomStore.getState();
-       if (currentUserId) {
-          updateParticipant(currentUserId, { isVideoOff: !targetEnabled });
-          const { participants } = useRoomStore.getState();
-          const me = participants.find((p) => p.id === currentUserId);
-          updateStatus(me?.isMuted ?? false, !targetEnabled);
-       }
+      const { currentUserId, updateParticipant } = useRoomStore.getState();
+      if (currentUserId) {
+        updateParticipant(currentUserId, { isVideoOff: !targetEnabled });
+        const { participants } = useRoomStore.getState();
+        const me = participants.find((p) => p.id === currentUserId);
+        updateStatus(me?.isMuted ?? false, !targetEnabled);
+      }
     }
   };
 
@@ -329,6 +338,7 @@ export function CCStudyRoomClient(): React.ReactNode {
 
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
+      <StudySocketInitiator studyId={studyId} />
       <CCLiveKitWrapper studyId={studyId}>
         <StudyRoomContent studyId={studyId} />
       </CCLiveKitWrapper>

@@ -130,7 +130,7 @@ export function CCAddProblemModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-      <div className="bg-background p-6 rounded-lg w-full max-w-md shadow-lg border border-border flex flex-col max-h-[80vh]">
+      <div className="bg-background text-foreground p-6 rounded-lg w-full max-w-md shadow-lg border border-border flex flex-col max-h-[80vh]">
         <h3 className="font-semibold text-lg mb-1">문제 검색 및 추가</h3>
         <p className="text-sm text-muted-foreground mb-4">
           문제 번호 또는 제목으로 검색하여 선택하세요.

@@ -28,21 +28,26 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
 
   const handleTileClick = (identity: string) => {
     const userId = Number(identity); // Identity is userId string
-    
+
     if (userId === currentUserId) {
-       resetToOnlyMine();
+      resetToOnlyMine();
     } else {
-       const p = roomStoreParticipants.find(p => p.id === userId);
-       if (p) {
-         viewRealtimeCode(p);
-       } else {
-         console.warn("Participant not found in store:", userId);
-       }
+      const p = roomStoreParticipants.find((p) => p.id === userId);
+      if (p) {
+        viewRealtimeCode(p);
+      } else {
+        console.warn('Participant not found in store:', userId);
+      }
     }
   };
 
   return (
-    <div className={cn('flex gap-2 overflow-x-auto border-b border-border bg-card p-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]', className)}>
+    <div
+      className={cn(
+        'flex gap-2 overflow-x-auto border-b border-border bg-card p-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
+        className,
+      )}
+    >
       {isWhiteboardActive && <WhiteboardTile onClick={onWhiteboardClick} />}
 
       {sortedParticipants.map((participant) => (
@@ -53,11 +58,11 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
           onClick={() => handleTileClick(participant.identity)}
         />
       ))}
-      
+
       {sortedParticipants.length === 0 && (
-         <div className="flex h-32 w-48 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-            참가자 대기 중...
-         </div>
+        <div className="flex h-32 w-48 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+          참가자 대기 중...
+        </div>
       )}
     </div>
   );
