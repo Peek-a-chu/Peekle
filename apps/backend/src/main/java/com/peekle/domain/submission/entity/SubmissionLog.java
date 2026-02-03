@@ -56,6 +56,9 @@ public class SubmissionLog {
     @Column(name = "execution_time")
     private Integer executionTime;
 
+    @Column(name = "is_success")
+    private Boolean isSuccess;
+
     @Column(name = "tag")
     private String tag; // e.g. "[팀] 스피드 레이스", "알고리즘 스터디"
 
@@ -69,7 +72,7 @@ public class SubmissionLog {
 
     public static SubmissionLog create(User user, Problem problem, SourceType sourceType,
             String problemTitle, String problemTier, String externalId,
-            String tag, String result,
+            String tag, String result, Boolean isSuccess,
             String code, Integer memory,
             Integer executionTime, String language, LocalDateTime submittedAt) {
         SubmissionLog log = new SubmissionLog();
@@ -81,6 +84,7 @@ public class SubmissionLog {
         log.problemTier = problemTier;
         log.tag = tag;
         log.result = result;
+        log.isSuccess = isSuccess;
         log.code = code;
         log.memory = memory;
         log.executionTime = executionTime;

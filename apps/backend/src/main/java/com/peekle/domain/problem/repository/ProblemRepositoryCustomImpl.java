@@ -27,7 +27,9 @@ public class ProblemRepositoryCustomImpl implements ProblemRepositoryCustom {
 
         // 키워드 검색 (문제 제목!)
         if (StringUtils.hasText(keyword)) {
-            builder.and(problem.title.containsIgnoreCase(keyword));
+            builder.and(
+                    problem.title.containsIgnoreCase(keyword)
+                            .or(problem.externalId.containsIgnoreCase(keyword)));
         }
 
         // 난이도 검색

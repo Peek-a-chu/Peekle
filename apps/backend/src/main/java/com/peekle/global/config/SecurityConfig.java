@@ -58,7 +58,19 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/submissions/**").permitAll()
                                                 .requestMatchers("/api/problems/**").permitAll() // 문제 검색/동기화
                                                 .requestMatchers("/api/users/me/**").permitAll() // Extension token
-                                                                                                 // endpoints
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/profile")
+                                                .permitAll() // 남의 프로필 조회
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/history")
+                                                .permitAll() // 남의 히스토리 조회
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/streak")
+                                                .permitAll() // 남의 스트릭 조회
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/timeline")
+                                                .permitAll() // 남의 타임라인 조회
+                                                // endpoints
 
                                                 // Dev / Test
                                                 .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API

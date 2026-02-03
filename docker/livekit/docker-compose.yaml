@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  livekit:
+    image: livekit/livekit-server:v1.5.0
+    container_name: peekle-livekit-standalone
+    command: --node-ip ${PUBLIC_IP}
+    restart: unless-stopped
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "${RTC_PORT_START}-${RTC_PORT_END}:${RTC_PORT_START}-${RTC_PORT_END}/udp"
+    env_file:
+      - .env
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+      - |
+        LIVEKIT_CONFIG=
+        rtc:
+          port_range_start: ${RTC_PORT_START}
+          port_range_end: ${RTC_PORT_END}
+          use_external_ip: false

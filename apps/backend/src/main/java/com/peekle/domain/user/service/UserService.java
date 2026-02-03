@@ -15,6 +15,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import com.peekle.domain.submission.dto.SubmissionLogResponse;
 import com.peekle.domain.submission.entity.SubmissionLog;
+import com.peekle.domain.submission.dto.SubmissionHistoryFilterDto;
+import com.peekle.domain.submission.enums.SourceType;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +38,7 @@ public class UserService {
     private final SubmissionLogRepository submissionLogRepository;
     private final com.peekle.global.storage.R2StorageService r2StorageService;
     private final LeagueService leagueService;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Transactional
     public String generateExtensionToken(Long userId, boolean forceRegenerate) {
@@ -88,7 +98,7 @@ public class UserService {
         long rank = userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
 
         // 3. 필드 데이터 조회
-        long solvedCount = submissionLogRepository.countByUserId(user.getId());
+        long solvedCount = submissionLogRepository.countSolvedByUserId(user.getId());
 
         boolean isMe = currentUserId != null && currentUserId.equals(userId);
 
@@ -129,6 +139,14 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.List<com.peekle.domain.user.dto.ActivityStreakDto> getUserActivityStreakByNickname(
+            String nickname) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return getUserActivityStreak(user.getId());
+    }
+
+    @Transactional(readOnly = true)
     public java.util.List<com.peekle.domain.user.dto.ActivityStreakDto> getUserActivityStreak(Long userId) {
         // 1. 유저의 모든 제출 내역 조회 (오래된 순)
         java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = submissionLogRepository
@@ -145,6 +163,11 @@ public class UserService {
             String date = log.getSubmittedAt().toLocalDate().toString(); // YYYY-MM-DD
             String uniqueKey = date + ":" + problemId;
 
+            // 성공한 제출만 카운트
+            if (log.getIsSuccess() == null || !log.getIsSuccess()) {
+                continue;
+            }
+
             // 해당 날짜에 아직 안 푼 문제인 경우에만 카운트
             if (!dailySolvedCheck.contains(uniqueKey)) {
                 dailySolvedCheck.add(uniqueKey);
@@ -157,6 +180,13 @@ public class UserService {
                 .map(entry -> new com.peekle.domain.user.dto.ActivityStreakDto(entry.getKey(), entry.getValue()))
                 .sorted(java.util.Comparator.comparing(com.peekle.domain.user.dto.ActivityStreakDto::getDate))
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<TimelineItemDto> getDailyTimelineByNickname(String nickname, String dateStr) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return getDailyTimeline(user.getId(), dateStr);
     }
 
     @Transactional(readOnly = true)
@@ -220,6 +250,7 @@ public class UserService {
                         .memory(log.getMemory())
                         .executionTime(log.getExecutionTime())
                         .result(log.getResult())
+                        .isSuccess(log.getIsSuccess())
                         .submittedAt(log.getSubmittedAt().toString())
                         .build());
             }
@@ -255,18 +286,71 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public Page<SubmissionLogResponse> getUserSubmissionsByNickname(String nickname, Pageable pageable) {
-        User user = userRepository.findByNickname(nickname)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    public Page<SubmissionLogResponse> getUserSubmissionsByNickname(
+            String nickname, Pageable pageable,
+            String date, String tier, String sourceType, String status) {
 
-        return getUserSubmissions(user.getId(), pageable);
+        SubmissionHistoryFilterDto.SubmissionHistoryFilterDtoBuilder builder = SubmissionHistoryFilterDto.builder()
+                .nickname(nickname);
+
+        applyFilters(builder, date, tier, sourceType, status);
+
+        Page<SubmissionLog> logs = submissionLogRepository.findHistory(builder.build(), pageable);
+        return logs.map(SubmissionLogResponse::from);
     }
 
     @Transactional(readOnly = true)
-    public Page<SubmissionLogResponse> getUserSubmissions(Long userId, Pageable pageable) {
-        Page<SubmissionLog> logs = submissionLogRepository.findAllByUserIdOrderBySubmittedAtDesc(userId, pageable);
+    public Page<SubmissionLogResponse> getUserSubmissions(
+            Long userId, Pageable pageable,
+            String date, String tier, String sourceType, String status) {
 
+        SubmissionHistoryFilterDto.SubmissionHistoryFilterDtoBuilder builder = SubmissionHistoryFilterDto.builder()
+                .userId(userId);
+
+        applyFilters(builder, date, tier, sourceType, status);
+
+        Page<SubmissionLog> logs = submissionLogRepository.findHistory(builder.build(), pageable);
         return logs.map(SubmissionLogResponse::from);
+    }
+
+    private void applyFilters(
+            SubmissionHistoryFilterDto.SubmissionHistoryFilterDtoBuilder builder,
+            String date, String tier, String sourceTypeStr, String status) {
+
+        // Date (>= date 00:00:00)
+        if (date != null && !date.isEmpty()) {
+            try {
+                java.time.LocalDate localDate = java.time.LocalDate.parse(date);
+                builder.startDate(localDate.atStartOfDay());
+                // Optional: To show only that day? Or From that day?
+                // "Simple Filter" usually implies "On that day" or "From".
+                // Let's implement ">= Date" logic for history flow.
+            } catch (Exception e) {
+                // Ignore invalid date
+            }
+        }
+
+        // Tier
+        if (tier != null && !tier.isEmpty() && !tier.equals("전체")) {
+            builder.tier(tier);
+        }
+
+        // SourceType
+        if (sourceTypeStr != null && !sourceTypeStr.equals("ALL")) {
+            try {
+                builder.sourceType(com.peekle.domain.submission.enums.SourceType.valueOf(sourceTypeStr));
+            } catch (Exception e) {
+            }
+        }
+
+        // Status
+        if (status != null && !status.isEmpty() && !status.equals("ALL")) {
+            if ("SUCCESS".equalsIgnoreCase(status)) {
+                builder.isSuccess(true);
+            } else if ("FAIL".equalsIgnoreCase(status)) {
+                builder.isSuccess(false);
+            }
+        }
     }
 
     @Transactional
@@ -362,5 +446,31 @@ public class UserService {
         response.put("presignedUrl", presignedUrl);
         response.put("publicUrl", publicUrl);
         return response;
+    }
+
+    public boolean validateBojId(String bojId) {
+        if (bojId == null || bojId.trim().isEmpty()) {
+            return false;
+        }
+
+        String url = "https://www.acmicpc.net/user/" + bojId.trim();
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+            return response.getStatusCode() == HttpStatus.OK;
+        } catch (HttpClientErrorException.NotFound e) {
+            return false;
+        } catch (Exception e) {
+            System.err.println("Error validating BOJ ID: " + e.getMessage());
+            // 에러 발생 시(타임아웃 등)는 일단 false 처리하거나, 혹은 별도 에러 처리가 필요할 수 있음
+            // 여기서는 존재 확인이 목적이므로 에러면 확인 불가 -> false로 처리 (또는 true로 처리해서 넘길 수도 있지만 엄격하게 false)
+            return false;
+        }
     }
 }

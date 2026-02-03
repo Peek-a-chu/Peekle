@@ -8,8 +8,15 @@ import { useLeagueRanking } from '../hooks/useDashboardData';
 import { UserIcon } from '@/components/UserIcon';
 // import defaultProfileImg from '@/assets/icons/profile.png';
 
-const LeagueRanking = () => {
-  const { data } = useLeagueRanking();
+import { LeagueRankingData } from '@/domains/league/types';
+
+interface LeagueRankingProps {
+  initialData?: LeagueRankingData;
+}
+
+const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
+  const { data: fetchedData } = useLeagueRanking(30000, { skip: !!initialData });
+  const data = initialData || fetchedData;
 
   // 현재 리그의 승급/강등 규칙 가져오기
   const rules = data.rule;
