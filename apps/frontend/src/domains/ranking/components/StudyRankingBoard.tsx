@@ -60,7 +60,7 @@ export function StudyRankingBoard(): React.ReactNode {
   const handleStudyClick = (studyId: number): void => {
     // TODO: S8-2에서 상세 모달 구현
     console.log('Study clicked:', studyId);
-    
+
     // Expand the clicked study if not already expanded
     if (scope !== 'ALL') setScope('ALL');
     setExpandedIds((prev) => (prev.includes(studyId) ? prev : [...prev, studyId]));

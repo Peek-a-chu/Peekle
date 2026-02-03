@@ -6,7 +6,8 @@ import { getOAuthLoginUrl } from '@/api/authApi';
 
 export default function LoginPage() {
   const handleLogin = (provider: 'kakao' | 'naver' | 'google') => {
-    window.location.href = getOAuthLoginUrl(provider);
+    const redirectUri = window.location.origin;
+    window.location.href = getOAuthLoginUrl(provider, redirectUri);
   };
 
   return (

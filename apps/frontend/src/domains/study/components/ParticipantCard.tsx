@@ -145,96 +145,100 @@ export function ParticipantCard({
         </div>
       </div>
 
-      {/* Menu Trigger */}
-      {hasAnyAction && (
-        <div className="relative flex items-center" ref={menuRef}>
-          {/* Status Icons (Online only) */}
-          {isOnline && (
-            <div className="flex items-center gap-2">
-              {participant.isMuted && <MicOff className="h-3 w-3 text-red-500" />}
-              {participant.isVideoOff && <VideoOff className="h-3 w-3 text-red-500" />}
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100"
-            data-state={isMenuOpen ? 'open' : 'closed'}
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label="메뉴"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </Button>
+      {/* Status Icons & Menu */}
+      <div className="flex items-center gap-1.5">
+        {/* Status Icons (Online only) - Always visible if condition meets */}
+        {isOnline && (
+          <div className="flex items-center gap-1.5 mr-1">
+            {participant.isMuted && <MicOff className="h-3.5 w-3.5 text-red-500" />}
+            {participant.isVideoOff && <VideoOff className="h-3.5 w-3.5 text-red-500" />}
+          </div>
+        )}
 
-          {isMenuOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95">
-              <div className="flex flex-col py-1">
-                {/* 1. Owner Actions */}
-                {canOwnerActions && (
-                  <>
+        {/* Menu Trigger */}
+        {hasAnyAction && (
+          <div className="relative flex items-center" ref={menuRef}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100"
+              data-state={isMenuOpen ? 'open' : 'closed'}
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="메뉴"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95">
+                <div className="flex flex-col py-1">
+                  {/* 1. Owner Actions */}
+                  {canOwnerActions && (
+                    <>
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
+                        onClick={() => onMuteUser?.(participant)}
+                      >
+                        <MicOff className="h-3.5 w-3.5" />
+                        마이크 끄기
+                      </button>
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
+                        onClick={() => onVideoOffUser?.(participant)}
+                      >
+                        <VideoOff className="h-3.5 w-3.5" />
+                        카메라 끄기
+                      </button>
+                    </>
+                  )}
+
+                  {/* 2. Common Online Actions */}
+                  {canViewCode && (
                     <button
                       className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
-                      onClick={() => onMuteUser?.(participant)}
+                      onClick={() => onViewCode?.(participant)}
                     >
-                      <MicOff className="h-3.5 w-3.5" />
-                      마이크 끄기
+                      <FileCode2 className="h-3.5 w-3.5 text-blue-500" />
+                      실시간 코드 보기
                     </button>
-                    <button
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
-                      onClick={() => onVideoOffUser?.(participant)}
-                    >
-                      <VideoOff className="h-3.5 w-3.5" />
-                      카메라 끄기
-                    </button>
-                  </>
-                )}
+                  )}
 
-                {/* 2. Common Online Actions */}
-                {canViewCode && (
+                  {/* 3. Owner Critical Actions */}
+                  {canOwnerActions && (
+                    <>
+                      <div className="my-1 h-px bg-border" />
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
+                        onClick={() => onDelegate?.(participant)}
+                      >
+                        <Crown className="h-3.5 w-3.5 text-yellow-600" />
+                        방장 넘기기
+                      </button>
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent text-red-500 hover:text-red-600 text-left"
+                        onClick={() => onKick?.(participant)}
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                        강퇴하기
+                      </button>
+                    </>
+                  )}
+
+                  {/* 4. Profile (Always) */}
+                  <div className="my-1 h-px bg-border" />
                   <button
                     className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
-                    onClick={() => onViewCode?.(participant)}
+                    onClick={() => onViewProfile?.(participant)}
                   >
-                    <FileCode2 className="h-3.5 w-3.5 text-blue-500" />
-                    실시간 코드 보기
+                    <UserCircle className="h-3.5 w-3.5" />
+                    프로필 보기
                   </button>
-                )}
-
-                {/* 3. Owner Critical Actions */}
-                {canOwnerActions && (
-                  <>
-                    <div className="my-1 h-px bg-border" />
-                    <button
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
-                      onClick={() => onDelegate?.(participant)}
-                    >
-                      <Crown className="h-3.5 w-3.5 text-yellow-600" />
-                      방장 넘기기
-                    </button>
-                    <button
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent text-red-500 hover:text-red-600 text-left"
-                      onClick={() => onKick?.(participant)}
-                    >
-                      <Ban className="h-3.5 w-3.5" />
-                      강퇴하기
-                    </button>
-                  </>
-                )}
-
-                {/* 4. Profile (Always) */}
-                <div className="my-1 h-px bg-border" />
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground text-left"
-                  onClick={() => onViewProfile?.(participant)}
-                >
-                  <UserCircle className="h-3.5 w-3.5" />
-                  프로필 보기
-                </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

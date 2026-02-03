@@ -161,9 +161,9 @@ export function StudyParticipantPanel() {
                   isRoomOwner={isOwner}
                   onKick={setKickTarget}
                   onDelegate={setDelegateTarget}
-                  onViewCode={() => { }} // Disabled for offline
+                  onViewCode={() => {}} // Disabled for offline
                   onViewProfile={handleViewProfile}
-                // Mute/Video actions usually disabled or hidden for offline
+                  // Mute/Video actions usually disabled or hidden for offline
                 />
               ))}
             </div>

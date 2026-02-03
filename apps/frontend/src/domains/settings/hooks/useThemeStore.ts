@@ -96,14 +96,17 @@ const applyThemeVariables = (
 // Extension과 통신 - 테마 동기화 메시지 전송
 const syncThemeToExtension = (mode: string, accentColor: string, customColor: string) => {
   if (typeof window === 'undefined') return;
-  window.postMessage({
-    type: 'PEEKLE_THEME_SYNC',
-    payload: {
-      mode,
-      accentColor,
-      customColor
-    }
-  }, '*');
+  window.postMessage(
+    {
+      type: 'PEEKLE_THEME_SYNC',
+      payload: {
+        mode,
+        accentColor,
+        customColor,
+      },
+    },
+    '*',
+  );
 };
 
 export const useThemeStore = create<ThemeState>()(

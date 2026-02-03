@@ -39,7 +39,7 @@ export function WorkbooksLeftPanel({
           onLoadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (observerRef.current) {
@@ -60,7 +60,9 @@ export function WorkbooksLeftPanel({
   }
 
   return (
-    <div className={cn('flex-1 border rounded-xl bg-card overflow-hidden flex flex-col', className)}>
+    <div
+      className={cn('flex-1 border rounded-xl bg-card overflow-hidden flex flex-col', className)}
+    >
       {/* 헤더 */}
       <div className="flex items-center gap-4 px-4 py-3 border-b bg-muted/50 text-xs font-medium text-muted-foreground shrink-0">
         <div className="shrink-0 w-8 text-center">#</div>

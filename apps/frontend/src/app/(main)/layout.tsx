@@ -2,6 +2,8 @@ import Sidebar from '@/domains/lnb/components/Sidebar';
 import LeagueResultModal from '@/domains/league/components/LeagueResultModal';
 import { getMyProfile } from '@/domains/profile/actions/profile';
 
+export const dynamic = 'force-dynamic';
+
 export default async function MainLayout({
   children,
 }: Readonly<{

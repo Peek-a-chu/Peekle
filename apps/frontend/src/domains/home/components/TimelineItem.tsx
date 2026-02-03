@@ -1,10 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, Users, Gamepad2, FileText, ChevronDown, ChevronUp, CornerDownRight } from 'lucide-react';
+import {
+  ExternalLink,
+  Users,
+  Gamepad2,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  CornerDownRight,
+} from 'lucide-react';
 import Link from 'next/link';
 import { TimelineItemData, BOJ_TIER_NAMES, BOJ_TIER_COLORS } from '../mocks/dashboardMocks';
-
 
 interface TimelineItemProps {
   items: TimelineItemData[];
@@ -43,8 +50,12 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
       >
         <div className="flex items-center gap-4 flex-1 overflow-hidden">
           {/* 문제 정보 */}
-          <span className="text-sm text-muted-foreground w-16 shrink-0 font-mono">#{problemId}</span>
-          <span className="font-bold text-foreground truncate max-w-[200px]" title={title}>{title}</span>
+          <span className="text-sm text-muted-foreground w-16 shrink-0 font-mono">
+            #{problemId}
+          </span>
+          <span className="font-bold text-foreground truncate max-w-[200px]" title={title}>
+            {title}
+          </span>
           <span
             className="px-2 py-0.5 rounded-full text-xs font-bold border text-muted-foreground shrink-0"
             style={{ borderColor: BOJ_TIER_COLORS[tier], color: BOJ_TIER_COLORS[tier] }}
@@ -88,7 +99,11 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
               </>
             )}
 
-            {mainItem.language && <span className="font-mono text-[10px] uppercase border-l pl-2 ml-1 border-border">{mainItem.language}</span>}
+            {mainItem.language && (
+              <span className="font-mono text-[10px] uppercase border-l pl-2 ml-1 border-border">
+                {mainItem.language}
+              </span>
+            )}
           </div>
 
           {/* 확장 토글 아이콘 */}
@@ -104,7 +119,7 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
                 if (isMe) onSelect(mainItem);
               }}
               className={`p-1.5 transition-colors ${isMe ? 'text-muted-foreground hover:text-primary' : 'text-muted-foreground/30 cursor-not-allowed'}`}
-              title={isMe ? "풀이 상세 보기" : "비공개"}
+              title={isMe ? '풀이 상세 보기' : '비공개'}
             >
               <FileText className="w-4 h-4" />
             </button>
@@ -140,8 +155,15 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
                   {/* 태그 */}
                   <div className="truncate">
                     {item.tag ? (
-                      <div className="flex items-center gap-1.5 text-primary text-xs font-medium truncate" title={item.tag}>
-                        {item.sourceType === 'study' ? <Users className="w-3 h-3 shrink-0" /> : <Gamepad2 className="w-3 h-3 shrink-0" />}
+                      <div
+                        className="flex items-center gap-1.5 text-primary text-xs font-medium truncate"
+                        title={item.tag}
+                      >
+                        {item.sourceType === 'study' ? (
+                          <Users className="w-3 h-3 shrink-0" />
+                        ) : (
+                          <Gamepad2 className="w-3 h-3 shrink-0" />
+                        )}
                         <span className="truncate">{item.tag}</span>
                       </div>
                     ) : (
@@ -150,19 +172,25 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
                   </div>
 
                   {/* 언어 */}
-                  <div className="font-mono text-xs uppercase text-foreground/80">{item.language}</div>
+                  <div className="font-mono text-xs uppercase text-foreground/80">
+                    {item.language}
+                  </div>
 
                   {/* 메모리 - 성공시에만 */}
-                  <div className="text-xs">{isItemSuccess && item.memory ? `${item.memory}KB` : '-'}</div>
+                  <div className="text-xs">
+                    {isItemSuccess && item.memory ? `${item.memory}KB` : '-'}
+                  </div>
 
                   {/* 시간 - 성공시에만 */}
-                  <div className="text-xs">{isItemSuccess && item.executionTime ? `${item.executionTime}ms` : '-'}</div>
+                  <div className="text-xs">
+                    {isItemSuccess && item.executionTime ? `${item.executionTime}ms` : '-'}
+                  </div>
 
                   {/* 결과 */}
                   <div className="text-xs font-medium">
                     {item.result ? (
                       <span className={`${isItemSuccess ? 'text-green-600' : 'text-red-600'}`}>
-                        {isItemSuccess ? '성공' : (item.result.replace(/\n/g, ' ') || '실패')}
+                        {isItemSuccess ? '성공' : item.result.replace(/\n/g, ' ') || '실패'}
                       </span>
                     ) : (
                       '-'
@@ -170,13 +198,15 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
                   </div>
 
                   {/* 제출일시 */}
-                  <div className="text-xs text-muted-foreground">{formatDateTime(item.submittedAt)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatDateTime(item.submittedAt)}
+                  </div>
 
                   {/* 상세 버튼 */}
                   <div className="flex justify-center">
                     <button
                       className={`p-1 transition-colors ${isMe ? 'text-muted-foreground hover:text-primary' : 'text-muted-foreground/30 cursor-not-allowed'}`}
-                      title={isMe ? "상세 보기" : "비공개"}
+                      title={isMe ? '상세 보기' : '비공개'}
                       disabled={!isMe}
                     >
                       <FileText className="w-4 h-4" />

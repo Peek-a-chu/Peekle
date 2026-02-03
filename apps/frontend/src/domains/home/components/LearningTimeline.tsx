@@ -15,22 +15,30 @@ interface LearningTimelineProps {
   initialData?: TimelineItemData[];
 }
 
-const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname, initialData }: LearningTimelineProps) => {
+const LearningTimeline = ({
+  selectedDate,
+  showHistoryLink = false,
+  nickname,
+  initialData,
+}: LearningTimelineProps) => {
   const { data: fetchedData } = useTimeline(selectedDate || '', nickname, { skip: !!initialData });
   const data = initialData || fetchedData;
   const [expanded, setExpanded] = useState(false);
 
   // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
-  const groupedDataMap = data.reduce((acc, item) => {
-    if (!acc[item.problemId]) {
-      acc[item.problemId] = [];
-    }
-    acc[item.problemId].push(item);
-    return acc;
-  }, {} as Record<string, typeof data>);
+  const groupedDataMap = data.reduce(
+    (acc, item) => {
+      if (!acc[item.problemId]) {
+        acc[item.problemId] = [];
+      }
+      acc[item.problemId].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof data>,
+  );
 
   // 각 그룹 내에서 정답(AC)을 최우선으로, 그 다음 최신순으로 정렬
-  Object.keys(groupedDataMap).forEach(problemId => {
+  Object.keys(groupedDataMap).forEach((problemId) => {
     groupedDataMap[problemId].sort((a, b) => {
       // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
       // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
@@ -81,7 +89,10 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname, ini
         </div>
 
         {showHistoryLink && nickname && (
-          <Link href={`/profile/${nickname}/history`} className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1">
+          <Link
+            href={`/profile/${nickname}/history`}
+            className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1"
+          >
             <span className="text-xs font-medium">풀이 내역 조회</span>
             <ChevronRight className="w-5 h-5" />
           </Link>

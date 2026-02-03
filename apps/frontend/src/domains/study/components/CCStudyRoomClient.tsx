@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { Loader2 } from 'lucide-react';
 import { CCStudyHeader as StudyHeader } from './CCStudyHeader';
 import { CCProblemListPanel as ProblemListPanel } from './CCProblemListPanel';
 import { CCCenterPanel as CenterPanel } from './CCCenterPanel';
@@ -13,6 +14,7 @@ import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 import type { DailyProblem as Problem } from '@/domains/study/types';
 import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
+import { format } from 'date-fns';
 import { formatDate } from '@/lib/utils';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
@@ -23,14 +25,37 @@ import {
 } from '@/domains/study/hooks/useStudySocket';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
+import { useLocalParticipant } from '@livekit/components-react';
+
+function StudySocketInitiator({ studyId }: { studyId: number }) {
+  const { user, checkAuth } = useAuthStore();
+  const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
+
+  // 1. Ensure Auth & Sync User ID
+  useEffect(() => {
+    if (!user) {
+      void checkAuth();
+    }
+    if (user?.id) {
+      setCurrentUserId(user.id);
+    }
+  }, [user, checkAuth, setCurrentUserId]);
+
+  // 2. Manage Socket Subscription (This will connect socket -> send Enter -> get Token)
+  useStudySocketSubscription(studyId);
+
+  return null;
+}
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
-  const { user, checkAuth } = useAuthStore();
+  const { user } = useAuthStore();
+  const { localParticipant } = useLocalParticipant();
 
   // Listen for participant events and Handle Enter/Leave
-  useStudySocketSubscription(studyId);
+  // MOVED TO StudySocketInitiator
+  // useStudySocketSubscription(studyId);   <-- REMOVED
   const { updateStatus } = useStudySocketActions();
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
@@ -60,7 +85,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   // User asked "Make modal also not appear" likely referring to this one in context of access denied.
   // We can make it dependent on success of fetchStudyRoom or similar state.
   // But strictly speaking, we can just remove it from here and let user open it manually or put it in .then() of fetchStudyRoom.
-  
+
   // However, usually we want it on entry.
   // Let's add a state `isAccessGranted` and only open if granted.
 
@@ -71,7 +96,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       openSettingsModal('device');
     }
   }, [openSettingsModal, isAccessGranted]);
-
 
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
@@ -116,42 +140,16 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   }, [setSelectedProblem, resetToOnlyMine]);
 
   // API Hooks
-  const { problems, addProblem, deleteProblem } = useProblems(studyId);
+  const { problems, addProblem, deleteProblem } = useProblems(
+    studyId,
+    format(selectedDate, 'yyyy-MM-dd'),
+  );
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
-  // Set currentUserId when user is available
+  // Initialize room data (fetch participants only, room info fetched in wrapper)
   useEffect(() => {
-    if (user?.id) {
-      setCurrentUserId(user.id);
-    }
-  }, [user, setCurrentUserId]);
-
-  // Initialize room data (in real app, fetch from API)
-  useEffect(() => {
-    // Load user if not already available
-    if (!user) {
-      void checkAuth();
-    }
-
-    // Ensure roomId is set in store immediately when studyId is available
-    if (studyId) {
-      setRoomInfo({ roomId: studyId, roomTitle: `Loading...` });
-    }
-
-    fetchStudyRoom(studyId)
-      .then((data) => {
-        setRoomInfo({
-          roomId: data.id,
-          roomTitle: data.title,
-          myRole: data.role,
-        });
-        setIsAccessGranted(true);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch room info:', err);
-        toast.error('접근 권한이 없습니다.');
-        router.replace('/study');
-      });
+    // Access is guaranteed by wrapper
+    setIsAccessGranted(true);
 
     setCurrentDate(formatDate(new Date()));
 
@@ -170,7 +168,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         ),
       )
       .catch((err) => console.error('Failed to fetch participants:', err));
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, checkAuth, user]);
+  }, [studyId, setCurrentDate, setParticipants, user]);
 
   const handleBack = (): void => {
     router.push('/study');
@@ -182,7 +180,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     tags?: string[],
     problemId?: number,
   ): Promise<void> => {
-    await addProblem(title, number, tags, problemId);
+    await addProblem(title, number, tags, problemId, format(selectedDate, 'yyyy-MM-dd'));
     console.log('Add problem clicked in header');
   };
 
@@ -196,44 +194,68 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     console.log('Settings clicked');
   };
 
-  const handleMicToggle = (): void => {
-    // Determine new state based on simple toggle
-    // However, ControlBar is stateless now and relies on Store.
-    // So we invoke updateStatus with inverted current state
-    const { currentUserId, participants, updateParticipant } = useRoomStore.getState();
-    const me = participants.find((p) => p.id === currentUserId);
-    if (!me || !currentUserId) return;
+  const handleMicToggle = async (): Promise<void> => {
+    if (localParticipant) {
+      try {
+        const targetEnabled = !localParticipant.isMicrophoneEnabled;
+        await localParticipant.setMicrophoneEnabled(targetEnabled);
 
-    // Optimistic Update
-    const newMuted = !me.isMuted;
-    updateParticipant(currentUserId, { isMuted: newMuted });
-
-    // Toggle Mute (OpenVidu + Socket)
-    updateStatus(newMuted, me.isVideoOff);
-    
-    // OpenVidu 오디오 토글도 호출 (useOpenVidu가 CCVideoGrid에서 호출되므로 전역 함수 사용)
-    const toggleAudio = (window as any).__openviduToggleAudio;
-    if (toggleAudio) {
-      toggleAudio();
+        const { currentUserId, updateParticipant } = useRoomStore.getState();
+        if (currentUserId) {
+          updateParticipant(currentUserId, { isMuted: !targetEnabled });
+          const { participants } = useRoomStore.getState();
+          const me = participants.find((p) => p.id === currentUserId);
+          updateStatus(!targetEnabled, me?.isVideoOff ?? false);
+        }
+      } catch (error) {
+        console.warn('Mic toggle error:', error);
+        toast.error('마이크를 켤 수 없습니다.', {
+          description: '설정에서 장치 권한을 확인하거나 다시 선택해주세요.',
+          action: {
+            label: '설정 열기',
+            onClick: () => useSettingsStore.getState().openModal('device'),
+          },
+        });
+        // Open modal automatically if permission error is suspected
+        if (
+          error instanceof Error &&
+          (error.name === 'NotAllowedError' || error.message.includes('Permission denied'))
+        ) {
+          useSettingsStore.getState().openModal('device');
+        }
+      }
     }
   };
 
-  const handleVideoToggle = (): void => {
-    const { currentUserId, participants, updateParticipant } = useRoomStore.getState();
-    const me = participants.find((p) => p.id === currentUserId);
-    if (!me || !currentUserId) return;
+  const handleVideoToggle = async (): Promise<void> => {
+    if (localParticipant) {
+      try {
+        const targetEnabled = !localParticipant.isCameraEnabled;
+        await localParticipant.setCameraEnabled(targetEnabled);
 
-    // Optimistic Update
-    const newVideoOff = !me.isVideoOff;
-    updateParticipant(currentUserId, { isVideoOff: newVideoOff });
-
-    // Toggle Video (OpenVidu + Socket)
-    updateStatus(me.isMuted, newVideoOff);
-    
-    // OpenVidu 비디오 토글도 호출
-    const toggleVideo = (window as any).__openviduToggleVideo;
-    if (toggleVideo) {
-      toggleVideo();
+        const { currentUserId, updateParticipant } = useRoomStore.getState();
+        if (currentUserId) {
+          updateParticipant(currentUserId, { isVideoOff: !targetEnabled });
+          const { participants } = useRoomStore.getState();
+          const me = participants.find((p) => p.id === currentUserId);
+          updateStatus(me?.isMuted ?? false, !targetEnabled);
+        }
+      } catch (error) {
+        console.warn('Camera toggle error:', error);
+        toast.error('카메라를 켤 수 없습니다.', {
+          description: '설정에서 장치 권한을 확인하거나 다시 선택해주세요.',
+          action: {
+            label: '설정 열기',
+            onClick: () => useSettingsStore.getState().openModal('device'),
+          },
+        });
+        if (
+          error instanceof Error &&
+          (error.name === 'NotAllowedError' || error.message.includes('Permission denied'))
+        ) {
+          useSettingsStore.getState().openModal('device');
+        }
+      }
     }
   };
 
@@ -248,12 +270,15 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       // Turn on whiteboard - send START message
       sendMessage({ action: 'START' });
       setIsWhiteboardActive(true);
+      setWhiteboardOverlayOpen(true);
     }
   };
 
-  // VideoGrid tile click: handled directly in WhiteboardTile component
+  // VideoGrid tile click: handled directly in WhiteboardTile (only toggles overlay)
   const handleWhiteboardClick = (): void => {
-    // No-op: WhiteboardTile handles the toggle internally
+    // [Fix] Tile click should NOT toggle the global whiteboard session (isWhiteboardActive).
+    // It only toggles the local overlay visibility, which is handled inside CCWhiteboardTile.tsx
+    console.log('Whiteboard tile clicked (Overlay toggle)');
   };
 
   const handleSelectProblem = (problem: Problem): void => {
@@ -264,7 +289,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       console.warn('[StudyRoomClient] Invalid problem ID:', problem.problemId);
       return;
     }
-    setSelectedProblem(pId, problem.title);
+    setSelectedProblem(pId, problem.title, problem.externalId || String((problem as any).number));
   };
 
   const handleDateChange = (date: Date): void => {
@@ -328,19 +353,67 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   );
 }
 
-// Wrapper to provide SocketContext
+import { CCLiveKitWrapper } from './CCLiveKitWrapper';
+
+// Wrapper to provide SocketContext and handle Auth Check
 export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
   const studyId = Number(params.id) || 0;
+  const router = useRouter();
   const currentUserId = useRoomStore((state) => state.currentUserId);
+  const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
 
-  // Wait for userId to be initialized if you want to delay connection?
-  // But we want to render the content immediately.
-  // SocketProvider will handle connection updates when currentUserId changes.
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Check access permission before mounting socket/LiveKit
+  useEffect(() => {
+    if (!studyId) {
+      setIsChecking(false);
+      return;
+    }
+
+    fetchStudyRoom(studyId)
+      .then((data) => {
+        setRoomInfo({
+          roomId: data.id,
+          roomTitle: data.title,
+          myRole: data.role,
+        });
+        setIsAuthorized(true);
+      })
+      .catch((err) => {
+        console.error('[CCStudyRoomClient] Access Check Failed:', err);
+        // Error message is already toast-ed? no, StudyApi throws Error with message.
+        // We should show toast here.
+        toast.error(err.message || '접근 권한이 없습니다.');
+        router.replace('/study');
+      })
+      .finally(() => {
+        setIsChecking(false);
+      });
+  }, [studyId, setRoomInfo, router]);
+
+  if (isChecking) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-primary h-8 w-8" />
+        <span className="ml-2 text-lg font-medium text-foreground">스터디 정보 확인 중...</span>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    // Already redirecting in useEffect, return empty or loader
+    return null;
+  }
 
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
-      <StudyRoomContent studyId={studyId} />
+      <StudySocketInitiator studyId={studyId} />
+      <CCLiveKitWrapper studyId={studyId}>
+        <StudyRoomContent studyId={studyId} />
+      </CCLiveKitWrapper>
     </SocketProvider>
   );
 }

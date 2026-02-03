@@ -33,11 +33,7 @@ const PreBlock = ({ children, ...props }: any) => {
           {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         </Button>
       </div>
-      <pre
-        ref={preRef}
-        className="overflow-x-auto p-4 font-mono text-xs text-zinc-50"
-        {...props}
-      >
+      <pre ref={preRef} className="overflow-x-auto p-4 font-mono text-xs text-zinc-50" {...props}>
         {children}
       </pre>
     </div>
@@ -101,6 +97,9 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
           language: message.metadata.language || 'python',
           ownerName: displayOwnerName,
           problemTitle: message.metadata.problemTitle,
+          problemId: message.metadata.problemId,
+          externalId: message.metadata.externalId,
+          isRealtime: false,
         });
         return;
       }
@@ -191,6 +190,7 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
                 problemTitle={message.metadata.problemTitle}
                 ownerName={message.metadata.ownerName}
                 problemId={message.metadata.problemId}
+                externalId={message.metadata.externalId}
                 onClick={handleCodeClick}
                 className={
                   isMine ? 'bg-primary-foreground/10 border-primary-foreground/20' : 'bg-background'

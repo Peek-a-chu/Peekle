@@ -14,6 +14,7 @@ import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CCCenterPanelProps {
   ideContent?: ReactNode;
@@ -59,11 +60,15 @@ export function CCCenterPanel({
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const selectedProblemExternalId = useRoomStore((state) => state.selectedProblemExternalId);
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
 
+  // [Fix] Whiteboard is only visible when a problem is selected
+  const isWhiteboardVisible = isWhiteboardOverlayOpen && !!selectedProblemTitle;
+
   // Show right panel when viewing other's code OR whiteboard is open
-  const showRightPanel = isViewingOther || isWhiteboardOverlayOpen;
+  const showRightPanel = isViewingOther || isWhiteboardVisible;
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -84,6 +89,14 @@ export function CCCenterPanel({
 
   const handleLanguageChange = (lang: string): void => {
     setLanguage(lang);
+  };
+
+  const handleWhiteboardToggleWrapper = () => {
+    if (!selectedProblemTitle) {
+      toast.error('문제를 먼저 선택해주세요.');
+      return;
+    }
+    onWhiteboardToggle?.();
   };
 
   return (
@@ -123,6 +136,8 @@ export function CCCenterPanel({
               viewMode={viewMode}
               targetSubmission={targetSubmission}
               onResetView={resetToOnlyMine}
+              disabled={!selectedProblemTitle && !isViewingOther}
+              problemExternalId={selectedProblemExternalId}
               // Standard Handlers
               onLanguageChange={(lang) => leftPanelRef.current?.setLanguage(lang)}
               onThemeToggle={handleThemeToggle}
@@ -170,6 +185,7 @@ export function CCCenterPanel({
                     ownerName: ownerName || 'Unknown',
                     problemTitle: resolvedProblemTitle,
                     problemId: resolvedProblemId,
+                    externalId: selectedProblemExternalId || undefined,
                     isRealtime: viewMode === 'SPLIT_REALTIME',
                   });
                   useRoomStore.getState().setRightPanelActiveTab('chat');
@@ -189,6 +205,7 @@ export function CCCenterPanel({
                         ...currentPending,
                         problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
                         problemId: useRoomStore.getState().selectedProblemId ?? undefined,
+                        externalId: selectedProblemExternalId || undefined,
                         isRealtime: true, // Own code is treated as realtime capable
                       });
                     }
@@ -226,7 +243,7 @@ export function CCCenterPanel({
             )}
 
             {/* [New] Overlay if no problem is selected and not viewing other */}
-            {!selectedProblemTitle && !isViewingOther && !isWhiteboardOverlayOpen && (
+            {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
                 <Lock className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium text-muted-foreground">
@@ -235,11 +252,10 @@ export function CCCenterPanel({
               </div>
             )}
           </div>
-
           {/* Right Panel: Whiteboard OR Other's Code */}
           {showRightPanel && (
             <div className="flex-1 min-w-0">
-              {isWhiteboardOverlayOpen ? (
+              {isWhiteboardVisible ? (
                 <WhiteboardPanel className="border-l-2 border-rose-400" />
               ) : (
                 <IDEPanel
@@ -266,7 +282,7 @@ export function CCCenterPanel({
       <ControlBar
         onMicToggle={onMicToggle}
         onVideoToggle={onVideoToggle}
-        onWhiteboardToggle={onWhiteboardToggle}
+        onWhiteboardToggle={handleWhiteboardToggleWrapper}
         onSettingsClick={onSettingsClick}
       />
     </div>

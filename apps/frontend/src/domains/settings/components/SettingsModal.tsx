@@ -1,19 +1,30 @@
 'use client';
 
 import { Palette, Monitor } from 'lucide-react';
-import { useSettingsStore } from '../hooks/useSettingsStore';
+import { useSettingsStore, type SettingsTab } from '../hooks/useSettingsStore';
 import { Dialog, DialogContent, DialogOverlay, DialogTitle } from '@/components/ui/dialog';
 import ThemeSection from './ThemeSection';
 import DeviceSection from './DeviceSection';
 import { cn } from '@/lib/utils';
+import { usePathname } from 'next/navigation';
 
-const SettingsModal = () => {
+interface SettingsModalProps {
+  isGlobal?: boolean;
+}
+
+const SettingsModal = ({ isGlobal = false }: SettingsModalProps) => {
   const { isOpen, closeModal, activeTab, setActiveTab } = useSettingsStore();
+  const pathname = usePathname();
 
-  const tabs = [
+  // Hide global modal on study pages path to avoid duplication with the local modal
+  if (isGlobal && (pathname?.startsWith('/study/') || pathname?.startsWith('/game/'))) {
+    return null;
+  }
+
+  const tabs: { id: SettingsTab; label: string; icon: any }[] = [
     { id: 'theme', label: '테마 설정', icon: Palette },
     { id: 'device', label: '장치 관리', icon: Monitor },
-  ] as const;
+  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
@@ -60,7 +71,8 @@ const SettingsModal = () => {
           <main className="flex-1 p-4 sm:p-8 relative flex flex-col min-w-0 bg-card overflow-hidden">
             {/* 활성 탭 컨텐츠 */}
             <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
-              {activeTab === 'theme' ? <ThemeSection /> : <DeviceSection />}
+              {activeTab === 'theme' && <ThemeSection />}
+              {activeTab === 'device' && <DeviceSection isGlobal={isGlobal} />}
             </div>
           </main>
         </div>

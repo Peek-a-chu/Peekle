@@ -74,7 +74,6 @@ export function hexToHsl(hex: string): string {
     h /= 6;
   }
 
-
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }
 

@@ -119,12 +119,12 @@ export function StudyRankingList({
 
       {/* Table Header Row */}
       <div className="hidden md:grid grid-cols-[4rem_1fr_5rem_6rem_3rem] gap-4 px-6 py-2 text-sm font-medium text-slate-400">
-          <div className="text-center">순위</div>
-          <div>팀 이름</div>
-          <div className="text-center">인원</div>
-          <div className="text-right pr-2">총 점수</div>
-          <div></div>
-        </div>
+        <div className="text-center">순위</div>
+        <div>팀 이름</div>
+        <div className="text-center">인원</div>
+        <div className="text-right pr-2">총 점수</div>
+        <div></div>
+      </div>
 
       {/* List Items */}
       {isLoading ? (
@@ -221,23 +221,23 @@ export function StudyRankingList({
                                     {member.nickname.charAt(0)}
                                   </div>
                                 )}
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-700 text-sm">
-                                  {member.nickname}
-                                </span>
-                                <span
-                                  className={cn(
-                                    'text-[10px] font-bold px-1.5 py-0.5 rounded w-fit',
-                                    member.role === 'OWNER'
-                                      ? 'bg-primary/10 text-primary'
-                                      : 'bg-slate-100 text-slate-500',
-                                  )}
-                                >
-                                  {member.role === 'OWNER' ? 'OWNER' : 'MEMBER'}
-                                </span>
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-700 text-sm">
+                                    {member.nickname}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      'text-[10px] font-bold px-1.5 py-0.5 rounded w-fit',
+                                      member.role === 'OWNER'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-slate-100 text-slate-500',
+                                    )}
+                                  >
+                                    {member.role === 'OWNER' ? 'OWNER' : 'MEMBER'}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
                           );
                         })}
                       </div>

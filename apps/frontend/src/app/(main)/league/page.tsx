@@ -6,7 +6,7 @@ import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
 export default async function LeaguePage() {
   const [leagueStatus, weeklySummary] = await Promise.all([
     getLeagueStatusServer(),
-    getWeeklyPointSummaryServer()
+    getWeeklyPointSummaryServer(),
   ]);
 
   const finalLeagueStatus = leagueStatus || DEFAULT_LEAGUE_RANKING;

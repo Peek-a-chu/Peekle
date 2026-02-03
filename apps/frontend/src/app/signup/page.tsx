@@ -286,7 +286,11 @@ function SignupForm() {
 
             <button
               type="submit"
-              disabled={isSubmitting || validation.status !== 'valid' || (!!bojId.trim() && bojValidation.status !== 'valid')}
+              disabled={
+                isSubmitting ||
+                validation.status !== 'valid' ||
+                (!!bojId.trim() && bojValidation.status !== 'valid')
+              }
               className="w-full h-[52px] bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? '가입 중...' : '가입 완료'}

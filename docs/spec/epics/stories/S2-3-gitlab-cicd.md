@@ -178,7 +178,7 @@ docker compose -f docker-compose.prod.yml ps
 # peekle-frontend    Up
 # peekle-backend     Up
 # peekle-redis       Up (healthy)
-# peekle-openvidu    Up
+# peekle-livekit       Up (healthy)
 # peekle-coturn      Up
 ```
 
@@ -292,8 +292,8 @@ docker network inspect docker_peekle-network
                │ │                      │      │ │
                │ ▼                      ▼      │ │
                │ ┌────────┐       ┌─────────┐  │ │
-               │ │OpenVidu│◄─────►│  Redis  │  │ │
-               │ │ :4443  │       │  :6379  │  │ │
+               │ │LiveKit │◄─────►│  Redis  │  │ │
+               │ │ :7880  │       │  :6379  │  │ │
                │ └────┬───┘       └─────────┘  │ │
                │      │                        │ │
                │      ▼                        │ │
@@ -320,8 +320,8 @@ docker network inspect docker_peekle-network
 | Frontend | 3000 | - (internal) | TCP |
 | Backend | 8080 | - (internal) | TCP |
 | Redis | 6379 | - (internal) | TCP |
-| OpenVidu | 4443 | 4443 | TCP |
-| OpenVidu (media) | 40000-40050 | 40000-40050 | UDP/TCP |
+| LiveKit | 7880 | 7880 | TCP |
+| LiveKit (media) | 50000-60000 | 50000-60000 | UDP/TCP |
 | Coturn | 3478 | 3478 | UDP/TCP |
 | Coturn (TLS) | 5349 | 5349 | UDP/TCP |
 | Coturn (relay) | 51000-51050 | 51000-51050 | UDP |

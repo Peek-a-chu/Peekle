@@ -7,6 +7,7 @@ export interface Problem {
   title: string;
   tier: string;
   tags: string[];
+  externalId: string;
 }
 
 export interface Workbook {

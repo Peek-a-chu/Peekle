@@ -8,6 +8,7 @@ interface CodeShareCardProps {
   problemTitle?: string;
   ownerName?: string;
   problemId?: number;
+  externalId?: string; // Add
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   className?: string;
 }
@@ -18,6 +19,7 @@ export function CodeShareCard({
   problemTitle,
   ownerName,
   problemId,
+  externalId, // Add
   onClick,
   className,
 }: CodeShareCardProps): React.ReactNode {
@@ -48,8 +50,8 @@ export function CodeShareCard({
           <BookOpen size={16} className="text-primary shrink-0" />
           <span className="truncate">
             {problemTitle
-              ? problemId
-                ? `${problemId}. ${problemTitle}`
+              ? externalId || problemId
+                ? `${externalId || problemId}. ${problemTitle}`
                 : problemTitle
               : 'No Problem Selected'}
           </span>

@@ -31,14 +31,7 @@ interface SubmissionLogResponse {
 
 export async function fetchUserHistory(
   nickname: string,
-  {
-    tier,
-    date,
-    sourceType,
-    status,
-    page = 0,
-    size = 20,
-  }: FetchHistoryParams
+  { tier, date, sourceType, status, page = 0, size = 20 }: FetchHistoryParams,
 ): Promise<SubmissionHistory[]> {
   try {
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
@@ -62,9 +55,7 @@ export async function fetchUserHistory(
     if (status && status !== 'ALL') params.append('status', status);
 
     const endpoint =
-      nickname && nickname !== 'me'
-        ? `/api/users/${nickname}/history`
-        : `/api/users/me/history`;
+      nickname && nickname !== 'me' ? `/api/users/${nickname}/history` : `/api/users/me/history`;
 
     const url = `${backendUrl}${endpoint}?${params.toString()}`;
 
@@ -95,15 +86,19 @@ export async function fetchUserHistory(
 
       // Timestamp formatting - Convert to KST (UTC+9)
       const formattedDate = item.submittedAt
-        ? new Date(item.submittedAt).toLocaleString('ko-KR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-          timeZone: 'Asia/Seoul',
-        }).replace(/\. /g, '.').replace(/\.$/, '').replace(', ', ' ')
+        ? new Date(item.submittedAt)
+            .toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Seoul',
+            })
+            .replace(/\. /g, '.')
+            .replace(/\.$/, '')
+            .replace(', ', ' ')
         : '';
 
       return {
