@@ -13,36 +13,47 @@ import {
     Code2,
     GraduationCap
 } from 'lucide-react';
-import { useWeeklyScore } from '../hooks/useDashboardData';
+import { WeeklyPointSummary } from '@/domains/league/types';
+import { useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
-export const CCWeeklyScore = () => {
+interface CCWeeklyScoreProps {
+    initialData?: WeeklyPointSummary | null;
+    selectedDate?: string;
+}
+
+export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWeeklyScoreProps) => {
     // 현재 날짜 (YYYY-MM-DD)
-    const [currentDate, setCurrentDate] = useState<string>(() => {
+    const [internalDate, setInternalDate] = useState<string>(() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     });
 
-    const { data, isLoading } = useWeeklyScore(currentDate);
+    const currentDate = externalDate || internalDate;
+
+    const { data: fetchedData, isLoading: networkLoading } = useWeeklyScore(currentDate, { skip: !!initialData });
+    const data = initialData || fetchedData;
+    const isLoading = initialData ? false : networkLoading;
+
 
     // 날짜 이동 핸들러
     const handlePrevWeek = () => {
         const d = new Date(currentDate);
         d.setDate(d.getDate() - 7);
-        setCurrentDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        setInternalDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     };
 
     const handleNextWeek = () => {
         const d = new Date(currentDate);
         d.setDate(d.getDate() + 7);
-        setCurrentDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        setInternalDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     };
 
     // Date Picker 핸들러
     const handleDateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.value) {
-            setCurrentDate(e.target.value);
+            setInternalDate(e.target.value);
         }
     };
 

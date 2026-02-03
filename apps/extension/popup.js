@@ -182,8 +182,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 프로필 이미지 표시 (없으면 DiceBear API 사용)
         const tierIconEl = document.getElementById('tier-icon');
-        const imgUrl = data.profileImg || data.profileImage ||
-            `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(data.nickname || 'user')}`;
+        const rawImgUrl = data.profileImg || data.profileImage;
+        let imgUrl;
+
+        if (rawImgUrl) {
+            // URL에 공백 등이 있을 수 있으므로 인코딩 후 Next.js Image Proxy 사용
+            const encodedUrl = encodeURIComponent(rawImgUrl);
+            imgUrl = `${frontendBaseUrl}/_next/image?url=${encodedUrl}&w=256&q=75`;
+        } else {
+            imgUrl = `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(data.nickname || 'user')}`;
+        }
 
         tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile Image" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
 

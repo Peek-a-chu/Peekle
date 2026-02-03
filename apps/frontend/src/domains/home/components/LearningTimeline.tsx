@@ -4,18 +4,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
-import { TimelineItemData } from '../mocks/dashboardMocks';
 import { useTimeline } from '../hooks/useDashboardData';
+import { TimelineItemData } from '../mocks/dashboardMocks';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
   selectedDate: string | null;
   showHistoryLink?: boolean;
   nickname?: string;
+  initialData?: TimelineItemData[];
 }
 
-const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: LearningTimelineProps) => {
-  const { data } = useTimeline(selectedDate || '');
+const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname, initialData }: LearningTimelineProps) => {
+  const { data: fetchedData } = useTimeline(selectedDate || '', nickname, { skip: !!initialData });
+  const data = initialData || fetchedData;
   const [expanded, setExpanded] = useState(false);
 
   // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
@@ -31,8 +33,9 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: L
   Object.keys(groupedDataMap).forEach(problemId => {
     groupedDataMap[problemId].sort((a, b) => {
       // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
-      const aIsSuccess = a.result?.includes('맞았습니다') ?? false;
-      const bIsSuccess = b.result?.includes('맞았습니다') ?? false;
+      // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
+      const aIsSuccess = a.isSuccess ?? false;
+      const bIsSuccess = b.isSuccess ?? false;
 
       if (aIsSuccess !== bIsSuccess) {
         return bIsSuccess ? 1 : -1;
@@ -94,6 +97,7 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: L
                 key={problemId}
                 items={groupedDataMap[problemId]}
                 onSelect={handleSelect}
+                isMe={showHistoryLink}
               />
             ))
           ) : (

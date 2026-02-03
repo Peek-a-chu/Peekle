@@ -21,9 +21,13 @@ interface Props {
   };
   editBojId?: string;
   setEditBojId?: (value: string) => void;
+  bojIdValidation?: {
+    status: 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
+    message: string;
+  };
 }
 
-export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCancel, onEditSave, onUploadImage, onDeleteImage, editNickname, setEditNickname, nicknameValidation, editBojId, setEditBojId }: Props) {
+export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCancel, onEditSave, onUploadImage, onDeleteImage, editNickname, setEditNickname, nicknameValidation, editBojId, setEditBojId, bojIdValidation }: Props) {
   const isExtensionLinked = !!user.bojId;
 
   // 기본 이미지 생성
@@ -49,18 +53,39 @@ export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCanc
     }
   };
 
+  const getBojInputBorderColor = () => {
+    if (!bojIdValidation) return 'border-muted-foreground/50';
+    switch (bojIdValidation.status) {
+      case 'valid': return 'border-green-500 focus:border-green-500';
+      case 'invalid':
+      case 'error': return 'border-red-500 focus:border-red-500';
+      default: return 'border-muted-foreground/50 focus:border-primary';
+    }
+  };
+
+  const getBojValidationColor = () => {
+    if (!bojIdValidation) return '';
+    switch (bojIdValidation.status) {
+      case 'valid': return 'text-green-500';
+      case 'invalid':
+      case 'error': return 'text-red-500';
+      case 'checking': return 'text-slate-400';
+      default: return 'text-slate-400';
+    }
+  };
+
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-6">
         {/* Profile Image (Placeholder based on nickname) */}
-        <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-primary/10 flex items-center justify-center text-4xl font-bold text-primary shrink-0 border-4 border-background shadow-lg overflow-hidden group">
+        <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full flex items-center justify-center shrink-0 overflow-hidden group">
           {/* 프로필 상세 페이지에서는 항상 고해상도 이미지(profileImg)를 우선 사용 */}
           {/* profileImg가 없으면 썸네일(profileImgThumb) -> 둘 다 없으면 기본 이미지(DiceBear) */}
           <UserIcon
             src={user.profileImg || user.profileImgThumb}
             nickname={user.nickname}
             size={80}
-            className="ring-4 ring-background border-2 border-primary/20"
+            className="w-full h-full"
           />
 
           {/* Edit Overlay */}
@@ -120,15 +145,27 @@ export function CCProfileHeader({ user, isMe, isEditing, onEditStart, onEditCanc
 
 
           {isEditing && setEditBojId ? (
-            <div className="flex items-center gap-2 mt-6">
+            <div className="flex items-center gap-2 mt-6 relative">
               <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">BOJ ID:</span>
-              <input
-                type="text"
-                value={editBojId}
-                onChange={(e) => setEditBojId(e.target.value)}
-                className="text-sm bg-transparent border-b border-muted-foreground/50 text-foreground focus:outline-none focus:border-primary w-full max-w-[150px]"
-                placeholder="Baekjoon"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={editBojId}
+                  onChange={(e) => setEditBojId(e.target.value)}
+                  className={`text-sm bg-transparent border-b text-foreground focus:outline-none w-full max-w-[150px] transition-colors ${getBojInputBorderColor()}`}
+                  placeholder="Baekjoon"
+                />
+                {bojIdValidation && bojIdValidation.message && (
+                  <p className={`absolute top-full left-0 mt-1 text-xs whitespace-nowrap ${getBojValidationColor()}`}>
+                    {bojIdValidation.status === 'checking' && (
+                      <span className="inline-block w-2 pb-0.5 align-middle">
+                        <div className="w-2 h-2 border border-slate-300 border-t-slate-500 rounded-full animate-spin"></div>
+                      </span>
+                    )}
+                    {bojIdValidation.message}
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
