@@ -340,28 +340,38 @@ public class StudySocketController {
                                         .problemDate(request.getProblemDate())
                                         .build();
 
-                                studyCurriculumService.addProblem(userId, studyId, addRequest);
+                                ProblemStatusResponse addedProblem = studyCurriculumService.addProblem(userId, studyId, addRequest);
 
                                 String nickname = getUserNickname(userId);
                                 // [SYSTEM] 문제 추가 알림
                                 studyChatService.sendChat(studyId, userId,
                                         ChatMessageRequest.builder()
                                                 .content(nickname + "님이 커리큘럼을 추가했습니다: "
-                                                        + request.getProblemId())
+                                                        + addedProblem.getExternalId() + ". " + addedProblem.getTitle())
                                                 .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
 
+                                // Broadcast ADD event
+                                redisPublisher.publish(
+                                        new ChannelTopic("topic/studies/rooms/" + studyId + "/problems"),
+                                        SocketResponse.of("ADD", addedProblem));
+
                         } else if ("REMOVE".equalsIgnoreCase(request.getAction())) {
-                                studyCurriculumService.removeProblem(userId, studyId, request.getProblemId());
+                                ProblemStatusResponse removedProblem = studyCurriculumService.removeProblem(userId, studyId, request.getProblemId());
 
                                 String nickname = getUserNickname(userId);
                                 // [SYSTEM] 문제 삭제 알림
                                 studyChatService.sendChat(studyId, userId,
                                         ChatMessageRequest.builder()
                                                 .content(nickname + "님이 커리큘럼을 삭제했습니다: "
-                                                        + request.getProblemId())
+                                                        + removedProblem.getExternalId() + ". " + removedProblem.getTitle())
                                                 .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
+
+                                // Broadcast REMOVE event
+                                redisPublisher.publish(
+                                        new ChannelTopic("topic/studies/rooms/" + studyId + "/problems"),
+                                        SocketResponse.of("REMOVE", removedProblem));
                         }
                 } catch (Exception e) {
                         log.error("Curriculum Socket Error: {}", e.getMessage());
