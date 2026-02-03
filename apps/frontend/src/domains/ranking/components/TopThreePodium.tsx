@@ -10,7 +10,7 @@ interface TopThreePodiumProps {
   onStudyClick: (studyId: number) => void;
 }
 
-const MemberAvatars = ({
+const MemberIcons = ({
   members,
   limit = 3,
 }: {
@@ -73,7 +73,7 @@ export function TopThreePodium({ rankings, onStudyClick }: TopThreePodiumProps):
                 {second.name}
               </h3>
               <div className="mb-2">
-                <MemberAvatars members={second.members} />
+                <MemberIcons members={second.members} />
               </div>
               <div className="space-y-1 text-xs bg-slate-200/50 rounded-lg p-1.5">
                 <div className="flex items-center justify-center gap-1 font-bold text-slate-700">
@@ -117,7 +117,7 @@ export function TopThreePodium({ rankings, onStudyClick }: TopThreePodiumProps):
                 {first.name}
               </h3>
               <div className="mb-2">
-                <MemberAvatars members={first.members} />
+                <MemberIcons members={first.members} />
               </div>
               <div className="space-y-1 text-xs bg-yellow-200/50 rounded-lg p-1.5">
                 <div className="flex items-center justify-center gap-1 font-bold text-yellow-700">
@@ -161,7 +161,7 @@ export function TopThreePodium({ rankings, onStudyClick }: TopThreePodiumProps):
                 {third.name}
               </h3>
               <div className="mb-2">
-                <MemberAvatars members={third.members} />
+                <MemberIcons members={third.members} />
               </div>
               <div className="space-y-1 text-xs bg-orange-200/50 rounded-lg p-1.5">
                 <div className="flex items-center justify-center gap-1 font-bold text-orange-700">

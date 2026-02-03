@@ -64,15 +64,15 @@ const generateStreakData = (): ActivityStreakData[] => {
     const randomVal = seededRandom(seed);
     const randomCountVal = seededRandom(seed + 9999);
 
-        // 랜덤 문제 풀이 수 (0~8)
-        const count = randomVal > 0.3 ? Math.floor(randomCountVal * 8) : 0;
+    // 랜덤 문제 풀이 수 (0~8)
+    const count = randomVal > 0.3 ? Math.floor(randomCountVal * 8) : 0;
 
-        // 희소 데이터: 0이 아닌 경우에만 추가
-        if (count > 0) {
-            data.push({ date: dateStr, count });
-        }
+    // 희소 데이터: 0이 아닌 경우에만 추가
+    if (count > 0) {
+      data.push({ date: dateStr, count });
     }
-    return data;
+  }
+  return data;
 };
 
 export const MOCK_ACTIVITY_STREAK: ActivityStreakData[] = generateStreakData();
@@ -101,21 +101,22 @@ export const BOJ_TIER_COLORS: Record<BojTier, string> = {
 
 // 학습 타임라인 아이템
 export interface TimelineItemData {
-    submissionId?: number;
-    problemId: string;
-    title: string;
-    tier: BojTier;
-    tierLevel: BojTierLevel;
-    link: string;
-    sources: string[]; // 다중 태그 지원을 위해 배열로 변경
-    sourceType: 'study' | 'game' | 'problem';
-    tag?: string; // [팀] 게임방 이름 등 (서버에서 받은 태그)
-    gameType?: 'team' | 'personal'; // 게임일 경우 팀전/개인전 구분
-    language?: string;
-    memory?: number;
-    executionTime?: number;
-    code?: string;
-    submittedAt?: string;
+  submissionId?: number;
+  problemId: string;
+  title: string;
+  tier: BojTier;
+  tierLevel: BojTierLevel;
+  link: string;
+  sources: string[]; // 다중 태그 지원을 위해 배열로 변경
+  sourceType: 'study' | 'game' | 'problem';
+  tag?: string; // [팀] 게임방 이름 등 (서버에서 받은 태그)
+  gameType?: 'team' | 'personal'; // 게임일 경우 팀전/개인전 구분
+  language?: string;
+  memory?: number;
+  executionTime?: number;
+  code?: string;
+  submittedAt?: string;
+  result?: string; // 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등)
 }
 
 export const MOCK_TIMELINE: TimelineItemData[] = [
@@ -298,7 +299,6 @@ export const MOCK_WEEKLY_SCORE = MOCK_WEEKLY_SCORES[0];
 export interface LeagueRankingMember {
   rank: number;
   name: string;
-  avatar: string;
   score: number;
   isMe?: boolean;
 }
@@ -360,15 +360,15 @@ export const MOCK_LEAGUE_RANKING: LeagueRankingData = {
   maxLeague: 'diamond',
   maxScore: 230,
   members: [
-    { rank: 1, name: 'user_1', avatar: '/avatars/default.png', score: 970 },
-    { rank: 2, name: '꿈꾸며유영', avatar: '/avatars/default.png', score: 880 },
-    { rank: 3, name: '심도랑하이', avatar: '/avatars/default.png', score: 850, isMe: true }, // 나 (승급권)
-    { rank: 4, name: 'user_4', avatar: '/avatars/default.png', score: 720 },
-    { rank: 5, name: 'user_5', avatar: '/avatars/default.png', score: 680 },
-    { rank: 6, name: 'user_6', avatar: '/avatars/default.png', score: 650 },
-    { rank: 7, name: 'user_7', avatar: '/avatars/default.png', score: 620 },
-    { rank: 8, name: 'user_8', avatar: '/avatars/default.png', score: 580 },
-    { rank: 9, name: 'user_9', avatar: '/avatars/default.png', score: 480 },
-    { rank: 10, name: 'user_10', avatar: '/avatars/default.png', score: 430 },
+    { rank: 1, name: 'user_1', score: 970 },
+    { rank: 2, name: '꿈꾸며유영', score: 880 },
+    { rank: 3, name: '심도랑하이', score: 850, isMe: true }, // 나 (승급권)
+    { rank: 4, name: 'user_4', score: 720 },
+    { rank: 5, name: 'user_5', score: 680 },
+    { rank: 6, name: 'user_6', score: 650 },
+    { rank: 7, name: 'user_7', score: 620 },
+    { rank: 8, name: 'user_8', score: 580 },
+    { rank: 9, name: 'user_9', score: 480 },
+    { rank: 10, name: 'user_10', score: 430 },
   ],
 };

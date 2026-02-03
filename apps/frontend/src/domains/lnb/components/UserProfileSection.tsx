@@ -1,5 +1,3 @@
-'use client';
-
 import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -9,13 +7,25 @@ import MyLeagueCard from './MyLeagueCard';
 import { logout } from '@/api/authApi';
 import { useAuthStore } from '@/store/auth-store';
 
-const UserProfileSection = () => {
+import { UserProfile } from '@/domains/profile/types';
+import { UserIcon } from '@/components/UserIcon';
+// import defaultProfileImg from '@/assets/icons/profile.png';
+
+interface UserProfileSectionProps {
+  initialUser: UserProfile;
+}
+
+const UserProfileSection = ({ initialUser }: UserProfileSectionProps) => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const user = useAuthStore((state) => state.user);
+  const storeUser = useAuthStore((state) => state.user);
   const checkAuth = useAuthStore((state) => state.checkAuth);
+
+  // Use store user if available (client-side update), otherwise fallback to initialUser (SSR)
+  const user = storeUser || initialUser;
+
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -48,20 +58,12 @@ const UserProfileSection = () => {
     <div className="px-5 py-1">
       <div className="relative mb-6" ref={dropdownRef}>
         <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center gap-3 group">
-          <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center overflow-hidden border-2 border-background shrink-0 ml-2 shadow-sm">
-            {user.profileImg ? (
-              <Image
-                src={user.profileImg}
-                alt={user.nickname}
-                fill
-                className="object-cover rounded-full"
-              />
-            ) : (
-              <span className="text-primary-foreground font-bold text-lg">
-                {user.nickname.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
+          <UserIcon
+            src={user.profileImgThumb || user.profileImg}
+            nickname={user.nickname}
+            size={32}
+            className="border-primary/20"
+          />
           <span className="flex-1 font-semibold text-sm text-foreground truncate group-hover:text-primary text-left transition-colors">
             {user.nickname}
           </span>
@@ -93,7 +95,10 @@ const UserProfileSection = () => {
         )}
       </div>
 
-      <MyLeagueCard />
+      <MyLeagueCard
+        initialTier={user.league}
+        initialScore={user.leaguePoint}
+      />
     </div>
   );
 };

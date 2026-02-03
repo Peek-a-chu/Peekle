@@ -5,6 +5,7 @@ interface User {
   id: number;
   nickname: string;
   profileImg: string | null;
+  profileImgThumb: string | null;
   bojId: string | null;
   league: string;
   leaguePoint: number;

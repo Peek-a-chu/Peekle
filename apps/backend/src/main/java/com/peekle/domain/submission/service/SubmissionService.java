@@ -14,6 +14,7 @@ import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.domain.game.service.RedisGameService;
+import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -57,8 +58,8 @@ public class SubmissionService {
             }
         }
 
-        // 0. 검증 (Extension 변조 방지)
-        if (user.getBojId() != null && !user.getBojId().isEmpty()) {
+        // 0. 검증 (Extension 변조 방지) - AC(성공)일 때만 검증
+        if (request.getIsSuccess() && user.getBojId() != null && !user.getBojId().isEmpty()) {
             try {
                 submissionValidator.validateSubmission(
                         String.valueOf(request.getProblemId()),
@@ -79,6 +80,9 @@ public class SubmissionService {
                         .message("검증 중 오류 발생: " + e.getMessage())
                         .build();
             }
+        } else if (!request.getIsSuccess()) {
+            // WA, RTE, TLE 등 실패한 제출은 검증 없이 저장
+            System.out.println("⚠️ Skip Validation: Failed submission (WA/RTE/TLE/etc)");
         } else {
             System.out.println("⚠️ Skip Validation: User has no BOJ ID linked.");
         }
@@ -148,6 +152,7 @@ public class SubmissionService {
                 user, problem, sourceType,
                 request.getProblemTitle(), reqTierStr, externalId,
                 tag,
+                request.getResult(), // result 추가
                 request.getCode(),
                 request.getMemory(), request.getExecutionTime(),
                 request.getLanguage(), submittedAt);
@@ -158,13 +163,15 @@ public class SubmissionService {
 
         // 5. 리그 포인트 & 랭킹 계산
         int earnedPoints = leagueService.updateLeaguePointForSolvedProblem(user, problem);
-        int currentRank = leagueService.getUserRank(user);
+
+        // 그룹 내 순위 및 상태 계산 (LeagueService 활용)
+        com.peekle.domain.league.dto.UserLeagueStatusDto statusDto = leagueService.getUserLeagueStatus(user);
 
         System.out.println("✅ Submission saved! ID: " + log.getId());
 
         // 유저가 게임 중이라면 점수 반영
         try {
-            String userGameKey = String.format(com.peekle.global.redis.RedisKeyConst.USER_CURRENT_GAME, user.getId());
+            String userGameKey = String.format(RedisKeyConst.USER_CURRENT_GAME, user.getId());
             Object gameIdObj = redisTemplate.opsForValue().get(userGameKey);
 
             if (gameIdObj != null) {
@@ -176,16 +183,38 @@ public class SubmissionService {
             System.err.println("Failed to update game score: " + e.getMessage());
         }
 
-        return SubmissionResponse.builder()
-                .success(true)
-                .submissionId(log.getId())
-                .firstSolve(earnedPoints > 0)
-                .earnedPoints(earnedPoints)
-                .totalPoints(user.getLeaguePoint())
-                .currentRank(currentRank)
-                .currentLeague(user.getLeague())
-                .message(earnedPoints > 0 ? "Problem Solved! (+" + earnedPoints + ")" : "Already Solved.")
-                .build();
+        // 성공/실패 여부에 따라 다른 응답
+        boolean isAC = request.getIsSuccess() != null && request.getIsSuccess();
+
+        if (isAC) {
+            // AC (맞았습니다) - 포인트 획득 가능
+            return SubmissionResponse.builder()
+                    .success(true)
+                    .submissionId(log.getId())
+                    .firstSolve(earnedPoints > 0)
+                    .earnedPoints(earnedPoints)
+                    .totalPoints(user.getLeaguePoint())
+                    .currentRank(statusDto.getGroupRank())
+                    .currentLeague(user.getLeague())
+                    .leagueStatus(statusDto.getLeagueStatus())
+                    .pointsToPromotion(statusDto.getPointsToPromotion())
+                    .pointsToMaintenance(statusDto.getPointsToMaintenance())
+                    .message(earnedPoints > 0 ? "Problem Solved! (+" + earnedPoints + ")" : "Already Solved.")
+                    .build();
+        } else {
+            // WA, RTE, TLE, MLE, OLE 등 - 저장만 하고 포인트 없음
+            return SubmissionResponse.builder()
+                    .success(false) // 실패 토스트 표시용
+                    .submissionId(log.getId())
+                    .totalPoints(user.getLeaguePoint())
+                    .currentRank(statusDto.getGroupRank())
+                    .currentLeague(user.getLeague())
+                    .leagueStatus(statusDto.getLeagueStatus())
+                    .pointsToPromotion(statusDto.getPointsToPromotion())
+                    .pointsToMaintenance(statusDto.getPointsToMaintenance())
+                    .message(request.getResult()) // "틀렸습니다", "런타임 에러" 등
+                    .build();
+        }
     }
 
     private User createTempUser() {

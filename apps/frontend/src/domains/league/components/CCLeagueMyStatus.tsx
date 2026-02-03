@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trophy, Settings2, Clock } from 'lucide-react';
+import { Trophy, Clock } from 'lucide-react';
 import LeagueIcon, { LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { useLeagueRanking, useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
 import LeagueRuleModal from './LeagueRuleModal';
@@ -98,34 +98,12 @@ const CCLeagueMyStatus = () => {
   const { data: rankingData } = useLeagueRanking();
   const { data: weeklyData } = useWeeklyScore();
 
-  // --- [Dev] 임시 상태 관리 ---
-  const [myRank, setMyRank] = useState(rankingData.myRank);
-  const [myScore, setMyScore] = useState(weeklyData?.totalScore ?? 0);
-  const [showDev, setShowDev] = useState(false);
+  // 실제 데이터 사용
+  const myRank = rankingData.myRank;
+  const myScore = weeklyData?.totalScore ?? 0;
 
-  // [Dev] 타겟 날짜 강제 설정
-  const [forceTargetDate, setForceTargetDate] = useState<string>('');
-  // [Dev] 디버그 패널용 초단위 업데이트
-  const [debugTick, setDebugTick] = useState(0);
-
-  // 데이터 로드 시 초기화
-  useEffect(() => {
-    setMyRank(rankingData.myRank);
-    if (weeklyData) {
-      setMyScore(weeklyData.totalScore);
-    }
-  }, [rankingData.myRank, weeklyData]);
-
-  // [Dev] 디버그 모드일 때 1초마다 리렌더링 (시간 확인용)
-  useEffect(() => {
-    if (!showDev) return;
-    const timer = setInterval(() => setDebugTick((t) => t + 1), 1000);
-    return () => clearInterval(timer);
-  }, [showDev]);
-
-  // 타겟 날짜 결정
-  const targetDate = forceTargetDate ? new Date(forceTargetDate) : getNextTuesday2100UTC();
-  // ---------------------------
+  // 타겟 날짜 결정 (UTC 화요일 21:00)
+  const targetDate = getNextTuesday2100UTC();
 
   // 계산 로직 (Backend Status 기반)
   // 전체 인원
@@ -194,71 +172,11 @@ const CCLeagueMyStatus = () => {
             leagueStats={rankingData.leagueStats}
           />
         </div>
-        {/* Dev Toggle */}
-        <button
-          onClick={() => setShowDev(!showDev)}
-          className="text-muted-foreground/30 hover:text-muted-foreground"
-        >
-          <Settings2 className="w-4 h-4" />
-        </button>
       </div>
 
       <p className="text-sm text-muted-foreground -mt-4 mb-4">
         매주 점수를 쌓아 상위 리그로 승급하세요
       </p>
-
-      {/* [Dev] 컨트롤 패널 */}
-      {showDev && (
-        <div className="bg-muted/30 p-3 rounded-lg mb-4 space-y-2 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-10 font-bold">내 순위</span>
-            <input
-              type="number"
-              className="w-16 p-1 rounded border"
-              value={myRank}
-              onChange={(e) => setMyRank(Number(e.target.value))}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-10 font-bold">내 점수</span>
-            <input
-              type="number"
-              className="w-16 p-1 rounded border"
-              value={myScore}
-              onChange={(e) => setMyScore(Number(e.target.value))}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-10 font-bold">종료 설정</span>
-            <input
-              type="datetime-local"
-              className="p-1 rounded border"
-              value={forceTargetDate}
-              onChange={(e) => setForceTargetDate(e.target.value)}
-            />
-            <button
-              onClick={() => setForceTargetDate('')}
-              className="ml-2 text-xs underline text-muted-foreground"
-            >
-              초기화
-            </button>
-          </div>
-
-          {/* [Dev] 시간 디버깅 정보 */}
-          <div className="pt-2 border-t border-border/20 space-y-1 text-[10px] text-muted-foreground font-mono">
-            <div key={debugTick} className="hidden"></div>
-            <div>현재(KST): {new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</div>
-            <div>현재(Local): {new Date().toLocaleString()}</div>
-            <div>현재(UTC): {new Date().toUTCString()}</div>
-            <div>
-              목표(Target KST): {targetDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
-            </div>
-            <div>목표(Target Local): {targetDate.toLocaleString()}</div>
-            <div>목표(Target UTC): {targetDate.toUTCString()}</div>
-            <div>남은시간(ms): {targetDate.getTime() - new Date().getTime()}</div>
-          </div>
-        </div>
-      )}
 
       {/* 카드 */}
       <div className="relative bg-card rounded-3xl p-6 border border-border/50 shadow-sm overflow-hidden">

@@ -15,10 +15,10 @@ export function CCProfileStatsRow({ user }: Props) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-      {/* 1. 현재 티어 */}
+      {/* 1. 현재 리그 */}
       <div className="p-4 rounded-lg bg-muted/30 text-center border border-border">
         <div className="flex justify-center mb-2">
-          {/* 티어 아이콘 */}
+          {/* 리그 아이콘 */}
           {!user.league || imgError ? (
             <div className="w-6 h-6 bg-muted rounded-lg flex items-center justify-center text-[6px] text-muted-foreground font-bold leading-tight border border-dashed border-border">
               UR
@@ -35,7 +35,7 @@ export function CCProfileStatsRow({ user }: Props) {
           )}
         </div>
         <p className="text-2xl font-bold text-foreground">{user.league || '언랭크'}</p>
-        <p className="text-sm text-muted-foreground">현재 티어</p>
+        <p className="text-sm text-muted-foreground">현재 리그</p>
       </div>
 
       {/* 2. 해결한 문제 */}

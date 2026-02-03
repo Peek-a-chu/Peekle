@@ -8,6 +8,7 @@ import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
 import PeopleIcon from '@/assets/icons/people.svg';
 import TrophyIcon from '@/assets/icons/trophy.svg';
 import ZoomIcon from '@/assets/icons/zoom.svg';
+import { UserIcon } from '@/components/UserIcon';
 
 interface StudyRankingListProps {
   rankings: RankResponse[];

@@ -24,6 +24,7 @@ public class WorkbookResponse {
     private boolean isOwner;
 
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private CreatorInfo creator;
     private List<WorkbookProblemResponse> problems;
 
@@ -44,6 +45,7 @@ public class WorkbookResponse {
                 .isBookmarked(isBookmarked)
                 .isOwner(isOwner)
                 .createdAt(workbook.getCreatedAt())
+                .updatedAt(workbook.getUpdatedAt())
                 .creator(CreatorInfo.builder()
                         .id(workbook.getCreator().getId())
                         .nickname(workbook.getCreator().getNickname())
