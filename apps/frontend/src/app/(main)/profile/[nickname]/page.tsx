@@ -17,7 +17,7 @@ export default async function UserProfilePage({ params }: Props) {
   const [user, streak, timeline] = await Promise.all([
     getUserProfile(decodedNickname),
     getActivityStreakServer(decodedNickname),
-    getTimelineServer(dateStr, decodedNickname)
+    getTimelineServer(dateStr, decodedNickname),
   ]);
 
   if (!user) {
