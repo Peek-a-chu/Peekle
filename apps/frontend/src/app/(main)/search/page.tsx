@@ -17,6 +17,7 @@ import {
 import ProblemIcon from '@/assets/icons/problem.svg';
 import BookIcon from '@/assets/icons/book.svg';
 import PeopleIcon from '@/assets/icons/people.svg';
+import { UserIcon } from '@/components/UserIcon';
 
 type SearchType = 'all' | 'problem' | 'user' | 'workbook';
 
@@ -126,7 +127,7 @@ const SearchResultItem = ({
 
   return (
     <div
-      className="relative flex items-center gap-4 p-4 min-h-[72px] cursor-pointer hover:bg-gray-50 transition-colors"
+      className="relative flex items-center gap-4 p-4 min-h-[72px] cursor-pointer hover:bg-accent transition-colors"
       onClick={onClick}
     >
       {/* Left Indicator */}
@@ -142,9 +143,12 @@ const SearchResultItem = ({
             {tier?.split('_')[0] || 'Unrated'}
           </div>
         ) : isUser(result) ? (
-          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200">
-            <PeopleIcon className="h-5 w-5 text-gray-500" />
-          </div>
+          <UserIcon
+            src={result.profileImage}
+            nickname={result.handle}
+            size={40}
+            className="border-border"
+          />
         ) : (
           <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
             <BookIcon className="h-5 w-5" />
@@ -154,11 +158,11 @@ const SearchResultItem = ({
 
       {/* Content */}
       <div className="flex-1 min-w-0 flex flex-col justify-center">
-        <h3 className="text-base font-bold text-[#040C13] truncate mb-0.5">
+        <h3 className="text-base font-bold text-foreground truncate mb-0.5">
           {highlightMatch(title, query)}
         </h3>
         {description && (
-          <p className="text-sm text-[#9DA7B0] line-clamp-1">
+          <p className="text-sm text-muted-foreground line-clamp-1">
             {highlightMatch(description, query)}
           </p>
         )}
@@ -169,7 +173,7 @@ const SearchResultItem = ({
         {tags?.slice(0, 2).map((tag) => (
           <span
             key={tag}
-            className="text-xs font-medium text-[#9DA7B0] bg-[#F7F8FC] px-2 py-1 rounded"
+            className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded"
           >
             #{tag}
           </span>
@@ -191,21 +195,17 @@ const UserGridItem = ({
   return (
     <div
       onClick={onClick}
-      className="flex items-center p-5 bg-white rounded-2xl border border-[#D8DFE4] h-[132px] hover:border-[#E24EA0] transition-colors cursor-pointer gap-4 shadow-[0_2px_8px_0_rgba(0,0,0,0.04)]"
+      className="flex items-center p-5 bg-card rounded-2xl border border-border h-[132px] hover:border-primary transition-colors cursor-pointer gap-4 shadow-[0_2px_8px_0_rgba(0,0,0,0.04)]"
     >
-      <div className="h-12 w-12 flex-shrink-0 rounded-full bg-[#F7F8FC] flex items-center justify-center border border-[#F2F4F7] overflow-hidden">
-        <img
-          src={
-            result.profileImage ||
-            `https://api.dicebear.com/9.x/avataaars/svg?seed=${result.handle}`
-          }
-          alt={result.handle}
-          className="h-full w-full object-cover"
-        />
-      </div>
+      <UserIcon
+        src={result.profileImage}
+        nickname={result.handle}
+        size={48}
+        className="border-border"
+      />
       <div className="flex flex-col justify-center min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <h3 className="text-base font-bold text-[#040C13] truncate">
+          <h3 className="text-base font-bold text-foreground truncate">
             {highlightMatch(result.handle, query)}
           </h3>
           <span
@@ -217,7 +217,7 @@ const UserGridItem = ({
           ></span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <p className="text-sm font-medium text-[#59656E]">
+          <p className="text-sm font-medium text-muted-foreground">
             {result.league} • {result.score}P
           </p>
         </div>
@@ -238,25 +238,25 @@ const WorkbookGridItem = ({
   return (
     <div
       onClick={onClick}
-      className="flex flex-col p-5 bg-white rounded-2xl border border-[#D8DFE4] h-full hover:border-[#E24EA0] transition-colors cursor-pointer shadow-[0_2px_8px_0_rgba(0,0,0,0.04)]"
+      className="flex flex-col p-5 bg-card rounded-2xl border border-border h-full hover:border-[#E24EA0] transition-colors cursor-pointer shadow-[0_2px_8px_0_rgba(0,0,0,0.04)]"
     >
       <div className="flex items-center gap-3 mb-3">
         <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
           <BookIcon className="h-5 w-5" />
         </div>
-        <h3 className="flex-1 text-base font-bold text-[#040C13] line-clamp-1">
+        <h3 className="flex-1 text-base font-bold text-foreground line-clamp-1">
           {highlightMatch(result.title, query)}
         </h3>
       </div>
 
       {result.description && (
-        <p className="text-sm text-[#9DA7B0] line-clamp-2 min-h-[40px] mb-3">
+        <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px] mb-3">
           {highlightMatch(result.description, query)}
         </p>
       )}
 
       {/* Problem Count */}
-      <div className="text-xs font-medium text-[#59656E] mb-3">
+      <div className="text-xs font-medium text-muted-foreground mb-3">
         총 {result.problemCount || 0}문제
       </div>
     </div>
@@ -285,10 +285,10 @@ const SearchResultSection = ({
   return (
     <div className="mb-8 last:mb-0">
       <div className="flex items-center justify-between mb-4 px-2">
-        <h2 className="text-lg font-bold text-[#040C13]">{title}</h2>
+        <h2 className="text-lg font-bold text-foreground">{title}</h2>
         <button
           onClick={onMoreClick}
-          className="text-sm font-medium text-[#59656E] hover:text-[#E24EA0] transition-colors"
+          className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
         >
           더보기
         </button>
@@ -320,7 +320,7 @@ const SearchResultSection = ({
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-[24px] border border-[#D8DFE4] divide-y divide-[#D8DFE4] overflow-hidden">
+        <div className="bg-card rounded-[24px] border border-border divide-y divide-border overflow-hidden">
           {results.map((result) => (
             <SearchResultItem
               key={
@@ -479,13 +479,13 @@ function SearchPageContent() {
 
   const singleResults: SearchResultItemType[] = !isAll
     ? data?.pages.flatMap((page) => {
-        const d = page.data;
-        // Explicitly return as generic SearchResultItemType arrays to avoid union mismatch in flatMap inference
-        if (activeTab === 'problem') return d.problems as SearchResultItemType[];
-        if (activeTab === 'workbook') return d.workbooks as SearchResultItemType[];
-        if (activeTab === 'user') return d.users as SearchResultItemType[];
-        return [] as SearchResultItemType[];
-      }) || []
+      const d = page.data;
+      // Explicitly return as generic SearchResultItemType arrays to avoid union mismatch in flatMap inference
+      if (activeTab === 'problem') return d.problems as SearchResultItemType[];
+      if (activeTab === 'workbook') return d.workbooks as SearchResultItemType[];
+      if (activeTab === 'user') return d.users as SearchResultItemType[];
+      return [] as SearchResultItemType[];
+    }) || []
     : [];
 
   // Calculate if we have any results to show
@@ -501,7 +501,7 @@ function SearchPageContent() {
     <SearchErrorBoundary>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-200">
-          <h1 className="mb-6 text-2xl font-bold text-[#040C13]">검색</h1>
+          <h1 className="mb-6 text-2xl font-bold text-foreground">검색</h1>
 
           {/* Search Bar */}
           <div className="mb-8">
@@ -513,7 +513,7 @@ function SearchPageContent() {
           </div>
 
           {/* Tabs & Filter Toggle */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D8DFE4] mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border mb-6">
             <div className="flex overflow-x-auto no-scrollbar">
               {TABS.map((tab) => (
                 <button
@@ -522,8 +522,8 @@ function SearchPageContent() {
                   className={cn(
                     'flex items-center gap-2 px-1 py-3 mr-6 text-sm font-bold border-b-2 transition-colors whitespace-nowrap',
                     activeTab === tab.value
-                      ? 'border-[#040C13] text-[#040C13]'
-                      : 'border-transparent text-[#59656E] hover:text-[#040C13]',
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {tab.icon}
@@ -537,14 +537,14 @@ function SearchPageContent() {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors mb-2 sm:mb-0 ml-auto sm:ml-0',
                 isFilterOpen || activeTiers.length > 0 || activeTags.length > 0
-                  ? 'bg-[#E24EA0]/10 text-[#E24EA0]'
-                  : 'text-[#59656E] hover:bg-gray-100',
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-accent',
               )}
             >
               <Filter className="h-4 w-4" />
               필터
               {(activeTiers.length > 0 || activeTags.length > 0) && (
-                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#E24EA0] text-[10px] text-white">
+                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
                   {activeTiers.length + activeTags.length}
                 </span>
               )}
@@ -553,11 +553,11 @@ function SearchPageContent() {
 
           {/* Filter Container */}
           {isFilterOpen && (
-            <div className="bg-white p-6 rounded-2xl border border-[#D8DFE4] mb-8 shadow-sm animate-in fade-in slide-in-from-top-2">
+            <div className="bg-card p-6 rounded-2xl border border-border mb-8 shadow-sm animate-in fade-in slide-in-from-top-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Difficulty Section */}
                 <div>
-                  <h3 className="text-sm font-bold text-[#040C13] mb-3">백준 티어</h3>
+                  <h3 className="text-sm font-bold text-foreground mb-3">백준 티어</h3>
                   <div className="flex flex-wrap gap-2">
                     {Object.keys(TIER_COLORS).map((tier) => (
                       <button
@@ -566,8 +566,8 @@ function SearchPageContent() {
                         className={cn(
                           'px-3 py-1.5 rounded-lg border text-xs font-bold transition-all',
                           tempTiers.includes(tier)
-                            ? 'border-[#E24EA0] bg-[#E24EA0]/10 text-[#E24EA0]'
-                            : 'border-[#D8DFE4] text-[#59656E] hover:border-[#E24EA0] hover:text-[#E24EA0] bg-white',
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:border-primary hover:text-primary bg-card',
                         )}
                       >
                         {tier}
@@ -578,7 +578,7 @@ function SearchPageContent() {
 
                 {/* Tags Section */}
                 <div>
-                  <h3 className="text-sm font-bold text-[#040C13] mb-3">태그</h3>
+                  <h3 className="text-sm font-bold text-foreground mb-3">태그</h3>
                   <div className="flex flex-wrap gap-2">
                     {SUGGESTED_KEYWORDS.map((keyword) => (
                       <button
@@ -587,8 +587,8 @@ function SearchPageContent() {
                         className={cn(
                           'px-3 py-1.5 rounded-lg border text-xs font-bold transition-all',
                           tempTags.includes(keyword)
-                            ? 'border-[#E24EA0] bg-[#E24EA0]/10 text-[#E24EA0]'
-                            : 'border-[#D8DFE4] text-[#59656E] hover:border-[#E24EA0] hover:text-[#E24EA0] bg-white',
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:border-primary hover:text-primary bg-card',
                         )}
                       >
                         {keyword}
@@ -599,10 +599,10 @@ function SearchPageContent() {
               </div>
 
               {/* Filter Actions */}
-              <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#F2F4F7]">
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
                 <button
                   onClick={handleResetFilter}
-                  className="flex items-center gap-1.5 px-2 py-2 text-sm font-medium text-[#9DA7B0] hover:text-[#59656E] transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   초기화
@@ -610,13 +610,13 @@ function SearchPageContent() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleCancelFilter}
-                    className="px-4 py-2 text-sm font-bold text-[#59656E] hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-accent rounded-lg transition-colors"
                   >
                     취소
                   </button>
                   <button
                     onClick={handleApplyFilter}
-                    className="px-4 py-2 text-sm font-bold text-white bg-[#040C13] hover:bg-[#040C13]/90 rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
                   >
                     적용하기
                   </button>

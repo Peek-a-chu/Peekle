@@ -6,6 +6,7 @@ import { useRoomStore, type Participant } from '@/domains/study/hooks/useRoomSto
 import { cn } from '@/lib/utils';
 import { Crown, Mic, MicOff, VideoOff, User, Loader2 } from 'lucide-react';
 import type { StreamManager } from 'openvidu-browser';
+import { UserIcon } from '@/components/UserIcon';
 
 interface CCVideoTileProps {
   participant: Participant;
@@ -83,11 +84,11 @@ export function CCVideoTile({
             videoElement.srcObject = null;
             videoElement.pause();
             videoElement.load(); // video element 리셋
-            
+
             // OpenVidu 스트림이 준비될 때까지 대기
             let retryCount = 0;
             const maxRetries = 20;
-            
+
             const checkAndAdd = () => {
               if (videoElement && publisher && publisher.stream.videoActive) {
                 try {
@@ -117,7 +118,7 @@ export function CCVideoTile({
                 }
               }
             };
-            
+
             // 즉시 시도 후, 실패하면 재시도
             retryTimeoutRef.current = setTimeout(checkAndAdd, 50);
           }
@@ -207,12 +208,12 @@ export function CCVideoTile({
       window.removeEventListener('openvidu-publisher-created', handlePublisherCreated as EventListener);
       window.removeEventListener('openvidu-publisher-destroyed', handlePublisherDestroyed as EventListener);
       window.removeEventListener('openvidu-publisher-video-changed', handlePublisherVideoChanged as EventListener);
-      
+
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
         retryTimeoutRef.current = null;
       }
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
@@ -236,11 +237,11 @@ export function CCVideoTile({
         videoElement.pause();
         videoElement.srcObject = null;
         videoElement.load(); // video element 리셋
-        
+
         // OpenVidu 스트림이 준비될 때까지 대기
         let retryCount = 0;
         const maxRetries = 20;
-        
+
         const checkAndAdd = () => {
           if (videoElement && publisher && publisher.stream.videoActive) {
             try {
@@ -271,9 +272,9 @@ export function CCVideoTile({
             }
           }
         };
-        
+
         retryTimeoutRef.current = setTimeout(checkAndAdd, 50);
-        
+
         return () => {
           if (retryTimeoutRef.current) {
             clearTimeout(retryTimeoutRef.current);
@@ -292,7 +293,7 @@ export function CCVideoTile({
       const getStreamManager = (window as any).__openviduGetStreamManager as
         | ((userId: number) => StreamManager | null)
         | undefined;
-      
+
       if (getStreamManager) {
         const subscriber = getStreamManager(participant.id);
         if (subscriber && !participant.isVideoOff) {
@@ -301,11 +302,11 @@ export function CCVideoTile({
           videoElement.pause();
           videoElement.srcObject = null;
           videoElement.load();
-          
+
           // OpenVidu 스트림이 준비될 때까지 대기
           let retryCount = 0;
           const maxRetries = 20;
-          
+
           const checkAndAdd = () => {
             if (videoElement && subscriber && subscriber.stream.videoActive) {
               try {
@@ -333,9 +334,9 @@ export function CCVideoTile({
               }
             }
           };
-          
+
           retryTimeoutRef.current = setTimeout(checkAndAdd, 50);
-          
+
           return () => {
             if (retryTimeoutRef.current) {
               clearTimeout(retryTimeoutRef.current);
@@ -373,16 +374,12 @@ export function CCVideoTile({
       <div className="relative flex flex-1 items-center justify-center bg-muted-foreground/10 overflow-hidden">
         {participant.isVideoOff ? (
           <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-muted-foreground/20">
-            {participant.profileImage ? (
-              <Image
-                src={participant.profileImage}
-                alt={participant.nickname}
-                fill
-                className="rounded-full object-cover"
-              />
-            ) : (
-              <User className="h-6 w-6 text-muted-foreground" />
-            )}
+            <UserIcon
+              src={participant.profileImage}
+              nickname={participant.nickname}
+              size={48}
+              className="w-full h-full"
+            />
           </div>
         ) : (
           <>
