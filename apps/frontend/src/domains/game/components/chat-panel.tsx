@@ -35,11 +35,7 @@ const PreBlock = ({ children, ...props }: any) => {
           {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         </Button>
       </div>
-      <pre
-        ref={preRef}
-        className="overflow-x-auto p-4 font-mono text-xs text-zinc-50"
-        {...props}
-      >
+      <pre ref={preRef} className="overflow-x-auto p-4 font-mono text-xs text-zinc-50" {...props}>
         {children}
       </pre>
     </div>
