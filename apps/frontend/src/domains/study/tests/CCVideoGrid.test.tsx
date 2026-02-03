@@ -56,15 +56,14 @@ describe('CCVideoGrid', () => {
   it('allows selecting another participant when problem is selected (enters split view)', () => {
     // Set selectedProblemId to allow split view
     mockState.selectedProblemId = 1;
-    
+
     render(<CCVideoGrid />);
 
     fireEvent.click(screen.getByText('Other'));
     expect(mockViewRealtimeCode).toHaveBeenCalledTimes(1);
     expect(mockViewRealtimeCode.mock.calls[0][0]).toMatchObject({ id: 2 });
-    
+
     // Reset for other tests
     mockState.selectedProblemId = null;
   });
 });
-

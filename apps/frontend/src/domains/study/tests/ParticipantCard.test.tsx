@@ -72,7 +72,7 @@ describe('ParticipantCard', () => {
     // Should show menu button (hasAnyAction = true because canOwnerActions || canViewCode || canViewProfile)
     const menuButton = screen.getByLabelText('메뉴');
     expect(menuButton).toBeDefined();
-    
+
     // Check that menu button exists
     const buttons = screen.getAllByRole('button');
     // Menu button exists (may have opacity-0 but is in DOM)

@@ -22,4 +22,3 @@ export const WHITEBOARD_TEXT_PLACEHOLDER = '텍스트 입력';
 export function isBlankText(text: unknown): boolean {
   return typeof text !== 'string' || text.trim().length === 0;
 }
-
