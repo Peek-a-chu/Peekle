@@ -6,7 +6,12 @@ import { useExtensionCheck } from '@/hooks/useExtensionCheck';
 import { UserProfile, ExtensionStatus } from '../types';
 import { CCProfileHeader } from './CCProfileHeader';
 import { CCProfileStatsRow } from './CCProfileStatsRow';
-import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi, getPresignedUrl, updateUserProfile } from '@/api/userApi';
+import {
+  checkNickname as checkNicknameApi,
+  checkBojId as checkBojIdApi,
+  getPresignedUrl,
+  updateUserProfile,
+} from '@/api/userApi';
 import ActivityStreak from '@/domains/home/components/ActivityStreak';
 import LearningTimeline from '@/domains/home/components/LearningTimeline';
 import { useAuthStore } from '@/store/auth-store';
@@ -113,33 +118,36 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
   };
 
   // 닉네임 유효성 검사 (디바운스 적용)
-  const checkNickname = useCallback(async (value: string) => {
-    if (!value.trim()) {
-      setNicknameValidation({ status: 'idle', message: '' });
-      return;
-    }
-
-    // 원래 닉네임과 같으면 통과 (변경 없음)
-    if (value === user.nickname) {
-      setNicknameValidation({ status: 'valid', message: '' });
-      return;
-    }
-
-    setNicknameValidation({ status: 'checking', message: '확인 중...' });
-
-    try {
-      const data = await checkNicknameApi(value);
-
-      if (data.success && data.data) {
-        setNicknameValidation({
-          status: data.data.available ? 'valid' : 'invalid',
-          message: data.data.message,
-        });
+  const checkNickname = useCallback(
+    async (value: string) => {
+      if (!value.trim()) {
+        setNicknameValidation({ status: 'idle', message: '' });
+        return;
       }
-    } catch {
-      setNicknameValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
-    }
-  }, [user.nickname]);
+
+      // 원래 닉네임과 같으면 통과 (변경 없음)
+      if (value === user.nickname) {
+        setNicknameValidation({ status: 'valid', message: '' });
+        return;
+      }
+
+      setNicknameValidation({ status: 'checking', message: '확인 중...' });
+
+      try {
+        const data = await checkNicknameApi(value);
+
+        if (data.success && data.data) {
+          setNicknameValidation({
+            status: data.data.available ? 'valid' : 'invalid',
+            message: data.data.message,
+          });
+        }
+      } catch {
+        setNicknameValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
+      }
+    },
+    [user.nickname],
+  );
 
   // 디바운스된 닉네임 체크
   useEffect(() => {
@@ -159,33 +167,36 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
   }, [editNickname, isEditing, checkNickname, user.nickname]);
 
   // BOJ ID 유효성 검사 (디바운스 적용)
-  const checkBojId = useCallback(async (value: string) => {
-    if (!value.trim()) {
-      setBojIdValidation({ status: 'idle', message: '' });
-      return;
-    }
-
-    // 기존 ID와 같으면 패스 (변경 없음)
-    if (value === user.bojId) {
-      setBojIdValidation({ status: 'valid', message: '' });
-      return;
-    }
-
-    setBojIdValidation({ status: 'checking', message: '확인 중...' });
-
-    try {
-      const data = await checkBojIdApi(value);
-
-      if (data.success && data.data) {
-        setBojIdValidation({
-          status: data.data.valid ? 'valid' : 'invalid',
-          message: data.data.message,
-        });
+  const checkBojId = useCallback(
+    async (value: string) => {
+      if (!value.trim()) {
+        setBojIdValidation({ status: 'idle', message: '' });
+        return;
       }
-    } catch {
-      setBojIdValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
-    }
-  }, [user.bojId]);
+
+      // 기존 ID와 같으면 패스 (변경 없음)
+      if (value === user.bojId) {
+        setBojIdValidation({ status: 'valid', message: '' });
+        return;
+      }
+
+      setBojIdValidation({ status: 'checking', message: '확인 중...' });
+
+      try {
+        const data = await checkBojIdApi(value);
+
+        if (data.success && data.data) {
+          setBojIdValidation({
+            status: data.data.valid ? 'valid' : 'invalid',
+            message: data.data.message,
+          });
+        }
+      } catch {
+        setBojIdValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
+      }
+    },
+    [user.bojId],
+  );
 
   // 디바운스된 BOJ ID 체크
   useEffect(() => {
@@ -213,7 +224,12 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
     document.getElementById('profile-image-input')?.click();
   };
 
-  const resizeImage = (file: File, width: number, height: number, filenamePrefix: string): Promise<File> => {
+  const resizeImage = (
+    file: File,
+    width: number,
+    height: number,
+    filenamePrefix: string,
+  ): Promise<File> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = URL.createObjectURL(file);
@@ -233,7 +249,9 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
 
           canvas.toBlob((blob) => {
             if (blob) {
-              const resizedFile = new File([blob], `${filenamePrefix}_${file.name}`, { type: file.type });
+              const resizedFile = new File([blob], `${filenamePrefix}_${file.name}`, {
+                type: file.type,
+              });
               resolve(resizedFile);
             } else {
               resolve(file);
@@ -315,7 +333,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
         bojId: editBojId || optimisticUser.bojId,
         profileImg: nextProfileImg,
         // We might want to clear thumb or set it same as profile for preview purposes
-        profileImgThumb: nextProfileImg // for immediate preview, using same img is fine
+        profileImgThumb: nextProfileImg, // for immediate preview, using same img is fine
       };
 
       setOptimisticUser(nextUser);
@@ -329,14 +347,13 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
 
       // 4. Upload images if exist
       if (mainImageToUpload && thumbToUpload) {
-
         // --- A. Upload Main Image (112x112) ---
         const presignMainRes = await fetch(`/api/users/me/profile-image/presigned-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fileName: mainImageToUpload.name,
-            contentType: mainImageToUpload.type
+            contentType: mainImageToUpload.type,
           }),
         });
 
@@ -346,11 +363,10 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
         await fetch(mainData.presignedUrl, {
           method: 'PUT',
           body: mainImageToUpload,
-          headers: { 'Content-Type': mainImageToUpload.type }
+          headers: { 'Content-Type': mainImageToUpload.type },
         });
 
         uploadedImageUrl = mainData.publicUrl;
-
 
         // --- B. Upload Thumbnail (36x36) ---
         const presignThumbRes = await fetch(`/api/users/me/profile-image/presigned-url`, {
@@ -358,7 +374,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fileName: thumbToUpload.name,
-            contentType: thumbToUpload.type
+            contentType: thumbToUpload.type,
           }),
         });
 
@@ -368,7 +384,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
         await fetch(thumbData.presignedUrl, {
           method: 'PUT',
           body: thumbToUpload,
-          headers: { 'Content-Type': thumbToUpload.type }
+          headers: { 'Content-Type': thumbToUpload.type },
         });
 
         uploadedImageThumbUrl = thumbData.publicUrl;
@@ -410,7 +426,6 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
       } else {
         router.refresh();
       }
-
     } catch (error) {
       console.error('Save failed', error);
       toast.error('프로필 저장에 실패했습니다. 변경사항을 되돌립니다.');
@@ -480,7 +495,13 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
       <div className="p-6 border border-card-border rounded-xl bg-card">
         {/* 1. Header Section */}
         <CCProfileHeader
-          user={isEditing && previewImage ? { ...optimisticUser, profileImg: previewImage } : (isProfileImageDeleted ? { ...optimisticUser, profileImg: undefined, profileImgThumb: undefined } : optimisticUser)}
+          user={
+            isEditing && previewImage
+              ? { ...optimisticUser, profileImg: previewImage }
+              : isProfileImageDeleted
+                ? { ...optimisticUser, profileImg: undefined, profileImgThumb: undefined }
+                : optimisticUser
+          }
           isMe={isMe}
           isEditing={isEditing}
           onEditStart={handleEditStart}
@@ -488,7 +509,6 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
           onEditSave={handleEditSave}
           onUploadImage={handleUploadImageTrigger}
           onDeleteImage={handleDeleteImage}
-
           editNickname={editNickname}
           setEditNickname={setEditNickname}
           nicknameValidation={nicknameValidation}
@@ -518,10 +538,11 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabKey)}
-                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
-                  ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
-                  : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  activeTab === tab
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
                 {tab}
               </button>
