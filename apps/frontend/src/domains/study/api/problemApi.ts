@@ -86,7 +86,9 @@ export interface ExternalProblem {
 }
 
 export async function searchExternalProblems(query: string): Promise<ExternalProblem[]> {
-  const res = await apiFetch<any>('/api/problems/search?keyword=' + encodeURIComponent(query) + '&limit=20');
+  const res = await apiFetch<any>(
+    '/api/problems/search?keyword=' + encodeURIComponent(query) + '&limit=20',
+  );
 
   let data: any;
 
@@ -102,11 +104,7 @@ export async function searchExternalProblems(query: string): Promise<ExternalPro
     data = res;
   }
 
-  const list = Array.isArray(data)
-    ? data
-    : Array.isArray(data?.content)
-      ? data.content
-      : [];
+  const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : [];
 
   // 백엔드 응답을 ExternalProblem 형식으로 변환
   return list.map((item: any) => ({
