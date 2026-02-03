@@ -1,143 +1,243 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional
 import os
+import re
 from openai import OpenAI
-from embedding_service import search_similar_problems
+# embedding_service는 사용자 환경에 맞게 유지
+from embedding_service import search_similar_problems 
 
 app = FastAPI()
 
-# GPT-4o-mini API 클라이언트
+# GPT-4o-mini API 클라이언트 설정
 ai_client = OpenAI(
     api_key=os.getenv("GMS_API_KEY"),
     base_url=os.getenv("GPT_BASE_URL")
 )
 
-# 태그 통계 모델
+# --- 데이터 모델 정의 ---
 class TagStat(BaseModel):
     tagName: str
     accuracyRate: float
     attemptCount: int
 
-# 백엔드로부터 받을 유저 데이터 형식
 class UserActivity(BaseModel):
     solvedProblemTitles: List[str]
     failedProblemTitles: List[str]
     tagStats: List[TagStat]
     currentTier: str
 
+# --- 헬퍼 함수: 러시아어 등 필터링 ---
+def is_bad_language(text):
+    # 1. 러시아어(키릴 문자) 및 기타 잡다한 특수 문자 영역 체크
+    # \u0400-\u04FF: 키릴 문자 (러시아어 등)
+    if re.search('[\u0400-\u04FF]', text):
+        return True
+        
+    # 2. 라틴 확장 문자 체크 (Auksinės의 'ė', 'š' 같은 문자)
+    # \u0100-\u024F: Latin Extended-A/B (유럽 언어 특수문자)
+    if re.search('[\u0100-\u024F]', text):
+        return True
+        
+    # 3. 중국어/일본어
+    if re.search('[\u4E00-\u9FFF]', text):
+        return True
+
+    return False
+
 @app.post("/recommend/intelligent")
 async def get_intelligent_recommendation(activity: UserActivity):
     try:
+        print(f"\n[DEBUG] {activity.currentTier} 티어 유저 추천 요청 수신")
+        
         # 유저 데이터 분석
         strong_tags = [s.tagName for s in activity.tagStats if s.accuracyRate >= 0.7]
         weak_tags = [s.tagName for s in activity.tagStats if s.accuracyRate < 0.7]
         total_solved = len(activity.solvedProblemTitles)
         
-        # 신규 유저 체크
         is_new_user = total_solved == 0 and not activity.tagStats
+        print(f"[DEBUG] 신규 유저 여부: {is_new_user}")
         
-        # 1단계: AI에게 전략 수립 요청
+        # ---------------------------------------------------------
+        # 1단계: AI에게 전략 수립 요청 (형식 변경: 키워드 | 전략)
+        # ---------------------------------------------------------
         if is_new_user:
             strategy_prompt = f"""
 당신은 알고리즘 코치입니다. 이 유저는 우리 서비스를 처음 사용하는 신규 유저입니다.
+유저 정보: 현재 티어 {activity.currentTier}, 풀이 기록 없음.
 
-유저 정보:
-- 현재 티어: {activity.currentTier}
-- 풀이 기록: 없음
+이 유저가 코딩테스트 실력을 본인의 티어에 맞게 성장시킬 수 있도록, ChromaDB에서 검색할 인기 알고리즘 유형 키워드 3개를 정해주세요.
 
-신규 유저에게 알맞은 입문 문제 3개를 추천하기 위한 검색 키워드를 정해주세요.
-첫 경험이 중요하니 너무 어렵지 않으면서도 성취감을 줄 수 있는 문제들로요.
+🚨 [중요] 응답 형식:
+"키워드 | 의도" 형태로 콤마(,)로 구분해 주세요.
+- 키워드는 "알고리즘유형 난이도" 형식
+- 의도는 아주 짧게(명사형 추천)
 
-응답 형식 (콤마로 구분된 3개 키워드만):
-예: 입문 구현, 기초 수학, 쉬운 문자열
+예시:
+구현 Bronze | 기초 구현력 점검, 수학 Bronze | 논리적 사고 배양, 문자열 Bronze | 문자열 처리 기초
 """
         else:
             strategy_prompt = f"""
-당신은 알고리즘 코치입니다. 아래 유저의 학습 데이터를 분석하고, 오늘 이 유저가 풀면 가장 성장에 도움이 될 문제 3가지를 추천해주세요.
+당신은 데이터 기반 알고리즘 코치입니다. 
+아래 유저 데이터를 종합적으로 분석하여, 현재 시점에서 가장 성장에 필요한 문제 유형 3개를 선정해주세요.
 
-📊 유저 분석 데이터:
+📊 유저 데이터:
 - 현재 티어: {activity.currentTier}
-- 최근 성공한 문제들: {activity.solvedProblemTitles if activity.solvedProblemTitles else "없음"}
-- 최근 실패한 문제들: {activity.failedProblemTitles if activity.failedProblemTitles else "없음"}
-- 강점 유형 (정답률 70% 이상): {strong_tags if strong_tags else "아직 파악되지 않음"}
-- 취약 유형 (정답률 70% 미만): {weak_tags if weak_tags else "아직 파악되지 않음"}
-- 태그별 상세: {[(s.tagName, f"{s.accuracyRate*100:.0f}%", f"{s.attemptCount}회") for s in activity.tagStats] if activity.tagStats else "없음"}
+- 최근 성공: {activity.solvedProblemTitles[:10]}
+- 최근 실패: {activity.failedProblemTitles[:10]}
+- 강점 유형: {strong_tags if strong_tags else "분석 중"}
+- 취약 유형: {weak_tags if weak_tags else "분석 중"}
 
-🎯 추천 전략 가이드:
-1. 취약점 보완: 실패했거나 정답률이 낮은 유형 중 기초 문제
-2. 강점 심화: 잘하는 유형에서 한 단계 높은 난이도로 도전
-3. 새로운 영역: 아직 시도하지 않은 유형으로 시야 확장
+🎯 판단 가이드 (우선순위를 유동적으로 결정하세요):
+1. [취약점] 실패했거나 정답률 낮은 유형 -> "보완 필요"
+2. [도전] 강점 유형의 상위 난이도 -> "실력 상승 도전"
+3. [복습] 오랫동안 안 푼 유형 -> "감 유지"
 
-위 데이터를 종합적으로 분석해서, ChromaDB에서 검색할 키워드 3개를 정해주세요.
-각 키워드는 "알고리즘유형 난이도" 형식으로 작성해주세요.
+🚨 [중요] 응답 형식:
+"키워드 | 의도" 형태로 콤마(,)로 구분해 주세요.
+- 키워드: 반드시 "알고리즘유형 난이도" (예: 그리디 Silver) 형식.
+- 의도: '취약점 보완', '티어 상승', '기초 다지기' 처럼 짧고 명확하게.
 
-응답 형식 (콤마로 구분된 3개 키워드만):
-예: DP Silver, 그래프 Gold, BFS Bronze
+예시:
+그리디 Silver | 취약점 보완,
+구현 Gold | 실력 상승 도전,
+그래프 Silver | 푼 지 오래된 유형 복습
 """
 
         response = ai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": strategy_prompt}]
         )
-        keywords = [kw.strip() for kw in response.choices[0].message.content.split(",")]
+        
+        # 응답 파싱: "키워드 | 전략" 쌍으로 분리
+        raw_items = [item.strip() for item in response.choices[0].message.content.split(",")]
+        parsed_strategies = []
+        
+        for item in raw_items:
+            if "|" in item:
+                kw, reason = item.split("|", 1)
+                parsed_strategies.append({"keyword": kw.strip(), "strategy_note": reason.strip()})
+            else:
+                parsed_strategies.append({"keyword": item.strip(), "strategy_note": "성장을 위한 맞춤 문제입니다."})
 
-        # 2단계: ChromaDB에서 문제 검색
+        print(f"[DEBUG] 파싱된 전략: {parsed_strategies}")
+
+        # ---------------------------------------------------------
+        # 2단계: ChromaDB 검색 (전략 정보를 유지하며 검색)
+        # ---------------------------------------------------------
         final_recommendations = []
-        for kw in keywords[:3]:
-            search_results = search_similar_problems(kw, n_results=1)
+        seen_problems = set()
+        
+        for item in parsed_strategies[:3]: # 최대 3개
+            kw = item["keyword"]
+            strategy_note = item["strategy_note"]
+            
+            # 후보군 넉넉히 검색
+            search_results = search_similar_problems(kw, n_results=7)
+            
             if search_results['documents'] and search_results['documents'][0]:
-                final_recommendations.append({
-                    "keyword": kw,
-                    "problem_info": search_results['documents'][0][0],
-                    "metadata": search_results['metadatas'][0][0] if search_results['metadatas'][0] else {}
-                })
+                found = False
+                for idx in range(len(search_results['documents'][0])):
+                    p_info = search_results['documents'][0][idx]
+                    p_meta = search_results['metadatas'][0][idx] if search_results['metadatas'][0] else {}
+                    
+                    if p_info not in seen_problems and not is_bad_language(p_info):
+                        final_recommendations.append({
+                            "keyword": kw,
+                            "problem_info": p_info,
+                            "strategy_note": strategy_note, 
+                            "metadata": p_meta
+                        })
+                        seen_problems.add(p_info)
+                        found = True
+                        break
+                
+                # 검색 결과가 하나도 없거나 필터링된 경우
+                if not found:
+                    print(f"[WARN] '{kw}' 키워드에 적합한 문제를 찾지 못함")
 
-        if not final_recommendations:
-            return {"recommendations": []}
+        # ---------------------------------------------------------
+        # 3단계: 추천 사유 생성 (문제 정보 + 1단계 전략 메모 전달)
+        # ---------------------------------------------------------
+        
+        # 프롬프트에 전달할 맥락 구성: "문제 제목 (추천 의도: ...)" 형태
+        context_lines = []
+        for i, rec in enumerate(final_recommendations):
+            context_lines.append(f"{i+1}. 문제: {rec['problem_info']} (추천 의도: {rec['strategy_note']})")
+        
+        context_text = "\n".join(context_lines)
 
-        # 3단계: 인간미 있는 추천 사유 생성
-        reason_prompt = f"""
-당신은 따뜻하면서도 전문적인 알고리즘 코치입니다.
-아래 3개 문제를 이 유저에게 추천하는 이유를 각각 한 문장씩 작성해주세요.
+        if is_new_user:
+            reason_prompt = f"""
+당신은 친절한 알고리즘 멘토입니다. 
+신규 유저에게 아래 문제들을 추천합니다. 괄호 안의 '추천 의도'를 참고하여, 유저에게 건네는 따뜻한 한 마디를 작성해주세요.
 
-유저 정보:
-- 티어: {activity.currentTier}
-- 최근 성공: {activity.solvedProblemTitles[:3] if activity.solvedProblemTitles else "없음"}
-- 최근 실패: {activity.failedProblemTitles[:3] if activity.failedProblemTitles else "없음"}
-- 강점: {strong_tags if strong_tags else "아직 파악 중"}
-- 취약점: {weak_tags if weak_tags else "아직 파악 중"}
+추천 목록:
+{context_text}
 
-추천 문제들:
-{[f"{i+1}. {r['problem_info']}" for i, r in enumerate(final_recommendations)]}
+🚨 [작성 규칙]
+1. 각 문제에 대한 코멘트를 줄바꿈(Enter)으로 구분하여 총 {len(final_recommendations)}줄을 작성하세요.
+2. 문제 제목이나 번호는 적지 말고, 문장만 적으세요.
+3. 첫 번째 줄에만 "환영합니다!" 같은 인사를 자연스럽게 섞어주세요.
 
-작성 가이드:
-- 유저의 상황에 맞춰 공감하는 어조로
-- 왜 이 문제가 성장에 도움이 되는지 구체적으로
-- 격려와 동기부여가 담긴 문장으로
+응답 예시:
+환영합니다! 이 문제는 추천 의도처럼 기초 입출력을 배우기에 아주 적합합니다.
+조건문이 처음엔 낯설겠지만, 이 문제를 통해 논리적인 사고를 길러보세요.
+반복문을 마스터하면 코딩의 신세계가 열립니다. 화이팅!
+"""
+        else:
+            reason_prompt = f"""
+당신은 친근한 알고리즘 선배입니다. 유저(현재 티어:{activity.currentTier})에게 왜 이문제를 풀어야 하는지 딱 한문장으로 
+핵심만 말해주세요.
+괄호 안에 적힌 **'추천 의도'**가 문장에 잘 녹아들어야 합니다.
 
-응답 형식 (각 문제당 한 줄씩, 번호 없이):
-예:
-DP에서 자꾸 막히셨죠? 이 문제로 기초를 탄탄히 다져보세요!
-그래프 실력이 눈에 띄게 늘고 있어요. 한 단계 더 도전해볼까요?
-새로운 유형도 두려워 말고 도전! 의외로 재미있을 거예요.
+[추천 목록 및 의도]
+{context_text}
+
+🚨 [말투 가이드 - 중요]
+1. 분석 보고서처럼 쓰지 마세요. ("~함", "~임", "데이터 분석 결과" 금지)
+2. **"~네요", "~해봅시다(해보아요)", "~겁니다"** 같은 **자연스러운 권유형**을 쓰세요.
+3. 구체적인 문제 이름이나 숫자를 나열하지 말고, **느낌과 목적**만 전달하세요.
+
+✅ [따라해야 할 모범 답안]
+- (취약점 보완일 때): "최근 어려워하셨던 DP 유형이네요. 이 문제로 기초 점화식 세우기를 연습해봅시다."
+- (티어 상승일 때): "현재 티어보다 조금 높지만, 이 구현 문제를 풀면 실력이 확실히 늘 겁니다."
+- (감 유지일 때): "최근 그래프 문제를 안 푸셨네요. 감을 잃지 않게 가볍게 풀어보는 게 좋겠어요."
+- (기초 다지기일 때): "아직 그리디가 낯설 수 있어요. 가장 정석적인 문제로 연습해봅시다."
+
+🚨 [작성 규칙]
+1. 위 예시와 비슷한 톤으로 {len(final_recommendations)}개의 문장을 작성하세요.
+2. 문제 제목, 번호, 서론을 절대 적지 마세요. 바로 본론(이유)만 적으세요.
+
+
 """
 
+        # AI에게 멘트 생성 요청
         reason_response = ai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": reason_prompt}]
         )
+        
         reasons = [r.strip() for r in reason_response.choices[0].message.content.strip().split("\n") if r.strip()]
 
-        # 4단계: 결과 조립
+        # ---------------------------------------------------------
+        # 4단계: 결과 조립 및 반환
+        # ---------------------------------------------------------
         results = []
         for i, rec in enumerate(final_recommendations):
+            # 혹시나 AI가 줄 수를 못 맞췄을 경우를 대비한 안전장치
+            user_reason = reasons[i] if i < len(reasons) else f"{rec['strategy_note']} 도전해보세요!"
+            
             results.append({
                 "problem": rec['problem_info'],
-                "reason": reasons[i] if i < len(reasons) else "당신의 성장을 위해 AI가 엄선한 문제입니다!"
+                "reason": user_reason,
+                "keyword": rec['keyword'] # 디버깅용 혹은 프론트 표시용
             })
 
+        print("[DEBUG] 추천 로직 완료")
         return {"recommendations": results}
 
     except Exception as e:
+        print(f"[ERROR] 추천 로직 오류: {str(e)}")
+        # 실제 운영시에는 e를 그대로 내보내기보다 "추천 생성 중 오류 발생" 등으로 감싸는 것이 좋음
         raise HTTPException(status_code=500, detail=str(e))

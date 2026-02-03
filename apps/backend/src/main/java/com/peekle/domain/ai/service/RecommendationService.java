@@ -33,6 +33,7 @@ public class RecommendationService {
     private static final long CACHE_TTL_HOURS = 24;
 
     public List<RecommendedProblem> getOrGenerateRecommendations(Long userId) {
+        log.info("추천 로직 시작 - userId: {}", userId);
         String key = REDIS_KEY_PREFIX + userId;
 
         try {
