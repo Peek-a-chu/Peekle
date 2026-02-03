@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
+import { UserIcon } from '@/components/UserIcon';
 import { Crown, Sparkles } from 'lucide-react';
 import type { GameParticipant } from '../../types/result';
 
@@ -18,17 +18,17 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
   const theme =
     teamColor === 'RED'
       ? {
-          bg: 'bg-red-500/5',
-          border: 'border-red-500/20',
-          text: 'text-red-500',
-          glow: 'shadow-red-500/20',
-        }
+        bg: 'bg-red-500/5',
+        border: 'border-red-500/20',
+        text: 'text-red-500',
+        glow: 'shadow-red-500/20',
+      }
       : {
-          bg: 'bg-blue-500/5',
-          border: 'border-blue-500/20',
-          text: 'text-blue-500',
-          glow: 'shadow-blue-500/20',
-        };
+        bg: 'bg-blue-500/5',
+        border: 'border-blue-500/20',
+        text: 'text-blue-500',
+        glow: 'shadow-blue-500/20',
+      };
 
   const formatTime = (seconds?: number) => {
     if (seconds === undefined) return '-';
@@ -80,11 +80,10 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
         {team.map((p) => (
           <div
             key={p.userId}
-            className={`group relative flex items-center p-3 rounded-xl border transition-all ${
-              p.isMe
-                ? `bg-background ${p.teamId === 'RED' ? 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`
-                : 'bg-background/50 border-border/50 hover:bg-background'
-            } ${p.userId === mvpId ? 'z-20' : 'z-0'}`}
+            className={`group relative flex items-center p-3 rounded-xl border transition-all ${p.isMe
+              ? `bg-background ${p.teamId === 'RED' ? 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`
+              : 'bg-background/50 border-border/50 hover:bg-background'
+              } ${p.userId === mvpId ? 'z-20' : 'z-0'}`}
           >
             {/* MVP/ACE Badge */}
             {p.userId === mvpId && (
@@ -108,17 +107,12 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
 
             {/* Profile & Name */}
             <div className="flex-1 flex items-center gap-3 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-muted overflow-hidden border border-border/50 shrink-0">
-                {p.profileImg && (
-                  <Image
-                    src={p.profileImg}
-                    alt={p.nickname}
-                    width={32}
-                    height={32}
-                    className="object-cover"
-                  />
-                )}
-              </div>
+              <UserIcon
+                src={p.profileImg}
+                nickname={p.nickname}
+                size={32}
+                className="border-border/50"
+              />
               <div className="flex flex-col min-w-0">
                 <span
                   className={`text-sm font-bold truncate ${p.isMe ? theme.text : 'text-foreground'}`}

@@ -9,6 +9,7 @@ import { fetchSearchResults } from '@/api/searchApi';
 import ProblemIcon from '@/assets/icons/problem.svg';
 import BookIcon from '@/assets/icons/book.svg';
 import PeopleIcon from '@/assets/icons/people.svg';
+import { UserIcon } from '../UserIcon';
 
 const DEBOUNCE_DELAY_MS = 300;
 const MIN_SEARCH_LENGTH = 1;
@@ -19,6 +20,7 @@ interface SearchSuggestion {
   title: string;
   type: 'problem' | 'user' | 'workbook';
   tier?: string;
+  profileImg?: string;
 }
 
 interface GlobalSearchBarProps {
@@ -79,6 +81,7 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
             title: u.handle,
             type: 'user',
             tier: u.tier,
+            profileImg: u.profileImg,
           }),
         );
 
@@ -187,12 +190,16 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
     inputRef.current?.focus();
   };
 
-  const getSuggestionIcon = (type: SearchSuggestion['type']) => {
-    switch (type) {
+  const getSuggestionIcon = (suggestion: SearchSuggestion) => {
+    switch (suggestion.type) {
       case 'problem':
         return <ProblemIcon className="h-5 w-5" />;
       case 'user':
-        return <PeopleIcon className="h-5 w-5" />;
+        return suggestion.profileImg ? (
+          <UserIcon src={suggestion.profileImg} nickname={suggestion.title} size={20} />
+        ) : (
+          <PeopleIcon className="h-5 w-5" />
+        );
       case 'workbook':
         return <BookIcon className="h-5 w-5" />;
       default:
@@ -268,7 +275,7 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
                     selectedIndex === index ? 'bg-[#E24EA0]/10 text-[#E24EA0]' : 'hover:bg-gray-50',
                   )}
                 >
-                  <span className="flex-shrink-0">{getSuggestionIcon(suggestion.type)}</span>
+                  <span className="flex-shrink-0">{getSuggestionIcon(suggestion)}</span>
                   <div className="flex-1">
                     <div className="font-medium">{suggestion.title}</div>
                     <div className="text-xs text-gray-500">

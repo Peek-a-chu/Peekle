@@ -17,6 +17,7 @@ import {
   Ban,
   UserCircle,
 } from 'lucide-react';
+import { UserIcon } from '@/components/UserIcon';
 
 interface ParticipantCardProps {
   participant: Participant;
@@ -109,17 +110,12 @@ export function ParticipantCard({
         {/* Profile & Status */}
         <div className="relative shrink-0">
           <div className="relative h-10 w-10 overflow-hidden rounded-full border border-border/50 bg-muted">
-            {participant.profileImage ? (
-              <img
-                src={participant.profileImage}
-                alt={participant.nickname}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
-                <User className="h-5 w-5" />
-              </div>
-            )}
+            <UserIcon
+              src={participant.profileImage}
+              nickname={participant.nickname}
+              size={40}
+              className="w-full h-full"
+            />
           </div>
 
           {/* Status Dot */}

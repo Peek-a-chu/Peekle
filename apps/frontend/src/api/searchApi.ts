@@ -21,7 +21,7 @@ export interface User {
   userId: number;
   handle: string;
   tier: string;
-  profileImage?: string;
+  profileImg?: string;
   league: string;
   score: number;
 }
@@ -98,7 +98,7 @@ export async function fetchSearchResults(params: SearchParams): Promise<SearchRe
     userId: user.userId,
     handle: user.nickname || user.handle, // Map nickname to handle
     tier: user.tier,
-    profileImage: user.profileImg || user.profileImage, // Map profileImg to profileImage
+    profileImg: user.profileImg || user.profileImage, // Map profileImg to profileImg
     league: user.league || user.tier || 'Unranked', // Use tier as league if league is missing
     score: user.score || 0, // Default value
   }));

@@ -4,6 +4,7 @@ import { Trophy, Medal, Award } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
+import { UserIcon } from '@/components/UserIcon';
 
 interface TopThreePodiumProps {
   rankings: RankResponse[];

@@ -6,6 +6,7 @@ import { useState } from 'react';
 interface UserIconProps {
     src?: string | null;
     nickname?: string;
+    user?: { nickname: string; profileImg?: string | null; profileImage?: string | null;[key: string]: any };
     size?: number;
     className?: string;
     unoptimized?: boolean;
@@ -14,15 +15,20 @@ interface UserIconProps {
 export function UserIcon({
     src,
     nickname,
+    user,
     size = 40,
     className,
     unoptimized = false,
 }: UserIconProps) {
     const [error, setError] = useState(false);
-    const fallbackUrl = getDefaultProfileImgUrl(nickname);
 
-    // If we have a source and no error yet, try to show the image
-    const finalSrc = !error && src && src !== '' ? src : fallbackUrl;
+    // user 객체가 있으면 거기서 정보를 가져옴
+    const finalNickname = nickname || user?.nickname;
+    const userImage = user?.profileImg || user?.profileImage; // Handle both likely property names if types vary
+    const sourceUrl = src || userImage;
+
+    const fallbackUrl = getDefaultProfileImgUrl(finalNickname);
+    const finalSrc = error || !sourceUrl ? fallbackUrl : sourceUrl;
 
     return (
         <div
@@ -34,7 +40,7 @@ export function UserIcon({
         >
             <Image
                 src={finalSrc}
-                alt={nickname || 'User profile image'}
+                alt={finalNickname || 'User profile image'}
                 width={size}
                 height={size}
                 className="w-full h-full object-cover"
