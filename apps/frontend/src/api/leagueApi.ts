@@ -1,6 +1,13 @@
 import { ApiResponse } from '@/types/apiUtils';
 import { apiFetch } from '@/lib/api'; // Assuming apiFetch is needed or already used
-import { LeagueRankingData, LeagueRankingMember, LeagueStat } from '@/domains/league/types';
+import {
+  LeagueRankingData,
+  LeagueRankingMember,
+  LeagueStat,
+  WeeklyPointSummary,
+  LeagueProgressData,
+  PointActivity
+} from '@/domains/league/types';
 import { LeagueType } from '@/components/LeagueIcon';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
@@ -88,19 +95,7 @@ export async function getLeagueRules(): Promise<LeagueRulesMap | null> {
     return null;
   }
 }
-export interface PointActivity {
-  description: string;
-  amount: number;
-  createdAt: string;
-  category?: 'PROBLEM' | 'GAME' | 'STUDY' | string; // Enum from backend
-}
 
-export interface WeeklyPointSummary {
-  totalScore: number;
-  startDate: string;
-  endDate: string;
-  activities: PointActivity[];
-}
 
 export async function getWeeklyPointSummary(date?: string): Promise<WeeklyPointSummary | null> {
   try {
@@ -117,13 +112,10 @@ export async function getWeeklyPointSummary(date?: string): Promise<WeeklyPointS
   }
 }
 
-export interface LeagueProgressData {
-  league: LeagueType;
-  score: number;
-  date: string;
-  periodEnd: string;
-  leagueIndex: number;
-}
+
+
+// Server-side exports
+
 
 export async function getLeagueProgress(): Promise<LeagueProgressData[]> {
   try {

@@ -133,7 +133,12 @@ public class LeagueService {
         int totalEarnedPoints = 0;
 
         // 1. 문제 풀이 기본 점수 (최초 1회)
-        long successCount = submissionLogRepository.countByUserIdAndProblemId(user.getId(), problem.getId());
+        // 기존: long successCount =
+        // submissionLogRepository.countByUserIdAndProblemId(user.getId(),
+        // problem.getId());
+        // 변경: 성공한 제출만 카운트 (실패 후 성공 시에도 1이 되어야 함)
+        long successCount = submissionLogRepository.countByUserIdAndProblemIdAndIsSuccessTrue(user.getId(),
+                problem.getId());
 
         if (successCount == 1) {
             int problemPoints = calculateProblemPoint(problem.getTier());

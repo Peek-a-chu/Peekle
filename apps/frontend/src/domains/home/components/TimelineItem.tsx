@@ -10,9 +10,10 @@ interface TimelineItemProps {
   items: TimelineItemData[];
   onSelect: (item: TimelineItemData) => void;
   selectedItemId?: string;
+  isMe?: boolean;
 }
 
-const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) => {
+const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: TimelineItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // 데이터가 없으면 렌더링 안 함
@@ -30,6 +31,8 @@ const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) =>
     const date = new Date(dateStr);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
+
+  const isMainSuccess = mainItem.result?.includes('맞았습니다') ?? false;
 
   return (
     <div className="border border-border rounded-lg mb-2 overflow-hidden bg-card transition-all hover:border-primary/50">
@@ -69,8 +72,22 @@ const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) =>
                 {items.length} submissions
               </span>
             )}
-            {mainItem.memory && <span>{mainItem.memory}KB</span>}
-            {mainItem.executionTime && <span>{mainItem.executionTime}ms</span>}
+
+            {/* 성공/실패 배지 */}
+            <span
+              className={`font-bold border-r border-border pr-2 mr-1 ${isMainSuccess ? 'text-green-600' : 'text-red-500'}`}
+            >
+              {isMainSuccess ? '성공' : '실패'}
+            </span>
+
+            {/* 메모리/시간 - 성공일 때만 표시 */}
+            {isMainSuccess && (
+              <>
+                {mainItem.memory && <span>{mainItem.memory}KB</span>}
+                {mainItem.executionTime && <span>{mainItem.executionTime}ms</span>}
+              </>
+            )}
+
             {mainItem.language && <span className="font-mono text-[10px] uppercase border-l pl-2 ml-1 border-border">{mainItem.language}</span>}
           </div>
 
@@ -84,10 +101,10 @@ const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) =>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect(mainItem);
+                if (isMe) onSelect(mainItem);
               }}
-              className="p-1.5 text-muted-foreground hover:text-primary transition-colors"
-              title="풀이 상세 보기"
+              className={`p-1.5 transition-colors ${isMe ? 'text-muted-foreground hover:text-primary' : 'text-muted-foreground/30 cursor-not-allowed'}`}
+              title={isMe ? "풀이 상세 보기" : "비공개"}
             >
               <FileText className="w-4 h-4" />
             </button>
@@ -108,60 +125,66 @@ const TimelineItem = ({ items, onSelect, selectedItemId }: TimelineItemProps) =>
               <div>제출일시</div>
               <div className="text-center">상세</div>
             </div>
-            {items.map((item, idx) => (
-              <div
-                key={idx}
-                className={`grid grid-cols-[1fr_80px_80px_80px_100px_140px_40px] gap-2 px-4 py-2.5 items-center hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0
+            {items.map((item, idx) => {
+              const isItemSuccess = item.result?.includes('맞았습니다') ?? false;
+              return (
+                <div
+                  key={idx}
+                  className={`grid grid-cols-[1fr_80px_80px_80px_100px_140px_40px] gap-2 px-4 py-2.5 items-center hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0
                             ${selectedItemId === item.submittedAt ? 'bg-primary/5' : ''}
                         `}
-              >
-                {/* 태그 */}
-                <div className="truncate">
-                  {item.tag ? (
-                    <div className="flex items-center gap-1.5 text-primary text-xs font-medium truncate" title={item.tag}>
-                      {item.sourceType === 'study' ? <Users className="w-3 h-3 shrink-0" /> : <Gamepad2 className="w-3 h-3 shrink-0" />}
-                      <span className="truncate">{item.tag}</span>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
-                  )}
+                  onClick={() => {
+                    if (isMe) onSelect(item);
+                  }}
+                >
+                  {/* 태그 */}
+                  <div className="truncate">
+                    {item.tag ? (
+                      <div className="flex items-center gap-1.5 text-primary text-xs font-medium truncate" title={item.tag}>
+                        {item.sourceType === 'study' ? <Users className="w-3 h-3 shrink-0" /> : <Gamepad2 className="w-3 h-3 shrink-0" />}
+                        <span className="truncate">{item.tag}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </div>
+
+                  {/* 언어 */}
+                  <div className="font-mono text-xs uppercase text-foreground/80">{item.language}</div>
+
+                  {/* 메모리 - 성공시에만 */}
+                  <div className="text-xs">{isItemSuccess && item.memory ? `${item.memory}KB` : '-'}</div>
+
+                  {/* 시간 - 성공시에만 */}
+                  <div className="text-xs">{isItemSuccess && item.executionTime ? `${item.executionTime}ms` : '-'}</div>
+
+                  {/* 결과 */}
+                  <div className="text-xs font-medium">
+                    {item.result ? (
+                      <span className={`${isItemSuccess ? 'text-green-600' : 'text-red-600'}`}>
+                        {isItemSuccess ? '성공' : (item.result.replace(/\n/g, ' ') || '실패')}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </div>
+
+                  {/* 제출일시 */}
+                  <div className="text-xs text-muted-foreground">{formatDateTime(item.submittedAt)}</div>
+
+                  {/* 상세 버튼 */}
+                  <div className="flex justify-center">
+                    <button
+                      className={`p-1 transition-colors ${isMe ? 'text-muted-foreground hover:text-primary' : 'text-muted-foreground/30 cursor-not-allowed'}`}
+                      title={isMe ? "상세 보기" : "비공개"}
+                      disabled={!isMe}
+                    >
+                      <FileText className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-
-                {/* 언어 */}
-                <div className="font-mono text-xs uppercase text-foreground/80">{item.language}</div>
-
-                {/* 메모리 */}
-                <div className="text-xs">{item.memory ? `${item.memory}KB` : '-'}</div>
-
-                {/* 시간 */}
-                <div className="text-xs">{item.executionTime ? `${item.executionTime}ms` : '-'}</div>
-
-                {/* 결과 */}
-                <div className="text-xs font-medium">
-                  {item.result ? (
-                    <span className={`${item.result.includes('맞았습니다') ? 'text-green-600' : 'text-red-600'}`}>
-                      {item.result}
-                    </span>
-                  ) : (
-                    '-'
-                  )}
-                </div>
-
-                {/* 제출일시 */}
-                <div className="text-xs text-muted-foreground">{formatDateTime(item.submittedAt)}</div>
-
-                {/* 상세 버튼 */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => onSelect(item)}
-                    className="p-1 text-muted-foreground hover:text-primary transition-colors"
-                    title="상세 보기"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

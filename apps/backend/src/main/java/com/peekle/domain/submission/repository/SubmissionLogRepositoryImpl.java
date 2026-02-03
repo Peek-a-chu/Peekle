@@ -57,4 +57,59 @@ public class SubmissionLogRepositoryImpl implements SubmissionLogRepositoryCusto
 
                 return new PageImpl<>(content, pageable, count != null ? count : 0);
         }
+
+        @Override
+        public Page<SubmissionLog> findHistory(com.peekle.domain.submission.dto.SubmissionHistoryFilterDto filter,
+                        Pageable pageable) {
+                com.querydsl.core.BooleanBuilder builder = new com.querydsl.core.BooleanBuilder();
+
+                // User Filtering
+                if (filter.getUserId() != null) {
+                        builder.and(submissionLog.user.id.eq(filter.getUserId()));
+                } else if (filter.getNickname() != null) {
+                        builder.and(submissionLog.user.nickname.eq(filter.getNickname()));
+                }
+
+                // Tier
+                if (filter.getTier() != null && !filter.getTier().equals("전체") && !filter.getTier().equals("ALL")) {
+                        // 'Gold' -> tier like 'Gold%'
+                        builder.and(submissionLog.problem.tier.startsWith(filter.getTier()));
+                }
+
+                // SourceType
+                if (filter.getSourceType() != null) {
+                        builder.and(submissionLog.sourceType.eq(filter.getSourceType()));
+                }
+
+                // Date
+                if (filter.getStartDate() != null) {
+                        builder.and(submissionLog.submittedAt.goe(filter.getStartDate()));
+                }
+                if (filter.getEndDate() != null) {
+                        builder.and(submissionLog.submittedAt.loe(filter.getEndDate()));
+                }
+
+                // Status (isSuccess)
+                if (filter.getIsSuccess() != null) {
+                        builder.and(submissionLog.isSuccess.eq(filter.getIsSuccess()));
+                }
+
+                List<SubmissionLog> content = queryFactory
+                                .selectFrom(submissionLog)
+                                .join(submissionLog.user).fetchJoin()
+                                .leftJoin(submissionLog.problem).fetchJoin()
+                                .where(builder)
+                                .orderBy(submissionLog.submittedAt.desc())
+                                .offset(pageable.getOffset())
+                                .limit(pageable.getPageSize())
+                                .fetch();
+
+                Long count = queryFactory
+                                .select(submissionLog.count())
+                                .from(submissionLog)
+                                .where(builder)
+                                .fetchOne();
+
+                return new PageImpl<>(content, pageable, count != null ? count : 0);
+        }
 }

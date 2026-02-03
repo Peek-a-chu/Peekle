@@ -117,6 +117,7 @@ export interface TimelineItemData {
   code?: string;
   submittedAt?: string;
   result?: string; // 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등)
+  isSuccess?: boolean; // 성공 여부
 }
 
 export const MOCK_TIMELINE: TimelineItemData[] = [
