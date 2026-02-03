@@ -19,6 +19,9 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const viewRealtimeCode = useRoomStore((state) => state.viewRealtimeCode);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
+  // [Added] To control whiteboard split View from within Grid if needed, or rely on Parent
+  const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
+  const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
 
   const sortedParticipants = [...participants].sort((a, b) => {
     if (a.isLocal) return -1;
@@ -27,6 +30,10 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   });
 
   const handleTileClick = (identity: string) => {
+    // When clicking a participant tile, we want to close whiteboard split view if open
+    // to focus on code viewing (or self view)
+    setWhiteboardOverlayOpen(false);
+
     const userId = Number(identity); // Identity is userId string
 
     if (userId === currentUserId) {
@@ -48,7 +55,19 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
         className,
       )}
     >
-      {isWhiteboardActive && <WhiteboardTile onClick={onWhiteboardClick} />}
+      {isWhiteboardActive && (
+        <div
+          onClickCapture={(e) => {
+            if (!selectedProblemTitle) {
+              e.stopPropagation();
+              e.preventDefault();
+              toast.error('문제를 먼저 선택해주세요.');
+            }
+          }}
+        >
+          <WhiteboardTile onClick={onWhiteboardClick} />
+        </div>
+      )}
 
       {sortedParticipants.map((participant) => (
         <CCVideoTile

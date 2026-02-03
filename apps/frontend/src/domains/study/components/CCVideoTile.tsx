@@ -1,7 +1,7 @@
 'use client';
 
 import { Track } from 'livekit-client';
-import { VideoTrack, useParticipantTile } from '@livekit/components-react';
+import { VideoTrack, useParticipantTracks } from '@livekit/components-react';
 import { cn } from '@/lib/utils';
 import { User, MicOff } from 'lucide-react';
 import { Participant } from 'livekit-client';
@@ -14,28 +14,39 @@ interface CCVideoTileProps {
 }
 
 export function CCVideoTile({ participant, className, onClick, isCurrentUser }: CCVideoTileProps) {
-  const publication = participant.getTrackPublication(Track.Source.Camera);
-  const isVideoEnabled = participant.isCameraEnabled && !!publication;
+  // Use hook to track camera state reactively
+  const videoTracks = useParticipantTracks([Track.Source.Camera], participant.identity);
+  const videoTrackRef = videoTracks[0]; // Requesting only Camera, so first one is it
+
+  const isVideoEnabled =
+    !!videoTrackRef &&
+    videoTrackRef.participant.isCameraEnabled &&
+    !videoTrackRef.publication.isMuted;
   const isAudioEnabled = participant.isMicrophoneEnabled;
+
+  // Additional check for local participant: sometimes isCameraEnabled is true but track is not yet published in the list?
+  // But useParticipantTracks should handle that.
+  // Note: participant.isCameraEnabled might update faster?
+  // Let's rely on track existence for rendering VideoTrack.
+  // Also check publication directly for logic if needed, but hook drives re-render.
+
+  // Re-deriving enabled state for consistent rendering
+  const shouldShowVideo = !!videoTrackRef && !videoTrackRef.publication.isMuted;
 
   return (
     <div
       className={cn(
-        'relative aspect-video w-48 shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+        'relative h-40 w-52 shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
         'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all',
         isCurrentUser && 'ring-2 ring-primary',
         className,
       )}
       onClick={onClick}
     >
-      {isVideoEnabled ? (
+      {shouldShowVideo ? (
         <VideoTrack
-          trackRef={{
-            participant,
-            source: Track.Source.Camera,
-            publication: publication!,
-          }}
-          className="h-full w-full object-cover"
+          trackRef={videoTrackRef}
+          className={cn('h-full w-full object-cover scale-x-[-1]')}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gray-900 text-muted-foreground">

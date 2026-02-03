@@ -22,9 +22,9 @@ export function CCLiveKitWrapper({ studyId, children }: CCLiveKitWrapperProps) {
 
   if (!token) {
     return (
-      <div className="flex h-full w-full items-center justify-center">
-        <Loader2 className="animate-spin text-primary" />
-        <span className="ml-2 text-sm text-muted-foreground">미디어 서버 연결 중...</span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <Loader2 className="animate-spin text-primary h-8 w-8" />
+        <span className="ml-2 text-lg font-medium text-foreground">미디어 서버 연결 중...</span>
       </div>
     );
   }

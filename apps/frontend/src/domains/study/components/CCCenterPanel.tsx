@@ -14,6 +14,7 @@ import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CCCenterPanelProps {
   ideContent?: ReactNode;
@@ -59,6 +60,7 @@ export function CCCenterPanel({
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const selectedProblemExternalId = useRoomStore((state) => state.selectedProblemExternalId);
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
 
@@ -84,6 +86,14 @@ export function CCCenterPanel({
 
   const handleLanguageChange = (lang: string): void => {
     setLanguage(lang);
+  };
+
+  const handleWhiteboardToggleWrapper = () => {
+    if (!selectedProblemTitle) {
+      toast.error('문제를 먼저 선택해주세요.');
+      return;
+    }
+    onWhiteboardToggle?.();
   };
 
   return (
@@ -123,6 +133,8 @@ export function CCCenterPanel({
               viewMode={viewMode}
               targetSubmission={targetSubmission}
               onResetView={resetToOnlyMine}
+              disabled={!selectedProblemTitle && !isViewingOther}
+              problemExternalId={selectedProblemExternalId}
               // Standard Handlers
               onLanguageChange={(lang) => leftPanelRef.current?.setLanguage(lang)}
               onThemeToggle={handleThemeToggle}
@@ -170,6 +182,7 @@ export function CCCenterPanel({
                     ownerName: ownerName || 'Unknown',
                     problemTitle: resolvedProblemTitle,
                     problemId: resolvedProblemId,
+                    externalId: selectedProblemExternalId || undefined,
                     isRealtime: viewMode === 'SPLIT_REALTIME',
                   });
                   useRoomStore.getState().setRightPanelActiveTab('chat');
@@ -189,6 +202,7 @@ export function CCCenterPanel({
                         ...currentPending,
                         problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
                         problemId: useRoomStore.getState().selectedProblemId ?? undefined,
+                        externalId: selectedProblemExternalId || undefined,
                         isRealtime: true, // Own code is treated as realtime capable
                       });
                     }
@@ -235,7 +249,6 @@ export function CCCenterPanel({
               </div>
             )}
           </div>
-
           {/* Right Panel: Whiteboard OR Other's Code */}
           {showRightPanel && (
             <div className="flex-1 min-w-0">
@@ -259,6 +272,7 @@ export function CCCenterPanel({
               )}
             </div>
           )}
+          handleWhiteboardToggleWrapper
         </div>
       </div>
 

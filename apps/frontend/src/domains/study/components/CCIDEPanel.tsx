@@ -304,13 +304,15 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleRefChat = (): void => {
       if (editorRef.current) {
         const currentCode = editorRef.current.getValue();
-        const { selectedProblemId, selectedProblemTitle } = useRoomStore.getState();
+        const { selectedProblemId, selectedProblemTitle, selectedProblemExternalId } =
+          useRoomStore.getState();
         setPendingCodeShare({
           code: currentCode,
           language,
           ownerName: 'Me',
           isRealtime: true,
           problemId: selectedProblemId ?? undefined,
+          externalId: selectedProblemExternalId ?? undefined,
           problemTitle: selectedProblemTitle ?? undefined,
         });
       }

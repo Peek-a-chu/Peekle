@@ -38,6 +38,16 @@ export function CCAddProblemModal({
 
   const debouncedQuery = useDebounce(query, 300);
 
+  // Reset state when modal is closed or opened
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery('');
+      setResults([]);
+      setSelectedProblem(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (!debouncedQuery) {
       setResults([]);
@@ -139,6 +149,7 @@ export function CCAddProblemModal({
         <div className="relative mb-4">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
+            autoFocus
             placeholder="문제 번호 또는 제목 검색 (예: 1753)"
             value={query}
             onChange={(e) => {
