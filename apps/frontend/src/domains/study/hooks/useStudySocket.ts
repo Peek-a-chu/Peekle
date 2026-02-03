@@ -63,8 +63,8 @@ export const useStudySocketActions = () => {
   );
 
   const addProblem = useCallback(
-    (problemId: number) => {
-      if (roomId) publish('/pub/studies/problems', { action: 'ADD', problemId });
+    (problemId: number, date?: string) => {
+      if (roomId) publish('/pub/studies/problems', { action: 'ADD', problemId, problemDate: date });
     },
     [roomId, publish],
   );
@@ -187,6 +187,19 @@ export const useStudySocketSubscription = (studyId: number) => {
         privateSubscription = client.subscribe(privateTopic, (message) => {
           handleSocketMessage(message);
         });
+
+        // 3-1. Subscribe Private Error Topic
+        const errorTopic = `/topic/studies/${studyId}/error/${currentUserId}`;
+        console.log('[StudySocket] Subscribing to Error:', errorTopic);
+        const errorSub = client.subscribe(errorTopic, (message) => {
+          handleSocketMessage(message);
+        });
+
+        const originalUnsubscribe = privateSubscription.unsubscribe;
+        privateSubscription.unsubscribe = () => {
+          originalUnsubscribe.call(privateSubscription);
+          errorSub.unsubscribe();
+        };
 
         // 4. Subscribe Video Token Topic
         const videoTokenTopic = `/topic/studies/${studyId}/video-token/${currentUserId}`;

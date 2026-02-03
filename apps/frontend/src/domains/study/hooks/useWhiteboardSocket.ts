@@ -46,6 +46,12 @@ export function useWhiteboardSocket(
   const messageQueueRef = useRef<any[]>([]);
   const lastRevisionRef = useRef<number | null>(null);
 
+  // [Fix] Ref for callback to avoid re-subscription loops caused by unstable callback references
+  const onMessageReceivedRef = useRef(onMessageReceived);
+  useEffect(() => {
+    onMessageReceivedRef.current = onMessageReceived;
+  }, [onMessageReceived]);
+
   // [New] Flush queue when connected
   useEffect(() => {
     if (client && connected && roomId && messageQueueRef.current.length > 0) {
@@ -172,8 +178,8 @@ export function useWhiteboardSocket(
           });
         }
 
-        if (onMessageReceived) {
-          onMessageReceived(body);
+        if (onMessageReceivedRef.current) {
+          onMessageReceivedRef.current(body);
         }
       } catch (err) {
         console.error('Failed to parse whiteboard message', err);
@@ -238,7 +244,7 @@ export function useWhiteboardSocket(
     connected,
     roomId,
     setWhiteboardOverlayOpen,
-    onMessageReceived,
+    // onMessageReceived, // Removed to prevent infinite loop
     enabled,
     userId,
     studyId,
