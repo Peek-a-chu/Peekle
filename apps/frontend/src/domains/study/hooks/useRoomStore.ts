@@ -82,7 +82,9 @@ export interface RoomState {
 export interface RoomActions {
   // Room info actions
   setRoomInfo: (
-    info: Partial<Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode' | 'myRole'>>,
+    info: Partial<
+      Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode' | 'myRole'>
+    >,
   ) => void;
   setCurrentDate: (date: string) => void;
 

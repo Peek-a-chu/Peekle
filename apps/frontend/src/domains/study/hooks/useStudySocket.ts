@@ -142,7 +142,7 @@ export const useStudySocketSubscription = (studyId: number) => {
         }
       };
       const enterInterval = setInterval(checkAndEnter, 500);
-      
+
       // 5초 후 타임아웃
       setTimeout(() => {
         clearInterval(enterInterval);
@@ -298,23 +298,25 @@ export const useStudySocketSubscription = (studyId: number) => {
 
             // 1. Optimistic Update: Mute everyone except the sender
             // using setParticipants to trigger re-render immediately for everyone
-            setParticipants(participants.map(p => {
-              if (p.id === senderId) return p; // Sender keeps status
-              return { ...p, isMuted: true }; // Everyone else muted locally
-            }));
+            setParticipants(
+              participants.map((p) => {
+                if (p.id === senderId) return p; // Sender keeps status
+                return { ...p, isMuted: true }; // Everyone else muted locally
+              }),
+            );
 
             // 2. If I am a victim (not sender), report status to server
             if (currentUserId && currentUserId !== senderId) {
               toast.warning('방장에 의해 음소거 되었습니다.');
 
               // Fetch my current video state to preserve it
-              const me = participants.find(p => p.id === currentUserId);
+              const me = participants.find((p) => p.id === currentUserId);
               const isVideoOff = me?.isVideoOff ?? false;
 
               if (client && client.connected) {
                 client.publish({
                   destination: '/pub/studies/status',
-                  body: JSON.stringify({ studyId, isMuted: true, isVideoOff })
+                  body: JSON.stringify({ studyId, isMuted: true, isVideoOff }),
                 });
               }
             } else {
@@ -380,7 +382,8 @@ export const useStudySocketSubscription = (studyId: number) => {
           }
           case 'ERROR': {
             // Error from server
-            const errorMessage = typeof data === 'string' ? data : data?.message || '알 수 없는 오류가 발생했습니다.';
+            const errorMessage =
+              typeof data === 'string' ? data : data?.message || '알 수 없는 오류가 발생했습니다.';
             toast.error(errorMessage);
             break;
           }

@@ -117,7 +117,10 @@ export function useProblems(studyId: number) {
     return () => {
       window.removeEventListener('study-problem-added', handleProblemAdded as EventListener);
       window.removeEventListener('study-problem-removed', handleProblemRemoved as EventListener);
-      window.removeEventListener('study-curriculum-updated', handleCurriculumUpdated as EventListener);
+      window.removeEventListener(
+        'study-curriculum-updated',
+        handleCurriculumUpdated as EventListener,
+      );
     };
   }, [studyId, fetchProblems]);
 
@@ -128,13 +131,13 @@ export function useProblems(studyId: number) {
     async (title: string, number: number, tags?: string[], problemId?: number) => {
       try {
         let actualProblemId = problemId;
-        
+
         // problemId가 제공되지 않으면 externalId로 조회
         if (!actualProblemId) {
           // number is externalId (BOJ problem number), convert to problemId
           actualProblemId = await getProblemIdByExternalId(String(number), 'BOJ');
         }
-        
+
         if (actualProblemId) {
           socketAddProblem(actualProblemId);
         } else {

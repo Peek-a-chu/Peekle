@@ -18,7 +18,7 @@ function normalizeChatType(
     return 'TALK';
   }
 
-  return rawType as ChatType;
+  return rawType;
 }
 
 export function useStudyChat(roomId: number) {
