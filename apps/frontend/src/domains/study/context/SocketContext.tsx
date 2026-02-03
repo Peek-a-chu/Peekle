@@ -57,18 +57,38 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
         return;
       }
 
-      // 백엔드 SockJS 엔드포인트 (http 프로토콜 사용)
-      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      // 백엔드 SockJS 엔드포인트
+      // Nginx를 사용하는 HTTPS 환경에서는 https://로 시작하는 URL이 주입됩니다.
+      // NEXT_PUBLIC_API_URL이 https://localhost (Nginx) 를 가리키기 때문에 이를 그대로 사용해야 합니다.
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
 
-      // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환 (SSL 연결 오류 방지)
-      if (
-        baseUrl.startsWith('https://') &&
-        (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))
-      ) {
-        baseUrl = baseUrl.replace('https://', 'http://');
-      }
+      // sockjs-client는 상대경로(/api/ws-stomp) 또는 절대경로(https://...) 모두 지원합니다.
+      // Nginx Reverse Proxy (HTTPS 443) -> Backend (HTTP 8080) 구조에서는
+      // 클라이언트는 Nginx (HTTPS) 로 접근해야 하므로 https 주소를 그대로 써야 합니다.
+      // 기존처럼 http로 강제 변환하거나 :8080을 붙이면 'Connection Refused' 또는 'Mixed Content' 에러가 납니다.
 
+      // 단, Nginx 설정 상 /ws-stomp 경로는 /api/ws-stomp 가 아니라 루트 레벨 등 경로 매핑 확인이 필요합니다.
+      // 일반적으로 백엔드 API가 /api/로 프록시된다면 소켓도 /api/ws-stomp 일 수 있고, 
+      // 별도 설정이면 /ws-stomp 일 수 있습니다. 확인된 context상 /ws-stomp는 루트에 있을 가능성이 높지만
+      // Nginx 설정을 보면 /api/ -> backend, 그 외에는 명시적이지 않습니다.
+      // 만약 백엔드의 /ws-stomp 엔드포인트가 Nginx의 /api/ws-stomp로 노출된다면 경로 수정이 필요합니다.
+      // 현재 일반적인 STOMP 설정은 /ws-stomp 이므로, Nginx가 이를 처리하는지 봐야합니다.
+      // Docker-compose에서 Nginx는 /api/ 및 /oauth2/ 만 프록시하고 있습니다.
+      // 따라서 /ws-stomp 요청은 Nginx에서 404가 될 수 있습니다.
+      
+      // -> Nginx 설정을 보면 /ws-stomp에 대한 프록시 설정이 없습니다! 
+      // 이 경우 백엔드로 직접 가거나 (8080은 막힘), Nginx 설정을 추가해야 합니다.
+      // 또는 /api/ws-stomp로 요청하고 백엔드에서 context-path를 맞추거나 해야 합니다.
+      
+      // 일단 기존 코드에서는 http://backend:8080 을 직접 찔렀던 것 같은데, 
+      // 브라우저에서는 Nginx(443)만 접근 가능하므로 Nginx가 /ws-stomp도 프록시해줘야 합니다.
+      // 하지만 당장 Nginx 설정을 못 바꾼다면, /api 경로 하위에 소켓이 존재하는지 확인해야 합니다.
+      // 만약 백엔드가 /ws-stomp 로 열려있다면, 프론트에서는 https://localhost/ws-stomp 로 요청하고
+      // Nginx conf에 location /ws-stomp { proxy_pass http://backend; ... } 가 있어야 합니다.
+      
+      // 우선 환경변수 그대로 사용하도록 롤백합니다 (http 강제 변환 제거).
       const socketUrl = `${baseUrl}/ws-stomp`;
+
       const connectKey = `${socketUrl}|${String(roomId)}|${String(userId)}`;
 
       // If we already have an active client for the same (url, roomId, userId), do nothing.

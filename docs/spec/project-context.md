@@ -29,7 +29,7 @@ status: 'Implementation Ready'
 *   **Language:** TypeScript (Strict)
 *   **Styling:** Tailwind CSS + Shadcn/UI
 *   **State:** Zustand (Client) + TanStack Query (Server State)
-*   **Real-time:** `sockjs-client`, `@stomp/stompjs`, `openvidu-browser` (WebRTC)
+*   **Real-time:** `sockjs-client`, `@stomp/stompjs`, `livekit-client` (WebRTC)
 
 ### Backend (`apps/backend`)
 *   **Framework:** Spring Boot 3.x

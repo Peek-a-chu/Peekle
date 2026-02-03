@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useSocketContext } from '@/domains/study/context/SocketContext';
-import { useRoomStore, Participant } from '@/domains/study/hooks/useRoomStore';
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { fetchStudyRoom, fetchStudyParticipants } from '../api/studyApi';
@@ -372,7 +372,7 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'VIDEO_TOKEN': {
-            // OpenVidu token received
+            // LiveKit token received
             const token = data;
             console.log('[StudySocket] Received VIDEO_TOKEN');
             setVideoToken(token);

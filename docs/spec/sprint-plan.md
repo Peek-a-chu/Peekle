@@ -70,7 +70,7 @@
 - [ ] **Story 03.4**: WebSocket Broker Config (Backend) - [Epic-03](epics/epic-03-study-room.md#story-034)
 - [ ] **Story 03.5**: Monaco Editor Integration (Frontend) - [Epic-03](epics/epic-03-study-room.md#story-035)
 - [ ] **Story 03.6**: WebRTC Video Grid (Frontend) - [Epic-03](epics/epic-03-study-room.md#story-036)
-- [ ] **Story 03.7**: OpenVidu Webhook Handler (Backend) - [Epic-03](epics/epic-03-study-room.md#story-037)
+- [ ] **Story 03.7**: LiveKit Webhook Handler (Backend) - [Epic-03](epics/epic-03-study-room.md#story-037)
 - [ ] **Story 03.8**: Code Synchronization (View) (Frontend) - [Epic-03](epics/epic-03-study-room.md#story-038)
 - [ ] **Story 03.9**: Observation Mode & Reacts (Frontend) - [Epic-03](epics/epic-03-study-room.md#story-039)
 - [ ] **Story 03.10**: Invite Modal (Frontend) - [Epic-03](epics/epic-03-study-room.md#story-0310)

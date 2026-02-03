@@ -22,7 +22,7 @@
 - **Frontend:** Next.js (App Router), TypeScript
 - **Backend (Real-time & Media):** Spring Boot
     - **WebSocket:** SockJS (실시간 채팅, 게임 상태 동기화)
-    - **WebRTC:** OpenVidu (화상 채팅, 화면 공유)
+    - **WebRTC:** LiveKit (화상 채팅, 화면 공유)
     - **API Communication:** `fetch` / `axios`를 통한 백엔드 통신 허용
 - **External Links:** BOJ(백준) 등 외부 이동이 필요한 경우, `target="_blank"`를 사용하여 새 탭으로만 허용
 

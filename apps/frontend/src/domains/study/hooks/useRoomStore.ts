@@ -5,7 +5,6 @@ export type ViewMode = 'ONLY_MINE' | 'SPLIT_REALTIME' | 'SPLIT_SAVED';
 
 export interface Participant {
   id: number;
-  odUid: string; // OpenVidu User ID
   nickname: string;
   profileImage?: string;
   isOwner: boolean;

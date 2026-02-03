@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
 import { toast } from 'sonner';
-import type { Publisher } from 'openvidu-browser';
+import { useLocalParticipant } from '@livekit/components-react';
+import { LocalParticipant } from 'livekit-client';
 
 const DeviceSection = () => {
   const {
@@ -33,6 +34,7 @@ const DeviceSection = () => {
   const participants = useRoomStore((state) => state.participants);
   const updateParticipant = useRoomStore((state) => state.updateParticipant);
   const { updateStatus } = useStudySocketActions();
+  const { localParticipant } = useLocalParticipant();
   const me = participants.find((p) => p.id === currentUserId);
   const isMuted = me?.isMuted ?? false;
   const isVideoOff = me?.isVideoOff ?? false;
@@ -147,107 +149,138 @@ const DeviceSection = () => {
   const speakerTestAudioRef = useRef<HTMLAudioElement | null>(null);
   const speakerGainNodeRef = useRef<GainNode | null>(null);
 
-  // OpenVidu publisher에서 오디오 레벨 측정 및 볼륨 제어
+  // 마이크 레벨 측정 (LiveKit 또는 로컬 스트림 사용)
   useEffect(() => {
-    const publisher = (window as any).__openviduPublisher as Publisher | undefined;
+    let localStream: MediaStream | null = null;
+    let stopped = false;
 
-    if (!publisher) {
-      setMicLevel(0);
-      return;
-    }
+    const startMetering = async () => {
+      try {
+        let stream: MediaStream | null = null;
+        let isLocal = false;
 
-    try {
-      if (!publisher.stream) {
-        setMicLevel(0);
-        return;
-      }
-
-      const stream = publisher.stream.getMediaStream();
-
-      if (!stream) {
-        setMicLevel(0);
-        return;
-      }
-
-      const audioTracks = stream.getAudioTracks();
-
-      if (audioTracks.length === 0 || isMuted) {
-        setMicLevel(0);
-        return;
-      }
-
-      // AudioContext 생성
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-
-      const audioContext = audioContextRef.current;
-      const source = audioContext.createMediaStreamSource(stream);
-
-      // GainNode 생성 (입력 볼륨 제어)
-      if (!gainNodeRef.current) {
-        gainNodeRef.current = audioContext.createGain();
-      }
-
-      const gainNode = gainNodeRef.current;
-      gainNode.gain.value = micVolume / 100; // 0-1 범위로 변환
-
-      if (!analyserRef.current) {
-        analyserRef.current = audioContext.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.8;
-        dataArrayRef.current = new Uint8Array(
-          new ArrayBuffer(analyserRef.current.frequencyBinCount),
-        );
-      }
-
-      const analyser = analyserRef.current;
-      const dataArray = dataArrayRef.current;
-
-      // source -> gainNode -> analyser 연결
-      source.connect(gainNode);
-      gainNode.connect(analyser);
-
-      const updateLevel = () => {
-        if (!analyser || !dataArray) return;
-
-        // TypeScript 타입 호환성을 위해 타입 단언 사용
-        analyser.getByteFrequencyData(dataArray as any);
-
-        // 평균 레벨 계산
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
+        // 1. LiveKit (활성 트랙)
+        if (localParticipant && !isMuted) {
+           // LiveKit LocalParticipant uses camelCase for tracks in some versions, or trackPublications
+           // But 'audioTracks' is correct for LocalParticipant in livekit-client
+           // Let's use getAudioTracks() if possible or access via property safely
+           // Actually, LocalParticipant extends Participant which has audioTracks: Map<string, TrackPublication>
+           // Checking updated LiveKit types...
+           const trackReq = Array.from(localParticipant.audioTrackPublications.values()).find(t => t.track?.kind === 'audio');
+           if (trackReq?.track?.mediaStreamTrack) {
+               stream = new MediaStream([trackReq.track.mediaStreamTrack]);
+           }
         }
-        const average = sum / dataArray.length;
 
-        // 0-100 범위로 정규화 (0-255를 0-100으로)
-        const normalizedLevel = Math.min(100, (average / 255) * 100);
-        setMicLevel(normalizedLevel);
-
-        animationFrameRef.current = requestAnimationFrame(updateLevel);
-      };
-
-      updateLevel();
-
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
+        // 2. getUserMedia (없으면 직접 요청 - 레벨 미터용)
+        if (!stream) {
+           try {
+             stream = await navigator.mediaDevices.getUserMedia({
+                audio: { deviceId: selectedMicId !== 'default' ? { exact: selectedMicId } : undefined }
+             });
+             isLocal = true;
+             localStream = stream; // cleanup을 위해 저장
+           } catch (e) {
+             console.warn('[DeviceSection] Failed to get local mic stream for metering:', e);
+           }
         }
-        try {
-          source.disconnect();
-          gainNode.disconnect();
-        } catch (e) {
-          // Ignore disconnect errors
-        }
-      };
-    } catch (error) {
-      console.error('[DeviceSection] Failed to measure audio level:', error);
-      setMicLevel(0);
-    }
-  }, [isMuted, micVolume]);
 
-  // 입력 볼륨 변경 시 OpenVidu publisher에 적용
+        if (stopped) {
+            // 이미 언마운트됨
+            if (isLocal && stream) stream.getTracks().forEach(t => t.stop());
+            return;
+        }
+
+        if (!stream) {
+          setMicLevel(0);
+          return;
+        }
+
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          setMicLevel(0);
+          return;
+        }
+
+        // AudioContext 생성
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+
+        const audioContext = audioContextRef.current;
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+
+        const source = audioContext.createMediaStreamSource(stream);
+
+        // GainNode 생성 (입력 볼륨 제어)
+        if (!gainNodeRef.current) {
+          gainNodeRef.current = audioContext.createGain();
+        }
+
+        const gainNode = gainNodeRef.current;
+        gainNode.gain.value = micVolume / 100;
+
+        if (!analyserRef.current) {
+          analyserRef.current = audioContext.createAnalyser();
+          analyserRef.current.fftSize = 256;
+          analyserRef.current.smoothingTimeConstant = 0.8;
+          dataArrayRef.current = new Uint8Array(
+            new ArrayBuffer(analyserRef.current.frequencyBinCount),
+          );
+        }
+
+        const analyser = analyserRef.current;
+        const dataArray = dataArrayRef.current;
+
+        source.connect(gainNode);
+        gainNode.connect(analyser);
+
+        const updateLevel = () => {
+          if (!analyser || !dataArray) return;
+          analyser.getByteFrequencyData(dataArray as any);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / dataArray.length;
+          const normalizedLevel = Math.min(100, (average / 255) * 100);
+          setMicLevel(normalizedLevel);
+          animationFrameRef.current = requestAnimationFrame(updateLevel);
+        };
+
+        updateLevel();
+
+        // Cleanup function for this execution
+        return () => {
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            try {
+                source.disconnect();
+                gainNode.disconnect();
+            } catch(e) {}
+        };
+      } catch (error) {
+        console.error('[DeviceSection] Failed to setup audio metering:', error);
+        setMicLevel(0);
+      }
+    };
+
+    const cleanupPromise = startMetering();
+
+    return () => {
+      stopped = true;
+      if (localStream) {
+          localStream.getTracks().forEach(t => t.stop());
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      // AudioContext는 전역 ref로 유지되므로 닫지 않음 (다른 테스트에서 재사용)
+    };
+  }, [isMuted, micVolume, selectedMicId, localParticipant]);
+
+  // 입력 볼륨 변경 시 GainNode에 적용
   useEffect(() => {
     if (gainNodeRef.current) {
       gainNodeRef.current.gain.value = micVolume / 100;
@@ -262,37 +295,35 @@ const DeviceSection = () => {
   }, [speakerVolume]);
 
   // 마이크/카메라 토글 핸들러
-  const handleMicToggle = () => {
+  const handleMicToggle = async () => {
     if (!currentUserId || !me) return;
 
     // Optimistic Update
     const newMuted = !isMuted;
     updateParticipant(currentUserId, { isMuted: newMuted });
 
-    // Toggle Mute (OpenVidu + Socket)
+    // Toggle Mute (Socket)
     updateStatus(newMuted, isVideoOff);
 
-    // OpenVidu 오디오 토글도 호출
-    const toggleAudio = (window as any).__openviduToggleAudio;
-    if (toggleAudio) {
-      toggleAudio();
+    // LiveKit 오디오 토글
+    if (localParticipant) {
+      await localParticipant.setMicrophoneEnabled(!newMuted);
     }
   };
 
-  const handleVideoToggle = () => {
+  const handleVideoToggle = async () => {
     if (!currentUserId || !me) return;
 
     // Optimistic Update
     const newVideoOff = !isVideoOff;
     updateParticipant(currentUserId, { isVideoOff: newVideoOff });
 
-    // Toggle Video (OpenVidu + Socket)
+    // Toggle Video (Socket)
     updateStatus(isMuted, newVideoOff);
 
-    // OpenVidu 비디오 토글도 호출
-    const toggleVideo = (window as any).__openviduToggleVideo;
-    if (toggleVideo) {
-      toggleVideo();
+    // LiveKit 비디오 토글
+    if (localParticipant) {
+      await localParticipant.setCameraEnabled(!newVideoOff);
     }
   };
 
@@ -300,12 +331,21 @@ const DeviceSection = () => {
   const handleCameraPreview = async () => {
     if (isPreviewOn) {
       if (streamRef.current) {
-        // OpenVidu 스트림이 아닌 경우에만 트랙 중지
-        const publisher = (window as any).__openviduPublisher;
-        const ovStream = publisher?.stream?.getMediaStream();
-
-        if (!ovStream || streamRef.current.id !== ovStream.id) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
+        // LiveKit 스트림이 아닌 경우에만 트랙 중지 (로컬 생성 스트림인 경우)
+        // track id 비교 등으로 확인 가능하나, 간단히 stop() 호출. 
+        // 주의: LiveKit 트랙을 여기서 stop하면 송출도 멈출 수 있음.
+        // 따라서 localParticipant track이 아닌 경우에만 stop해야 함.
+        
+        let isLiveKitTrack = false;
+        if (localParticipant) {
+             const trackReq = Array.from(localParticipant.videoTrackPublications.values()).find(t => t.track?.kind === 'video');
+             if (trackReq?.track?.mediaStreamTrack?.id === streamRef.current.getVideoTracks()[0]?.id) {
+                 isLiveKitTrack = true;
+             }
+        }
+        
+        if (!isLiveKitTrack) {
+             streamRef.current.getTracks().forEach((track) => track.stop());
         }
         streamRef.current = null;
       }
@@ -318,24 +358,18 @@ const DeviceSection = () => {
 
     try {
       let stream: MediaStream | null = null;
-      const publisher = (window as any).__openviduPublisher;
 
-      // 1. OpenVidu 스트림 재사용 시도 (카메라가 켜져있을 때만)
-      if (publisher && publisher.stream && !isVideoOff) {
-        const ovStream = publisher.stream.getMediaStream();
-        // 활성 비디오 트랙이 있는지 확인
-        if (
-          ovStream &&
-          ovStream.active &&
-          ovStream.getVideoTracks().length > 0 &&
-          ovStream.getVideoTracks()[0].enabled
-        ) {
-          stream = ovStream;
-          console.log('[DeviceSection] Reusing OpenVidu stream for preview');
+      // 1. LiveKit 스트림 재사용 시도 (카메라가 켜져있을 때만)
+      if (localParticipant && !isVideoOff) {
+        // Array.from() to iterate map values
+        const trackReq = Array.from(localParticipant.videoTrackPublications.values()).find(t => t.track?.kind === 'video');
+        if (trackReq && trackReq.track && trackReq.track.mediaStreamTrack) {
+           stream = new MediaStream([trackReq.track.mediaStreamTrack]);
+           console.log('[DeviceSection] Reusing LiveKit stream for preview');
         }
       }
 
-      // 2. OpenVidu 스트림이 없거나 사용할 수 없으면 새로 요청
+      // 2. LiveKit 스트림이 없거나 사용할 수 없으면 새로 요청
       if (!stream) {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -385,13 +419,25 @@ const DeviceSection = () => {
     }
 
     try {
-      const publisher = (window as any).__openviduPublisher as Publisher | undefined;
-      if (!publisher) {
-        toast.error('OpenVidu 연결을 찾을 수 없습니다. 비디오 세션에 먼저 참여해주세요.');
-        return;
+      let stream: MediaStream | null = null;
+
+      // 1. LiveKit 스트림 확인 (Muted가 아닌 경우)
+      if (localParticipant && !isMuted) {
+         const trackReq = Array.from(localParticipant.audioTrackPublications.values()).find(t => t.track?.kind === 'audio');
+         if (trackReq?.track?.mediaStreamTrack) {
+             stream = new MediaStream([trackReq.track.mediaStreamTrack]);
+         }
       }
 
-      const stream = publisher.stream.getMediaStream();
+      // 2. getUserMedia 확인 (LiveKit 스트림이 없거나 Muted 상태일 때 하드웨어 직접 테스트)
+      if (!stream) {
+         stream = await navigator.mediaDevices.getUserMedia({
+             audio: {
+                 deviceId: selectedMicId !== 'default' ? { exact: selectedMicId } : undefined
+             }
+         });
+      }
+
       if (!stream) {
         toast.error('오디오 스트림을 찾을 수 없습니다.');
         return;
@@ -401,11 +447,6 @@ const DeviceSection = () => {
 
       if (audioTracks.length === 0) {
         toast.error('마이크 트랙을 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.');
-        return;
-      }
-
-      if (isMuted) {
-        toast.error('마이크가 꺼져 있습니다. 마이크를 켜주세요.');
         return;
       }
 

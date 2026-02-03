@@ -10,7 +10,8 @@ import {
 } from '@/domains/league/types';
 import { LeagueType } from '@/components/LeagueIcon';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
+
 
 // Backend DTO matches this structure
 export interface BackendRankingMember {

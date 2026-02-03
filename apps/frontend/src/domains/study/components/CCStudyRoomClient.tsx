@@ -23,11 +23,13 @@ import {
 } from '@/domains/study/hooks/useStudySocket';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
+import { useLocalParticipant } from '@livekit/components-react';
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
   const { user, checkAuth } = useAuthStore();
+  const { localParticipant } = useLocalParticipant();
 
   // Listen for participant events and Handle Enter/Leave
   useStudySocketSubscription(studyId);
@@ -196,44 +198,33 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     console.log('Settings clicked');
   };
 
-  const handleMicToggle = (): void => {
-    // Determine new state based on simple toggle
-    // However, ControlBar is stateless now and relies on Store.
-    // So we invoke updateStatus with inverted current state
-    const { currentUserId, participants, updateParticipant } = useRoomStore.getState();
-    const me = participants.find((p) => p.id === currentUserId);
-    if (!me || !currentUserId) return;
-
-    // Optimistic Update
-    const newMuted = !me.isMuted;
-    updateParticipant(currentUserId, { isMuted: newMuted });
-
-    // Toggle Mute (OpenVidu + Socket)
-    updateStatus(newMuted, me.isVideoOff);
-    
-    // OpenVidu 오디오 토글도 호출 (useOpenVidu가 CCVideoGrid에서 호출되므로 전역 함수 사용)
-    const toggleAudio = (window as any).__openviduToggleAudio;
-    if (toggleAudio) {
-      toggleAudio();
+  const handleMicToggle = async (): Promise<void> => {
+    if (localParticipant) {
+       const targetEnabled = !localParticipant.isMicrophoneEnabled;
+       await localParticipant.setMicrophoneEnabled(targetEnabled);
+       
+       const { currentUserId, updateParticipant } = useRoomStore.getState();
+       if (currentUserId) {
+          updateParticipant(currentUserId, { isMuted: !targetEnabled });
+          const { participants } = useRoomStore.getState();
+          const me = participants.find((p) => p.id === currentUserId);
+          updateStatus(!targetEnabled, me?.isVideoOff ?? false);
+       }
     }
   };
 
-  const handleVideoToggle = (): void => {
-    const { currentUserId, participants, updateParticipant } = useRoomStore.getState();
-    const me = participants.find((p) => p.id === currentUserId);
-    if (!me || !currentUserId) return;
+  const handleVideoToggle = async (): Promise<void> => {
+    if (localParticipant) {
+       const targetEnabled = !localParticipant.isCameraEnabled;
+       await localParticipant.setCameraEnabled(targetEnabled);
 
-    // Optimistic Update
-    const newVideoOff = !me.isVideoOff;
-    updateParticipant(currentUserId, { isVideoOff: newVideoOff });
-
-    // Toggle Video (OpenVidu + Socket)
-    updateStatus(me.isMuted, newVideoOff);
-    
-    // OpenVidu 비디오 토글도 호출
-    const toggleVideo = (window as any).__openviduToggleVideo;
-    if (toggleVideo) {
-      toggleVideo();
+       const { currentUserId, updateParticipant } = useRoomStore.getState();
+       if (currentUserId) {
+          updateParticipant(currentUserId, { isVideoOff: !targetEnabled });
+          const { participants } = useRoomStore.getState();
+          const me = participants.find((p) => p.id === currentUserId);
+          updateStatus(me?.isMuted ?? false, !targetEnabled);
+       }
     }
   };
 
@@ -328,19 +319,19 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   );
 }
 
+import { CCLiveKitWrapper } from './CCLiveKitWrapper';
+
 // Wrapper to provide SocketContext
 export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
   const studyId = Number(params.id) || 0;
   const currentUserId = useRoomStore((state) => state.currentUserId);
 
-  // Wait for userId to be initialized if you want to delay connection?
-  // But we want to render the content immediately.
-  // SocketProvider will handle connection updates when currentUserId changes.
-
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
-      <StudyRoomContent studyId={studyId} />
+      <CCLiveKitWrapper studyId={studyId}>
+        <StudyRoomContent studyId={studyId} />
+      </CCLiveKitWrapper>
     </SocketProvider>
   );
 }
