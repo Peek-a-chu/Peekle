@@ -45,7 +45,12 @@ services:
       dockerfile: Dockerfile
     container_name: peekle-backend-dev
     user: root
-    entrypoint: ["sh", "-c", "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS -jar app.jar"]
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher",
+      ]
     env_file:
       - ../apps/backend/.env
     environment:
@@ -53,8 +58,10 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
+      - AI_SERVER_URL=http://ai-server:8000
       - OPENVIDU_URL=https://openvidu:8443
       - OPENVIDU_SECRET=MY_SECRET
+      - AI_SERVER_URL=http://ai-server:8000
     volumes:
       - h2-data:/app/data
     expose:
@@ -62,8 +69,12 @@ services:
     depends_on:
       redis:
         condition: service_started
+      ai-server:
+        condition: service_started
       openvidu:
         condition: service_healthy
+      ai-server:
+        condition: service_started
     networks:
       - peekle-network-dev
 
@@ -71,8 +82,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: peekle-redis-dev
-    expose:
-      - "6379"
+    command: redis-server --requirepass peekle-redis-password
+    ports:
+      - "6379:6379"
     networks:
       - peekle-network-dev
 
@@ -118,11 +130,53 @@ services:
       - openvidu-recordings:/opt/openvidu/recordings
       - openvidu-log:/var/log/openvidu
     healthcheck:
-      test: ["CMD", "curl", "-f", "https://localhost:8443/api/config", "-k", "-u", "OPENVIDUAPP:MY_SECRET"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "https://localhost:8443/api/config",
+          "-k",
+          "-u",
+          "OPENVIDUAPP:MY_SECRET",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - peekle-network-dev
+
+  # ChromaDB - Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma-dev
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - peekle-network-dev
+
+  # AI Server - FastAPI (Python)
+  ai-server:
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+    container_name: peekle-ai-server-dev
+    env_file:
+      - ../apps/ai-server/.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../apps/ai-server:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - redis
+      - chroma
     networks:
       - peekle-network-dev
 
@@ -135,9 +189,13 @@ volumes:
     driver: local
   nginx-certs:
     driver: local
+  chroma-data:
+    driver: local
   openvidu-recordings:
     driver: local
   openvidu-log:
     driver: local
   coturn-logs:
     driver: local
+  chroma-data:
+    driver: local"

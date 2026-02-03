@@ -3,7 +3,6 @@ import { LeagueType } from '@/components/LeagueIcon';
 export interface LeagueRankingMember {
   rank: number;
   name: string;
-  avatar: string;
   profileImgThumb?: string;
   score: number;
   me?: boolean;

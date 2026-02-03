@@ -35,6 +35,7 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
     createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
     creator: {
       id: String(item.creator.id),
       nickname: item.creator.nickname || '알 수 없음',
@@ -55,6 +56,7 @@ function mapWorkbookResponseToWorkbook(item: WorkbookResponse): Workbook {
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
     createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
     creator: {
       id: String(item.creator.id),
       nickname: item.creator.nickname || '알 수 없음',
@@ -115,7 +117,9 @@ export interface UseWorkbooksPageLogicReturn {
   refresh: () => void;
 }
 
-export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
+export function useWorkbooksPageLogic(
+  initialSelectedId?: string | null,
+): UseWorkbooksPageLogicReturn {
   // 데이터 상태
   const [workbookList, setWorkbookList] = useState<Workbook[]>([]);
   const [totalElements, setTotalElements] = useState(0);
@@ -139,7 +143,14 @@ export function useWorkbooksPageLogic(): UseWorkbooksPageLogicReturn {
   const isInitialLoadRef = useRef(true);
 
   // 선택 상태
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId || null);
+
+  // 초기 ID 변경 감지
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedId(initialSelectedId);
+    }
+  }, [initialSelectedId]);
 
   // 탭별 개수 조회
   const fetchCounts = useCallback(async () => {

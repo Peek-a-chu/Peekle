@@ -35,10 +35,14 @@ public class LeagueSmallGroupTest {
     @Autowired
     private LeagueHistoryRepository leagueHistoryRepository;
 
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
     private int currentSeasonWeek;
 
     @BeforeEach
     void setUp() {
+        redisTemplate.delete("league:season:current");
         leagueHistoryRepository.deleteAll();
         leagueGroupRepository.deleteAll();
         userRepository.deleteAll();

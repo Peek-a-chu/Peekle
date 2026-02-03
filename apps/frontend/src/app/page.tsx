@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
-import { getMe } from '@/api/userApi';
+// import { getMe } from '@/api/userApi';
 
 export default function Home() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
 
+  /*
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -27,6 +28,7 @@ export default function Home() {
 
     void checkAuth();
   }, [router]);
+  */
 
   if (isChecking) {
     return (

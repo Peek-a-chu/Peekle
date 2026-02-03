@@ -44,7 +44,7 @@ export function CCWorkbookRow({
       <div
         className={cn(
           'shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors',
-          isSelected ? 'bg-pink-500 text-white' : 'bg-muted text-muted-foreground',
+          isSelected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground',
         )}
       >
         {workbook.number}
@@ -55,7 +55,7 @@ export function CCWorkbookRow({
         <h3
           className={cn(
             'font-medium text-sm line-clamp-1 transition-colors',
-            isSelected ? 'text-pink-600 dark:text-pink-400' : 'text-foreground',
+            isSelected ? 'text-primary dark:text-pink-400' : 'text-foreground',
           )}
         >
           {workbook.title}
@@ -118,7 +118,7 @@ export function CCWorkbookRow({
         className={cn(
           'shrink-0 w-4 h-4 transition-all',
           isSelected
-            ? 'text-pink-500 translate-x-0.5'
+            ? 'text-primary translate-x-0.5'
             : 'text-muted-foreground/50 group-hover:text-muted-foreground',
         )}
       />

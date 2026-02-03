@@ -10,11 +10,10 @@ import lombok.Getter;
 public class LeagueRankingMemberDto {
     private int rank;
     private String name;
-    private String avatar;
     private String profileImgThumb;
     private int score;
     private LeagueStatus status;
-    
+
     @JsonProperty("me")
     private boolean me;
 }

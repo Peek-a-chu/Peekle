@@ -81,12 +81,36 @@ export async function fetchSearchResults(params: SearchParams): Promise<SearchRe
   const queryString = urlParams.toString();
   console.log('Fetching search results:', `/api/search?${queryString}`);
 
-  const res = await apiFetch<SearchResponse>(`/api/search?${queryString}`);
+  const res = await apiFetch<any>(`/api/search?${queryString}`);
 
   if (!res.success || !res.data) {
     console.error('Search API error:', res);
     throw new Error(res.error?.message || 'Search failed');
   }
 
-  return res.data;
+  // Map backend response to frontend interface
+  const searchResult = res.data;
+  const innerData = searchResult.data || {};
+
+  const rawUsers = innerData.users || [];
+
+  const mappedUsers = rawUsers.map((user: any) => ({
+    userId: user.userId,
+    handle: user.nickname || user.handle, // Map nickname to handle
+    tier: user.tier,
+    profileImage: user.profileImg || user.profileImage, // Map profileImg to profileImage
+    league: user.league || user.tier || 'Unranked', // Use tier as league if league is missing
+    score: user.score || 0, // Default value
+  }));
+
+  const mappedData: SearchData = {
+    problems: innerData.problems || [],
+    workbooks: innerData.workbooks || [],
+    users: mappedUsers,
+  };
+
+  return {
+    ...searchResult,
+    data: mappedData,
+  };
 }

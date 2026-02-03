@@ -18,7 +18,11 @@ interface WorkbooksFilterProps {
   className?: string;
 }
 
-const TAB_OPTIONS: { value: WorkbookTab; label: string; countKey: keyof WorkbooksFilterProps['tabCounts'] }[] = [
+const TAB_OPTIONS: {
+  value: WorkbookTab;
+  label: string;
+  countKey: keyof WorkbooksFilterProps['tabCounts'];
+}[] = [
   { value: 'ALL', label: '전체', countKey: 'all' },
   { value: 'MY', label: '내 문제집', countKey: 'my' },
   { value: 'BOOKMARKED', label: '즐겨찾기', countKey: 'bookmarked' },
@@ -68,8 +72,8 @@ export function WorkbooksFilter({
             className={cn(
               'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors',
               tab === option.value
-                ? 'bg-background text-pink-500 shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-background text-primary shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {option.label}
@@ -77,7 +81,7 @@ export function WorkbooksFilter({
               variant="secondary"
               className={cn(
                 'h-5 min-w-5 px-1.5 text-[10px]',
-                tab === option.value ? 'bg-pink-100 text-pink-600' : ''
+                tab === option.value ? 'bg-pink-100 text-primary' : '',
               )}
             >
               {tabCounts[option.countKey]}
@@ -103,10 +107,12 @@ export function WorkbooksFilter({
         <div ref={sortRef} className="relative">
           <button
             onClick={() => setIsSortOpen(!isSortOpen)}
-            className="flex items-center gap-1 px-4 py-2 rounded-md bg-pink-500 hover:bg-pink-600 text-white text-sm font-medium transition-colors"
+            className="flex items-center gap-1 px-4 py-2 rounded-md bg-primary hover:bg-primary text-white text-sm font-medium transition-colors"
           >
             {currentSortLabel}
-            <ChevronDown className={cn('h-4 w-4 transition-transform', isSortOpen && 'rotate-180')} />
+            <ChevronDown
+              className={cn('h-4 w-4 transition-transform', isSortOpen && 'rotate-180')}
+            />
           </button>
 
           {isSortOpen && (
@@ -120,7 +126,7 @@ export function WorkbooksFilter({
                   }}
                   className={cn(
                     'w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                    sortBy === option.value && 'text-pink-500 font-medium'
+                    sortBy === option.value && 'text-primary font-medium',
                   )}
                 >
                   {option.label}

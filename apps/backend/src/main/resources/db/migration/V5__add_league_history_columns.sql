@@ -1,0 +1,2 @@
+ALTER TABLE league_history ADD COLUMN rank_value INTEGER;
+ALTER TABLE league_history ADD COLUMN is_viewed BOOLEAN NOT NULL DEFAULT FALSE;

@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
@@ -16,18 +18,34 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MediaService {
 
+    private final ObjectMapper objectMapper;
+
     @Value("${OPENVIDU_URL}")
     private String openViduUrl;
 
     @Value("${OPENVIDU_SECRET}")
     private String openViduSecret;
 
+    @Value("${spring.profiles.active:dev}")
+    private String activeProfile;
+
     private OpenVidu openVidu;
 
     @PostConstruct
     public void init() {
-        // 개발 환경용: SSL 인증서 검증 무시 (자체 서명 인증서 사용 시 필요)
-        disableSslVerification();
+        // 개발 환경일 경우 로컬호스트 주소 강제 설정
+        if ("dev".equals(activeProfile) || "local".equals(activeProfile)) {
+            // Development environment: Force use of localhost HTTPS
+            // The default OpenVidu deployment uses a self-signed certificate on port 8443
+            this.openViduUrl = "http://localhost:8443/";
+            log.info("[Dev Profile] OpenVidu URL forced to: {}", this.openViduUrl);
+
+            // 개발 환경용: SSL 인증서 검증 무시
+            disableSslVerification();
+        } else {
+            // Prod 환경: application.yml (System Env from Docker) 값 사용
+            log.info("[Prod Profile] Using Env OpenVidu URL: {}", this.openViduUrl);
+        }
 
         this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
         log.info("Initializing OpenVidu client at {}", openViduUrl);
@@ -167,9 +185,19 @@ public class MediaService {
         // 세션이 활성 상태인지 확인 (옵션)
         // openVidu.fetch(); // 너무 빈번한 호출은 성능 저하 유발 가능
 
+        String serverData = "";
+        if (userData != null) {
+            try {
+                serverData = objectMapper.writeValueAsString(userData);
+            } catch (JsonProcessingException e) {
+                log.warn("Failed to serialize userData to JSON, falling back to toString()", e);
+                serverData = userData.toString();
+            }
+        }
+
         ConnectionProperties properties = new ConnectionProperties.Builder()
                 .type(ConnectionType.WEBRTC)
-                .data(userData != null ? userData.toString() : "")
+                .data(serverData)
                 .role(OpenViduRole.PUBLISHER)
                 .build();
 

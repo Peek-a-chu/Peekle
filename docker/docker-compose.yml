@@ -10,7 +10,7 @@ services:
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
