@@ -83,7 +83,7 @@ export function CCStudyRankingBoard(): React.ReactNode {
   const handleStudyClick = (studyId: number): void => {
     if (scope !== 'ALL') setScope('ALL');
     if (currentPage !== 0) setCurrentPage(0);
-    
+
     // Expand the clicked study if not already expanded
     setExpandedIds((prev) => (prev.includes(studyId) ? prev : [...prev, studyId]));
   };
