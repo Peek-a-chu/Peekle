@@ -64,8 +64,11 @@ export function CCCenterPanel({
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
 
+  // [Fix] Whiteboard is only visible when a problem is selected
+  const isWhiteboardVisible = isWhiteboardOverlayOpen && !!selectedProblemTitle;
+
   // Show right panel when viewing other's code OR whiteboard is open
-  const showRightPanel = isViewingOther || isWhiteboardOverlayOpen;
+  const showRightPanel = isViewingOther || isWhiteboardVisible;
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -240,7 +243,7 @@ export function CCCenterPanel({
             )}
 
             {/* [New] Overlay if no problem is selected and not viewing other */}
-            {!selectedProblemTitle && !isViewingOther && !isWhiteboardOverlayOpen && (
+            {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
                 <Lock className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium text-muted-foreground">
@@ -252,7 +255,7 @@ export function CCCenterPanel({
           {/* Right Panel: Whiteboard OR Other's Code */}
           {showRightPanel && (
             <div className="flex-1 min-w-0">
-              {isWhiteboardOverlayOpen ? (
+              {isWhiteboardVisible ? (
                 <WhiteboardPanel className="border-l-2 border-rose-400" />
               ) : (
                 <IDEPanel
