@@ -108,6 +108,27 @@ export interface WeeklyPointSummary {
   activities: PointActivity[];
 }
 
+export interface BackendRankingMember {
+  rank: number;
+  name: string;
+  profileImgThumb?: string;
+  score: number;
+  me: boolean;
+  status: 'PROMOTE' | 'STAY' | 'DEMOTE';
+}
+
+export interface LeagueStatusResponse {
+  myLeague: string;
+  myRank: number;
+  myScore: number;
+  maxLeague?: string;
+  members: BackendRankingMember[];
+  promotePercent: number;
+  demotePercent: number;
+  myPercentile: number;
+  leagueStats: LeagueStat[];
+}
+
 export interface LeagueProgressData {
   league: LeagueType;
   score: number;
