@@ -55,19 +55,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
         className,
       )}
     >
-      {isWhiteboardActive && (
-        <div
-          onClickCapture={(e) => {
-            if (!selectedProblemTitle) {
-              e.stopPropagation();
-              e.preventDefault();
-              toast.error('문제를 먼저 선택해주세요.');
-            }
-          }}
-        >
-          <WhiteboardTile onClick={onWhiteboardClick} />
-        </div>
-      )}
+      {isWhiteboardActive && selectedProblemTitle && <WhiteboardTile onClick={onWhiteboardClick} />}
 
       {sortedParticipants.map((participant) => (
         <CCVideoTile
