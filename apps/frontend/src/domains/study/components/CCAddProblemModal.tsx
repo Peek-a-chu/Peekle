@@ -159,7 +159,7 @@ export function CCAddProblemModal({
             <ul className="divide-y divide-border">
               {results.map((problem) => (
                 <li
-                  key={problem.number}
+                  key={problem.externalId || problem.number}
                   onClick={() => setSelectedProblem(problem)}
                   className={cn(
                     'p-3 cursor-pointer hover:bg-accent transition-colors flex justify-between items-center',

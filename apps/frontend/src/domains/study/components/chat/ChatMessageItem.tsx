@@ -1,8 +1,48 @@
+import { useRef, useState } from 'react';
+import { Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ChatMessage } from '../../types/chat';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { CodeShareCard } from './CodeShareCard';
 import { useRoomStore } from '../../hooks/useRoomStore';
+
+const PreBlock = ({ children, ...props }: any) => {
+  const preRef = useRef<HTMLPreElement>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (preRef.current) {
+      const codeText = preRef.current.innerText || '';
+      navigator.clipboard.writeText(codeText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="relative my-2 overflow-hidden rounded-md bg-zinc-950/90 border border-white/10 text-left group/code">
+      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover/code:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleCopy}
+          className="h-6 w-6 text-zinc-400 hover:text-white hover:bg-white/10"
+        >
+          {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        </Button>
+      </div>
+      <pre
+        ref={preRef}
+        className="overflow-x-auto p-4 font-mono text-xs text-zinc-50"
+        {...props}
+      >
+        {children}
+      </pre>
+    </div>
+  );
+};
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -166,6 +206,25 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
             <div className={cn('markdown-prose', isMine && 'markdown-prose-invert')}>
               <ReactMarkdown
                 components={{
+                  pre: PreBlock,
+                  code: ({ node, className, children, ...props }: any) => {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return !match ? (
+                      <code
+                        className={cn(
+                          'rounded px-1 font-mono text-sm bg-black/10 dark:bg-white/10',
+                          className,
+                        )}
+                        {...props}
+                      >
+                        {children}
+                      </code>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    );
+                  },
                   // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   a: ({ node, ...props }) => (
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any

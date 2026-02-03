@@ -20,7 +20,7 @@ function getOpenViduUrl(): string {
 
   // localhost인 경우 직접 포트로 접근 (로컬 실행)
   if (socketUrl.includes('localhost') || socketUrl.includes('127.0.0.1')) {
-    const openViduUrl = 'https://localhost:8443';
+    const openViduUrl = 'http://localhost:4443';
     console.log('[OpenVidu] Server URL (local):', openViduUrl);
     return openViduUrl;
   }

@@ -5,6 +5,7 @@ export interface StudyMemberResponse {
   userId: number;
   nickname: string;
   profileImg: string;
+  profileImgThumb?: string; // Added field
   role: 'OWNER' | 'MEMBER';
   isOnline: boolean;
 }
