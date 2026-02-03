@@ -9,4 +9,7 @@ public interface StudyRoomRepositoryCustom {
 
     // 스터디 랭킹 조회
     Page<StudyRoom> findRankings(Long userId, String keyword, String scope, Pageable pageable);
+
+    // 내 스터디의 전체 랭킹 조회 (나보다 점수가 높은 스터디 개수 + 1)
+    long countHigherRankStudies(int rankingPoint, Long studyId);
 }
