@@ -101,7 +101,7 @@ describe.skip('GlobalSearchBar', () => {
 
   it('clears input when clear button is clicked', () => {
     render(<GlobalSearchBar />);
-    const input = screen.getByPlaceholderText('문제, 사용자, 문제집 검색...') as HTMLInputElement;
+    const input = screen.getByPlaceholderText('문제, 사용자, 문제집 검색...');
 
     fireEvent.change(input, { target: { value: 'test' } });
     expect(input.value).toBe('test');
