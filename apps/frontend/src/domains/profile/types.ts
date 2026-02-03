@@ -22,6 +22,7 @@ export interface SubmissionHistory {
   memory: string; // "31120KB"
   time: string; // "40ms"
   isSuccess: boolean;
+  result: string; // "맞았습니다", "틀렸습니다" 등 상세 결과
   timestamp: string; // "2026.01.16 10:30"
   sourceType: 'SOLO' | 'STUDY' | 'GAME';
   sourceDetail?: string; // 스터디명 or 게임유형(팀전/개인전)

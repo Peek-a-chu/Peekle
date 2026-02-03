@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 import { signup as signupApi } from '@/api/authApi';
-import { checkNickname as checkNicknameApi } from '@/api/userApi';
+import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi } from '@/api/userApi';
 
 interface NicknameValidation {
   status: 'idle' | 'checking' | 'valid' | 'invalid';
@@ -33,6 +33,14 @@ function SignupForm() {
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [bojValidation, setBojValidation] = useState<{
+    status: 'idle' | 'checking' | 'valid' | 'invalid';
+    message: string;
+  }>({
+    status: 'idle',
+    message: '',
+  });
 
   useEffect(() => {
     if (!token) {
@@ -84,7 +92,40 @@ function SignupForm() {
     }, 300);
 
     return () => clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, [nickname, checkNickname]);
+
+  // BOJ ID 유효성 검사 (디바운스)
+  const checkBojId = useCallback(async (value: string) => {
+    // 빈 값은 허용 (체크 안함, status: idle/valid 취급을 위해 idle로 둠)
+    if (!value.trim()) {
+      setBojValidation({ status: 'idle', message: '' });
+      return;
+    }
+
+    setBojValidation({ status: 'checking', message: '확인 중...' });
+
+    try {
+      const data = await checkBojIdApi(value);
+
+      if (data.success && data.data) {
+        setBojValidation({
+          status: data.data.valid ? 'valid' : 'invalid',
+          message: data.data.message,
+        });
+      }
+    } catch {
+      setBojValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void checkBojId(bojId);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [bojId, checkBojId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +144,12 @@ function SignupForm() {
 
     if (validation.status !== 'valid') {
       setError('닉네임을 확인해주세요.');
+      return;
+    }
+
+    // BOJ ID가 입력되어 있는데 유효하지 않으면 차단
+    if (bojId.trim() && bojValidation.status !== 'valid') {
+      setError('백준 아이디를 확인해주세요.');
       return;
     }
 
@@ -138,6 +185,30 @@ function SignupForm() {
 
   const getInputBorderColor = () => {
     switch (validation.status) {
+      case 'valid':
+        return 'border-green-300 focus:ring-green-200 focus:border-green-400';
+      case 'invalid':
+        return 'border-red-300 focus:ring-red-200 focus:border-red-400';
+      default:
+        return 'border-slate-200 focus:ring-pink-200 focus:border-pink-300';
+    }
+  };
+
+  const getBojValidationColor = () => {
+    switch (bojValidation.status) {
+      case 'valid':
+        return 'text-green-500';
+      case 'invalid':
+        return 'text-red-500';
+      case 'checking':
+        return 'text-slate-400';
+      default:
+        return 'text-slate-400';
+    }
+  };
+
+  const getBojInputBorderColor = () => {
+    switch (bojValidation.status) {
       case 'valid':
         return 'border-green-300 focus:ring-green-200 focus:border-green-400';
       case 'invalid':
@@ -199,15 +270,23 @@ function SignupForm() {
                 value={bojId}
                 onChange={(e) => setBojId(e.target.value)}
                 placeholder="백준 아이디를 입력하세요"
-                className="w-full h-11 px-4 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-200 focus:border-pink-300 transition-all"
+                className={`w-full h-11 px-4 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all ${getBojInputBorderColor()}`}
               />
+              {bojValidation.message && (
+                <p className={`mt-1.5 text-sm ${getBojValidationColor()}`}>
+                  {bojValidation.status === 'checking' && (
+                    <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin mr-1.5 align-middle" />
+                  )}
+                  {bojValidation.message}
+                </p>
+              )}
             </div>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
             <button
               type="submit"
-              disabled={isSubmitting || validation.status !== 'valid'}
+              disabled={isSubmitting || validation.status !== 'valid' || (!!bojId.trim() && bojValidation.status !== 'valid')}
               className="w-full h-[52px] bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? '가입 중...' : '가입 완료'}

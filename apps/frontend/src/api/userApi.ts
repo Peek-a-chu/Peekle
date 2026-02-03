@@ -18,6 +18,15 @@ export async function checkNickname(nickname: string): Promise<ApiResponse<Check
   return await apiFetch<CheckNicknameResponse>(`/api/users/check-nickname?nickname=${encodeURIComponent(nickname)}`);
 }
 
+export interface CheckBojIdResponse {
+  valid: boolean;
+  message: string;
+}
+
+export async function checkBojId(bojId: string): Promise<ApiResponse<CheckBojIdResponse>> {
+  return await apiFetch<CheckBojIdResponse>(`/api/users/check-boj-id?bojId=${encodeURIComponent(bojId)}`);
+}
+
 export async function getPresignedUrl(fileName: string, contentType: string): Promise<ApiResponse<{ presignedUrl: string; publicUrl: string }>> {
   return await apiFetch<{ presignedUrl: string; publicUrl: string }>(`/api/users/me/profile-image/presigned-url`, {
     method: 'POST',
@@ -35,3 +44,6 @@ export async function updateUserProfile(data: any): Promise<ApiResponse<void>> {
 export async function getMe(): Promise<ApiResponse<UserInfo>> {
   return await apiFetch<UserInfo>(`/api/users/me`);
 }
+
+// Server-side exports
+

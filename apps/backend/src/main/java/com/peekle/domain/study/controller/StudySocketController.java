@@ -11,11 +11,10 @@ import com.peekle.domain.study.entity.StudyChatLog;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.service.*;
+import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
-import io.openvidu.java.client.Connection;
-import io.openvidu.java.client.Session;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -26,9 +25,7 @@ import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Controller
 @RequiredArgsConstructor
@@ -45,7 +42,7 @@ public class StudySocketController {
         private final SimpMessagingTemplate messagingTemplate;
         private final StudyChatService studyChatService; // Injected
         private final WhiteboardService whiteboardService; // Injected
-        private final com.peekle.domain.user.repository.UserRepository userRepository; // Custom injection
+        private final UserRepository userRepository; // Custom injection
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
@@ -94,86 +91,19 @@ public class StudySocketController {
                 redisTemplate.opsForValue().set(activeStudyKey, String.valueOf(studyId));
                 redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
-                // 2. OpenVidu 및 초기화 (Bundled)
+                // 2. LiveKit 및 초기화 (Bundled)
                 try {
-                        log.info("Try OpenVidu: study_{}, user_{}", studyId, userId);
-                        String sessionId = "study_" + studyId;
-                        Session session = mediaService.getOrCreateSession(sessionId);
+                        String token = mediaService.createAccessToken(studyId, userId, getUserNickname(userId));
+                        log.info("Generated LiveKit token for user {}, study {}", userId, studyId);
 
-                        Map<String, Object> userData = new HashMap<>();
-                        userData.put("userId", userId);
-
-                        Connection connection = mediaService.createConnection(session, userData);
-                        String token = connection.getToken();
-
-                        // Fix OpenVidu Token for Nginx Proxy (Protocol, Domain, Trailing Slash)
-                        
-                        // 1. Always upgrade to WSS (OpenVidu is HTTPS)
-                        if (token.startsWith("ws://")) {
-                            token = token.replace("ws://", "wss://");
-                        }
-
-                        // 2. Production/Nginx specific adjustments (Skip for localhost)
-                        if (!token.contains("localhost")) {
-                                // Remove port 4443 to route through Nginx standard HTTPS port
-                                if (token.contains(":4443")) {
-                                    token = token.replace(":4443", "");
-                                }
-
-                                // Ensure path starts with /openvidu/ to match Nginx location and avoid redirects
-                                if (!token.contains("/openvidu")) {
-                                     token = token.replace("?sessionId=", "/openvidu/?sessionId=");
-                                } else if (token.contains("/openvidu?")) {
-                                     token = token.replace("/openvidu?", "/openvidu/?");
-                                }
-                        } else {
-                                // Localhost Adjustment: 
-                                // Backend connects via HTTP:4443 (ws://), but Browser needs HTTPS:4443 (wss://)
-                                if (token.contains(":4443")) {
-                                    token = token.replace(":4443", ":4443");
-                                }
-                        }
-                        
-                        // Validates domain if localhost (fallback)
-                        // Localhost 연결 지원을 위해 주석 처리
-                         if (token.contains("localhost")) {
-                              // token = token.replace("localhost", "i14a408.p.ssafy.io");
-                         }
-
-                        log.info("Modified OpenVidu token for Client: {}", token);
-
-                        // Connection ID 저장 (Redis Hash)
-                        redisTemplate.opsForHash().put("study:" + studyId + ":connection_ids", userId.toString(),
-                                connection.getConnectionId());
-
-                        // 1. OpenVidu Token
                         messagingTemplate.convertAndSend(
                                 "/topic/studies/" + studyId + "/video-token/" + userId,
                                 SocketResponse.of("VIDEO_TOKEN", token));
                 } catch (Exception e) {
-                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId,
-                                e.getMessage(), e);
-                        String errorMessage = e.getMessage();
-                        if (errorMessage == null || errorMessage.isEmpty()) {
-                                errorMessage = e.getClass().getSimpleName();
-                        }
-                        log.error("OpenVidu initialization failed for study_{}, user_{}: {}", studyId, userId,
-                                errorMessage, e);
-
-                        // 더 명확한 에러 메시지 제공
-                        String userFriendlyMessage = "OpenVidu 서버 연결 실패";
-                        if (errorMessage.contains("Connection") || errorMessage.contains("connect")) {
-                                userFriendlyMessage = "OpenVidu 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
-                        } else if (errorMessage.contains("401") || errorMessage.contains("Unauthorized")) {
-                                userFriendlyMessage = "OpenVidu 인증 실패. SECRET 설정을 확인해주세요.";
-                        } else if (errorMessage.contains("404") || errorMessage.contains("Not Found")) {
-                                userFriendlyMessage = "OpenVidu 서버를 찾을 수 없습니다. URL 설정을 확인해주세요.";
-                        }
-
+                        log.error("LiveKit token generation failed: {}", e.getMessage());
                         messagingTemplate.convertAndSend(
                                 "/topic/studies/" + studyId + "/video-token/" + userId,
-                                SocketResponse.of("ERROR", "Init Error: " + userFriendlyMessage));
-                        // OpenVidu 실패해도 다른 초기화는 계속 진행
+                                SocketResponse.of("ERROR", "Video connection failed"));
                 }
 
                 try {
@@ -288,7 +218,7 @@ public class StudySocketController {
                                 .type(StudyChatLog.ChatType.SYSTEM)
                                 .build());
 
-                // 4. OpenVidu Force Disconnect
+                // 4. LiveKit Force Disconnect
                 mediaService.evictUser(request.getStudyId(), userId);
         }
 
@@ -335,7 +265,7 @@ public class StudySocketController {
                         new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                         SocketResponse.of("QUIT", userId));
 
-                // 5. OpenVidu Force Disconnect
+                // 5. LiveKit Force Disconnect
                 mediaService.evictUser(request.getStudyId(), userId);
         }
 
@@ -365,7 +295,7 @@ public class StudySocketController {
                         new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                         SocketResponse.of("KICK", request.getTargetUserId()));
 
-                // OpenVidu Force Disconnect (Kick target)
+                // LiveKit Force Disconnect (Kick target)
                 mediaService.evictUser(request.getStudyId(), request.getTargetUserId());
         }
 

@@ -76,5 +76,7 @@ app:
 springwolf:
   enabled: false
 
-OPENVIDU_URL: https://openvidu:4443
-OPENVIDU_SECRET: sdafdsf
+livekit:
+  url: http://localhost:7880 # 환경변수 없으면 로컬호스트 사용
+  api-key: apitestkey
+  api-secret: awefbnioaweubfiawuebfkweajbfkljebfiaweybfkawebfiubawef

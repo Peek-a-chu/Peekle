@@ -6,17 +6,22 @@ import { useExtensionCheck } from '@/hooks/useExtensionCheck';
 import { UserProfile, ExtensionStatus } from '../types';
 import { CCProfileHeader } from './CCProfileHeader';
 import { CCProfileStatsRow } from './CCProfileStatsRow';
-import { checkNickname as checkNicknameApi, getPresignedUrl, updateUserProfile } from '@/api/userApi';
+import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi, getPresignedUrl, updateUserProfile } from '@/api/userApi';
 import ActivityStreak from '@/domains/home/components/ActivityStreak';
 import LearningTimeline from '@/domains/home/components/LearningTimeline';
 import { useAuthStore } from '@/store/auth-store';
 import { ConfirmModal } from '@/components/common/Modal';
+import { toast } from 'sonner';
 
 import { CCExtensionGuide } from './CCExtensionGuide';
+
+import { ActivityStreakData, TimelineItemData } from '@/domains/home/mocks/dashboardMocks';
 
 interface Props {
   user: UserProfile;
   isMe: boolean;
+  initialStreak?: ActivityStreakData[];
+  initialTimeline?: TimelineItemData[];
 }
 
 interface ValidateResponse {
@@ -33,7 +38,7 @@ const TABS = {
 
 type TabKey = (typeof TABS)[keyof typeof TABS];
 
-export function CCProfileView({ user, isMe }: Props) {
+export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>(TABS.OVERVIEW);
   const [selectedDate, setSelectedDate] = useState<string | null>(
@@ -41,6 +46,14 @@ export function CCProfileView({ user, isMe }: Props) {
   );
 
   const checkAuth = useAuthStore((state) => state.checkAuth);
+
+  // Optimistic UI State
+  const [optimisticUser, setOptimisticUser] = useState<UserProfile>(user);
+
+  // Sync optimistic user with real user data when it updates (e.g. after refresh)
+  useEffect(() => {
+    setOptimisticUser(user);
+  }, [user]);
 
   // Profile Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -59,6 +72,11 @@ export function CCProfileView({ user, isMe }: Props) {
     message: string;
   }>({ status: 'idle', message: '' });
 
+  const [bojIdValidation, setBojIdValidation] = useState<{
+    status: 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
+    message: string;
+  }>({ status: 'idle', message: '' });
+
   // Modal State
   const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string }>({
     isOpen: false,
@@ -73,13 +91,14 @@ export function CCProfileView({ user, isMe }: Props) {
   const handleEditStart = () => {
     setIsEditing(true);
     // Initialize states
-    setPreviewImage(user.profileImg || null);
+    setPreviewImage(optimisticUser.profileImg || null);
     setIsProfileImageDeleted(false);
     setMainImageToUpload(null);
     setThumbToUpload(null);
-    setEditNickname(user.nickname);
-    setEditBojId(user.bojId || '');
+    setEditNickname(optimisticUser.nickname);
+    setEditBojId(optimisticUser.bojId || '');
     setNicknameValidation({ status: 'idle', message: '' });
+    setBojIdValidation({ status: 'idle', message: '' });
   };
 
   const handleEditCancel = () => {
@@ -139,6 +158,57 @@ export function CCProfileView({ user, isMe }: Props) {
     return () => clearTimeout(timer);
   }, [editNickname, isEditing, checkNickname, user.nickname]);
 
+  // BOJ ID 유효성 검사 (디바운스 적용)
+  const checkBojId = useCallback(async (value: string) => {
+    if (!value.trim()) {
+      setBojIdValidation({ status: 'idle', message: '' });
+      return;
+    }
+
+    // 기존 ID와 같으면 패스 (변경 없음)
+    if (value === user.bojId) {
+      setBojIdValidation({ status: 'valid', message: '' });
+      return;
+    }
+
+    setBojIdValidation({ status: 'checking', message: '확인 중...' });
+
+    try {
+      const data = await checkBojIdApi(value);
+
+      if (data.success && data.data) {
+        setBojIdValidation({
+          status: data.data.valid ? 'valid' : 'invalid',
+          message: data.data.message,
+        });
+      }
+    } catch {
+      setBojIdValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
+    }
+  }, [user.bojId]);
+
+  // 디바운스된 BOJ ID 체크
+  useEffect(() => {
+    if (!isEditing) return;
+
+    if (editBojId === (user.bojId || '')) {
+      setBojIdValidation({ status: 'valid', message: '' });
+      return;
+    }
+
+    // 빈 값일 때 처리
+    if (!editBojId.trim()) {
+      setBojIdValidation({ status: 'idle', message: '' });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void checkBojId(editBojId);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [editBojId, isEditing, checkBojId, user.bojId]);
+
   const handleUploadImageTrigger = () => {
     document.getElementById('profile-image-input')?.click();
   };
@@ -181,6 +251,13 @@ export function CCProfileView({ user, isMe }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // File Type Validation
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('jpg, png, jpeg, webp 파일만 업로드 가능합니다.');
+      return;
+    }
+
     setIsProfileImageDeleted(false);
 
     // 1. Create Main Image (112x112)
@@ -206,12 +283,51 @@ export function CCProfileView({ user, isMe }: Props) {
     setIsProfileImageDeleted(true);
   };
 
+  // --- Optimistic UI Update ---
   const handleEditSave = async () => {
+    // 1. Snapshot previous state for rollback
+    const previousUser = { ...optimisticUser };
+
+    // 2. Data Validation
+    if (editNickname !== user.nickname && nicknameValidation.status !== 'valid') {
+      toast.error('닉네임을 확인해주세요.');
+      return;
+    }
+
+    if (editBojId !== (user.bojId || '') && bojIdValidation.status !== 'valid') {
+      toast.error('백준 아이디를 확인해주세요.');
+      return;
+    }
+
     try {
+      // 3. Apply Optimistic Update Immediately
+      // Determine image to show: previewImage (if uploaded/changed) -> or null (if deleted) -> or original
+      let nextProfileImg = optimisticUser.profileImg;
+      if (isProfileImageDeleted) {
+        nextProfileImg = undefined; // Deleted
+      } else if (previewImage) {
+        nextProfileImg = previewImage; // Uploaded/Changed (Data URL)
+      }
+
+      const nextUser = {
+        ...optimisticUser,
+        nickname: editNickname,
+        bojId: editBojId || optimisticUser.bojId,
+        profileImg: nextProfileImg,
+        // We might want to clear thumb or set it same as profile for preview purposes
+        profileImgThumb: nextProfileImg // for immediate preview, using same img is fine
+      };
+
+      setOptimisticUser(nextUser);
+      setIsEditing(false); // Close edit mode immediately
+      toast.success('프로필이 업데이트되었습니다.');
+
+      // --- Background Sync ---
+
       let uploadedImageUrl = undefined;
       let uploadedImageThumbUrl = undefined;
 
-      // 1. Upload images if exist
+      // 4. Upload images if exist
       if (mainImageToUpload && thumbToUpload) {
 
         // --- A. Upload Main Image (112x112) ---
@@ -258,16 +374,11 @@ export function CCProfileView({ user, isMe }: Props) {
         uploadedImageThumbUrl = thumbData.publicUrl;
       }
 
-      // 2. Update Profile
+      // 5. Update Profile API Call
       const updatePayload: any = {};
 
       // Text fields
       if (editNickname !== user.nickname) {
-        // Validation check
-        if (nicknameValidation.status !== 'valid') {
-          setErrorModal({ isOpen: true, message: '닉네임을 확인해주세요.' });
-          return;
-        }
         updatePayload.nickname = editNickname;
       }
       if (editBojId !== (user.bojId || '')) {
@@ -284,31 +395,29 @@ export function CCProfileView({ user, isMe }: Props) {
         updatePayload.isProfileImageDeleted = true;
       }
 
-      // Only send checking if there is something to update
-      if (Object.keys(updatePayload).length === 0) {
-        setIsEditing(false);
-        return;
+      // Only send checking if there is something to update (though optimistic update already happened)
+      if (Object.keys(updatePayload).length > 0) {
+        await updateUserProfile(updatePayload);
       }
 
-      await updateUserProfile(updatePayload);
-
+      // 6. Final Sync
       // Refresh auth store to update sidebar
       await checkAuth();
 
-      // 닉네임이 변경되었다면 새 URL로 이동, 아니면 새로고침
+      // Soft Refresh to get authoritative data from server
       if (updatePayload.nickname && updatePayload.nickname !== user.nickname) {
-        // 닉네임 변경 시: 새 페이지로 이동 (replace로 뒤로가기 방지)
         router.replace(`/profile/${updatePayload.nickname}`);
       } else {
-        // 닉네임 변경 없음: 현재 페이지 새로고침
-        window.location.reload();
+        router.refresh();
       }
 
     } catch (error) {
       console.error('Save failed', error);
-      setErrorModal({ isOpen: true, message: '프로필 저장에 실패했습니다.' });
-    } finally {
-      setIsEditing(false);
+      toast.error('프로필 저장에 실패했습니다. 변경사항을 되돌립니다.');
+
+      // Rollback
+      setOptimisticUser(previousUser);
+      setIsEditing(true); // Re-open edit mode so user can retry
     }
   };
 
@@ -371,7 +480,7 @@ export function CCProfileView({ user, isMe }: Props) {
       <div className="p-6 border border-card-border rounded-xl bg-card">
         {/* 1. Header Section */}
         <CCProfileHeader
-          user={isEditing && previewImage ? { ...user, profileImg: previewImage } : (isProfileImageDeleted ? { ...user, profileImg: undefined } : user)}
+          user={isEditing && previewImage ? { ...optimisticUser, profileImg: previewImage } : (isProfileImageDeleted ? { ...optimisticUser, profileImg: undefined, profileImgThumb: undefined } : optimisticUser)}
           isMe={isMe}
           isEditing={isEditing}
           onEditStart={handleEditStart}
@@ -385,18 +494,19 @@ export function CCProfileView({ user, isMe }: Props) {
           nicknameValidation={nicknameValidation}
           editBojId={editBojId}
           setEditBojId={setEditBojId}
+          bojIdValidation={bojIdValidation}
         />
 
         <input
           type="file"
           id="profile-image-input"
           className="hidden"
-          accept="image/*"
+          accept=".jpg,.jpeg,.png,.webp"
           onChange={handleFileChange}
         />
 
         {/* 3. Stats Row */}
-        <CCProfileStatsRow user={user} />
+        <CCProfileStatsRow user={optimisticUser} />
       </div>
 
       {/* 4. Tabs (Segmented Control) */}
@@ -424,13 +534,19 @@ export function CCProfileView({ user, isMe }: Props) {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="border border-card-border rounded-2xl bg-card overflow-hidden">
             {/* 활동 스트릭 */}
-            <ActivityStreak onDateSelect={setSelectedDate} selectedDate={selectedDate} />
+            <ActivityStreak
+              onDateSelect={setSelectedDate}
+              selectedDate={selectedDate}
+              nickname={optimisticUser.nickname}
+              initialData={initialStreak}
+            />
 
             {/* 학습 타임라인 */}
             <LearningTimeline
               selectedDate={selectedDate}
               showHistoryLink={isMe}
-              nickname={user.nickname}
+              nickname={optimisticUser.nickname}
+              initialData={initialTimeline}
             />
           </div>
         </div>
@@ -439,7 +555,7 @@ export function CCProfileView({ user, isMe }: Props) {
       {activeTab === TABS.EXTENSION && isMe && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <CCExtensionGuide
-            user={user}
+            user={optimisticUser}
             isInstalled={isInstalled}
             extensionToken={extensionToken}
             checkInstallation={checkInstallation}

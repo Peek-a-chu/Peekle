@@ -6,8 +6,15 @@ import { useAIRecommendations } from '../hooks/useDashboardData';
 import { BOJ_TIER_NAMES, BOJ_TIER_COLORS } from '../mocks/dashboardMocks';
 import { Button } from '@/components/ui/button';
 
-const AIRecommendation = () => {
-  const { data } = useAIRecommendations();
+import { AIRecommendationData } from '../mocks/dashboardMocks';
+
+interface AIRecommendationProps {
+  initialData?: AIRecommendationData[];
+}
+
+const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
+  const { data: fetchedData } = useAIRecommendations({ skip: !!initialData });
+  const data = initialData || fetchedData;
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6 h-full transition-colors duration-300">

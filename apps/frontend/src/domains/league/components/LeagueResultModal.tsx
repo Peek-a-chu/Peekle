@@ -7,7 +7,7 @@ import {
     getLeagueHistoryRanking,
     LeagueHistoryResponse,
     BackendRankingMember
-} from '@/app/api/leagueApi';
+} from '@/api/leagueApi';
 import LeagueIcon, { LeagueType, LEAGUE_ORDER, LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserIcon } from '@/components/UserIcon';

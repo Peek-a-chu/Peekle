@@ -153,6 +153,7 @@ public class SubmissionService {
                 request.getProblemTitle(), reqTierStr, externalId,
                 tag,
                 request.getResult(), // result 추가
+                request.getIsSuccess(), // isSuccess 추가
                 request.getCode(),
                 request.getMemory(), request.getExecutionTime(),
                 request.getLanguage(), submittedAt);

@@ -42,8 +42,10 @@ dependencies {
     implementation 'io.github.springwolf:springwolf-core:1.6.0'
     implementation 'io.github.springwolf:springwolf-stomp:1.6.0'
 
-    // OpenVidu
-    implementation 'io.openvidu:openvidu-java-client:2.32.1'
+    // LiveKit
+    implementation 'io.livekit:livekit-server:0.6.0'
+    implementation 'com.google.protobuf:protobuf-java:3.25.1'
+
     // Database
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'

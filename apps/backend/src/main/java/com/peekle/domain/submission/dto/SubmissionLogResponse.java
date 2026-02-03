@@ -26,6 +26,7 @@ public class SubmissionLogResponse {
     private String sourceDetail;
     private String code;
     private String result; // 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등)
+    private Boolean isSuccess; // 성공 여부
 
     // 코드 확인을 위한 상세 내용은 별도 조회하거나,
     // 리스트에서 바로 보여주고 싶다면 여기에 code 필드를 추가할 수도 있음.
@@ -50,6 +51,7 @@ public class SubmissionLogResponse {
                 .sourceDetail(log.getTag())
                 .code(log.getCode())
                 .result(log.getResult())
+                .isSuccess(log.getIsSuccess())
                 .build();
     }
 }
