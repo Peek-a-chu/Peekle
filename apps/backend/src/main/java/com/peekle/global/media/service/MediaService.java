@@ -39,7 +39,7 @@ public class MediaService {
             // The default OpenVidu deployment uses a self-signed certificate on port 8443
             this.openViduUrl = "http://localhost:8443/";
             log.info("[Dev Profile] OpenVidu URL forced to: {}", this.openViduUrl);
-            
+
             // 개발 환경용: SSL 인증서 검증 무시
             disableSslVerification();
         } else {
@@ -49,11 +49,11 @@ public class MediaService {
 
         this.openVidu = new OpenVidu(openViduUrl, openViduSecret);
         log.info("Initializing OpenVidu client at {}", openViduUrl);
-        
+
         // 초기화 시 연결 테스트 (비동기로 실행하여 애플리케이션 시작을 막지 않음)
         testConnection();
     }
-    
+
     /**
      * OpenVidu 서버 연결 테스트
      */
@@ -118,11 +118,12 @@ public class MediaService {
 
     /**
      * 세션 ID(스터디 ID 등)를 받아 활성 세션이 있으면 반환, 없으면 생성합니다.
-     * 
+     *
      * @param customSessionId "study_{id}" 등의 고유 식별자
-     * @return OpenVidu Session ID
+     * @return OpenVidu Session 객체
      */
-    public String getOrCreateSession(String customSessionId) throws OpenViduJavaClientException, OpenViduHttpException {
+    public Session getOrCreateSession(String customSessionId)
+            throws OpenViduJavaClientException, OpenViduHttpException {
         // OpenVidu 클라이언트가 초기화되지 않은 경우 재시도
         if (openVidu == null) {
             log.warn("OpenVidu client not initialized, attempting to reinitialize...");
@@ -139,7 +140,7 @@ public class MediaService {
                 throw new RuntimeException("OpenVidu connection failed: " + e.getMessage(), e);
             }
         }
-        
+
         // 1. 활성 세션 목록 조회
         try {
             openVidu.fetch();
@@ -153,7 +154,7 @@ public class MediaService {
         for (Session session : openVidu.getActiveSessions()) {
             if (session.getSessionId().equals(customSessionId)) {
                 log.info("Found existing session: {}", customSessionId);
-                return session.getSessionId();
+                return session;
             }
         }
 
@@ -164,33 +165,25 @@ public class MediaService {
 
         Session session = openVidu.createSession(properties);
         log.info("Created new session: {}", session.getSessionId());
-        return session.getSessionId();
+        return session;
     }
 
     /**
-     * 특정 세션에 대한 연결 토큰을 생성합니다.
-     * 
-     * @param sessionId OpenVidu Session ID
-     * @param userData  사용자 메타데이터 (JSON String 등)
-     * @return Connection 객체 (Token 및 ConnectionId 포함)
+     * 특정 세션 객체에 대한 연결 토큰을 생성합니다.
+     *
+     * @param session  OpenVidu Session 객체
+     * @param userData 사용자 메타데이터
+     * @return Connection 객체
      */
-    public Connection createConnection(String sessionId, Map<String, Object> userData)
+    public Connection createConnection(Session session, Map<String, Object> userData)
             throws OpenViduJavaClientException, OpenViduHttpException {
-        openVidu.fetch();
-        Session session = openVidu.getActiveSessions().stream()
-                .filter(s -> s.getSessionId().equals(sessionId))
-                .findFirst()
-                .orElse(null);
 
         if (session == null) {
-            log.warn("Session {} not found active. Re-creating...", sessionId);
-            // 세션 재생성 시도 (재귀 호출 대신 세션 ID만 가져와서 진행)
-            getOrCreateSession(sessionId);
-            session = openVidu.getActiveSessions().stream()
-                    .filter(s -> s.getSessionId().equals(sessionId))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Failed to recreate session " + sessionId));
+            throw new RuntimeException("Cannot create connection: Session is null");
         }
+
+        // 세션이 활성 상태인지 확인 (옵션)
+        // openVidu.fetch(); // 너무 빈번한 호출은 성능 저하 유발 가능
 
         String serverData = "";
         if (userData != null) {
@@ -209,7 +202,7 @@ public class MediaService {
                 .build();
 
         Connection connection = session.createConnection(properties);
-        log.info("Created connection token for session {}", sessionId);
+        log.info("Created connection token for session {}", session.getSessionId());
         return connection;
     }
 
