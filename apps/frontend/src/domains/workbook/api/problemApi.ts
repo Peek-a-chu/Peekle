@@ -8,11 +8,14 @@ export interface BojProblemResponse {
   url: string;
 }
 
-export async function searchBojProblems(keyword: string, limit: number = 10): Promise<BojProblemResponse[]> {
+export async function searchBojProblems(
+  keyword: string,
+  limit: number = 10,
+): Promise<BojProblemResponse[]> {
   if (!keyword.trim()) return [];
 
   const res = await fetch(
-    `${API_BASE_URL}/api/problems/search?keyword=${encodeURIComponent(keyword)}&limit=${limit}`
+    `${API_BASE_URL}/api/problems/search?keyword=${encodeURIComponent(keyword)}&limit=${limit}`,
   );
 
   if (!res.ok) {
