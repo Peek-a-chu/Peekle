@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { CCStudyHeader as StudyHeader } from './CCStudyHeader';
 import { CCProblemListPanel as ProblemListPanel } from './CCProblemListPanel';
@@ -20,6 +21,8 @@ import {
   useStudySocketActions,
   useStudySocketSubscription,
 } from '@/domains/study/hooks/useStudySocket';
+import SettingsModal from '@/domains/settings/components/SettingsModal';
+import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 
 // Inner component with main logic
 function StudyRoomContent({ studyId }: { studyId: number }) {
@@ -50,6 +53,25 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
+  const openSettingsModal = useSettingsStore((state) => state.openModal);
+
+  // [Fix] Move device settings modal open logic to after successful join or remove auto-open if causing issues on redirect.
+  // Or handle it carefully. For now, let's keep it but maybe it triggers before redirect?
+  // User asked "Make modal also not appear" likely referring to this one in context of access denied.
+  // We can make it dependent on success of fetchStudyRoom or similar state.
+  // But strictly speaking, we can just remove it from here and let user open it manually or put it in .then() of fetchStudyRoom.
+  
+  // However, usually we want it on entry.
+  // Let's add a state `isAccessGranted` and only open if granted.
+
+  const [isAccessGranted, setIsAccessGranted] = useState(false);
+
+  useEffect(() => {
+    if (isAccessGranted) {
+      openSettingsModal('device');
+    }
+  }, [openSettingsModal, isAccessGranted]);
+
 
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
@@ -117,14 +139,19 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     }
 
     fetchStudyRoom(studyId)
-      .then((data) =>
+      .then((data) => {
         setRoomInfo({
           roomId: data.id,
           roomTitle: data.title,
           myRole: data.role,
-        }),
-      )
-      .catch((err) => console.error('Failed to fetch room info:', err));
+        });
+        setIsAccessGranted(true);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch room info:', err);
+        toast.error('접근 권한이 없습니다.');
+        router.replace('/study');
+      });
 
     setCurrentDate(formatDate(new Date()));
 
@@ -251,6 +278,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   return (
     <>
+      <SettingsModal />
       <StudyLayoutContent
         header={
           <StudyHeader

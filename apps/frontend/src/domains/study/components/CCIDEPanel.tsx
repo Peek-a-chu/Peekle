@@ -324,8 +324,14 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleSubmit = (): void => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
-        // TODO: 문제번호 넣어주세용
-        const problemId = '1000';
+        const { selectedProblemId } = useRoomStore.getState();
+
+        if (!selectedProblemId) {
+          toast.error('선택된 문제가 없습니다.');
+          return;
+        }
+
+        const problemId = String(selectedProblemId);
 
         // 확장 프로그램에 메시지 전송 (확장 프로그램이 수신 후 스토리지 저장 -> 페이지 이동 처리)
         window.postMessage(

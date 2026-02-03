@@ -19,15 +19,26 @@ const MemberIcons = ({
   limit?: number;
 }): React.ReactNode => (
   <div className="flex items-center justify-center -space-x-2">
-    {members.slice(0, limit).map((m) => (
-      <UserIcon
-        key={m.userId}
-        src={m.profileImg}
-        nickname={m.nickname}
-        className="border-2 border-background ring-0"
-        size={24}
-      />
-    ))}
+    {members.slice(0, limit).map((m) => {
+      const displayImg = m.profileImgThumb || m.profileImg;
+      return displayImg ? (
+        <img
+          key={m.userId}
+          src={encodeURI(displayImg)}
+          alt={m.nickname}
+          className="h-6 w-6 rounded-full border-2 border-background bg-muted"
+          title={m.nickname}
+        />
+      ) : (
+        <div
+          key={m.userId}
+          className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold text-slate-500"
+          title={m.nickname}
+        >
+          {m.nickname.charAt(0)}
+        </div>
+      );
+    })}
     {members.length > limit && (
       <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold">
         +{members.length - limit}

@@ -16,6 +16,7 @@ export function StudyRankingBoard(): React.ReactNode {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [scope, setScope] = useState<'ALL' | 'MINE'>('ALL');
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const pageSize = 10;
 
   useEffect(() => {
@@ -47,11 +48,22 @@ export function StudyRankingBoard(): React.ReactNode {
     if (scope === newScope) return;
     setScope(newScope);
     setCurrentPage(0);
+    setExpandedIds([]);
+  };
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   };
 
   const handleStudyClick = (studyId: number): void => {
     // TODO: S8-2에서 상세 모달 구현
     console.log('Study clicked:', studyId);
+    
+    // Expand the clicked study if not already expanded
+    if (scope !== 'ALL') setScope('ALL');
+    setExpandedIds((prev) => (prev.includes(studyId) ? prev : [...prev, studyId]));
   };
 
   if (isLoading) {
@@ -90,6 +102,8 @@ export function StudyRankingBoard(): React.ReactNode {
         onStudyClick={handleStudyClick}
         scope={scope}
         onScopeChange={handleScopeChange}
+        expandedIds={expandedIds}
+        onToggleExpand={toggleExpand}
       >
         {currentPage === 0 && topThree.length > 0 && scope === 'ALL' && (
           <TopThreePodium rankings={topThree} onStudyClick={handleStudyClick} />

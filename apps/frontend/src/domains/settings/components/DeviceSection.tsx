@@ -300,7 +300,13 @@ const DeviceSection = () => {
   const handleCameraPreview = async () => {
     if (isPreviewOn) {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+        // OpenVidu 스트림이 아닌 경우에만 트랙 중지
+        const publisher = (window as any).__openviduPublisher;
+        const ovStream = publisher?.stream?.getMediaStream();
+
+        if (!ovStream || streamRef.current.id !== ovStream.id) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
         streamRef.current = null;
       }
       if (videoRef.current) {
@@ -311,11 +317,33 @@ const DeviceSection = () => {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: selectedCameraId !== 'default' ? { exact: selectedCameraId } : undefined,
-        },
-      });
+      let stream: MediaStream | null = null;
+      const publisher = (window as any).__openviduPublisher;
+
+      // 1. OpenVidu 스트림 재사용 시도 (카메라가 켜져있을 때만)
+      if (publisher && publisher.stream && !isVideoOff) {
+        const ovStream = publisher.stream.getMediaStream();
+        // 활성 비디오 트랙이 있는지 확인
+        if (
+          ovStream &&
+          ovStream.active &&
+          ovStream.getVideoTracks().length > 0 &&
+          ovStream.getVideoTracks()[0].enabled
+        ) {
+          stream = ovStream;
+          console.log('[DeviceSection] Reusing OpenVidu stream for preview');
+        }
+      }
+
+      // 2. OpenVidu 스트림이 없거나 사용할 수 없으면 새로 요청
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: selectedCameraId !== 'default' ? { exact: selectedCameraId } : undefined,
+          },
+        });
+        console.log('[DeviceSection] Created new stream for preview');
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;

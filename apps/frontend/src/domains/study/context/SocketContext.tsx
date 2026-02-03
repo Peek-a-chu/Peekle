@@ -3,13 +3,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { useAuthStore } from '@/store/auth-store';
 
 interface SocketContextType {
   client: Client | null;
   connected: boolean;
 }
 
-const SocketContext = createContext<SocketContextType>({
+export const SocketContext = createContext<SocketContextType>({
   client: null,
   connected: false,
 });
@@ -23,6 +24,7 @@ interface SocketProviderProps {
 }
 
 export function SocketProvider({ children, roomId, userId }: SocketProviderProps) {
+  const accessToken = useAuthStore((state) => state.accessToken);
   const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
   const clientRef = React.useRef<Client | null>(null);
@@ -100,6 +102,7 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
         connectHeaders: {
           userId: String(userId),
           studyId: String(roomId),
+          Authorization: accessToken ? `Bearer ${accessToken}` : '',
         },
         debug: (str) => {
           if (process.env.NODE_ENV === 'development') {

@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api';
+import { UserProfile } from '@/domains/profile/types';
 
 export interface TimelineItem {
   submissionId: number;
@@ -97,5 +98,29 @@ export async function fetchMySubmissions(page = 0, size = 20): Promise<Submissio
     totalElements: res.data.totalElements,
     last: res.data.last,
     number: res.data.number,
+  };
+}
+
+export async function fetchUserProfile(nickname: string): Promise<UserProfile> {
+  const res = await apiFetch<any>(`/api/users/${encodeURIComponent(nickname)}/profile`);
+
+  if (!res.success || !res.data) {
+    throw new Error(res.error?.message || 'Failed to fetch user profile');
+  }
+
+  const data = res.data;
+  return {
+    id: String(data.id),
+    nickname: data.nickname,
+    bojId: data.bojId,
+    league: data.leagueName,
+    leaguePoint: Number(data.score),
+    streakCurrent: data.streakCurrent,
+    streakMax: data.streakMax,
+    profileImg: data.profileImg,
+    profileImgThumb: data.profileImgThumb,
+    solvedCount: Number(data.solvedCount),
+    isMe: data.me,
+    leagueGroupId: data.leagueGroupId,
   };
 }

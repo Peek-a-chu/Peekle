@@ -215,13 +215,19 @@ export const useStudySocketSubscription = (studyId: number) => {
 
         switch (type) {
           case 'ENTER': {
-            // ...
-            // Same as before
             const enteredUserId = data;
+            // Optimistic update for immediate feedback
+            updateParticipant(enteredUserId, { isOnline: true });
+
             try {
               const members = await fetchStudyParticipants(studyId);
-              setParticipants(members);
-              const enteredMember = members.find((p) => p.id === enteredUserId);
+              // Ensure the entering user is marked online, in case API is slightly behind
+              const updatedMembers = members.map((p) =>
+                p.id === enteredUserId ? { ...p, isOnline: true } : p,
+              );
+              setParticipants(updatedMembers);
+
+              const enteredMember = updatedMembers.find((p) => p.id === enteredUserId);
               if (enteredMember && enteredUserId !== useRoomStore.getState().currentUserId) {
                 toast.info(`${enteredMember.nickname}님이 입장하셨습니다.`);
               }

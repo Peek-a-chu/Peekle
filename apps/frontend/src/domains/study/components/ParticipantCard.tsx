@@ -90,8 +90,8 @@ export function ParticipantCard({
   const canOwnerActions = isRoomOwner && !isMe;
   // 2. View Code (Online Only, Not Me)
   const canViewCode = isOnline && !isMe;
-  // 3. View Profile (Everyone except me? Or everyone? usually everyone active)
-  const canViewProfile = true; // Everyone has profile
+  // 3. View Profile (Everyone except me)
+  const canViewProfile = !isMe;
 
   const hasAnyAction = canOwnerActions || canViewCode || canViewProfile;
 
