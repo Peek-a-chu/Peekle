@@ -72,7 +72,7 @@ function SignupForm() {
     setValidation({ status: 'checking', message: '확인 중...' });
 
     try {
-      const data = await checkNicknameApi(value);
+      const data = await checkNicknameApi(value, token || undefined);
 
       if (data.success && data.data) {
         setValidation({
@@ -83,7 +83,7 @@ function SignupForm() {
     } catch {
       setValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
     }
-  }, []);
+  }, [token]);
 
   // 디바운스된 닉네임 체크
   useEffect(() => {
@@ -91,7 +91,6 @@ function SignupForm() {
       void checkNickname(nickname);
     }, 300);
 
-    return () => clearTimeout(timer);
     return () => clearTimeout(timer);
   }, [nickname, checkNickname]);
 
@@ -106,7 +105,7 @@ function SignupForm() {
     setBojValidation({ status: 'checking', message: '확인 중...' });
 
     try {
-      const data = await checkBojIdApi(value);
+      const data = await checkBojIdApi(value, token || undefined);
 
       if (data.success && data.data) {
         setBojValidation({
@@ -117,7 +116,7 @@ function SignupForm() {
     } catch {
       setBojValidation({ status: 'invalid', message: '서버 연결에 실패했습니다.' });
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
