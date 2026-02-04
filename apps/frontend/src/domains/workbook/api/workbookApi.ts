@@ -20,6 +20,7 @@ export interface WorkbookResponse {
   id: number;
   title: string;
   description: string;
+  problemCount: number;
   solvedCount: number;
   failedCount: number;
   bookmarkCount: number;

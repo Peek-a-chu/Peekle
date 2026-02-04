@@ -31,6 +31,7 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
     description: item.description || '',
     problemCount: item.problemCount,
     solvedCount: item.solvedCount,
+    failedCount: item.failedCount,
     bookmarkCount: item.bookmarkCount,
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
@@ -44,14 +45,14 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
 }
 
 function mapWorkbookResponseToWorkbook(item: WorkbookResponse): Workbook {
-  const solvedCount = item.problems?.filter((p) => p.solved).length ?? 0;
   return {
     id: String(item.id),
     number: item.id,
     title: item.title,
     description: item.description || '',
     problemCount: item.problemCount,
-    solvedCount,
+    solvedCount: item.solvedCount,
+    failedCount: item.failedCount,
     bookmarkCount: item.bookmarkCount,
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
