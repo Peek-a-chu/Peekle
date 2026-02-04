@@ -20,5 +20,6 @@ public interface StudyProblemRepository extends JpaRepository<StudyProblem, Long
     List<StudyProblem> findByStudyIdAndProblemDate(Long studyId, LocalDate problemDate);
 
     // 중복 등록 방지
-    boolean existsByStudyAndProblemId(StudyRoom study, Long problemId);
+    // 중복 등록 방지 (같은 날짜에 같은 문제 불가)
+    boolean existsByStudyAndProblemIdAndProblemDate(StudyRoom study, Long problemId, LocalDate problemDate);
 }
