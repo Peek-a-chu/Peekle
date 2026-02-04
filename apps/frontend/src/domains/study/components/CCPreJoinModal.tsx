@@ -324,8 +324,7 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
             inputGain.connect(ctx.destination); // To Speakers
 
             analyserRef.current = analyser;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as any;
+            dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
 
             const update = () => {
                 if (!analyserRef.current || !dataArrayRef.current) return;

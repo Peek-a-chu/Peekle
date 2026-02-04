@@ -163,7 +163,6 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="center">
             <WeekCalendar
-              mode="single"
               selected={new Date(displayDate)}
               onSelect={handleDateSelect}
               initialFocus
