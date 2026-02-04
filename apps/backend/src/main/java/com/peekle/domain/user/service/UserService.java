@@ -369,13 +369,6 @@ public class UserService {
             }
         }
 
-        // 백준 아이디 중복 검사 (새로운 아이디 입력시)
-        if (request.getBojId() != null && !request.getBojId().equals(user.getBojId())) {
-            if (userRepository.findByBojId(request.getBojId()).isPresent()) {
-                throw new BusinessException(ErrorCode.DUPLICATE_BOJ_ID);
-            }
-        }
-
         // 프로필 이미지 삭제 요청 처리
         if (Boolean.TRUE.equals(request.getIsProfileImageDeleted())) {
             // 기존 이미지 삭제
