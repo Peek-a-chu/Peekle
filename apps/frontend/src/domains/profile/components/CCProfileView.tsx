@@ -538,13 +538,32 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabKey)}
-                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${
-                  activeTab === tab
-                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab
+                  ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                  : 'text-muted-foreground hover:text-foreground'
+                  }`}
               >
-                {tab}
+                <span className="flex items-center justify-center gap-1.5">
+                  {tab}
+                  {isMe && tab === TABS.EXTENSION && !isChecking && (!isInstalled || !extensionToken) && (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-warning"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  )}
+                </span>
               </button>
             ))}
         </div>
