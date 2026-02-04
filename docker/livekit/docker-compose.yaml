@@ -24,10 +24,10 @@ services:
         LIVEKIT_CONFIG=
         port: 7880
         rtc:
-          node_ip: 3.39.236.149
+          node_ip: 3.39.236.149 # Explicitly serving Public IP for external clients
           tcp_port: 7881
           udp_port: 7882
-          use_external_ip: true
+          use_external_ip: false # Disable STUN lookup, trust node_ip
         turn:
           enabled: true
           domain: i14a408.p.ssafy.io

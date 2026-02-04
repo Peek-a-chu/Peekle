@@ -166,7 +166,7 @@ services:
   # LiveKit Server (SFU)
   livekit:
     image: livekit/livekit-server:latest
-    container_name: peekle-livekit
+    container_name: peekle-livekit-standalone
     entrypoint: ["/bin/sh", "-c", "sleep 5 && /livekit-server --config /livekit.yaml"]
     # command: --config /livekit.yaml
     restart: unless-stopped
@@ -174,13 +174,23 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+      - "3478:3478/udp" # TURN UDP
+      - "30000-30010:30000-30010/udp" # UDP Relay
     volumes:
       - ./livekit/livekit.yaml:/livekit.yaml
       - nginx-certs:/etc/letsencrypt
     environment:
       - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
-      # Host 모드가 아니므로 Bridge 네트워크 내부의 Redis 호스트명 사용
-      - LIVEKIT_REDIS_ADDRESS=redis:6379 
+      - LIVEKIT_REDIS_ADDRESS=redis:6379
+      # Overriding/Ensuring Config for Production
+      - |
+        LIVEKIT_RTC_NODE_IP=3.39.236.149
+        LIVEKIT_RTC_USE_EXTERNAL_IP=false
+        LIVEKIT_TURN_ENABLED=true
+        LIVEKIT_TURN_DOMAIN=i14a408.p.ssafy.io
+        LIVEKIT_TURN_TLS_PORT=443
+        LIVEKIT_TURN_UDP_PORT=3478
+ 
     depends_on:
       redis:
         condition: service_healthy
