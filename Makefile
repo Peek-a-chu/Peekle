@@ -102,12 +102,12 @@ webrtc-down: livekit-down coturn-down
 # ===========================================
 
 clean:
-	docker compose -f $(DEV_COMPOSE_FILE) down
-	docker compose -f $(COMPOSE_FILE) down
-	docker compose -f $(COTURN_COMPOSE_FILE) down
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
-	docker compose -f $(PROD_COMPOSE_FILE) down
-	-docker rm -f peekle-chroma-dev peekle-ai-server-dev
+	docker compose -f $(DEV_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COTURN_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
+	-docker rm -f peekle-chroma-dev peekle-ai-server-dev 2>/dev/null || true
 	@echo "🧹 All containers cleaned"
 
 clean-prod:
@@ -115,18 +115,18 @@ clean-prod:
 	@echo "🧹 Production containers stopped"
 
 clean-all:
-	docker compose -f $(DEV_COMPOSE_FILE) down
-	docker compose -f $(COMPOSE_FILE) down
-	docker compose -f $(PROD_COMPOSE_FILE) down
-	docker compose -f $(COTURN_COMPOSE_FILE) down
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
+	docker compose -f $(DEV_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COTURN_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
 
 fclean:
-	docker compose -f $(DEV_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(PROD_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(COTURN_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
+	docker compose -f $(DEV_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(PROD_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(COTURN_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
 	docker system prune --all --volumes --force
 
 re:
