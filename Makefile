@@ -38,19 +38,52 @@ redis-down:
 # ===========================================
 
 prod-up:
-	@echo "Starting production services (includes LiveKit)..."
-	@if [ -d "/etc/letsencrypt/live" ]; then \
-		echo "🔄 Finding existing SSL certificates on host..."; \
+	@echo "🚀 Starting production services (includes LiveKit)..."
+	@echo ""
+	@# Step 1: Sync existing certificates from host (if any)
+	@if [ -d "/etc/letsencrypt/live" ] && [ -n "$$(sudo ls -A /etc/letsencrypt/live 2>/dev/null)" ]; then \
+		echo "📦 Found SSL certificates on host. Syncing to Docker volume..."; \
 		docker compose -f $(PROD_COMPOSE_FILE) run --rm --no-deps \
 			--entrypoint "/bin/sh -c" \
 			-v /etc/letsencrypt:/tmp/host_certs:ro \
 			certbot \
-			"cp -ans /tmp/host_certs/* /etc/letsencrypt/ 2>/dev/null || cp -rn /tmp/host_certs/* /etc/letsencrypt/ && echo '✅ Certificates synced to volume'"; \
+			"cp -ans /tmp/host_certs/* /etc/letsencrypt/ 2>/dev/null || cp -rn /tmp/host_certs/* /etc/letsencrypt/ && echo '✅ Certificates synced from host'"; \
 	else \
-		echo "No host certificates found at /etc/letsencrypt/live. Skipping sync."; \
+		echo "ℹ️  No existing certificates on host. Will auto-generate on first Nginx start."; \
 	fi
+	@echo ""
+	@# Step 2: Stop standalone LiveKit if running
 	@docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
+	@echo ""
+	@# Step 3: Build and start all services
+	@echo "🔨 Building and starting containers..."
 	DOCKER_BUILDKIT=1 docker compose -f $(PROD_COMPOSE_FILE) up --build -d
+	@echo ""
+	@# Step 4: Wait for Nginx to complete certificate setup
+	@echo "⏳ Waiting for SSL certificate setup (max 60s)..."
+	@timeout=60; \
+	elapsed=0; \
+	while [ $$elapsed -lt $$timeout ]; do \
+		if docker exec peekle-nginx test -f /etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem 2>/dev/null; then \
+			if docker exec peekle-nginx openssl x509 -in /etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem -noout -issuer 2>/dev/null | grep -qE "Let's Encrypt|ZeroSSL|Sectigo"; then \
+				echo "✅ Valid SSL certificate detected!"; \
+				break; \
+			else \
+				echo "⚠️  Self-signed certificate detected. Waiting for real certificate..."; \
+			fi; \
+		fi; \
+		sleep 2; \
+		elapsed=$$((elapsed + 2)); \
+	done
+	@echo ""
+	@echo "✨ Production deployment complete!"
+	@echo "   • Frontend:  https://i14a408.p.ssafy.io"
+	@echo "   • Backend:   https://i14a408.p.ssafy.io/api"
+	@echo "   • LiveKit:   wss://i14a408.p.ssafy.io (port 8880)"
+	@echo ""
+	@echo "📊 Check status: make prod-ps"
+	@echo "📝 View logs:    make prod-logs"
+
 
 prod-down:
 	docker compose -f $(PROD_COMPOSE_FILE) down
