@@ -215,8 +215,8 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
               style={{ height: `${100 / yAxisIcons.length}%` }}
             >
               <Image
-                src={`/icons/league/${league}.svg`}
-                alt={LEAGUE_NAMES[league]}
+                src={`/icons/league/${league.toLowerCase()}.svg`}
+                alt={LEAGUE_NAMES[league as keyof typeof LEAGUE_NAMES] || LEAGUE_NAMES[league.toLowerCase() as keyof typeof LEAGUE_NAMES]}
                 width={18}
                 height={18}
               />
