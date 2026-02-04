@@ -78,11 +78,6 @@ export function CCLiveKitWrapper({
       audio={initialMicEnabled}
       token={token}
       serverUrl={serverUrl}
-      connectOptions={{
-        rtcConfig: {
-          iceTransportPolicy: 'relay',
-        },
-      }}
       data-lk-theme="default"
       style={{ height: '100%', width: '100%' }}
     >

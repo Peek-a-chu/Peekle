@@ -4,40 +4,15 @@ services:
     container_name: peekle-livekit-standalone
     # command: --node-ip ${PUBLIC_IP:-127.0.0.1}
     restart: unless-stopped
-    ports:
-      # Port 7880 is handled by Nginx via Docker Network
-      - "7881:7881"
-      - "7882:7882/udp"
-      # TURN/STUN Ports (Built-in)
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "5349:5349"
-      - "5349:5349/udp"
-      - "30000-30010:30000-30010/udp"
+    network_mode: "host"
     volumes:
       - docker_nginx-certs:/etc/letsencrypt:ro
-    networks:
-      - peekle-network
+      - ./livekit.yaml:/livekit.yaml
+    command: --config /livekit.yaml
+    user: root # Required to read /etc/letsencrypt/live keys (chmod 600 root)
     environment:
       - "LIVEKIT_KEYS=livekit_api_key: peekle_livekit_secret_at_least_32_chars_long"
-      - |
-        LIVEKIT_CONFIG=
-        port: 7880
-        rtc:
-          node_ip: 3.39.236.149 # Explicitly serving Public IP for external clients
-          tcp_port: 7881
-          udp_port: 7882
-          use_external_ip: false # Disable STUN lookup, trust node_ip
-        turn:
-          enabled: true
-          domain: i14a408.p.ssafy.io
-          cert_file: "/etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem"
-          key_file: "/etc/letsencrypt/live/i14a408.p.ssafy.io/privkey.pem"
-          tls_port: 443
-          udp_port: 3478
-          external_tls: false
-          relay_range_start: 30000
-          relay_range_end: 30010
+
 
 volumes:
   docker_nginx-certs:

@@ -2,14 +2,14 @@ port: 7880
 logging:
   level: debug
 rtc:
-  node_ip: 3.39.236.149
   tcp_port: 7881
-  udp_port: 7882
-  use_external_ip: false
+  port_range_start: 50000
+  port_range_end: 50200
+  use_external_ip: true
   enable_loopback_candidate: false
 
 redis:
-  address: redis:6379
+  address: 127.0.0.1:6379
   db: 0
   password: "peekle-redis-password"
 
@@ -27,4 +27,4 @@ turn:
   udp_port: 3478
   external_tls: false
   relay_range_start: 30000
-  relay_range_end: 30010
+  relay_range_end: 30200
