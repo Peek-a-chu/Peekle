@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Sparkles, ExternalLink, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useAIRecommendations } from '../hooks/useDashboardData';
@@ -7,6 +8,7 @@ import { BOJ_TIER_NAMES, BOJ_TIER_COLORS } from '../mocks/dashboardMocks';
 import { Button } from '@/components/ui/button';
 
 import { AIRecommendationData } from '../mocks/dashboardMocks';
+import { AddToWorkbookModal } from '@/domains/workbook/components/AddToWorkbookModal';
 
 interface AIRecommendationProps {
   initialData?: AIRecommendationData[];
@@ -15,6 +17,14 @@ interface AIRecommendationProps {
 const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   const { data: fetchedData } = useAIRecommendations({ skip: !!initialData });
   const data = initialData || fetchedData;
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProblem, setSelectedProblem] = useState<{ id: string; title: string } | null>(null);
+
+  const handleOpenModal = (id: string, title: string) => {
+    setSelectedProblem({ id, title });
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6 h-full transition-colors duration-300">
@@ -73,7 +83,12 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
                   풀러가기
                 </Button>
               </Link>
-              <Button size="sm" variant="outline" className="gap-1 border-border">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 border-border"
+                onClick={() => handleOpenModal(item.problemId, item.title)}
+              >
                 <Plus className="w-3 h-3" />
                 문제집에 추가
               </Button>
@@ -81,6 +96,15 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
           </div>
         ))}
       </div>
+
+      {selectedProblem && (
+        <AddToWorkbookModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          problemBojId={selectedProblem.id}
+          problemTitle={selectedProblem.title}
+        />
+      )}
     </div>
   );
 };

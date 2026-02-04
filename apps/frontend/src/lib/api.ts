@@ -125,7 +125,27 @@ export async function apiFetch<T>(
     };
   }
 
-  return response.json() as Promise<ApiResponse<T>>;
+  const json = await response.json();
+
+  // 1. 이미 ApiResponse 규격인 경우 그대로 반환
+  if (json && typeof json === 'object' && 'success' in json) {
+    return json as ApiResponse<T>;
+  }
+
+  // 2. ApiResponse 규격이 아니지만 응답이 성공(2xx)인 경우 성공으로 래핑
+  if (response.ok) {
+    return { success: true, data: json, error: undefined } as ApiResponse<T>;
+  }
+
+  // 3. 응답이 실패인데 ApiResponse 규격이 아닌 경우(Spring 기본 에러 등) 실패로 래핑
+  return {
+    success: false,
+    data: null,
+    error: {
+      code: json.code || json.status?.toString() || 'API_ERROR',
+      message: json.message || json.error || `Request failed with status ${response.status}`,
+    },
+  } as ApiResponse<T>;
 }
 
 async function retryOriginalRequest<T>(url: string, fetchOptions: RequestInit): Promise<ApiResponse<T>> {

@@ -66,7 +66,8 @@ public class WorkbookService {
     }
 
     // 문제집 목록 조회
-    public Page<WorkbookListResponse> getWorkbooks(Long userId, String tab, String keyword, String sort, Pageable pageable) {
+    public Page<WorkbookListResponse> getWorkbooks(Long userId, String tab, String keyword, String sort,
+            Pageable pageable) {
         Page<Workbook> workbooks;
 
         // 로그인하지 않은 사용자는 MY/BOOKMARKED 탭 접근 불가 - 빈 결과 반환
@@ -106,7 +107,8 @@ public class WorkbookService {
                     int solvedCount = (int) workbook.getProblems().stream()
                             .filter(wp -> solvedProblemIds.contains(wp.getProblem().getId()))
                             .count();
-                    boolean isBookmarked = user != null && workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
+                    boolean isBookmarked = user != null
+                            && workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
                     boolean isOwner = user != null && workbook.getCreator().getId().equals(userId);
                     return WorkbookListResponse.of(workbook, problemCount, solvedCount, isBookmarked, isOwner);
                 })
@@ -186,6 +188,41 @@ public class WorkbookService {
         workbook.deactivate();
     }
 
+    // 문제집에 단일 문제 추가
+    @Transactional
+    public void addProblemToWorkbook(Long userId, Long workbookId, Long problemId) {
+        Workbook workbook = workbookRepository.findById(workbookId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKBOOK_NOT_FOUND));
+
+        // 권한 체크
+        if (!workbook.getCreator().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+
+        // 중복 체크
+        boolean exists = workbook.getProblems().stream()
+                .anyMatch(wp -> wp.getProblem().getId().equals(problemId));
+
+        if (exists) {
+            throw new BusinessException(ErrorCode.PROBLEM_ALREADY_ADDED);
+        }
+
+        // 마지막 인덱스 계산
+        int lastIndex = workbook.getProblems().size();
+
+        WorkbookProblem workbookProblem = WorkbookProblem.builder()
+                .workbook(workbook)
+                .problem(problem)
+                .orderIndex(lastIndex)
+                .build();
+
+        workbook.addProblem(workbookProblem);
+        workbookRepository.save(workbook);
+    }
+
     // 북마크 토글
     @Transactional
     public boolean toggleBookmark(Long userId, Long workbookId) {
@@ -259,8 +296,7 @@ public class WorkbookService {
                 .toList();
 
         Set<Long> solvedProblemIds = new HashSet<>(
-                submissionLogRepository.findSolvedProblemIds(userId, problemIds)
-        );
+                submissionLogRepository.findSolvedProblemIds(userId, problemIds));
 
         return workbookProblems.stream()
                 .map(wp -> WorkbookProblemResponse.of(wp, solvedProblemIds.contains(wp.getProblem().getId())))

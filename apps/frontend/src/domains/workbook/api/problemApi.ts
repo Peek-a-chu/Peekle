@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { apiFetch } from '@/lib/api';
 
 export interface BojProblemResponse {
   id: number;
@@ -14,13 +14,28 @@ export async function searchBojProblems(
 ): Promise<BojProblemResponse[]> {
   if (!keyword.trim()) return [];
 
-  const res = await fetch(
-    `${API_BASE_URL}/api/problems/search?keyword=${encodeURIComponent(keyword)}&limit=${limit}`,
+  const response = await apiFetch<BojProblemResponse[]>(
+    `/api/problems/search?keyword=${encodeURIComponent(keyword)}&limit=${limit}`,
   );
 
-  if (!res.ok) {
-    throw new Error('Failed to search problems');
+  if (!response.success || !response.data) {
+    throw new Error(response.error?.message || 'Failed to search problems');
   }
 
-  return res.json();
+  return response.data;
+}
+
+export async function getProblemIdByExternalId(
+  externalId: string,
+  source: string = 'BOJ',
+): Promise<number> {
+  const response = await apiFetch<{ problemId: number }>(
+    `/api/problems/by-external-id?externalId=${externalId}&source=${source}`,
+  );
+
+  if (!response.success || !response.data) {
+    throw new Error(response.error?.message || 'Failed to get problem ID');
+  }
+
+  return response.data.problemId;
 }
