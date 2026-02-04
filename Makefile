@@ -93,6 +93,7 @@ clean:
 	docker compose -f $(COMPOSE_FILE) down
 	docker compose -f $(COTURN_COMPOSE_FILE) down
 	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
+	docker compose -f $(PROD_COMPOSE_FILE) down
 	-docker rm -f peekle-chroma-dev peekle-ai-server-dev
 
 clean-prod:

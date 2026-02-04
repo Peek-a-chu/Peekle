@@ -1,20 +1,49 @@
 services:
   livekit:
-    image: livekit/livekit-server:v1.5.0
+    image: livekit/livekit-server:v1.8.0
     container_name: peekle-livekit-standalone
-    command: --node-ip ${PUBLIC_IP}
+    # command: --node-ip ${PUBLIC_IP:-127.0.0.1}
     restart: unless-stopped
     ports:
-      - "7880:7880"
+      # Port 7880 is handled by Nginx via Docker Network
       - "7881:7881"
-      - "${RTC_PORT_START}-${RTC_PORT_END}:${RTC_PORT_START}-${RTC_PORT_END}/udp"
-    env_file:
-      - ../.env
+      - "7882:7882/udp"
+      # TURN/STUN Ports (Built-in)
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "30000-30010:30000-30010/udp"
+    volumes:
+      - docker_nginx-certs:/etc/letsencrypt:ro
+    networks:
+      - peekle-network
     environment:
-      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+      - "LIVEKIT_KEYS=livekit_api_key: peekle_livekit_secret_at_least_32_chars_long"
       - |
         LIVEKIT_CONFIG=
+        port: 7880
         rtc:
-          port_range_start: ${RTC_PORT_START}
-          port_range_end: ${RTC_PORT_END}
-          use_external_ip: false
+          node_ip: 3.39.236.149
+          tcp_port: 7881
+          udp_port: 7882
+          use_external_ip: true
+        turn:
+          enabled: true
+          domain: i14a408.p.ssafy.io
+          cert_file: "/etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem"
+          key_file: "/etc/letsencrypt/live/i14a408.p.ssafy.io/privkey.pem"
+          tls_port: 443
+          udp_port: 3478
+          external_tls: false
+          relay_range_start: 30000
+          relay_range_end: 30010
+
+volumes:
+  docker_nginx-certs:
+    external: true
+
+networks:
+  peekle-network:
+    external: true
+    name: docker_peekle-network

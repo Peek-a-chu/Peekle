@@ -421,6 +421,7 @@ export const useStudySocketSubscription = (studyId: number) => {
     const resubscribeInterval = setInterval(checkAndResubscribe, 1000);
 
     return () => {
+      console.log('[StudySocket] Hook cleanup triggered');
       clearInterval(resubscribeInterval);
       publicSubscription.unsubscribe();
       curriculumSubscription.unsubscribe();
@@ -428,10 +429,19 @@ export const useStudySocketSubscription = (studyId: number) => {
       if (videoTokenSubscription) videoTokenSubscription.unsubscribe();
 
       // 3. Leave Study (Session Exit)
+      // Do NOT send explicit LEAVE here.
+      // If the component unmounts due to navigation, the Socket Disconnect event
+      // will be handled by the backend.
+      // If this cleanup runs due to re-render (e.g. router change), sending LEAVE
+      // causes the backend to kick the user from LiveKit, resulting in disconnection.
+      /*
       if (client && client.connected) {
-        console.log('[StudySocket] Sending LEAVE');
+        console.log('[StudySocket] Hook Cleanup - Sending LEAVE');
         client.publish({ destination: '/pub/studies/leave', body: JSON.stringify({ studyId }) });
+      } else {
+        console.log('[StudySocket] Hook Cleanup - Client not connected');
       }
+      */
     };
   }, [
     client,

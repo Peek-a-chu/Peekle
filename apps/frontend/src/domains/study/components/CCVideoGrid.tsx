@@ -34,7 +34,13 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
     // to focus on code viewing (or self view)
     setWhiteboardOverlayOpen(false);
 
-    const userId = Number(identity); // Identity is userId string
+    // Identity format is now "userId_uuid" or just "userId" (legacy)
+    // We need to parse it to get the userId for comparison
+    let userIdString = identity;
+    if (identity.includes('_')) {
+      userIdString = identity.split('_')[0];
+    }
+    const userId = Number(userIdString);
 
     if (userId === currentUserId) {
       resetToOnlyMine();

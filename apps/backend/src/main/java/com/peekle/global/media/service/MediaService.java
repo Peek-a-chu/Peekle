@@ -27,7 +27,8 @@ public class MediaService {
     // LiveKit 접속을 위한 Access Token 생성
     public String createAccessToken(Long studyId, Long userId, String nickname) {
         String roomName = "study_" + studyId;
-        String identity = String.valueOf(userId);
+        // DUPLICATE_IDENTITY 방지를 위해 UUID를 결합하여 고유 Identity 생성
+        String identity = userId + "_" + java.util.UUID.randomUUID().toString();
         AccessToken token = new AccessToken(apiKey, secret);
         token.setName(nickname); // 화면에 표시될 이름
         token.setIdentity(identity); // 유저 고유 ID

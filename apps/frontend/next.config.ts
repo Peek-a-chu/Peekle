@@ -4,6 +4,7 @@ import fs from 'fs';
 import withBundleAnalyzer from '@next/bundle-analyzer';
 
 const nextConfig: NextConfig = {
+  reactStrictMode: false,
   output: process.platform === 'win32' ? undefined : 'standalone',
   outputFileTracingRoot: process.platform === 'win32' ? undefined : path.join(__dirname, '../../'),
 
