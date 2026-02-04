@@ -1,7 +1,6 @@
 import { ApiResponse } from '@/types/apiUtils';
 
-let BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+let BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
 
 // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환
 if (

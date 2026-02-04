@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { UserIcon } from '@/components/UserIcon';
 import type { StudyListContent } from '@/domains/study/types';
 import { useAuthStore } from '@/store/auth-store';
 
@@ -97,56 +98,30 @@ export function CCStudyCard({
 
         {study.owner && (
           <div className="mb-4 flex items-center gap-2">
-            <div className="relative h-6 w-6 rounded-full border border-border overflow-hidden bg-muted shrink-0">
-              {study.owner.profileImage ? (
-                <Image
-                  src={study.owner.profileImage}
-                  alt={study.owner.nickname}
-                  width={24}
-                  height={24}
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="h-full w-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                  {study.owner.nickname.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
+            <UserIcon
+              src={study.owner.profileImage}
+              nickname={study.owner.nickname}
+              size={24}
+              className="border-border"
+            />
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-sm text-muted-foreground truncate">{study.owner.nickname}</span>
             </div>
           </div>
         )}
 
-        {/* Avatar Pile - Online Participants */}
+        {/* User Icon Pile - Online Participants */}
         {study.profileImages && study.profileImages.length > 0 && (
           <div className="flex items-center gap-2">
             <div className="flex -space-x-2">
               {study.profileImages.slice(0, 3).map((img, idx) => (
-                <div
+                <UserIcon
                   key={idx}
-                  className="relative h-8 w-8 rounded-full border-2 border-background overflow-hidden bg-muted"
-                >
-                  {img ? (
-                    <Image
-                      src={img}
-                      alt={`Participant ${idx + 1}`}
-                      width={32}
-                      height={32}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-muted" />
-                  )}
-                </div>
+                  src={img}
+                  nickname={`Participant ${idx + 1}`}
+                  size={32}
+                  className="border-2 border-background"
+                />
               ))}
             </div>
             {study.memberCount > 3 && (

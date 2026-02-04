@@ -19,11 +19,13 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
     currentUserId,
     isHost,
     isReady,
+    isCountingDown,
     inviteModalOpen,
     setInviteModalOpen,
     sendMessage,
     toggleReady,
     startGame,
+    onCountdownComplete,
     kickParticipant,
     changeTeam,
   } = useGameWaitingRoom(roomId);
@@ -47,12 +49,14 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
       currentUserId={currentUserId}
       isHost={isHost}
       isReady={isReady}
+      isCountingDown={isCountingDown}
       inviteModalOpen={inviteModalOpen}
       onInviteModalChange={setInviteModalOpen}
       onSendMessage={sendMessage}
       onReady={toggleReady}
       onCancelReady={toggleReady}
       onStartGame={startGame}
+      onCountdownComplete={onCountdownComplete}
       onKickParticipant={kickParticipant}
       onChangeTeam={changeTeam}
     />

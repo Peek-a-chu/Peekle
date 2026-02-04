@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import jakarta.annotation.PostConstruct;
+import java.util.TimeZone;
+
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -19,6 +22,12 @@ import java.nio.file.Paths;
 @EnableJpaAuditing
 @SpringBootApplication
 public class PeekleBackendApplication {
+
+    @PostConstruct
+    public void init() {
+        // Set default timezone to KST
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
+    }
 
     public static void main(String[] args) {
         // 1. 환경변수 또는 시스템 프로퍼티에서 우선 탐색, 없으면 기본 경로들 확인

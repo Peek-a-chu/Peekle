@@ -10,18 +10,29 @@ import {
   AIRecommendationData,
 } from '../mocks/dashboardMocks';
 import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
-import { LeagueRankingData } from '@/domains/league/types';
-import { getLeagueStatus, getLeagueRules, LeagueRulesMap, getWeeklyPointSummary, WeeklyPointSummary } from '@/app/api/leagueApi';
+import { LeagueRankingData, WeeklyPointSummary } from '@/domains/league/types';
+import {
+  getLeagueStatus,
+  getLeagueRules,
+  LeagueRulesMap,
+  getWeeklyPointSummary,
+} from '@/api/leagueApi';
 
 // 리그 변화 추이 데이터
-export const useLeagueProgress = (): { data: LeagueProgressData[]; isLoading: boolean } => {
+export const useLeagueProgress = (options?: {
+  skip?: boolean;
+}): { data: LeagueProgressData[]; isLoading: boolean } => {
   const [data, setData] = useState<LeagueProgressData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (options?.skip) {
+      setIsLoading(false);
+      return;
+    }
     const fetchData = async () => {
       try {
-        const result = await import('@/app/api/leagueApi').then(m => m.getLeagueProgress());
+        const result = await import('@/api/leagueApi').then((m) => m.getLeagueProgress());
         setData(result);
       } catch (error) {
         console.error('Failed to fetch league progress:', error);
@@ -37,14 +48,17 @@ export const useLeagueProgress = (): { data: LeagueProgressData[]; isLoading: bo
 };
 
 // 활동 스트릭 데이터
-export const useActivityStreak = (): { data: ActivityStreakData[]; isLoading: boolean } => {
+export const useActivityStreak = (
+  nickname?: string,
+): { data: ActivityStreakData[]; isLoading: boolean } => {
   const [data, setData] = useState<ActivityStreakData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/users/me/streak');
+        const endpoint = nickname ? `/api/users/${nickname}/streak` : '/api/users/me/streak';
+        const response = await fetch(endpoint);
         if (response.ok) {
           const json = await response.json();
           if (json.success && json.data) {
@@ -67,12 +81,21 @@ export const useActivityStreak = (): { data: ActivityStreakData[]; isLoading: bo
 };
 
 // 학습 타임라인 데이터
-export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading: boolean } => {
+export const useTimeline = (
+  date: string,
+  nickname?: string,
+  options?: { skip?: boolean },
+): { data: TimelineItemData[]; isLoading: boolean } => {
   const [data, setData] = useState<TimelineItemData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (options?.skip) {
+        setIsLoading(false);
+        return;
+      }
+
       if (!date) {
         setIsLoading(false);
         return;
@@ -80,7 +103,10 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
 
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/users/me/timeline?date=${date}`);
+        const endpoint = nickname
+          ? `/api/users/${nickname}/timeline?date=${date}`
+          : `/api/users/me/timeline?date=${date}`;
+        const response = await fetch(endpoint);
         if (response.ok) {
           const json = await response.json();
           if (json.success && json.data) {
@@ -102,7 +128,9 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
               language: item.language,
               memory: item.memory,
               executionTime: item.executionTime,
-              submittedAt: item.submittedAt
+              result: item.result, // 제출 결과
+              isSuccess: item.isSuccess, // 성공 여부 매핑
+              submittedAt: item.submittedAt,
             }));
             setData(mappedData);
           } else {
@@ -123,13 +151,18 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
 };
 
 // AI 추천 문제 데이터
-export const useAIRecommendations = (): { data: AIRecommendationData[]; isLoading: boolean } => {
+export const useAIRecommendations = (options?: {
+  skip?: boolean;
+}): { data: AIRecommendationData[]; isLoading: boolean } => {
   // TODO: API 연동 시 fetch/useSWR로 변경
   return { data: MOCK_AI_RECOMMENDATIONS, isLoading: false };
 };
 
 // 주간 점수 데이터
-export const useWeeklyScore = (date?: string): { data: WeeklyPointSummary | null; isLoading: boolean } => {
+export const useWeeklyScore = (
+  date?: string,
+  options?: { skip?: boolean },
+): { data: WeeklyPointSummary | null; isLoading: boolean } => {
   const [data, setData] = useState<WeeklyPointSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -155,12 +188,19 @@ export const useWeeklyScore = (date?: string): { data: WeeklyPointSummary | null
 };
 
 // 리그 순위 데이터
-export const useLeagueRanking = (): { data: LeagueRankingData; isLoading: boolean } => {
+export const useLeagueRanking = (
+  refreshInterval = 30000,
+  options?: { skip?: boolean },
+): { data: LeagueRankingData; isLoading: boolean } => {
   const [data, setData] = useState<LeagueRankingData>(DEFAULT_LEAGUE_RANKING);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    if (options?.skip) {
+      setIsLoading(false);
+      return;
+    }
+    const fetchData = async (isPoll = false) => {
       try {
         const result = await getLeagueStatus();
         if (result) {
@@ -169,12 +209,17 @@ export const useLeagueRanking = (): { data: LeagueRankingData; isLoading: boolea
       } catch (error) {
         console.error('Failed to fetch league ranking:', error);
       } finally {
-        setIsLoading(false);
+        if (!isPoll) setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    fetchData(); // Initial fetch
+
+    // Start polling
+    const intervalId = setInterval(() => fetchData(true), refreshInterval);
+
+    return () => clearInterval(intervalId);
+  }, [refreshInterval]);
 
   return { data, isLoading };
 };

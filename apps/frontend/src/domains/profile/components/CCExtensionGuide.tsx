@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Puzzle } from 'lucide-react';
 import { ExtensionStatus, UserProfile } from '../types';
+import { ConfirmModal, ActionModal } from '@/components/common/Modal';
 
 interface Props {
   user: UserProfile;
@@ -18,9 +19,33 @@ interface TokenResponse {
   };
 }
 
-export function CCExtensionGuide({ checkInstallation, extensionToken, status, isLoading }: Props) {
+export function CCExtensionGuide({
+  user,
+  checkInstallation,
+  extensionToken,
+  status,
+  isLoading,
+}: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [showManualGuide, setShowManualGuide] = useState(false);
+
+  // Modal State
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    message: string;
+    variant?: 'default' | 'destructive';
+  }>({
+    isOpen: false,
+    message: '',
+    variant: 'default',
+  });
+
+  // Confirmation Modal State (for regenerate)
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; regenerate: boolean }>({
+    isOpen: false,
+    regenerate: false,
+  });
 
   // 폴링을 위한 로컬 상태는 유지 (설치 감지용)
   const [isPolling, setIsPolling] = useState(false);
@@ -28,21 +53,21 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
 
   // 1. 상태 계산 로직 제거 -> 부모 컴포넌트(CCProfileView)에서 담당
 
-  // 2. 폴링 로직 (버튼 클릭 시 시작)
-  useEffect(() => {
-    if (isPolling && status === 'NOT_INSTALLED') {
-      pollingRef.current = setInterval(() => {
-        console.log('Extensions Detection: Pinging...');
-        checkInstallation();
-      }, 3000);
-    } else if (status !== 'NOT_INSTALLED') {
-      setIsPolling(false);
-    }
+  // 2. 폴링 로직 (버튼 클릭 시 시작) -> 제거됨 (사용자 요청: 한번하고 없으면 멈춤)
+  // useEffect(() => {
+  //   if (isPolling && status === 'NOT_INSTALLED') {
+  //     pollingRef.current = setInterval(() => {
+  //       console.log('Extensions Detection: Pinging...');
+  //       checkInstallation();
+  //     }, 3000);
+  //   } else if (status !== 'NOT_INSTALLED') {
+  //     setIsPolling(false);
+  //   }
 
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [isPolling, status, checkInstallation]);
+  //   return () => {
+  //     if (pollingRef.current) clearInterval(pollingRef.current);
+  //   };
+  // }, [isPolling, status, checkInstallation]);
 
   // 2. 폴링 로직 (버튼 클릭 시 시작)
   useEffect(() => {
@@ -59,22 +84,20 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
   }, [isPolling, status, checkInstallation]);
 
   const handleInstallClick = () => {
-    window.open(
-      'https://chromewebstore.google.com/detail/beminaoknafglpdlnjlconallpkhfgdm',
-      '_blank',
-    );
-    // 설치 버튼 누르면 감지 시작
+    // 수동 설치 모드: 설치 페이지로 이동하지 않고 감지 시작
     setIsPolling(true);
+    checkInstallation(); // 즉시 한번 체크
+
+    // 2초 뒤에도 여전히 NOT_INSTALLED라면 로딩 상태 해제 (한번만 체크하고 멈춤)
+    setTimeout(() => {
+      // 상태는 props로 들어오므로 여기서는 isPolling만 끔
+      // checkInstallation 내부적으로도 타임아웃이 있지만, UI 스피너 제어를 위해 추가
+      setIsPolling(false);
+    }, 2500);
   };
 
   // 공통 연동 함수 (regenerate 옵션만 다르게)
   const handleLinkAccount = async (regenerate: boolean) => {
-    const confirmMsg = regenerate
-      ? '토큰을 재발급하시겠습니까?\n기존에 연동된 기기에서는 로그아웃 처리됩니다.'
-      : '현재 계정으로 연동하시겠습니까?';
-
-    if (regenerate && !confirm(confirmMsg)) return;
-
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/users/me/extension-token', {
@@ -89,20 +112,25 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
           {
             type: 'PEEKLE_SET_TOKEN',
             token: newToken,
+            user: user, // 사용자 정보(이미지 포함) 함께 전송
           },
           '*',
         );
 
-        alert(regenerate ? '토큰이 재발급되었습니다.' : '계정 연동이 완료되었습니다!');
+        setModal({
+          isOpen: true,
+          message: regenerate ? '토큰이 재발급되었습니다.' : '계정 연동이 완료되었습니다!',
+          variant: 'default',
+        });
         // 상태 갱신을 위해 다시 체크
         checkInstallation();
         // 부모 컴포넌트가 checkInstallation 호출 -> 상태 업데이트 -> props 변경됨
       } else {
-        alert('토큰 발급 실패');
+        setModal({ isOpen: true, message: '토큰 발급 실패', variant: 'destructive' });
       }
     } catch (e) {
       console.error(e);
-      alert('오류 발생');
+      setModal({ isOpen: true, message: '오류가 발생했습니다.', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -155,26 +183,24 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
 
       {/* Status Banner */}
       <div
-        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${
-          status === 'LINKED'
+        className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${status === 'LINKED'
             ? 'bg-green-500/10 border border-green-500/20'
             : status === 'MISMATCH'
               ? 'bg-orange-500/10 border border-orange-500/20'
               : status === 'INSTALLED'
                 ? 'bg-blue-500/10 border border-blue-500/20'
                 : 'bg-muted border border-border'
-        }`}
+          }`}
       >
         <div
-          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-            status === 'LINKED'
+          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${status === 'LINKED'
               ? 'text-green-600 dark:text-green-400'
               : status === 'MISMATCH'
                 ? 'text-orange-600 dark:text-orange-400'
                 : status === 'INSTALLED'
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-muted-foreground'
-          }`}
+            }`}
         >
           {status === 'LINKED'
             ? '✅'
@@ -186,15 +212,14 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
         </div>
         <div>
           <h3
-            className={`font-bold text-sm ${
-              status === 'LINKED'
+            className={`font-bold text-sm ${status === 'LINKED'
                 ? 'text-green-700 dark:text-green-300'
                 : status === 'MISMATCH'
                   ? 'text-orange-700 dark:text-orange-300'
                   : status === 'INSTALLED'
                     ? 'text-blue-700 dark:text-blue-300'
                     : 'text-foreground'
-            }`}
+              }`}
           >
             {status === 'LINKED'
               ? '연동 완료'
@@ -205,15 +230,14 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
                   : '확장 프로그램이 설치되지 않았습니다'}
           </h3>
           <p
-            className={`text-sm mt-1 ${
-              status === 'LINKED'
+            className={`text-sm mt-1 ${status === 'LINKED'
                 ? 'text-green-600/80 dark:text-green-400/80'
                 : status === 'MISMATCH'
                   ? 'text-orange-600/80 dark:text-orange-400/80'
                   : status === 'INSTALLED'
                     ? 'text-blue-600/80 dark:text-blue-400/80'
                     : 'text-muted-foreground'
-            }`}
+              }`}
           >
             {status === 'LINKED'
               ? '모든 기능이 정상 동작 중입니다.'
@@ -233,21 +257,19 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
             {/* Vertical Line */}
             {idx !== steps.length - 1 && (
               <div
-                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${
-                  s.isDone ? 'bg-green-500' : 'bg-border'
-                }`}
+                className={`absolute left-[15px] top-8 bottom-[-32px] w-0.5 ${s.isDone ? 'bg-green-500' : 'bg-border'
+                  }`}
               ></div>
             )}
 
             {/* Step Circle */}
             <div
-              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
-                s.isDone
+              className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${s.isDone
                   ? 'bg-green-500 text-white'
                   : s.isActive
                     ? 'bg-foreground text-background'
                     : 'bg-muted text-muted-foreground'
-              }`}
+                }`}
             >
               {s.isDone ? '✓' : s.step}
             </div>
@@ -316,14 +338,24 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
       {/* Actions */}
       <div className="mt-10 flex gap-3">
         {status === 'NOT_INSTALLED' && (
-          <>
-            <button
-              onClick={handleInstallClick}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-            >
-              {isPolling ? '⏳ 감지 중...' : '⬇️ 확장 프로그램 설치'}
-            </button>
-          </>
+          <div className="flex flex-col gap-4 w-full items-center">
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
+                  handleInstallClick();
+                }}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 shadow-sm"
+              >
+                {isPolling ? '⏳ 확인 중...' : '📥 스토어에서 다운로드'}
+              </button>
+            </div>
+            {isPolling && (
+              <p className="text-xs text-muted-foreground animate-pulse">
+                확장 프로그램이 설치되면 자동으로 감지합니다...
+              </p>
+            )}
+          </div>
         )}
 
         {(status === 'INSTALLED' || status === 'MISMATCH') && (
@@ -345,7 +377,7 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
 
         {status === 'LINKED' && (
           <button
-            onClick={() => void handleLinkAccount(true)}
+            onClick={() => setConfirmModal({ isOpen: true, regenerate: true })}
             disabled={isSubmitting}
             className="px-5 py-2.5 bg-background border border-border text-foreground rounded-lg text-sm font-medium hover:bg-muted/50 disabled:bg-muted disabled:text-muted-foreground flex items-center gap-2"
           >
@@ -381,6 +413,38 @@ export function CCExtensionGuide({ checkInstallation, extensionToken, status, is
           </div>
         </div>
       )}
+
+      {/* Modal */}
+      <ConfirmModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ isOpen: false, message: '', variant: 'default' })}
+        title="알림"
+        description={modal.message}
+        variant={modal.variant}
+      />
+
+      {/* Confirmation Modal for Token Regeneration */}
+      <ActionModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, regenerate: false })}
+        onConfirm={() => {
+          setConfirmModal({ isOpen: false, regenerate: false });
+          void handleLinkAccount(confirmModal.regenerate);
+        }}
+        title="토큰 재발급"
+        description={
+          <>
+            토큰을 재발급하시겠습니까?
+            <br />
+            <br />
+            기존에 연동된 기기에서는 로그아웃 처리됩니다.
+          </>
+        }
+        confirmText="재발급"
+        cancelText="취소"
+        variant="destructive"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

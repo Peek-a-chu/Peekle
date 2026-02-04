@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-type SettingsTab = 'theme' | 'device';
+export type SettingsTab = 'theme' | 'device';
 
 interface SettingsState {
   // UI State

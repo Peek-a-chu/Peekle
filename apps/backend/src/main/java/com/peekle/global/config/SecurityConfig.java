@@ -52,13 +52,26 @@ public class SecurityConfig {
                                                 // Auth / OAuth2
                                                 .requestMatchers("/api/auth/**").permitAll()
                                                 .requestMatchers("/api/users/check-nickname").permitAll()
+                                                .requestMatchers("/api/users/check-boj-id").permitAll()
                                                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
                                                 // Extension / APIs
                                                 .requestMatchers("/api/submissions/**").permitAll()
                                                 .requestMatchers("/api/problems/**").permitAll() // 문제 검색/동기화
                                                 .requestMatchers("/api/users/me/**").permitAll() // Extension token
-                                                                                                 // endpoints
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/profile")
+                                                .permitAll() // 남의 프로필 조회
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/history")
+                                                .permitAll() // 남의 히스토리 조회
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/streak")
+                                                .permitAll() // 남의 스트릭 조회
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/*/timeline")
+                                                .permitAll() // 남의 타임라인 조회
+                                                // endpoints
 
                                                 // Dev / Test
                                                 .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API
@@ -92,7 +105,8 @@ public class SecurityConfig {
                                 .addFilterBefore(extensionAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .exceptionHandling(exception -> exception
-                                                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                                                .authenticationEntryPoint(
+                                                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                                 .headers(headers -> headers.frameOptions(frame -> frame.disable())); // H2 Console
                                                                                                      // iframe 허용
@@ -105,7 +119,7 @@ public class SecurityConfig {
                 CorsConfiguration configuration = new CorsConfiguration();
 
                 configuration.setAllowedOriginPatterns(List.of(frontendUrl, "chrome-extension://*", "*"));
-                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                 configuration.setAllowedHeaders(List.of("*"));
                 configuration.setAllowCredentials(true);
 

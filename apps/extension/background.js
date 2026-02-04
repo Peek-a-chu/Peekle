@@ -1,13 +1,15 @@
 // --- Configuration ---
-const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
+const IS_LOCAL = true; // false = 배포(Production), true = 로컬(Local)
 // 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
-// Local: Next.js (3000)가 /api/* 요청을 Backend(8080)로 Proxy함 (next.config.ts rewrites 확인됨)
+// Local: 확장 프로그램은 Backend(8080)로 직접 연결
 // Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
 const BASE_URL = IS_LOCAL
     ? 'http://localhost:3000'
     : 'https://i14a408.p.ssafy.io';
 
-const API_BASE_URL = BASE_URL; // Alias for compatibility
+const API_BASE_URL = IS_LOCAL
+    ? 'http://localhost:8080'  // 확장 프로그램은 백엔드 직접 연결
+    : BASE_URL;
 const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
 
 // --- Baekjoon Solver Logic ---
@@ -104,7 +106,7 @@ async function sendToBackend(data, studyId = null) {
 }
 
 async function handleSolvedSubmission(payload, sender) {
-    const { submitId, problemId, result, username, memory, time, language, code } = payload;
+    const { submitId, problemId, result, isSuccess, username, memory, time, language, code } = payload;
 
     // Retrieve both processed history and pending context
     chrome.storage.local.get([PROCESSED_SUBMISSIONS_KEY, 'pending_submission'], async (items) => {
@@ -117,7 +119,7 @@ async function handleSolvedSubmission(payload, sender) {
         }
 
         // New submission
-        console.log(`New correct submission: ${problemId} by ${username}`);
+        console.log(`New submission detected: ${problemId} by ${username} (Success: ${isSuccess})`);
 
         // Fetch problem details (tier, title)
         const problemInfo = await getProblemInfo(problemId);
@@ -185,7 +187,8 @@ async function handleSolvedSubmission(payload, sender) {
             code: code,
             memory: memoryInt,
             executionTime: timeInt,
-            // result: result, // Backend assumes success for all received submissions
+            result: result,
+            isSuccess: isSuccess,
             submittedAt: new Date().toISOString(),
             submitId: submitId,
             extensionToken,
@@ -248,5 +251,37 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
                 }
             }
         });
+    }
+});
+
+// --- Auto-Injection on Install ---
+// 확장 프로그램 설치/업데이트 시 현재 열려 있는 탭(프론트엔드)에 content script 강제 주입
+chrome.runtime.onInstalled.addListener(async () => {
+    console.log('[Background] Extension Installed/Updated. Injecting content scripts...');
+
+    // 타겟 URL 패턴 (프론트엔드 도메인)
+    // manifest.json의 host_permissions에 해당 도메인이 있어야 함
+    const targetPattern = IS_LOCAL ? 'http://localhost:3000/*' : 'https://i14a408.p.ssafy.io/*';
+
+    try {
+        // 프론트엔드 탭 찾기
+        const tabs = await chrome.tabs.query({ url: targetPattern });
+
+        for (const tab of tabs) {
+            if (tab.id) {
+                console.log(`[Background] Injecting script into tab ${tab.id} (${tab.url})`);
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['content.js']
+                    });
+                } catch (e) {
+                    // 이미 주입되어 있거나 권한 문제 등 발생 시 무시
+                    console.warn(`[Background] Failed to inject into tab ${tab.id}:`, e);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Background] Error during auto-injection:', e);
     }
 });

@@ -16,6 +16,7 @@ public enum ErrorCode {
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_001", "사용자를 찾을 수 없습니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "USER_002", "이미 사용 중인 닉네임입니다."),
+    DUPLICATE_BOJ_ID(HttpStatus.CONFLICT, "USER_003", "이미 사용 중인 백준 아이디입니다."),
 
     // Auth
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_001", "인증이 필요합니다."),
@@ -50,7 +51,10 @@ public enum ErrorCode {
     WHITEBOARD_PERMISSION_DENIED(HttpStatus.FORBIDDEN, "WHITEBOARD_003", "화이트보드 제어 권한이 없습니다."),
 
     // Workbook
-    WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다.");
+    WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다."),
+
+    // League
+    LEAGUE_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "LEAGUE_001", "리그 기록을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

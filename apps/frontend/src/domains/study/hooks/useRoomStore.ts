@@ -5,7 +5,6 @@ export type ViewMode = 'ONLY_MINE' | 'SPLIT_REALTIME' | 'SPLIT_SAVED';
 
 export interface Participant {
   id: number;
-  odUid: string; // OpenVidu User ID
   nickname: string;
   profileImage?: string;
   isOwner: boolean;
@@ -61,6 +60,7 @@ export interface RoomState {
   // Problem State
   selectedProblemId: number | null;
   selectedProblemTitle: string | null;
+  selectedProblemExternalId: string | null; // Added
 
   // Chat State
   pendingCodeShare: {
@@ -69,6 +69,7 @@ export interface RoomState {
     ownerName?: string;
     problemTitle?: string;
     problemId?: number; // Add problemId
+    externalId?: string; // Add externalId
     isRealtime?: boolean;
   } | null;
   replyingTo: {
@@ -83,7 +84,9 @@ export interface RoomState {
 export interface RoomActions {
   // Room info actions
   setRoomInfo: (
-    info: Partial<Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode' | 'myRole'>>,
+    info: Partial<
+      Pick<RoomState, 'roomId' | 'roomTitle' | 'roomDescription' | 'inviteCode' | 'myRole'>
+    >,
   ) => void;
   setCurrentDate: (date: string) => void;
 
@@ -97,6 +100,7 @@ export interface RoomActions {
     ownerName: string;
     problemTitle?: string;
     problemId?: number; // Add problemId
+    externalId?: string;
     isRealtime?: boolean;
   }) => void;
   resetToOnlyMine: () => void;
@@ -124,7 +128,7 @@ export interface RoomActions {
   // Problem Actions
   setSelectedProblemId: (id: number | null) => void;
   setSelectedProblemTitle: (title: string | null) => void;
-  setSelectedProblem: (id: number | null, title: string | null) => void;
+  setSelectedProblem: (id: number | null, title: string | null, externalId?: string | null) => void;
 
   // Chat Actions
   setPendingCodeShare: (
@@ -134,6 +138,7 @@ export interface RoomActions {
       ownerName?: string;
       problemTitle?: string;
       problemId?: number; // Add problemId
+      externalId?: string;
       isRealtime?: boolean;
     } | null,
   ) => void;
@@ -180,6 +185,7 @@ const initialState: RoomState = {
 
   selectedProblemId: null,
   selectedProblemTitle: null,
+  selectedProblemExternalId: null,
 
   pendingCodeShare: null,
   replyingTo: null,
@@ -200,7 +206,11 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
       viewMode: 'SPLIT_SAVED',
       targetSubmission: {
         id: Date.now(), // Unique ID for this shared code view
-        problemTitle: data.problemTitle || 'Unknown Problem',
+        problemTitle: data.problemTitle
+          ? data.externalId
+            ? `[${data.externalId}] ${data.problemTitle}`
+            : data.problemTitle
+          : 'Unknown Problem',
         username: data.ownerName,
         language: data.language,
         memory: 0,
@@ -238,8 +248,12 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
 
   setSelectedProblemId: (id): void => set({ selectedProblemId: id }),
   setSelectedProblemTitle: (title): void => set({ selectedProblemTitle: title }),
-  setSelectedProblem: (id, title): void =>
-    set({ selectedProblemId: id, selectedProblemTitle: title }),
+  setSelectedProblem: (id, title, externalId = null): void =>
+    set({
+      selectedProblemId: id,
+      selectedProblemTitle: title,
+      selectedProblemExternalId: externalId,
+    }),
 
   setPendingCodeShare: (data): void => set({ pendingCodeShare: data }),
   setReplyingTo: (message): void => set({ replyingTo: message }),

@@ -8,6 +8,7 @@ import { RoomSettingsPanel } from '../components/room-settings-panel';
 import { ParticipantGrid } from '../components/participant-grid';
 import { ChatPanel } from '../components/chat-panel';
 import { InviteModal } from '../components/invite-modal';
+import { GameCountdownOverlay } from '../components/game-countdown-overlay';
 import type { GameRoomDetail, ChatMessage } from '@/domains/game/mocks/mock-data';
 
 const modeLabels = {
@@ -26,12 +27,14 @@ interface GameWaitingRoomLayoutProps {
   currentUserId: string;
   isHost: boolean;
   isReady: boolean;
+  isCountingDown: boolean;
   inviteModalOpen: boolean;
   onInviteModalChange: (open: boolean) => void;
   onSendMessage: (content: string) => void;
   onReady: () => void;
   onCancelReady: () => void;
   onStartGame: () => void;
+  onCountdownComplete: () => void;
   onKickParticipant: (participantId: string) => void;
   onChangeTeam: () => void;
 }
@@ -42,12 +45,14 @@ export function GameWaitingRoomLayout({
   currentUserId,
   isHost,
   isReady,
+  isCountingDown,
   inviteModalOpen,
   onInviteModalChange,
   onSendMessage,
   onReady,
   onCancelReady,
   onStartGame,
+  onCountdownComplete,
   onKickParticipant,
   onChangeTeam,
 }: GameWaitingRoomLayoutProps) {
@@ -167,6 +172,9 @@ export function GameWaitingRoomLayout({
 
       {/* 초대 모달 */}
       <InviteModal open={inviteModalOpen} onOpenChange={onInviteModalChange} roomId={room.id} />
+
+      {/* 카운트다운 오버레이 */}
+      <GameCountdownOverlay isActive={isCountingDown} onComplete={onCountdownComplete} />
     </div>
   );
 }

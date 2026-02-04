@@ -1,6 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     // [Check Env]
-    let frontendBaseUrl = 'http://localhost:3000'; // Default fallback
+    let frontendBaseUrl = 'https://i14a408.p.ssafy.io'; // Default to prod
+    let apiBaseUrl = 'https://i14a408.p.ssafy.io';     // Default to prod
+
     chrome.runtime.sendMessage({ type: 'CHECK_ENV' }, (response) => {
         if (response) {
             if (response.isLocal) {
@@ -10,15 +12,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.frontendUrl) {
                 frontendBaseUrl = response.frontendUrl;
             }
+            if (response.apiUrl) {
+                apiBaseUrl = response.apiUrl;
+            }
         }
+
+        // Initialize Data Fetching AFTER Env Check to ensure URL is correct
+        initPopupData();
     });
 
     const loggedInBtns = document.getElementById('logged-in-btns');
     const loggedOutBtns = document.getElementById('logged-out-btns');
     const nicknameEl = document.getElementById('nickname');
     const statusEl = document.getElementById('status');
-
-    // ... (Existing Code) ...
 
     // 3. 버튼 이벤트 리스너
     document.getElementById('link-site-btn').onclick = () => {
@@ -46,26 +52,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 1. 초기 연동 여부 확인
-    chrome.storage.local.get(['peekle_token', 'userData'], (result) => {
-        if (result.peekle_token) {
-            // [연동 상태]
-            loggedInBtns.style.display = 'flex';
-            loggedOutBtns.style.display = 'none';
+    function initPopupData() {
+        // 1. 초기 연동 여부 확인
+        chrome.storage.local.get(['peekle_token', 'userData'], (result) => {
+            if (result.peekle_token) {
+                // [연동 상태]
+                loggedInBtns.style.display = 'flex';
+                loggedOutBtns.style.display = 'none';
 
-            if (result.userData) updateUI(result.userData);
-            fetchFreshData(result.peekle_token);
-        } else {
-            // [미연동 상태]
-            loggedInBtns.style.display = 'none';
-            loggedOutBtns.style.display = 'flex';
+                if (result.userData) updateUI(result.userData);
+                fetchFreshData(result.peekle_token);
+            } else {
+                // [미연동 상태]
+                loggedInBtns.style.display = 'none';
+                loggedOutBtns.style.display = 'flex';
 
-            nicknameEl.innerText = "로그인이 필요해요";
-            document.getElementById('league-name').innerText = "-";
-            document.getElementById('tier-icon').innerText = "❓";
-            statusEl.innerText = "사이트에서 계정을 연동해 주세요.";
-        }
-    });
+                nicknameEl.innerText = "로그인이 필요해요";
+                document.getElementById('league-name').innerText = "-";
+                document.getElementById('tier-icon').innerText = "❓";
+                statusEl.innerText = "사이트에서 계정을 연동해 주세요.";
+            }
+        });
+    }
 
     // 2. 로그아웃 함수 (토큰 지우고 버튼 갈아끼우기)
     function handleLogout() {
@@ -97,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchFreshData(token) {
         try {
             statusEl.innerText = "최신 정보를 가져오는 중...";
-            const response = await fetch(`http://localhost:8080/api/users/me/profile`, {
+            const response = await fetch(`${apiBaseUrl}/api/users/me/profile`, {
                 headers: { 'X-Peekle-Token': token }
             });
 
@@ -107,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const userData = json.data;
 
                     // [New] 추가 상태 정보 조회 (Streak + Today Solved)
-                    const statusResponse = await fetch(`http://localhost:8080/api/users/me/extension-status`, {
+                    const statusResponse = await fetch(`${apiBaseUrl}/api/users/me/extension-status`, {
                         headers: { 'X-Peekle-Token': token }
                     });
 
@@ -116,6 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (statusJson.success && statusJson.data) {
                             userData.streakCurrent = statusJson.data.streakCurrent;
                             userData.isSolvedToday = statusJson.data.isSolvedToday;
+                            userData.groupRank = statusJson.data.groupRank;
+                            userData.leagueStatus = statusJson.data.leagueStatus;
                         }
                     }
 
@@ -143,7 +153,17 @@ document.addEventListener('DOMContentLoaded', () => {
         nicknameEl.innerText = data.nickname || "알 수 없음";
         document.getElementById('league-name').innerText = data.leagueName || "Unranked";
         document.getElementById('user-score').innerText = (data.score || 0) + "점";
-        document.getElementById('user-rank').innerText = (data.rank ? data.rank + "위" : "-");
+
+        // 순위와 상태 함께 표시
+        const rankEl = document.getElementById('user-rank');
+        if (data.groupRank) {
+            const statusText = getStatusText(data.leagueStatus);
+            rankEl.innerHTML = `<span style="font-weight: 700;">${data.groupRank}위</span> <span style="font-size: 10px; color: ${getStatusColor(data.leagueStatus)};">${statusText}</span>`;
+        } else if (data.rank) {
+            rankEl.innerText = data.rank + "위";
+        } else {
+            rankEl.innerText = "-";
+        }
 
         // [New] 스트릭 및 오늘 문제 상태
         const streakEl = document.getElementById('user-streak');
@@ -160,12 +180,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 프로필 이미지 표시 (무조건 이미지 사용)
+        // 프로필 이미지 표시 (없으면 DiceBear API 사용)
         const tierIconEl = document.getElementById('tier-icon');
-        // 이미지가 없으면 기본값(예: empty string) 처리 -> onerror로 핸들링하거나 빈 이미지
-        const imgUrl = data.profileImage || "";
+        const rawImgUrl = data.profileImg || data.profileImage;
+        let imgUrl;
 
-        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+        if (rawImgUrl) {
+            // URL에 공백 등이 있을 수 있으므로 인코딩 후 Next.js Image Proxy 사용
+            const encodedUrl = encodeURIComponent(rawImgUrl);
+            imgUrl = `${frontendBaseUrl}/_next/image?url=${encodedUrl}&w=256&q=75`;
+        } else {
+            imgUrl = `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(data.nickname || 'user')}`;
+        }
+
+        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile Image" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
+
+    }
+
+    // Helper: Get status text
+    function getStatusText(status) {
+        const statusMap = {
+            'PROMOTE': '승급예정',
+            'STAY': '유지',
+            'DEMOTE': '강등위기'
+        };
+        return statusMap[status] || '';
+    }
+
+    // Helper: Get status color
+    function getStatusColor(status) {
+        const colorMap = {
+            'PROMOTE': 'var(--primary)',
+            'STAY': 'var(--muted-foreground)',
+            'DEMOTE': '#ef4444'
+        };
+        return colorMap[status] || 'var(--muted-foreground)';
     }
 
     // 테마 적용 헬퍼

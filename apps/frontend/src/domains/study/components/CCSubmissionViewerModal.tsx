@@ -120,9 +120,9 @@ export function CCSubmissionViewerModal({
                   className="flex items-center justify-between p-4 rounded-2xl border border-border bg-white shadow-sm hover:shadow-md transition-all group"
                 >
                   <div className="flex items-center gap-4">
-                    {/* Avatar Placeholder */}
+                    {/* Profile Image Placeholder */}
                     <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                      {/* Can use nice avatar images if available, using icon for now */}
+                      {/* Can use nice profile images if available, using icon for now */}
                       <User className="h-5 w-5 text-slate-400" />
                     </div>
 

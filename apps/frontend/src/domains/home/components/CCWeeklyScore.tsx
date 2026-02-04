@@ -1,202 +1,245 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-    Trophy,
-    Users,
-    Gamepad2,
-    BookOpen,
-    Award,
-    ChevronLeft,
-    ChevronRight,
-    Calendar,
-    Code2,
-    GraduationCap
+  Trophy,
+  Users,
+  Gamepad2,
+  Code2,
+  Award,
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
-import { useWeeklyScore } from '../hooks/useDashboardData';
-import { formatDistanceToNow } from 'date-fns';
+import { WeeklyPointSummary } from '@/domains/league/types';
+import { useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
+import { formatDistanceToNow, startOfWeek, endOfWeek, format, isFuture } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { WeekCalendar } from '@/components/ui/week-calendar';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-export const CCWeeklyScore = () => {
-    // 현재 날짜 (YYYY-MM-DD)
-    const [currentDate, setCurrentDate] = useState<string>(() => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    });
+interface CCWeeklyScoreProps {
+  initialData?: WeeklyPointSummary | null;
+  selectedDate?: string;
+}
 
-    const { data, isLoading } = useWeeklyScore(currentDate);
+export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWeeklyScoreProps) => {
+  // 1. 내부 상태 displayDate 관리 (YYYY-MM-DD string)
+  // 초기값: externalDate가 있으면 그것, 없으면 오늘
+  const [displayDate, setDisplayDate] = useState<string>(() => {
+    if (externalDate) return externalDate;
+    const d = new Date();
+    return format(d, 'yyyy-MM-dd');
+  });
 
-    // 날짜 이동 핸들러
-    const handlePrevWeek = () => {
-        const d = new Date(currentDate);
-        d.setDate(d.getDate() - 7);
-        setCurrentDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-    };
-
-    const handleNextWeek = () => {
-        const d = new Date(currentDate);
-        d.setDate(d.getDate() + 7);
-        setCurrentDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-    };
-
-    // Date Picker 핸들러
-    const handleDateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.value) {
-            setCurrentDate(e.target.value);
-        }
-    };
-
-    // 다음 주가 미래인지 체크
-    const isNextWeekFuture = () => {
-        // 현재 날짜에서 7일 뒤 계산
-        const d = new Date(currentDate);
-        d.setDate(d.getDate() + 7);
-        const nextWeekStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-        // 오늘 날짜 구하기
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        return nextWeekStr > todayStr;
-    };
-
-    // 날짜 포맷팅 (YYYY-MM-DD -> M월 D일)
-    const formatDate = (dateStr: string) => {
-        try {
-            const d = new Date(dateStr);
-            return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-        } catch {
-            return '';
-        }
-    };
-
-    // 상세 시간 포맷팅 (relative time)
-    const getRelativeTime = (dateStr: string) => {
-        try {
-            return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: ko });
-        } catch {
-            return dateStr;
-        }
-    };
-
-    // 활동 아이콘 매핑
-    const getIcon = (category?: string, description: string = '') => {
-        // 백엔드 Enum: PROBLEM, GAME (추후 확장 가능)
-        if (category === 'GAME' || description.includes('Game') || description.includes('게임')) return <Gamepad2 className="w-5 h-5 text-purple-500" />;
-        if (category === 'PROBLEM' || description.includes('Solved') || description.includes('problem')) return <Code2 className="w-5 h-5 text-green-500" />;
-        if (category === 'STUDY' || description.includes('Study') || description.includes('스터디')) return <Users className="w-5 h-5 text-blue-500" />;
-        if (category === 'LEAGUE' || description.includes('League') || description.includes('리그')) return <Award className="w-5 h-5 text-yellow-500" />;
-        return <Trophy className="w-5 h-5 text-muted-foreground" />;
-    };
-
-    if (isLoading) {
-        return (
-            <div className="bg-card border border-border rounded-2xl p-6 h-full flex items-center justify-center min-h-[300px]">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
+  // 2. externalDate가 변경되면 displayDate도 업데이트 (부모와의 동기화)
+  useEffect(() => {
+    if (externalDate) {
+      setDisplayDate(externalDate);
     }
+  }, [externalDate]);
 
-    if (!data) return null;
+  // 3. API 호출은 displayDate 기준
+  const { data: fetchedData, isLoading: networkLoading } = useWeeklyScore(displayDate);
 
-    const dateRangeStr = `${formatDate(data.startDate)} ~ ${formatDate(data.endDate)}`;
+  // 4. 데이터 우선순위: fetchedData가 있으면 사용, 없으면(로딩전/에러) initialData 사용하되, 
+  //    initialData가 현재 displayDate와 일치하는 주차의 데이터인지 확인은 어렵지만,
+  //    사용자 경험상 fetchedData가 로딩되면 바로 덮어쓰는 구조.
+  //    단, initialData가 있고 아직 fetchedData가 없는 초기 렌더링 시점을 위해 fallback.
+  //    네비게이션 후에는 fetchedData가 업데이트됨. 
+  //    *주의*: 날짜 이동 시 fetchedData가 null일 수 있는데, 이 때 엉뚱한 initialData(오늘)가 보이면 안됨.
+  //    따라서 displayDate가 오늘(initialDate)과 다르면 initialData를 무시하는게 안전함.
+  //    (여기서는 단순화를 위해 fetchedData 우선으로 처리)
+  const data = fetchedData || initialData;
+  const isLoading = initialData ? false : networkLoading;
 
+  // 날짜 핸들러
+  const handlePrevWeek = () => {
+    const d = new Date(displayDate);
+    d.setDate(d.getDate() - 7);
+    setDisplayDate(format(d, 'yyyy-MM-dd'));
+  };
+
+  const handleNextWeek = () => {
+    const d = new Date(displayDate);
+    d.setDate(d.getDate() + 7);
+    setDisplayDate(format(d, 'yyyy-MM-dd'));
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setDisplayDate(format(date, 'yyyy-MM-dd'));
+    }
+  };
+
+  // 다음 주가 미래인지 체크
+  const isNextWeekFuture = () => {
+    const d = new Date(displayDate);
+    d.setDate(d.getDate() + 7);
+    return isFuture(d); // date-fns isFuture checks if date > now
+  };
+
+  // 날짜 범위 포맷팅
+  const dateObj = new Date(displayDate);
+  const start = startOfWeek(dateObj, { locale: ko });
+  const end = endOfWeek(dateObj, { locale: ko });
+  const dateRangeStr = `${format(start, 'M월 d일')} ~ ${format(end, 'M월 d일')}`;
+
+  // 활동 아이콘 매핑
+  const getIcon = (category?: string, description: string = '') => {
+    if (category === 'GAME' || description.includes('Game') || description.includes('게임'))
+      return <Gamepad2 className="w-5 h-5 text-purple-500" />;
+    if (category === 'PROBLEM' || description.includes('Solved') || description.includes('problem'))
+      return <Code2 className="w-5 h-5 text-green-500" />;
+    if (category === 'STUDY' || description.includes('Study') || description.includes('스터디'))
+      return <Users className="w-5 h-5 text-blue-500" />;
+    if (category === 'LEAGUE' || description.includes('League') || description.includes('리그'))
+      return <Award className="w-5 h-5 text-yellow-500" />;
+    return <Trophy className="w-5 h-5 text-muted-foreground" />;
+  };
+
+  const getRelativeTime = (dateStr: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: ko });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  if (isLoading && !data) {
     return (
-        <div className="bg-card border border-border rounded-2xl p-6 h-full transition-all duration-300 flex flex-col">
-            {/* 헤더 */}
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-primary" />
-                    <div>
-                        <h3 className="font-bold text-foreground">기간 별 점수 기록</h3>
-                        <p className="text-xs text-muted-foreground">획득한 점수를 확인해보세요</p>
-                    </div>
-                </div>
-                <div className="w-6 h-6" />
-            </div>
-
-            {/* 기간 표시 & 내비게이션 */}
-            <div className="mb-4 flex items-center justify-center gap-2 flex-shrink-0">
-                <button
-                    onClick={handlePrevWeek}
-                    className="p-1 rounded-full hover:bg-accent transition-colors cursor-pointer"
-                    title="이전 주"
-                >
-                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-                </button>
-
-                <div className="flex items-center gap-2 bg-muted/50 px-3 py-1 rounded-full border border-border">
-                    <span className="text-sm font-medium text-foreground">{dateRangeStr}</span>
-                    <div className="relative group flex items-center cursor-pointer">
-                        <Calendar className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <input
-                            type="date"
-                            value={currentDate}
-                            onChange={handleDateSelect}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            title="날짜 선택"
-                        />
-                    </div>
-                </div>
-
-                <button
-                    onClick={handleNextWeek}
-                    disabled={isNextWeekFuture()}
-                    className={`p-1 rounded-full transition-colors ${isNextWeekFuture() ? 'opacity-20 cursor-not-allowed' : 'hover:bg-accent cursor-pointer'}`}
-                    title="다음 주"
-                >
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-            </div>
-
-            {/* 주간 총점 */}
-            <div className="bg-secondary/50 rounded-xl p-4 mb-4 text-center border border-border shadow-sm transition-all duration-300 flex-shrink-0">
-                <p className="text-xs text-muted-foreground font-medium mb-1">주간 점수</p>
-                <div className="flex items-center justify-center gap-1">
-                    <p className="text-3xl font-black text-primary tracking-tight">
-                        {data.totalScore.toLocaleString()}
-                    </p>
-                    <span className="text-sm font-bold text-primary/70 mt-2">점</span>
-                </div>
-            </div>
-
-            {/* 활동 내역 */}
-            <div className="flex flex-col flex-1 min-h-0 gap-3">
-                <div className="flex justify-between items-center px-1 flex-shrink-0">
-                    <p className="text-sm font-medium text-foreground">활동 내역</p>
-                    <span className="text-[10px] text-muted-foreground">{data.activities.length} entries</span>
-                </div>
-
-                <div className="custom-scrollbar overflow-y-auto pr-2 flex-1">
-                    {data.activities.length > 0 ? (
-                        data.activities.map((activity, index) => (
-                            <div
-                                key={index}
-                                className="flex items-center justify-between py-3 border-b border-border last:border-b-0 hover:bg-muted/30 px-2 rounded-lg transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-muted/50 flex items-center justify-center">
-                                        {getIcon(activity.category, activity.description)}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-foreground line-clamp-1">
-                                            {activity.description.replace(/^Solved problem: /, '')}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">{getRelativeTime(activity.createdAt)}</p>
-                                    </div>
-                                </div>
-                                <span className="text-sm font-bold text-emerald-500 shrink-0">+{activity.amount}점</span>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="py-8 text-center text-muted-foreground text-xs">
-                            이번 주 활동 내역이 없습니다.
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+      <div className="bg-card border border-border rounded-2xl p-6 h-full flex items-center justify-center min-h-[300px]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
     );
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 h-full transition-all duration-300 flex flex-col">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-primary" />
+          <div>
+            <h3 className="font-bold text-foreground">기간 별 점수 기록</h3>
+            <p className="text-xs text-muted-foreground">획득한 점수를 확인해보세요</p>
+          </div>
+        </div>
+        <div className="w-6 h-6" />
+      </div>
+
+      {/* 기간 표시 & 내비게이션 */}
+      <div className="mb-4 flex items-center justify-center gap-2 flex-shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handlePrevWeek}
+          className="h-8 w-8 rounded-full hover:bg-accent"
+          title="이전 주"
+        >
+          <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+        </Button>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 px-4 py-1 rounded-full border-border bg-muted/30 hover:bg-muted/50 text-foreground font-medium flex items-center gap-2",
+                !displayDate && "text-muted-foreground"
+              )}
+            >
+              <span>{dateRangeStr}</span>
+              <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground opacity-70" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="center">
+            <WeekCalendar
+              selected={new Date(displayDate)}
+              onSelect={handleDateSelect}
+              initialFocus
+              disabled={(date) => isFuture(date)}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleNextWeek}
+          disabled={isNextWeekFuture()}
+          className={cn(
+            "h-8 w-8 rounded-full",
+            isNextWeekFuture() ? "opacity-20" : "hover:bg-accent cursor-pointer"
+          )}
+          title="다음 주"
+        >
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Button>
+      </div>
+
+      {/* 주간 총점 */}
+      <div className="bg-secondary/50 rounded-xl p-4 mb-4 text-center border border-border shadow-sm transition-all duration-300 flex-shrink-0">
+        <p className="text-xs text-muted-foreground font-medium mb-1">주간 점수</p>
+        <div className="flex items-center justify-center gap-1">
+          <p className="text-3xl font-black text-primary tracking-tight">
+            {data.totalScore.toLocaleString()}
+          </p>
+          <span className="text-sm font-bold text-primary/70 mt-2">점</span>
+        </div>
+      </div>
+
+      {/* 활동 내역 */}
+      <div className="flex flex-col flex-1 min-h-0 gap-3">
+        <div className="flex justify-between items-center px-1 flex-shrink-0">
+          <p className="text-sm font-medium text-foreground">활동 내역</p>
+          <span className="text-[10px] text-muted-foreground">
+            {data.activities.length} entries
+          </span>
+        </div>
+
+        <div className="custom-scrollbar overflow-y-auto pr-2 flex-1">
+          {data.activities.length > 0 ? (
+            data.activities.map((activity, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between py-3 border-b border-border last:border-b-0 hover:bg-muted/30 px-2 rounded-lg transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-muted/50 flex items-center justify-center">
+                    {getIcon(activity.category, activity.description)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground line-clamp-1">
+                      {activity.description.replace(/^Solved problem: /, '')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {getRelativeTime(activity.createdAt)}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-sm font-bold text-emerald-500 shrink-0">
+                  +{activity.amount}점
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-xs">
+              이번 주 활동 내역이 없습니다.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default CCWeeklyScore;

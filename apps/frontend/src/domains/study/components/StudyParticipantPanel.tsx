@@ -9,6 +9,7 @@ import { VolumeX, Search } from 'lucide-react';
 import { ParticipantCard } from './ParticipantCard';
 import { KickConfirmModal } from './KickConfirmModal';
 import { CCDelegateConfirmModal } from './CCDelegateConfirmModal';
+import { CCUserProfileModal } from '@/domains/profile/components/CCUserProfileModal';
 import { toast } from 'sonner';
 import { useSocketContext } from '../context/SocketContext';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
@@ -31,6 +32,7 @@ export function StudyParticipantPanel() {
   const [search, setSearch] = useState('');
   const [kickTarget, setKickTarget] = useState<Participant | null>(null);
   const [delegateTarget, setDelegateTarget] = useState<Participant | null>(null);
+  const [profileTarget, setProfileTarget] = useState<Participant | null>(null);
 
   // Filter & Sort
   const filtered = participants.filter((p) =>
@@ -83,8 +85,7 @@ export function StudyParticipantPanel() {
   };
 
   const handleViewProfile = (p: Participant) => {
-    // TODO: Connect to profile modal or page
-    toast.info(`${p.nickname}님의 프로필: Lv.10 (준비중)`);
+    setProfileTarget(p);
   };
 
   return (
@@ -160,9 +161,9 @@ export function StudyParticipantPanel() {
                   isRoomOwner={isOwner}
                   onKick={setKickTarget}
                   onDelegate={setDelegateTarget}
-                  onViewCode={() => { }} // Disabled for offline
+                  onViewCode={() => {}} // Disabled for offline
                   onViewProfile={handleViewProfile}
-                // Mute/Video actions usually disabled or hidden for offline
+                  // Mute/Video actions usually disabled or hidden for offline
                 />
               ))}
             </div>
@@ -185,6 +186,13 @@ export function StudyParticipantPanel() {
           onClose={() => setDelegateTarget(null)}
           onConfirm={handleDelegate}
           userName={delegateTarget.nickname}
+        />
+      )}
+      {profileTarget && (
+        <CCUserProfileModal
+          isOpen={!!profileTarget}
+          onClose={() => setProfileTarget(null)}
+          nickname={profileTarget.nickname}
         />
       )}
     </div>

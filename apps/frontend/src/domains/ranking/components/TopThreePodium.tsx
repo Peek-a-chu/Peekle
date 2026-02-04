@@ -4,13 +4,14 @@ import { Trophy, Medal, Award } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
+import { UserIcon } from '@/components/UserIcon';
 
 interface TopThreePodiumProps {
   rankings: RankResponse[];
   onStudyClick: (studyId: number) => void;
 }
 
-const MemberAvatars = ({
+const MemberIcons = ({
   members,
   limit = 3,
 }: {
@@ -18,15 +19,26 @@ const MemberAvatars = ({
   limit?: number;
 }): React.ReactNode => (
   <div className="flex items-center justify-center -space-x-2">
-    {members.slice(0, limit).map((m) => (
-      <img
-        key={m.userId}
-        src={m.profileImg || `https://api.dicebear.com/9.x/pixel-art/svg?seed=${m.nickname}`}
-        alt={m.nickname}
-        className="h-6 w-6 rounded-full border-2 border-background bg-muted"
-        title={m.nickname}
-      />
-    ))}
+    {members.slice(0, limit).map((m) => {
+      const displayImg = m.profileImgThumb || m.profileImg;
+      return displayImg ? (
+        <img
+          key={m.userId}
+          src={encodeURI(displayImg)}
+          alt={m.nickname}
+          className="h-6 w-6 rounded-full border-2 border-background bg-muted"
+          title={m.nickname}
+        />
+      ) : (
+        <div
+          key={m.userId}
+          className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold text-slate-500"
+          title={m.nickname}
+        >
+          {m.nickname.charAt(0)}
+        </div>
+      );
+    })}
     {members.length > limit && (
       <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold">
         +{members.length - limit}
@@ -62,7 +74,7 @@ export function TopThreePodium({ rankings, onStudyClick }: TopThreePodiumProps):
                 {second.name}
               </h3>
               <div className="mb-2">
-                <MemberAvatars members={second.members} />
+                <MemberIcons members={second.members} />
               </div>
               <div className="space-y-1 text-xs bg-slate-200/50 rounded-lg p-1.5">
                 <div className="flex items-center justify-center gap-1 font-bold text-slate-700">
@@ -106,7 +118,7 @@ export function TopThreePodium({ rankings, onStudyClick }: TopThreePodiumProps):
                 {first.name}
               </h3>
               <div className="mb-2">
-                <MemberAvatars members={first.members} />
+                <MemberIcons members={first.members} />
               </div>
               <div className="space-y-1 text-xs bg-yellow-200/50 rounded-lg p-1.5">
                 <div className="flex items-center justify-center gap-1 font-bold text-yellow-700">
@@ -150,7 +162,7 @@ export function TopThreePodium({ rankings, onStudyClick }: TopThreePodiumProps):
                 {third.name}
               </h3>
               <div className="mb-2">
-                <MemberAvatars members={third.members} />
+                <MemberIcons members={third.members} />
               </div>
               <div className="space-y-1 text-xs bg-orange-200/50 rounded-lg p-1.5">
                 <div className="flex items-center justify-center gap-1 font-bold text-orange-700">

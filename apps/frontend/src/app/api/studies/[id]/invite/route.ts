@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:80
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cookieHeader = request.headers.get('cookie') || '';
-  
+
   try {
     const res = await fetch(`${API_BASE_URL}/api/studies/${id}/invite`, {
       method: 'POST',
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const contentType = res.headers.get('content-type') || '';
     const status = res.status;
-    
+
     // Handle redirects (likely authentication redirect)
     if (status >= 300 && status < 400) {
       const location = res.headers.get('location');
@@ -35,13 +35,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         { status: 401 },
       );
     }
-    
+
     // Check if response is JSON
     if (!contentType.includes('application/json')) {
       const text = await res.text();
       const snippet = text.slice(0, 500).replace(/\s+/g, ' ');
       console.error('[Invite API] Non-JSON response:', { status, contentType, snippet });
-      
+
       // If it's HTML, it's likely a login page
       if (contentType.includes('text/html')) {
         return NextResponse.json(
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           { status: 401 },
         );
       }
-      
+
       return NextResponse.json(
         {
           success: false,

@@ -58,7 +58,7 @@ const LeagueIcon = ({ league, size = 24, className = '' }: LeagueIconProps) => {
   return (
     <Image
       src={`/icons/league/${league}.svg`}
-      alt={LEAGUE_NAMES[league]}
+      alt={LEAGUE_NAMES[league] || 'League Icon'}
       width={size}
       height={size}
       className={className}
