@@ -1,16 +1,14 @@
-version: '3.8'
-
 services:
   coturn:
     image: coturn/coturn:latest
     container_name: peekle-coturn
     restart: unless-stopped
     ports:
-      # STUN/TURN Listener
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "5349:5349"
-      - "5349:5349/udp"
+      # STUN/TURN Listener - DISABLED (Handled by LiveKit Built-in)
+      # - "3478:3478"
+      # - "3478:3478/udp"
+      # - "5349:5349"
+      # - "5349:5349/udp"
       # Relay Ports (Min-Max) - Adjusted for Dev
       # You might need to expand this range for production
       - "49152-49162:49152-49162/udp" 

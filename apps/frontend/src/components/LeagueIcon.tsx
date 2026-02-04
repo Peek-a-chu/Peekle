@@ -55,10 +55,12 @@ interface LeagueIconProps {
 }
 
 const LeagueIcon = ({ league, size = 24, className = '' }: LeagueIconProps) => {
+  const safeLeague = (league?.toLowerCase() || 'stone') as LeagueType;
+
   return (
     <Image
-      src={`/icons/league/${league}.svg`}
-      alt={LEAGUE_NAMES[league] || 'League Icon'}
+      src={`/icons/league/${safeLeague}.svg`}
+      alt={LEAGUE_NAMES[safeLeague] || 'League Icon'}
       width={size}
       height={size}
       className={className}

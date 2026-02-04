@@ -28,28 +28,41 @@ fi
 echo "Starting Nginx in background..."
 nginx
 
-# 4. Attempt to obtain Let's Encrypt certificate
+# 4. Attempt to obtain SSL certificate
 echo "Checking SSL certificate status..."
-# Check if it is a real Let's Encrypt certificate
-ISSUER=$(openssl x509 -in "$CERT_DIR/fullchain.pem" -noout -issuer 2>/dev/null)
 
-if echo "$ISSUER" | grep -q "Let's Encrypt"; then
-    # It is a Let's Encrypt cert, check expiration
-    if openssl x509 -checkend 86400 -noout -in "$CERT_DIR/fullchain.pem" 2>/dev/null; then
-        echo "Valid Let's Encrypt certificate exists. Skipping issuance."
-        SKIP_ISSUANCE="true"
+if [ -f "$CERT_DIR/fullchain.pem" ]; then
+    # Check if certificate is valid for at least 7 days (604800 seconds)
+    if openssl x509 -checkend 604800 -noout -in "$CERT_DIR/fullchain.pem" 2>/dev/null; then
+         ISSUER=$(openssl x509 -in "$CERT_DIR/fullchain.pem" -noout -issuer 2>/dev/null)
+         # Check if it's one of our trusted CAs (Let's Encrypt, ZeroSSL, Sectigo, Buypass, etc.)
+         # Self-signed placeholder usually has Issuer == Subject (CN=domain)
+         if echo "$ISSUER" | grep -qE "Let's Encrypt|ZeroSSL|Sectigo|Buypass"; then
+             echo "Valid CA certificate found (Issuer: $ISSUER). Skipping issuance."
+             SKIP_ISSUANCE="true"
+         else
+             echo "Certificate is valid time-wise but appears self-signed or unknown CA (Issuer: $ISSUER). Proceeding with issuance..."
+             SKIP_ISSUANCE="false"
+         fi
     else
-        echo "Let's Encrypt certificate is expiring soon."
-        SKIP_ISSUANCE="false"
+         echo "Certificate is expiring within 7 days or invalid. Proceeding with issuance..."
+         SKIP_ISSUANCE="false"
     fi
 else
-    # It is likely a self-signed placeholder
-    echo "Placeholder certificate detected (Issuer: $ISSUER). Proceeding with issuance..."
+    echo "No certificate found. Proceeding with issuance..."
     SKIP_ISSUANCE="false"
 fi
 
 if [ "$SKIP_ISSUANCE" != "true" ]; then
-    echo "Requesting Let's Encrypt certificate..."
+    echo "Requesting SSL certificate..."
+
+    # Remove self-signed certificate directory to prevent Certbot from creating a duplicate directory (e.g., -0001)
+    # Nginx is holding these files in memory, so it won't crash immediately.
+    # When Certbot succeeds, it recreates this directory, and "nginx -s reload" loads the valid certs.
+    if [ -d "$CERT_DIR" ]; then
+        echo "Removing placeholder certificate to avoid conflict..."
+        rm -rf "$CERT_DIR"
+    fi
     
     # Removed --force-renewal to let certbot decide if renewal is needed
     CERTBOT_ARGS="certonly --webroot -w $WEBROOT -d $DOMAIN --email $EMAIL --agree-tos --non-interactive"
@@ -58,12 +71,56 @@ if [ "$SKIP_ISSUANCE" != "true" ]; then
         CERTBOT_ARGS="$CERTBOT_ARGS --staging"
     fi
 
-    if certbot $CERTBOT_ARGS; then
-        echo "Certificate obtained successfully!"
-        echo "Reloading Nginx config..."
-        nginx -s reload
+    # Try acme.sh (ZeroSSL) first as it has no rate limits vs Let's Encrypt
+    echo "Installing acme.sh client..."
+    # Install acme.sh
+    if curl https://get.acme.sh | sh -s email="$EMAIL"; then
+        source /root/.acme.sh/acme.sh.env 2>/dev/null
+        
+        # Set default CA to ZeroSSL
+        /root/.acme.sh/acme.sh --set-default-ca --server zerossl
+        
+        # Issue certificate
+        if /root/.acme.sh/acme.sh --issue -d "$DOMAIN" -w "$WEBROOT" --server zerossl; then
+            echo "Certificate obtained successfully (ZeroSSL)!"
+            
+            # Install certificate to the path Nginx expects
+            mkdir -p "$CERT_DIR"
+            /root/.acme.sh/acme.sh --install-cert -d "$DOMAIN" \
+                --key-file       "$CERT_DIR/privkey.pem"  \
+                --fullchain-file "$CERT_DIR/fullchain.pem" \
+                --reloadcmd     "nginx -s reload"
+                
+            echo "Reloading Nginx config..."
+            nginx -s reload
+        else
+            echo "acme.sh (ZeroSSL) failed. Trying Certbot (Let's Encrypt)..."
+            if certbot $CERTBOT_ARGS; then
+                echo "Certificate obtained successfully (Let's Encrypt)!"
+                echo "Reloading Nginx config..."
+                nginx -s reload
+            else
+                echo "Certbot failed. Falling back to self-signed certificate."
+                mkdir -p "$CERT_DIR"
+                openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                    -keyout "$CERT_DIR/privkey.pem" \
+                    -out "$CERT_DIR/fullchain.pem" \
+                    -subj "/CN=$DOMAIN"
+            fi
+        fi
     else
-        echo "Certbot failed. Falling back to self-signed certificate."
+         echo "acme.sh install failed. Trying Certbot..."
+         if certbot $CERTBOT_ARGS; then
+             echo "Certificate obtained successfully!"
+             nginx -s reload
+         else
+             echo "Certbot failed. Fallback to self-signed."
+             mkdir -p "$CERT_DIR"
+             openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "$CERT_DIR/privkey.pem" \
+                -out "$CERT_DIR/fullchain.pem" \
+                -subj "/CN=$DOMAIN"
+         fi
     fi
 fi
 
