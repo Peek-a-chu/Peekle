@@ -170,6 +170,20 @@ export async function deleteWorkbook(workbookId: number): Promise<void> {
   }
 }
 
+// 문제집에 문제 추가
+export async function addProblemToWorkbook(
+  workbookId: number,
+  problemId: number,
+): Promise<void> {
+  const response = await apiFetch<void>(`/api/workbooks/${workbookId}/problems/${problemId}`, {
+    method: 'POST',
+  });
+
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to add problem to workbook');
+  }
+}
+
 // 북마크 토글
 export async function toggleWorkbookBookmark(
   workbookId: number,
