@@ -116,3 +116,9 @@ r2:
   secret-access-key: ${R2_SECRET_ACCESS_KEY}
   bucket-name: ${R2_BUCKET_NAME}
   public-url: ${R2_PUBLIC_URL}
+
+# LiveKit 설정
+livekit:
+  url: ${LIVEKIT_URL:ws://localhost:7880}
+  api-key: ${LIVEKIT_API_KEY:devkey}
+  api-secret: ${LIVEKIT_API_SECRET:secret}

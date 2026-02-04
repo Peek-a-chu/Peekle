@@ -12,10 +12,17 @@ import {
 } from '../mocks/dashboardMocks';
 import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
 import { LeagueRankingData, WeeklyPointSummary } from '@/domains/league/types';
-import { getLeagueStatus, getLeagueRules, LeagueRulesMap, getWeeklyPointSummary } from '@/api/leagueApi';
+import {
+  getLeagueStatus,
+  getLeagueRules,
+  LeagueRulesMap,
+  getWeeklyPointSummary,
+} from '@/api/leagueApi';
 
 // 리그 변화 추이 데이터
-export const useLeagueProgress = (options?: { skip?: boolean }): { data: LeagueProgressData[]; isLoading: boolean } => {
+export const useLeagueProgress = (options?: {
+  skip?: boolean;
+}): { data: LeagueProgressData[]; isLoading: boolean } => {
   const [data, setData] = useState<LeagueProgressData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -26,7 +33,7 @@ export const useLeagueProgress = (options?: { skip?: boolean }): { data: LeagueP
     }
     const fetchData = async () => {
       try {
-        const result = await import('@/api/leagueApi').then(m => m.getLeagueProgress());
+        const result = await import('@/api/leagueApi').then((m) => m.getLeagueProgress());
         setData(result);
       } catch (error) {
         console.error('Failed to fetch league progress:', error);
@@ -42,7 +49,9 @@ export const useLeagueProgress = (options?: { skip?: boolean }): { data: LeagueP
 };
 
 // 활동 스트릭 데이터
-export const useActivityStreak = (nickname?: string): { data: ActivityStreakData[]; isLoading: boolean } => {
+export const useActivityStreak = (
+  nickname?: string,
+): { data: ActivityStreakData[]; isLoading: boolean } => {
   const [data, setData] = useState<ActivityStreakData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -73,7 +82,11 @@ export const useActivityStreak = (nickname?: string): { data: ActivityStreakData
 };
 
 // 학습 타임라인 데이터
-export const useTimeline = (date: string, nickname?: string, options?: { skip?: boolean }): { data: TimelineItemData[]; isLoading: boolean } => {
+export const useTimeline = (
+  date: string,
+  nickname?: string,
+  options?: { skip?: boolean },
+): { data: TimelineItemData[]; isLoading: boolean } => {
   const [data, setData] = useState<TimelineItemData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -91,7 +104,9 @@ export const useTimeline = (date: string, nickname?: string, options?: { skip?: 
 
       try {
         setIsLoading(true);
-        const endpoint = nickname ? `/api/users/${nickname}/timeline?date=${date}` : `/api/users/me/timeline?date=${date}`;
+        const endpoint = nickname
+          ? `/api/users/${nickname}/timeline?date=${date}`
+          : `/api/users/me/timeline?date=${date}`;
         const response = await fetch(endpoint);
         if (response.ok) {
           const json = await response.json();
@@ -116,7 +131,7 @@ export const useTimeline = (date: string, nickname?: string, options?: { skip?: 
               executionTime: item.executionTime,
               result: item.result, // 제출 결과
               isSuccess: item.isSuccess, // 성공 여부 매핑
-              submittedAt: item.submittedAt
+              submittedAt: item.submittedAt,
             }));
             setData(mappedData);
           } else {
@@ -186,7 +201,10 @@ export const useAIRecommendations = (options?: { skip?: boolean }): { data: AIRe
 };
 
 // 주간 점수 데이터
-export const useWeeklyScore = (date?: string, options?: { skip?: boolean }): { data: WeeklyPointSummary | null; isLoading: boolean } => {
+export const useWeeklyScore = (
+  date?: string,
+  options?: { skip?: boolean },
+): { data: WeeklyPointSummary | null; isLoading: boolean } => {
   const [data, setData] = useState<WeeklyPointSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -212,7 +230,10 @@ export const useWeeklyScore = (date?: string, options?: { skip?: boolean }): { d
 };
 
 // 리그 순위 데이터
-export const useLeagueRanking = (refreshInterval = 30000, options?: { skip?: boolean }): { data: LeagueRankingData; isLoading: boolean } => {
+export const useLeagueRanking = (
+  refreshInterval = 30000,
+  options?: { skip?: boolean },
+): { data: LeagueRankingData; isLoading: boolean } => {
   const [data, setData] = useState<LeagueRankingData>(DEFAULT_LEAGUE_RANKING);
   const [isLoading, setIsLoading] = useState(true);
 

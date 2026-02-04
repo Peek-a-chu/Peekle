@@ -80,10 +80,7 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
       {/* 헥사곤 프레임 */}
       <div className="hexagon-frame">
         <svg viewBox="0 0 100 100" className="hexagon-svg">
-          <polygon
-            points="50,3 97,25 97,75 50,97 3,75 3,25"
-            className="hexagon-path"
-          />
+          <polygon points="50,3 97,25 97,75 50,97 3,75 3,25" className="hexagon-path" />
         </svg>
       </div>
 
@@ -123,7 +120,7 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         .grid-background {
           position: absolute;
           inset: 0;
-          background-image: 
+          background-image:
             linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
             linear-gradient(90deg, hsl(var(--primary) / 0.05) 1px, transparent 1px);
           background-size: 50px 50px;
@@ -134,8 +131,12 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         @keyframes grid-move {
-          0% { background-position: 0 0; }
-          100% { background-position: 50px 50px; }
+          0% {
+            background-position: 0 0;
+          }
+          100% {
+            background-position: 50px 50px;
+          }
         }
 
         /* 별 필드 */
@@ -156,8 +157,15 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         @keyframes twinkle {
-          0%, 100% { opacity: 0.2; transform: scale(0.5); }
-          50% { opacity: 1; transform: scale(1.2); }
+          0%,
+          100% {
+            opacity: 0.2;
+            transform: scale(0.5);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.2);
+          }
         }
 
         /* 회전 링 */
@@ -195,8 +203,12 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
         }
 
         /* 충격파 */
@@ -207,7 +219,7 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
           border-radius: 50%;
           border: 4px solid hsl(var(--primary) / 0.8);
           animation: shockwave-expand 0.8s ease-out forwards;
-          box-shadow: 
+          box-shadow:
             0 0 20px hsl(var(--primary) / 0.5),
             inset 0 0 20px hsl(var(--primary) / 0.3);
         }
@@ -247,12 +259,18 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         @keyframes hexagon-rotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
         }
 
         @keyframes hexagon-draw {
-          to { stroke-dashoffset: 0; }
+          to {
+            stroke-dashoffset: 0;
+          }
         }
 
         /* 카운트다운 컨테이너 */
@@ -286,14 +304,24 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         .lightning-effect {
           position: absolute;
           inset: -100px;
-          background: radial-gradient(ellipse at center, hsl(var(--primary) / 0.3) 0%, transparent 70%);
+          background: radial-gradient(
+            ellipse at center,
+            hsl(var(--primary) / 0.3) 0%,
+            transparent 70%
+          );
           animation: lightning-flash 0.3s ease-out;
         }
 
         @keyframes lightning-flash {
-          0% { opacity: 0; }
-          20% { opacity: 1; }
-          100% { opacity: 0; }
+          0% {
+            opacity: 0;
+          }
+          20% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
         }
 
         /* 숫자 레이어 */
@@ -314,7 +342,7 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         .shadow-text {
           position: absolute;
           color: transparent;
-          text-shadow: 
+          text-shadow:
             0 0 80px hsl(var(--primary) / 0.8),
             0 0 160px hsl(var(--primary) / 0.5);
         }
@@ -348,9 +376,17 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         @keyframes shine-sweep {
-          0% { transform: translateX(-100%); opacity: 1; }
-          80% { opacity: 1; }
-          100% { transform: translateX(100%); opacity: 0; }
+          0% {
+            transform: translateX(-100%);
+            opacity: 1;
+          }
+          80% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
         }
 
         /* GO! 스타일 - 테마의 오렌지 컬러 사용 */
@@ -367,7 +403,7 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         .is-go .shadow-text {
-          text-shadow: 
+          text-shadow:
             0 0 80px hsl(var(--color-orange) / 0.9),
             0 0 160px hsl(var(--color-orange) / 0.7);
         }
@@ -377,8 +413,12 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
         }
 
         @keyframes fire-glow {
-          0% { filter: brightness(1); }
-          100% { filter: brightness(1.2); }
+          0% {
+            filter: brightness(1);
+          }
+          100% {
+            filter: brightness(1.2);
+          }
         }
 
         /* 코너 장식 */
@@ -391,20 +431,61 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
           border-width: 0;
         }
 
-        .corner-tl { top: 40px; left: 40px; border-top-width: 3px; border-left-width: 3px; }
-        .corner-tr { top: 40px; right: 40px; border-top-width: 3px; border-right-width: 3px; }
-        .corner-bl { bottom: 40px; left: 40px; border-bottom-width: 3px; border-left-width: 3px; }
-        .corner-br { bottom: 40px; right: 40px; border-bottom-width: 3px; border-right-width: 3px; }
+        .corner-tl {
+          top: 40px;
+          left: 40px;
+          border-top-width: 3px;
+          border-left-width: 3px;
+        }
+        .corner-tr {
+          top: 40px;
+          right: 40px;
+          border-top-width: 3px;
+          border-right-width: 3px;
+        }
+        .corner-bl {
+          bottom: 40px;
+          left: 40px;
+          border-bottom-width: 3px;
+          border-left-width: 3px;
+        }
+        .corner-br {
+          bottom: 40px;
+          right: 40px;
+          border-bottom-width: 3px;
+          border-right-width: 3px;
+        }
 
         /* 반응형 */
         @media (max-width: 768px) {
-          .rotating-rings { width: 250px; height: 250px; }
-          .hexagon-frame { width: 200px; height: 200px; }
-          .corner { width: 50px; height: 50px; }
-          .corner-tl, .corner-tr { top: 20px; }
-          .corner-bl, .corner-br { bottom: 20px; }
-          .corner-tl, .corner-bl { left: 20px; }
-          .corner-tr, .corner-br { right: 20px; }
+          .rotating-rings {
+            width: 250px;
+            height: 250px;
+          }
+          .hexagon-frame {
+            width: 200px;
+            height: 200px;
+          }
+          .corner {
+            width: 50px;
+            height: 50px;
+          }
+          .corner-tl,
+          .corner-tr {
+            top: 20px;
+          }
+          .corner-bl,
+          .corner-br {
+            bottom: 20px;
+          }
+          .corner-tl,
+          .corner-bl {
+            left: 20px;
+          }
+          .corner-tr,
+          .corner-br {
+            right: 20px;
+          }
         }
       `}</style>
     </div>

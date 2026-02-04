@@ -57,7 +57,9 @@ interface CCLeagueRankingListProps {
 }
 
 const CCLeagueRankingList = ({ initialData }: CCLeagueRankingListProps) => {
-  const { data: fetchedData, isLoading: isFetching } = useLeagueRanking(30000, { skip: !!initialData });
+  const { data: fetchedData, isLoading: isFetching } = useLeagueRanking(30000, {
+    skip: !!initialData,
+  });
 
   const data = initialData || fetchedData;
   const isLoading = initialData ? false : isFetching;

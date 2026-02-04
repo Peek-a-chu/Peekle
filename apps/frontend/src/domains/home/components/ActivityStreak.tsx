@@ -15,7 +15,12 @@ interface ActivityStreakProps {
 // 사용 가능한 년도들 (동적 생성)
 const CURRENT_YEAR = new Date().getFullYear();
 
-const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate, nickname, initialData }: ActivityStreakProps) => {
+const ActivityStreak = ({
+  onDateSelect,
+  selectedDate: externalSelectedDate,
+  nickname,
+  initialData,
+}: ActivityStreakProps) => {
   // If initialData is provided, use it. Otherwise, fetch via hook.
   const { data: fetchedData } = useActivityStreak(initialData ? undefined : nickname);
   const allData = initialData || fetchedData;
@@ -24,7 +29,8 @@ const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate, nick
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
 
   // 외부 prop이 있으면 그것을 사용, 없으면 내부 state 사용
-  const selectedDate = externalSelectedDate !== undefined ? externalSelectedDate : internalSelectedDate;
+  const selectedDate =
+    externalSelectedDate !== undefined ? externalSelectedDate : internalSelectedDate;
 
   // 사용 가능한 년도 계산 (데이터 기반 + 현재 년도)
   const availableYears = useMemo(() => {
@@ -54,11 +60,11 @@ const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate, nick
     }
 
     // 2. 실제 데이터 매핑
-    const dataMap = new Map(allData.map(item => [item.date, item.count]));
+    const dataMap = new Map(allData.map((item) => [item.date, item.count]));
 
-    return fullDates.map(item => ({
+    return fullDates.map((item) => ({
       ...item,
-      count: dataMap.get(item.date) || 0
+      count: dataMap.get(item.date) || 0,
     }));
   }, [allData, selectedYear]);
 
@@ -157,10 +163,11 @@ const ActivityStreak = ({ onDateSelect, selectedDate: externalSelectedDate, nick
                   <button
                     key={day.date}
                     onClick={() => handleDateClick(day.date)}
-                    className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${selectedDate === day.date
-                      ? 'ring-1 ring-primary ring-offset-1 relative z-10'
-                      : 'hover:ring-1 hover:ring-border'
-                      }`}
+                    className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${
+                      selectedDate === day.date
+                        ? 'ring-1 ring-primary ring-offset-1 relative z-10'
+                        : 'hover:ring-1 hover:ring-border'
+                    }`}
                     title={`${day.date}: ${day.count}문제`}
                   />
                 ))}

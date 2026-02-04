@@ -18,7 +18,7 @@ export interface Problem {
   totalMemberCount: number;
 }
 
-export function useProblems(studyId: number) {
+export function useProblems(studyId: number, dateString?: string) {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,8 +26,10 @@ export function useProblems(studyId: number) {
     if (!studyId) return;
     setIsLoading(true);
     try {
-      const date = new Date().toISOString().split('T')[0];
-      const res = await apiFetch<any[]>(`/api/studies/${studyId}/curriculum/daily?date=${date}`);
+      const targetDate = dateString || new Date().toISOString().split('T')[0];
+      const res = await apiFetch<any[]>(
+        `/api/studies/${studyId}/curriculum/daily?date=${targetDate}`,
+      );
       if (res.success && res.data) {
         setProblems(
           res.data.map((p) => ({
@@ -45,7 +47,7 @@ export function useProblems(studyId: number) {
     } finally {
       setIsLoading(false);
     }
-  }, [studyId]);
+  }, [studyId, dateString]);
 
   useEffect(() => {
     fetchProblems();
@@ -57,10 +59,12 @@ export function useProblems(studyId: number) {
       const { studyId: eventStudyId, problem } = event.detail;
       if (eventStudyId === studyId && problem) {
         console.log('[useProblems] Problem added, updating state:', problem);
+        const newProblemId = Number(problem.problemId || problem.id);
+
         // Optimistically add the problem if it's not already there
         setProblems((prev) => {
           // Check if problem already exists
-          if (prev.some((p) => p.problemId === problem.problemId)) {
+          if (prev.some((p) => Number(p.problemId) === newProblemId)) {
             console.log('[useProblems] Problem already exists, skipping optimistic add');
             return prev;
           }
@@ -68,12 +72,12 @@ export function useProblems(studyId: number) {
           return [
             ...prev,
             {
-              id: problem.problemId,
-              problemId: problem.problemId,
-              externalId: problem.externalId,
-              title: problem.title || 'Unknown',
+              id: newProblemId,
+              problemId: newProblemId,
+              externalId: problem.externalId || String(problem.number),
+              title: problem.title || `문제 ${newProblemId}`,
               tier: problem.tier || 'Unrated',
-              number: problem.externalId ? parseInt(problem.externalId, 10) : problem.problemId,
+              number: problem.externalId ? parseInt(problem.externalId, 10) : newProblemId,
               tags: [],
               status: 'not_started' as const,
               participantCount: 0,
@@ -87,7 +91,7 @@ export function useProblems(studyId: number) {
           ];
         });
         // Then refetch to ensure consistency and get all details
-        fetchProblems();
+        // fetchProblems(); // Disabled to prevent overwriting optimistic update with stale data
       }
     };
 
@@ -96,9 +100,13 @@ export function useProblems(studyId: number) {
       if (eventStudyId === studyId && problemId) {
         console.log('[useProblems] Problem removed, refetching:', problemId);
         // Remove from local state immediately for better UX
-        setProblems((prev) => prev.filter((p) => p.problemId !== problemId && p.id !== problemId));
+        setProblems((prev) =>
+          prev.filter(
+            (p) => Number(p.problemId) !== Number(problemId) && Number(p.id) !== Number(problemId),
+          ),
+        );
         // Then refetch to ensure consistency
-        fetchProblems();
+        // fetchProblems(); // Disabled to prevent overwriting optimistic update with stale data
       }
     };
 
@@ -117,7 +125,10 @@ export function useProblems(studyId: number) {
     return () => {
       window.removeEventListener('study-problem-added', handleProblemAdded as EventListener);
       window.removeEventListener('study-problem-removed', handleProblemRemoved as EventListener);
-      window.removeEventListener('study-curriculum-updated', handleCurriculumUpdated as EventListener);
+      window.removeEventListener(
+        'study-curriculum-updated',
+        handleCurriculumUpdated as EventListener,
+      );
     };
   }, [studyId, fetchProblems]);
 
@@ -125,18 +136,18 @@ export function useProblems(studyId: number) {
     useStudySocketActions();
 
   const addProblem = useCallback(
-    async (title: string, number: number, tags?: string[], problemId?: number) => {
+    async (title: string, number: number, tags?: string[], problemId?: number, date?: string) => {
       try {
         let actualProblemId = problemId;
-        
+
         // problemId가 제공되지 않으면 externalId로 조회
         if (!actualProblemId) {
           // number is externalId (BOJ problem number), convert to problemId
           actualProblemId = await getProblemIdByExternalId(String(number), 'BOJ');
         }
-        
+
         if (actualProblemId) {
-          socketAddProblem(actualProblemId);
+          socketAddProblem(actualProblemId, date);
         } else {
           throw new Error('Failed to find problem ID');
         }

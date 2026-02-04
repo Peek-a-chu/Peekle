@@ -100,7 +100,7 @@
 
 **🛠 Implementation Tasks**
 [ ] Grid Layout 퍼블리싱 (Left: List, Center: IDE, Right: Chat)
-[ ] OpenVidu Stream 정렬 로직 (Self First + Active Speaker Sort)
+[ ] LiveKit Stream 정렬 로직 (Self First + Active Speaker Sort)
 [ ] `useRoomStore`에 `viewingUser` 상태 관리 추가
 
 ### S5-5. 문제 목록 및 캘린더 (Left Panel)

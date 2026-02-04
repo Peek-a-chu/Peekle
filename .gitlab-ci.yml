@@ -88,6 +88,7 @@ frontend-build:
   only:
     refs:
       - master
+      - main
       - merge_requests
   before_script:
     - cd apps/frontend
@@ -118,6 +119,7 @@ spring-backend-build:
   only:
     refs:
       - master
+      - main
       - merge_requests
   before_script:
     - cd apps/backend
@@ -147,6 +149,7 @@ ai-server-build:
   image: python:3.10-slim
   only:
     refs:
+      - main
       - master
       - merge_requests
   before_script:
@@ -174,6 +177,7 @@ deploy-production:
     - docker:24-dind
   only:
     refs:
+      - main
       - master
   needs:
     - job: frontend-build
@@ -286,7 +290,7 @@ deploy-production:
         # Infrastructure services
         if [ "$DOCKER_CHANGED" = "yes" ]; then
           echo "Rebuilding infrastructure services..."
-          docker compose -f docker-compose.prod.yml build nginx redis openvidu coturn certbot
+          docker compose -f docker-compose.prod.yml build nginx redis livekit coturn certbot
         fi
 
         # ✅ OPTIMIZATION: Rolling restart (zero-downtime)

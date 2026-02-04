@@ -91,7 +91,7 @@
 ## 🛠 Implementation Tasks
 
 - [x] Grid Layout 퍼블리싱 (Left: List, Center: IDE, Right: Chat)
-- [x] OpenVidu Stream 정렬 로직 (Self First + Active Speaker Sort)
+- [x] LiveKit Stream 정렬 로직 (Self First + Active Speaker Sort)
 - [x] `useRoomStore`에 `viewingUser` 상태 관리 추가
 - [x] 비디오 타일 컴포넌트 구현 (닉네임, 방장뱃지, 마이크 상태 표시)
 - [x] 코드 열람 중인 유저 타일에 노란색 테두리 스타일 적용

@@ -73,8 +73,9 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
-      - OPENVIDU_URL=http://openvidu:4443/
-      - OPENVIDU_SECRET=${OPENVIDU_SECRET:-peekle_secret_1234}
+      - LIVEKIT_URL=http://localhost:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - AI_SERVER_URL=http://ai-server:8000
     ports:
       - "8080:8080"
@@ -147,28 +148,24 @@ services:
     networks:
       - peekle-network
 
-  # OpenVidu Server (WebRTC)
-  openvidu:
-    image: openvidu/openvidu-dev:2.29.0
-    container_name: peekle-openvidu
-    ports:
-      - "40000-40050:40000-40050/udp"
-      - "40000-40050:40000-40050/tcp"
-    environment:
-      - OPENVIDU_SECRET=${OPENVIDU_SECRET:-MY_SECRET}
-      - DOMAIN_OR_PUBLIC_IP=${DOMAIN_NAME:-localhost}
-      - OPENVIDU_PUBLICURL=https://${DOMAIN_NAME:-localhost}/openvidu
-      - HTTPS_PORT=4443
-      - KMS_MIN_PORT=40000
-      - KMS_MAX_PORT=40050
-      - COTURN_IP=${COTURN_IP:-auto}
-      - COTURN_PORT=3478
-    volumes:
-      - openvidu-recordings:/opt/openvidu/recordings
-      - openvidu-log:/var/log/openvidu
+  # LiveKit Server (SFU)
+  livekit:
+    image: livekit/livekit-server:v1.8.0
+    container_name: peekle-livekit
+    command: --config /livekit.yaml
     restart: unless-stopped
-    networks:
-      - peekle-network
+    # Performance is significantly better with host network
+    # But for compatibility with internal network (Connect to redis)
+    # Host mode can't access container network by default on Linux
+    # So we use host port mapping in livekit.yaml for Redis (127.0.0.1:6379)
+    network_mode: host 
+    volumes:
+      - ./livekit/livekit.yaml:/livekit.yaml
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    depends_on:
+      redis:
+        condition: service_healthy
 
   # Coturn TURN/STUN Server
   coturn:
@@ -193,10 +190,6 @@ networks:
 
 volumes:
   redis-data:
-    driver: local
-  openvidu-recordings:
-    driver: local
-  openvidu-log:
     driver: local
   nginx-certs:
     driver: local

@@ -31,17 +31,12 @@ export function CCStudyListPage() {
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-foreground">나의 스터디</h1>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setJoinModalOpen(true)}
-              className="gap-2"
-            >
+            <Button variant="outline" onClick={() => setJoinModalOpen(true)} className="gap-2">
               <LogIn className="h-4 w-4" />
               참여하기
             </Button>
             <Button onClick={() => setCreateModalOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              방 만들기
+              <Plus className="h-4 w-4" />방 만들기
             </Button>
           </div>
         </div>
@@ -75,7 +70,9 @@ export function CCStudyListPage() {
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
             <p className="text-muted-foreground mb-2">참여 중인 스터디가 없습니다</p>
             <p className="text-sm text-muted-foreground mb-4">
-              {searchQuery ? '검색 결과가 없습니다' : '새로운 스터디에 참여하거나 방을 만들어보세요'}
+              {searchQuery
+                ? '검색 결과가 없습니다'
+                : '새로운 스터디에 참여하거나 방을 만들어보세요'}
             </p>
             {!searchQuery && (
               <div className="flex gap-2">

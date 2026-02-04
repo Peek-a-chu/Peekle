@@ -42,7 +42,7 @@
 *   **Backend Interface:**
     *   **Backend Server:** Java Spring Boot.
     *   **Database:** MySQL (Main DB), Redis (Cache/PubSub), ChromaDB (Vector Search used for AI & Search).
-    *   **Real-time:** SockJS (WebSocket) for signaling/chat, OpenVidu (WebRTC) for media.
+    *   **Real-time:** SockJS (WebSocket) for signaling/chat, LiveKit (WebRTC) for media.
 *   **Shared Kernel:**
     *   `packages/shared-ui`: Video Grid, IDE Component 등 공통 UI 컴포넌트 라이브러리화.
     *   **API Integration:** Frontend는 `.env` 설정을 통해 API URL을 관리하며, API Client(Axios/Fetch)가 직접 호출한다.

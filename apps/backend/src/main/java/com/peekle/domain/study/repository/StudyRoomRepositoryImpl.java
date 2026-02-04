@@ -85,7 +85,7 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
         // 조건이 적용된 페이징 처리
         List<Long> ids = query
                 .where(builder)
-                .orderBy(studyRoom.rankingPoint.desc()) // 랭킹 포인트 내림차순
+                .orderBy(studyRoom.rankingPoint.desc(), studyRoom.id.asc()) // 랭킹 포인트 내림차순, 동점 시 ID 오름차순
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -132,5 +132,21 @@ public class StudyRoomRepositoryImpl implements StudyRoomRepositoryCustom {
         }
         return studyRoom.title.containsIgnoreCase(keyword)
                 .or(studyRoom.description.containsIgnoreCase(keyword));
+    }
+
+    @Override
+    public long countHigherRankStudies(int rankingPoint, Long studyId) {
+        Long count = queryFactory
+                .select(studyRoom.count())
+                .from(studyRoom)
+                .where(
+                        studyRoom.isActive.isTrue()
+                                .and(
+                                        studyRoom.rankingPoint.gt(rankingPoint)
+                                                .or(studyRoom.rankingPoint.eq(rankingPoint).and(studyRoom.id.lt(studyId)))
+                                )
+                )
+                .fetchOne();
+        return count != null ? count : 0;
     }
 }

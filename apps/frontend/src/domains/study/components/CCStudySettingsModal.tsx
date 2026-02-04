@@ -95,6 +95,13 @@ export function CCStudySettingsModal({ isOpen, onClose }: CCStudySettingsModalPr
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleSave();
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
@@ -113,6 +120,7 @@ export function CCStudySettingsModal({ isOpen, onClose }: CCStudySettingsModalPr
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={isOwner ? handleKeyDown : undefined}
               placeholder="스터디 이름을 입력하세요"
               readOnly={!isOwner}
               className={!isOwner ? 'bg-muted' : ''}
@@ -124,6 +132,7 @@ export function CCStudySettingsModal({ isOpen, onClose }: CCStudySettingsModalPr
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={isOwner ? handleKeyDown : undefined}
               placeholder="스터디 설명을 입력하세요"
               readOnly={!isOwner}
               className={!isOwner ? 'bg-muted' : ''}

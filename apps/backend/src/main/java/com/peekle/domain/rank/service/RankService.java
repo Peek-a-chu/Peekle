@@ -54,13 +54,20 @@ public class RankService {
         List<StudyRoom> studies = studyPage.getContent();
         List<RankResponse> content = new ArrayList<>();
 
+        boolean calculateGlobalRank = "MINE".equalsIgnoreCase(scope) || (keyword != null && !keyword.isBlank());
         long offset = studyPage.getPageable().getOffset();
 
         for (int i = 0; i < studies.size(); i++) {
             StudyRoom study = studies.get(i);
 
-            // 랭킹 계산: (이전 페이지까지의 개수) + (현재 리스트 인덱스) + 1
-            int rank = (int) (offset + i + 1);
+            int rank;
+            if (calculateGlobalRank) {
+                // 내 스터디 보기 또는 검색 시: 실제 전체 랭킹 조회
+                rank = (int) studyRoomRepository.countHigherRankStudies(study.getRankingPoint(), study.getId()) + 1;
+            } else {
+                // 일반 전체 랭킹 조회: 페이징 오프셋 기반 계산
+                rank = (int) (offset + i + 1);
+            }
 
             List<StudyMemberResponse> studyMembers = membersByStudyId.getOrDefault(study.getId(), List.of());
             content.add(RankResponse.builder()

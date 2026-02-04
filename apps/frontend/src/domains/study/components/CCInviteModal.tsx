@@ -48,7 +48,8 @@ export function CCInviteModal({ isOpen, onClose }: CCInviteModalProps) {
           setRoomInfo({ inviteCode: code });
         })
         .catch((err) => {
-          const message = err instanceof Error ? err.message : '초대 코드를 불러오는데 실패했습니다';
+          const message =
+            err instanceof Error ? err.message : '초대 코드를 불러오는데 실패했습니다';
           toast.error(message);
           console.error('Failed to generate invite code:', err);
         })
@@ -94,7 +95,9 @@ export function CCInviteModal({ isOpen, onClose }: CCInviteModalProps) {
             {isLoading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-sm text-muted-foreground">초대 코드를 불러오는 중...</span>
+                <span className="ml-2 text-sm text-muted-foreground">
+                  초대 코드를 불러오는 중...
+                </span>
               </div>
             ) : (
               <Input

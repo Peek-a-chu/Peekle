@@ -32,7 +32,7 @@ date: '2026-01-17'
     *   **Client State:** Zustand
 *   **Real-time:**
     *   **WebSocket:** `@stomp/stompjs` + `sockjs-client`
-    *   **Media/WebRTC:** `openvidu-browser`
+    *   **Media/WebRTC:** `livekit-client`, `@livekit/components-react`
     *   **Editor:** `@monaco-editor/react` (IDE)
     *   **Charts:** `recharts`
 
@@ -44,7 +44,7 @@ date: '2026-01-17'
     *   **RDBMS:** MySQL 8.0 (핵심 데이터)
     *   **In-Memory:** Redis 7.x (캐싱, 세션 저장소, Pub/Sub 브로커)
 *   **Security:** Spring Security + OAuth2 Client + JWT
-*   **Media Server:** OpenVidu Server 2.29.0 + Coturn
+*   **Media Server:** LiveKit Server (SFU)
 *   **Build Tool:** Gradle 8.x
 
 ### 2.3 DevOps & Infrastructure
@@ -72,7 +72,7 @@ graph TD
     subgraph Backend Infrastructure
         LB[Nginx / Load Balancer]
         API[Spring Boot API Server]
-        Media[OpenVidu Media Server]
+        Media[LiveKit Server]
     end
 
     subgraph Data Layer
@@ -89,7 +89,7 @@ graph TD
     LB --> API
     API --> MySQL
     API --> Redis
-    API -.->|RPC| Media
+    API -.->|HTTP API| Media
 ```
 
 ### 3.2 데이터 아키텍처 (Data Flow)
@@ -107,18 +107,18 @@ graph TD
 ## 4. 상세 모듈 설계
 
 ### 4.1 실시간 통신 전략 (Real-time Strategy)
-**OpenVidu (WebRTC) + STOMP (WebSocket)** 하이브리드 구조를 사용합니다.
+**LiveKit (WebRTC) + STOMP (WebSocket)** 하이브리드 구조를 사용합니다.
 
 | 구분 | 프로토콜 | 용도 | 흐름 |
 | :--- | :--- | :--- | :--- |
-| **미디어** | WebRTC (UDP/TCP) | 화상 채팅, 음성, 화면 공유 | Client <-> OpenVidu Server (Direct P2P or SFU) |
+| **미디어** | WebRTC (UDP/TCP) | 화상 채팅, 음성, 화면 공유 | Client <-> LiveKit Server (SFU) |
 | **시그널링** | WebSocket (STOMP) | 게임 상태, 채팅, 코드 동기화 | Client -> Spring Boot (Broker) -> Clients |
 
 **WebRTC 연결 시퀀스:**
 1.  Frontend가 Backend에 `POST /api/sessions` 요청 (세션 생성).
-2.  Backend가 OpenVidu Server와 통신하여 `sessionId` 생성 및 반환.
+2.  Backend가 LiveKit Server와 통신하여 `sessionId` 생성 및 반환.
 3.  Frontend가 `POST /api/sessions/{id}/connections` 요청 (토큰 발급).
-4.  Backend가 OpenVidu Server에서 `token` 발급 후 반환.
+4.  Backend가 LiveKit Server에서 `token` 발급 후 반환.
 5.  Frontend가 `token`을 사용해 미디어 스트림 연결.
 
 ### 4.2 협업 에디터 (Collaborative Editor)
@@ -172,14 +172,14 @@ peekle-monorepo/
 │       ├── src/main/java/com/peekle/
 │       │   ├── api/            # Controllers (Presentation)
 │       │   ├── domain/         # Business Logic & Entities
-│       │   ├── infra/          # External Integrations (Redis, OpenVidu)
+│       │   ├── infra/          # External Integrations (Redis, LiveKit)
 │       │   └── global/         # Config, Exceptions, Utils
 │       └── build.gradle
 │
 ├── docker/                     # Docker Compose Configs
 │   ├── mysql/
 │   ├── redis/
-│   └── openvidu/
+│   └── livekit/
 └── README.md
 ```
 

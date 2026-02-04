@@ -173,8 +173,9 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
           <button
             onClick={handlePrev}
             disabled={!canGoPrev}
-            className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
-              }`}
+            className={`p-1 rounded-full transition-colors ${
+              canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
+            }`}
           >
             <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -196,8 +197,9 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
           <button
             onClick={handleNext}
             disabled={!canGoNext}
-            className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
-              }`}
+            className={`p-1 rounded-full transition-colors ${
+              canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
+            }`}
           >
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>

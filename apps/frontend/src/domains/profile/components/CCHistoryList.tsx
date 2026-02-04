@@ -30,9 +30,9 @@ export function CCHistoryList({ initialHistory }: Props) {
   // Extract dates from history for calendar dots
   const historyDates = useMemo(() => {
     return initialHistory
-      .map(h => {
-        // submittedAt might be string ISO or formatted string. 
-        // Based on history.ts, `timestamp` is formatted string, but we don't have raw date object readily available in `initialHistory` item type 
+      .map((h) => {
+        // submittedAt might be string ISO or formatted string.
+        // Based on history.ts, `timestamp` is formatted string, but we don't have raw date object readily available in `initialHistory` item type
         // unless we modify the type or use current timestamp string to parse.
         // However, `initialHistory` in component props has `timestamp` as string.
         // Wait, `history.ts` maps `formattedDate` to `timestamp`.
@@ -45,7 +45,9 @@ export function CCHistoryList({ initialHistory }: Props) {
             return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
           }
           return new Date(); // fallback
-        } catch (e) { return null; }
+        } catch (e) {
+          return null;
+        }
       })
       .filter((d): d is Date => d !== null);
   }, [initialHistory]);
@@ -59,7 +61,6 @@ export function CCHistoryList({ initialHistory }: Props) {
       return startOfToday();
     }
   }, [filterDate]);
-
 
   // Fixed width for the side panel matching Workbook page style approximately
   const PANEL_WIDTH = 480;
@@ -80,7 +81,6 @@ export function CCHistoryList({ initialHistory }: Props) {
     setFilterDate(searchParams.get('date') || '');
     setFilterTier(searchParams.get('tier') || '전체');
     setFilterSource(searchParams.get('sourceType') || 'ALL');
-
   }, [searchParams, initialHistory]);
 
   const updateFilters = (key: string, value: string) => {
@@ -91,7 +91,7 @@ export function CCHistoryList({ initialHistory }: Props) {
       params.delete(key);
     }
     // 페이지네이션이 있다면 page=0으로 초기화해야 함
-    // params.set('page', '0'); 
+    // params.set('page', '0');
     router.replace(`${pathname}?${params.toString()}`);
   };
 
@@ -280,12 +280,13 @@ export function CCHistoryList({ initialHistory }: Props) {
                       </span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold text-white
-                                      ${item.tier.includes('Bronze')
-                            ? 'bg-amber-700'
-                            : item.tier.includes('Silver')
-                              ? 'bg-slate-400'
-                              : 'bg-yellow-500' // Gold etc
-                          }`}
+                                      ${
+                                        item.tier.includes('Bronze')
+                                          ? 'bg-amber-700'
+                                          : item.tier.includes('Silver')
+                                            ? 'bg-slate-400'
+                                            : 'bg-yellow-500' // Gold etc
+                                      }`}
                       >
                         {item.tier}
                       </span>
@@ -297,8 +298,10 @@ export function CCHistoryList({ initialHistory }: Props) {
                       <span>•</span>
                       <span>{item.time}</span>
 
-                      <span className={`ml-1 font-bold ${item.isSuccess ? 'text-green-600' : 'text-red-500'}`}>
-                        {item.isSuccess ? '성공' : (item.result?.replace(/\n/g, ' ') || '실패')}
+                      <span
+                        className={`ml-1 font-bold ${item.isSuccess ? 'text-green-600' : 'text-red-500'}`}
+                      >
+                        {item.isSuccess ? '성공' : item.result?.replace(/\n/g, ' ') || '실패'}
                       </span>
 
                       {item.sourceType !== 'SOLO' && (
@@ -322,9 +325,7 @@ export function CCHistoryList({ initialHistory }: Props) {
 
         {/* 3. Side Panel (Fixed position) */}
         {selectedSubmission && (
-          <div
-            className="fixed top-0 right-0 bottom-0 w-[480px] bg-card border-l border-border shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300 ease-in-out"
-          >
+          <div className="fixed top-0 right-0 bottom-0 w-[480px] bg-card border-l border-border shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300 ease-in-out">
             {/* Panel Header */}
             <div className="p-5 border-b border-border flex items-start justify-between bg-muted/10 shrink-0">
               <div>
@@ -335,7 +336,9 @@ export function CCHistoryList({ initialHistory }: Props) {
                   <span
                     className={`${selectedSubmission.isSuccess ? 'text-green-500' : 'text-red-500'} font-bold px-2 py-0.5 bg-muted rounded-md border border-border`}
                   >
-                    {selectedSubmission.isSuccess ? '성공' : (selectedSubmission.result?.replace(/\n/g, ' ') || '실패')}
+                    {selectedSubmission.isSuccess
+                      ? '성공'
+                      : selectedSubmission.result?.replace(/\n/g, ' ') || '실패'}
                   </span>
                   <span className="text-muted-foreground">|</span>
                   <span className="text-muted-foreground">{selectedSubmission.timestamp}</span>

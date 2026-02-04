@@ -11,6 +11,7 @@ interface ChatInputProps {
     isRealtime?: boolean;
     problemTitle?: string;
     problemId?: number;
+    externalId?: string;
   } | null;
   onCancelShare?: () => void;
 }
@@ -39,8 +40,10 @@ export function ChatInput({ onSend, pendingCodeShare, onCancelShare }: ChatInput
         <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-md border text-xs animate-in slide-in-from-bottom-2">
           <FileCode size={14} className="text-primary" />
           <span className="font-mono truncate flex-1">
-            {pendingCodeShare.problemId && (
-              <span className="mr-1">[#{pendingCodeShare.problemId}]</span>
+            {(pendingCodeShare.externalId || pendingCodeShare.problemId) && (
+              <span className="mr-1">
+                [#{pendingCodeShare.externalId || pendingCodeShare.problemId}]
+              </span>
             )}
             {pendingCodeShare.problemTitle ? `${pendingCodeShare.problemTitle} ` : 'Code '}(
             {pendingCodeShare.language})

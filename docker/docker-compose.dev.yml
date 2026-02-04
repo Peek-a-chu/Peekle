@@ -23,16 +23,17 @@ services:
   # Frontend - Next.js (Dev mode)
   frontend:
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://localhost/api
+        - NEXT_PUBLIC_API_URL=https://localhost
         - NEXT_PUBLIC_SOCKET_URL=https://localhost
     container_name: peekle-frontend-dev
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=https://localhost/api
+      - NEXT_PUBLIC_API_URL=https://localhost
       - NEXT_PUBLIC_SOCKET_URL=https://localhost
+      - NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880
     expose:
       - "3000"
     networks:
@@ -45,7 +46,12 @@ services:
       dockerfile: Dockerfile
     container_name: peekle-backend-dev
     user: root
-    entrypoint: [ "sh", "-c", "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher" ]
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher",
+      ]
     env_file:
       - ../apps/backend/.env
     environment:
@@ -54,8 +60,10 @@ services:
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
       - AI_SERVER_URL=http://ai-server:8000
-      - OPENVIDU_URL=https://openvidu:8443
-      - OPENVIDU_SECRET=MY_SECRET
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      - FRONTEND_URL=https://localhost
     volumes:
       - h2-data:/app/data
     expose:
@@ -65,8 +73,8 @@ services:
         condition: service_started
       ai-server:
         condition: service_started
-      openvidu:
-        condition: service_healthy
+      livekit:
+        condition: service_started
     networks:
       - peekle-network-dev
 
@@ -80,53 +88,17 @@ services:
     networks:
       - peekle-network-dev
 
-  # Coturn Server (TURN/STUN for WebRTC)
-  coturn:
-    image: coturn/coturn:latest
-    container_name: peekle-coturn-dev
-    restart: unless-stopped
+  # LiveKit Server (WebRTC) - Dev Mode
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: peekle-livekit-dev
+    command: --dev --bind 0.0.0.0
     ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "5349:5349/tcp"
-      - "5349:5349/udp"
-      - "50000-50050:50000-50050/tcp"
-      - "50000-50050:50000-50050/udp"
-    volumes:
-      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - coturn-logs:/var/log
-    command: [ "-c", "/etc/coturn/turnserver.conf" ]
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
     environment:
-      - DETECT_EXTERNAL_IP=yes
-      - DETECT_RELAY_IP=yes
-    networks:
-      - peekle-network-dev
-
-  # OpenVidu Server (WebRTC) - Local Dev Mode
-  openvidu:
-    image: openvidu/openvidu-dev:2.32.1
-    container_name: peekle-openvidu-dev
-    restart: unless-stopped
-    ports:
-      - "8443:8443"
-      - "4443:4443"
-      - "40000-40050:40000-40050/udp"
-      - "40000-40050:40000-40050/tcp"
-    environment:
-      - OPENVIDU_SECRET=MY_SECRET
-      - DOMAIN_OR_PUBLIC_IP=localhost
-      - OPENVIDU_PUBLICURL=https://localhost/openvidu
-      - KMS_MIN_PORT=40000
-      - KMS_MAX_PORT=40050
-    volumes:
-      - openvidu-recordings:/opt/openvidu/recordings
-      - openvidu-log:/var/log/openvidu
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "https://localhost:8443/api/config", "-k", "-u", "OPENVIDUAPP:MY_SECRET" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - "LIVEKIT_KEYS=devkey: secret"
     networks:
       - peekle-network-dev
 
@@ -174,9 +146,4 @@ volumes:
     driver: local
   chroma-data:
     driver: local
-  openvidu-recordings:
-    driver: local
-  openvidu-log:
-    driver: local
-  coturn-logs:
-    driver: local
+

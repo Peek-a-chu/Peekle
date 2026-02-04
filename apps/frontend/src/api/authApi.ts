@@ -40,6 +40,12 @@ export async function refresh(): Promise<ApiResponse<null>> {
   return res.json() as Promise<ApiResponse<null>>;
 }
 
-export function getOAuthLoginUrl(provider: 'kakao' | 'naver' | 'google'): string {
+export function getOAuthLoginUrl(
+  provider: 'kakao' | 'naver' | 'google',
+  redirectUri?: string,
+): string {
+  if (redirectUri) {
+    return `/oauth2/authorization/${provider}?redirect_uri=${redirectUri}`;
+  }
   return `/oauth2/authorization/${provider}`;
 }

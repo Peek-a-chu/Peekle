@@ -20,6 +20,7 @@ export interface ChatMessage {
     problemTitle?: string;
     ownerName?: string;
     problemId?: number;
+    externalId?: string; // Add externalId
     isRealtime?: boolean;
     targetUserId?: number;
     isRefChat?: boolean;
