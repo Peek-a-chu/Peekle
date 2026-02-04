@@ -1,9 +1,11 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import GoogleAnalyticsTracker from '@/components/common/GoogleAnalyticsTracker';
 
 export const metadata: Metadata = {
   title: 'Peekle',
@@ -73,10 +75,28 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background">
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+
+                gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+              `}
+            </Script>
+          </>
+        )}
         <QueryProvider>
           <ThemeProvider>
             {children}
             <SettingsModal isGlobal={true} />
+            <GoogleAnalyticsTracker />
           </ThemeProvider>
           <Toaster />
         </QueryProvider>
