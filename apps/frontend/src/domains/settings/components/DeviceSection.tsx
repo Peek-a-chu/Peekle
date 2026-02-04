@@ -192,6 +192,12 @@ const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectio
     let stopped = false;
 
     const startMetering = async () => {
+      // Test mode guard
+      if (!isMicTestRunning) {
+        setMicLevel(0);
+        return;
+      }
+
       try {
         let stream: MediaStream | null = null;
         let isLocalStream = false;
@@ -297,7 +303,7 @@ const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectio
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isMuted, selectedMicId, localParticipant]);
+  }, [isMuted, selectedMicId, localParticipant, isMicTestRunning]);
 
   // Volume Effect
   useEffect(() => {

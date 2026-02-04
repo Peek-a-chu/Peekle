@@ -9,9 +9,16 @@ import { Loader2 } from 'lucide-react';
 interface CCLiveKitWrapperProps {
   studyId: number;
   children: React.ReactNode;
+  initialMicEnabled?: boolean;
+  initialCamEnabled?: boolean;
 }
 
-export function CCLiveKitWrapper({ studyId, children }: CCLiveKitWrapperProps) {
+export function CCLiveKitWrapper({
+  studyId,
+  children,
+  initialMicEnabled = false,
+  initialCamEnabled = true,
+}: CCLiveKitWrapperProps) {
   // const [token, setToken] = useState<string>(''); // Managed in store now
   const user = useAuthStore((state) => state.user);
   const token = useRoomStore((state) => state.videoToken);
@@ -31,8 +38,8 @@ export function CCLiveKitWrapper({ studyId, children }: CCLiveKitWrapperProps) {
 
   return (
     <LiveKitRoom
-      video={true}
-      audio={true}
+      video={initialCamEnabled}
+      audio={initialMicEnabled}
       token={token}
       serverUrl={serverUrl}
       data-lk-theme="default"

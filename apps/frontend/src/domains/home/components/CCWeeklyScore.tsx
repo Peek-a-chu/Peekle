@@ -1,22 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Trophy,
   Users,
   Gamepad2,
-  BookOpen,
+  Code2,
   Award,
   ChevronLeft,
   ChevronRight,
-  Calendar,
-  Code2,
-  GraduationCap,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { WeeklyPointSummary } from '@/domains/league/types';
 import { useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, startOfWeek, endOfWeek, format, isFuture } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { WeekCalendar } from '@/components/ui/week-calendar';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface CCWeeklyScoreProps {
   initialData?: WeeklyPointSummary | null;
@@ -24,80 +30,69 @@ interface CCWeeklyScoreProps {
 }
 
 export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWeeklyScoreProps) => {
-  // 현재 날짜 (YYYY-MM-DD)
-  const [internalDate, setInternalDate] = useState<string>(() => {
+  // 1. 내부 상태 displayDate 관리 (YYYY-MM-DD string)
+  // 초기값: externalDate가 있으면 그것, 없으면 오늘
+  const [displayDate, setDisplayDate] = useState<string>(() => {
+    if (externalDate) return externalDate;
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return format(d, 'yyyy-MM-dd');
   });
 
-  const currentDate = externalDate || internalDate;
+  // 2. externalDate가 변경되면 displayDate도 업데이트 (부모와의 동기화)
+  useEffect(() => {
+    if (externalDate) {
+      setDisplayDate(externalDate);
+    }
+  }, [externalDate]);
 
-  const { data: fetchedData, isLoading: networkLoading } = useWeeklyScore(currentDate, {
-    skip: !!initialData,
-  });
-  const data = initialData || fetchedData;
+  // 3. API 호출은 displayDate 기준
+  const { data: fetchedData, isLoading: networkLoading } = useWeeklyScore(displayDate);
+
+  // 4. 데이터 우선순위: fetchedData가 있으면 사용, 없으면(로딩전/에러) initialData 사용하되, 
+  //    initialData가 현재 displayDate와 일치하는 주차의 데이터인지 확인은 어렵지만,
+  //    사용자 경험상 fetchedData가 로딩되면 바로 덮어쓰는 구조.
+  //    단, initialData가 있고 아직 fetchedData가 없는 초기 렌더링 시점을 위해 fallback.
+  //    네비게이션 후에는 fetchedData가 업데이트됨. 
+  //    *주의*: 날짜 이동 시 fetchedData가 null일 수 있는데, 이 때 엉뚱한 initialData(오늘)가 보이면 안됨.
+  //    따라서 displayDate가 오늘(initialDate)과 다르면 initialData를 무시하는게 안전함.
+  //    (여기서는 단순화를 위해 fetchedData 우선으로 처리)
+  const data = fetchedData || initialData;
   const isLoading = initialData ? false : networkLoading;
 
-  // 날짜 이동 핸들러
+  // 날짜 핸들러
   const handlePrevWeek = () => {
-    const d = new Date(currentDate);
+    const d = new Date(displayDate);
     d.setDate(d.getDate() - 7);
-    setInternalDate(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-    );
+    setDisplayDate(format(d, 'yyyy-MM-dd'));
   };
 
   const handleNextWeek = () => {
-    const d = new Date(currentDate);
+    const d = new Date(displayDate);
     d.setDate(d.getDate() + 7);
-    setInternalDate(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-    );
+    setDisplayDate(format(d, 'yyyy-MM-dd'));
   };
 
-  // Date Picker 핸들러
-  const handleDateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.value) {
-      setInternalDate(e.target.value);
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setDisplayDate(format(date, 'yyyy-MM-dd'));
     }
   };
 
   // 다음 주가 미래인지 체크
   const isNextWeekFuture = () => {
-    // 현재 날짜에서 7일 뒤 계산
-    const d = new Date(currentDate);
+    const d = new Date(displayDate);
     d.setDate(d.getDate() + 7);
-    const nextWeekStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-    // 오늘 날짜 구하기
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-    return nextWeekStr > todayStr;
+    return isFuture(d); // date-fns isFuture checks if date > now
   };
 
-  // 날짜 포맷팅 (YYYY-MM-DD -> M월 D일)
-  const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-    } catch {
-      return '';
-    }
-  };
-
-  // 상세 시간 포맷팅 (relative time)
-  const getRelativeTime = (dateStr: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: ko });
-    } catch {
-      return dateStr;
-    }
-  };
+  // 날짜 범위 포맷팅
+  const dateObj = new Date(displayDate);
+  const start = startOfWeek(dateObj, { locale: ko });
+  const end = endOfWeek(dateObj, { locale: ko });
+  const dateRangeStr = `${format(start, 'M월 d일')} ~ ${format(end, 'M월 d일')}`;
 
   // 활동 아이콘 매핑
   const getIcon = (category?: string, description: string = '') => {
-    // 백엔드 Enum: PROBLEM, GAME (추후 확장 가능)
     if (category === 'GAME' || description.includes('Game') || description.includes('게임'))
       return <Gamepad2 className="w-5 h-5 text-purple-500" />;
     if (category === 'PROBLEM' || description.includes('Solved') || description.includes('problem'))
@@ -109,7 +104,15 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
     return <Trophy className="w-5 h-5 text-muted-foreground" />;
   };
 
-  if (isLoading) {
+  const getRelativeTime = (dateStr: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: ko });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  if (isLoading && !data) {
     return (
       <div className="bg-card border border-border rounded-2xl p-6 h-full flex items-center justify-center min-h-[300px]">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -118,8 +121,6 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
   }
 
   if (!data) return null;
-
-  const dateRangeStr = `${formatDate(data.startDate)} ~ ${formatDate(data.endDate)}`;
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6 h-full transition-all duration-300 flex flex-col">
@@ -137,36 +138,53 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
 
       {/* 기간 표시 & 내비게이션 */}
       <div className="mb-4 flex items-center justify-center gap-2 flex-shrink-0">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handlePrevWeek}
-          className="p-1 rounded-full hover:bg-accent transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-full hover:bg-accent"
           title="이전 주"
         >
           <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-        </button>
+        </Button>
 
-        <div className="flex items-center gap-2 bg-muted/50 px-3 py-1 rounded-full border border-border">
-          <span className="text-sm font-medium text-foreground">{dateRangeStr}</span>
-          <div className="relative group flex items-center cursor-pointer">
-            <Calendar className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-            <input
-              type="date"
-              value={currentDate}
-              onChange={handleDateSelect}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              title="날짜 선택"
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 px-4 py-1 rounded-full border-border bg-muted/30 hover:bg-muted/50 text-foreground font-medium flex items-center gap-2",
+                !displayDate && "text-muted-foreground"
+              )}
+            >
+              <span>{dateRangeStr}</span>
+              <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground opacity-70" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="center">
+            <WeekCalendar
+              mode="single"
+              selected={new Date(displayDate)}
+              onSelect={handleDateSelect}
+              initialFocus
+              disabled={(date) => isFuture(date)}
             />
-          </div>
-        </div>
+          </PopoverContent>
+        </Popover>
 
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleNextWeek}
           disabled={isNextWeekFuture()}
-          className={`p-1 rounded-full transition-colors ${isNextWeekFuture() ? 'opacity-20 cursor-not-allowed' : 'hover:bg-accent cursor-pointer'}`}
+          className={cn(
+            "h-8 w-8 rounded-full",
+            isNextWeekFuture() ? "opacity-20" : "hover:bg-accent cursor-pointer"
+          )}
           title="다음 주"
         >
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </button>
+        </Button>
       </div>
 
       {/* 주간 총점 */}

@@ -173,9 +173,8 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
           <button
             onClick={handlePrev}
             disabled={!canGoPrev}
-            className={`p-1 rounded-full transition-colors ${
-              canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
-            }`}
+            className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
           >
             <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -197,9 +196,8 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
           <button
             onClick={handleNext}
             disabled={!canGoNext}
-            className={`p-1 rounded-full transition-colors ${
-              canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
-            }`}
+            className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
           >
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -229,7 +227,7 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
         {/* 차트 */}
         <div className="flex-1 h-[200px] min-w-0">
           {mounted && (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <AreaChart data={visibleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorLeague" x1="0" y1="0" x2="0" y2="1">

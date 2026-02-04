@@ -36,21 +36,16 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
         </div>
       </div>
 
-      {/* 내 순위 요약 카드 (네온 글로우 버전) */}
-      <div className="relative mb-4 group">
-        {/* 1. 뒤에서 빛이 번지는 효과 (Glow Layer) */}
-        <div className="absolute -inset-[1px] bg-primary rounded-xl blur-[2px] opacity-70"></div>
-
-        {/* 2. 실제 카드 레이어 */}
-        <div className="relative flex items-center justify-between p-3 bg-card rounded-xl leading-none border border-black/5 dark:border-white/10 shadow-lg font-sans">
+      {/* 내 순위 요약 카드 - Borderless, uses surface elevation only */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between p-3 bg-surface-2 rounded-xl shadow-sm">
           {/* 우측 상단 리그 정보 (태그 형식) */}
           <div className="absolute top-2.5 right-2.5">
             <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-sm"
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold"
               style={{
                 color: 'hsl(var(--primary))',
-                backgroundColor: 'hsl(var(--primary) / 0.05)',
-                borderColor: 'hsl(var(--primary) / 0.2)',
+                backgroundColor: 'hsl(var(--primary) / 0.08)',
               }}
             >
               {LEAGUE_NAMES[data.myLeague]} 리그
@@ -59,11 +54,7 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
 
           {/* 왼쪽 내용: 아이콘 + 순위 */}
           <div className="flex items-center gap-3">
-            <div className="relative">
-              {/* 아이콘 뒤에도 미세한 광채 추가 */}
-              <div className="absolute inset-0 bg-primary/20 blur-md rounded-full"></div>
-              <LeagueIcon league={data.myLeague} size={40} className="relative z-10" />
-            </div>
+            <LeagueIcon league={data.myLeague} size={40} />
             <div className="flex flex-col">
               <span className="text-[10px] font-semibold text-primary block mb-0">
                 나의 현재 순위
@@ -81,11 +72,11 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
         </div>
       </div>
 
-      {/* 순위 목록 (스크롤) */}
+      {/* 순위 목록 - Borderless containers, rely on bg-surface-2 */}
       <div className="flex-1 pr-1 -mr-1 custom-scrollbar overflow-y-auto space-y-2">
-        {/* 1. 승급 구간 (컨테이너 배경) */}
+        {/* 1. 승급 구간 */}
         {promotionZone.length > 0 && (
-          <div className="rounded-xl border border-green-500/10 bg-green-500/5 overflow-hidden">
+          <div className="rounded-xl bg-surface-2 overflow-hidden">
             {promotionZone.map((member) => (
               <RankingItem key={member.rank} member={member} />
             ))}
@@ -101,9 +92,9 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
           </div>
         )}
 
-        {/* 2. 유지 구간 (배경 없음/기본) */}
+        {/* 2. 유지 구간 */}
         {maintenanceZone.length > 0 && (
-          <div className="rounded-xl border border-transparent">
+          <div className="rounded-xl bg-surface-2">
             {maintenanceZone.map((member) => (
               <RankingItem key={member.rank} member={member} />
             ))}
@@ -119,9 +110,9 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
           </div>
         )}
 
-        {/* 3. 강등 구간 (컨테이너 배경) */}
+        {/* 3. 강등 구간 */}
         {demotionZone.length > 0 && (
-          <div className="rounded-xl border border-red-500/10 bg-red-500/5 overflow-hidden">
+          <div className="rounded-xl bg-surface-2 overflow-hidden">
             {demotionZone.map((member) => (
               <RankingItem key={member.rank} member={member} />
             ))}
@@ -136,15 +127,16 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
 const RankingItem = ({ member }: { member: any }) => {
   const isMe = member.me;
 
-  // 내 행 하이라이트 스타일 (League Page와 동일)
+  // 내 행 - Left accent bar + very subtle background
   const rowClass = isMe
-    ? 'bg-primary/5 border-l-2 border-l-primary border-y-transparent border-r-transparent pl-[calc(0.5rem-2px)] pr-2'
-    : 'hover:bg-muted/30 border-transparent px-2';
+    ? 'bg-surface-3/40 border-l-[3px] border-l-primary border-y-transparent border-r-transparent pl-[calc(0.5rem-3px)] pr-2'
+    : 'hover:bg-surface-3/50 border-transparent px-2 transition-colors';
 
   return (
     <div
       className={`
-                relative flex items-center py-1.5 transition-all border-b last:border-b-0
+                relative flex items-center py-1.5 transition-all 
+                border-t border-t-white/[0.02] first:border-t-0
                 ${rowClass}
             `}
     >

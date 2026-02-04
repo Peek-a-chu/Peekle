@@ -7,8 +7,15 @@ import { useStudyListPageLogic } from '@/domains/study/hooks/useStudyListPageLog
 import { CCStudyCard } from '@/domains/study/components/CCStudyCard';
 import { CCJoinStudyModal } from '@/domains/study/components/CCJoinStudyModal';
 import { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
+import type { StudyListContent } from '@/domains/study/types';
+import { CCPreJoinModal } from './CCPreJoinModal';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export function CCStudyListPage() {
+  const router = useRouter(); // Use local router for final navigation
+  const [selectedStudyForJoin, setSelectedStudyForJoin] = useState<StudyListContent | null>(null);
+
   const {
     studies,
     isLoading,
@@ -19,10 +26,24 @@ export function CCStudyListPage() {
     setJoinModalOpen,
     createModalOpen,
     setCreateModalOpen,
-    handleStudyClick,
+    // handleStudyClick, // We handle click locally now
     handleCreateSuccess,
     handleJoinSuccess,
   } = useStudyListPageLogic();
+
+  const handleCardClick = (studyId: number) => {
+    const study = studies.find((s) => s.id === studyId);
+    if (study) {
+      setSelectedStudyForJoin(study);
+    }
+  };
+
+  const handlePreJoin = (mic: boolean, cam: boolean) => {
+    if (!selectedStudyForJoin) return;
+    router.push(
+      `/study/${selectedStudyForJoin.id}?prejoined=true&mic=${mic}&cam=${cam}`
+    );
+  };
 
   return (
     <div className="min-h-screen">
@@ -90,7 +111,7 @@ export function CCStudyListPage() {
                 key={study.id}
                 study={study}
                 rank={index + 1}
-                onClick={() => handleStudyClick(study.id)}
+                onClick={() => handleCardClick(study.id)}
               />
             ))}
           </div>
@@ -108,6 +129,16 @@ export function CCStudyListPage() {
         onOpenChange={setCreateModalOpen}
         onSuccess={handleCreateSuccess}
       />
+
+      {/* Pre-Join Modal Overlay */}
+      {selectedStudyForJoin && (
+        <CCPreJoinModal
+          roomTitle={selectedStudyForJoin.title}
+          description={selectedStudyForJoin.description}
+          onJoin={handlePreJoin}
+          onCancel={() => setSelectedStudyForJoin(null)}
+        />
+      )}
     </div>
   );
 }
