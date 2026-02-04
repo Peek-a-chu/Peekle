@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.http.MediaType;
+import com.peekle.global.util.SolvedAcLevelUtil;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -199,12 +200,64 @@ public class RecommendationService {
                 })
                 .toList();
 
+        // 최근 성공한 문제들의 평균 티어 계산
+        List<Integer> solvedLevels = recentLogs.stream()
+                .filter(log -> Boolean.TRUE.equals(log.getIsSuccess()))
+                .map(log -> calculateTierLevel(log.getProblemTier()))
+                .filter(level -> level > 0)
+                .toList();
+
+        String currentTier;
+        if (solvedLevels.isEmpty()) {
+            // 풀이 기록이 없는 경우 브론즈 5 ~ 골드 1 사이에서 랜덤 배정 (1~15 레벨)
+            int randomLevel = (int) (Math.random() * 15) + 1;
+            currentTier = SolvedAcLevelUtil.convertLevelToTier(randomLevel);
+        } else {
+            double averageLevel = solvedLevels.stream()
+                    .mapToInt(Integer::intValue)
+                    .average()
+                    .orElse(0.0);
+            currentTier = SolvedAcLevelUtil.convertLevelToTier((int) Math.round(averageLevel));
+        }
+
         return new UserActivityRequest(
                 solvedTitles,
                 failedTitles,
                 tagStatDtos,
-                user.getLeague().name()
+                currentTier
         );
+    }
+
+    private int calculateTierLevel(String tier) {
+        if (tier == null || tier.equals("Unrated") || tier.equals("Unknown")) return 0;
+        
+        try {
+            String[] parts = tier.split(" ");
+            if (parts.length < 2) return 0;
+            
+            String rank = parts[0];
+            int step;
+            try {
+                step = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
+                step = parseRoman(parts[1]);
+            }
+            
+            int base = 0;
+            switch(rank) {
+                case "Bronze": base = 0; break;
+                case "Silver": base = 5; break;
+                case "Gold": base = 10; break;
+                case "Platinum": base = 15; break;
+                case "Diamond": base = 20; break;
+                case "Ruby": base = 25; break;
+                default: return 0;
+            }
+            
+            return base + (6 - step);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
 }

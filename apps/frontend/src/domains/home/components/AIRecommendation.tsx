@@ -53,15 +53,18 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 {/* 백준 티어 태그 */}
                 <span
-                  className="px-2 py-0.5 rounded text-xs font-medium text-white"
-                  style={{ backgroundColor: BOJ_TIER_COLORS[item.tier] || '#828282' }}
+                  className="px-2 py-0.5 rounded-full text-xs font-bold border text-muted-foreground shrink-0"
+                  style={{
+                    borderColor: BOJ_TIER_COLORS[item.tier] || '#828282',
+                    color: BOJ_TIER_COLORS[item.tier] || '#828282',
+                  }}
                 >
                   {BOJ_TIER_NAMES[item.tier] || 'Unknown'} {item.tierLevel}
                 </span>
                 {item.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-2 py-0.5 bg-muted rounded-full text-xs text-muted-foreground"
+                    className="px-2 py-0.5 bg-muted-foreground/20 rounded-full text-xs text-foreground/80 font-medium"
                   >
                     {tag}
                   </span>
@@ -69,7 +72,7 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
               </div>
 
               {/* 추천 이유 */}
-              <p className="text-sm text-muted-foreground mb-3">💡 {item.reason}</p>
+              <p className="text-[14px] text-muted-foreground mb-3">💡 {item.reason}</p>
 
               {/* 버튼들 */}
               <div className="flex items-center gap-2">
@@ -77,12 +80,12 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
                   href={`https://www.acmicpc.net/problem/${item.problemId.replace('#', '')}`}
                   target="_blank"
                 >
-                  <Button size="sm" className="gap-1">
+                  <Button className="h-8 px-2.5 text-xs gap-1 bg-primary hover:bg-primary">
                     <ExternalLink className="w-3 h-3" />
                     풀러가기
                   </Button>
                 </Link>
-                <Button size="sm" variant="outline" className="gap-1 border-border">
+                <Button variant="outline" className="h-8 px-2.5 text-xs gap-1 border-border">
                   <Plus className="w-3 h-3" />
                   문제집에 추가
                 </Button>

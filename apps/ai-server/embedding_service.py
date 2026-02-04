@@ -26,6 +26,22 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=openai_ef
 )
 
+def clear_collection():
+    """기존 컬렉션을 완전히 삭제하고 초기화"""
+    global collection
+    try:
+        chroma_client.delete_collection(name="problems")
+        print("기존 ChromaDB 컬렉션을 삭제했습니다.")
+    except Exception as e:
+        print(f"컬렉션 삭제 중 오류(이미 없을 수 있음): {e}")
+    
+    # 다시 생성
+    collection = chroma_client.create_collection(
+        name="problems",
+        embedding_function=openai_ef
+    )
+    print("새로운 컬렉션('problems')을 생성했습니다.")
+
 def index_problems(problems):
     """문제를 ChromaDB에 저장"""
     ids = [str(p['id']) for p in problems]

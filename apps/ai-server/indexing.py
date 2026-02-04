@@ -1,7 +1,10 @@
 import pandas as pd
-from embedding_service import index_problems
+from embedding_service import index_problems, clear_collection
 
 def run():
+    print("기존 데이터를 초기화하고 인덱싱을 시작합니다...")
+    clear_collection()
+    
     print("태그 정보가 포함된 CSV 파일에서 데이터를 가져오는 중...")
     try:
         # 1. CSV 읽기
