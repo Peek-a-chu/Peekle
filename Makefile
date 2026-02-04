@@ -38,6 +38,18 @@ redis-down:
 # ===========================================
 
 prod-up:
+	@echo "Starting production services (includes LiveKit)..."
+	@if [ -d "/etc/letsencrypt/live" ]; then \
+		echo "🔄 Finding existing SSL certificates on host..."; \
+		docker compose -f $(PROD_COMPOSE_FILE) run --rm --no-deps \
+			--entrypoint "/bin/sh -c" \
+			-v /etc/letsencrypt:/tmp/host_certs:ro \
+			certbot \
+			"cp -ans /tmp/host_certs/* /etc/letsencrypt/ 2>/dev/null || cp -rn /tmp/host_certs/* /etc/letsencrypt/ && echo '✅ Certificates synced to volume'"; \
+	else \
+		echo "No host certificates found at /etc/letsencrypt/live. Skipping sync."; \
+	fi
+	@docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
 	DOCKER_BUILDKIT=1 docker compose -f $(PROD_COMPOSE_FILE) up --build -d
 
 prod-down:
@@ -69,7 +81,7 @@ coturn-down:
 coturn-logs:
 	docker compose -f $(COTURN_COMPOSE_FILE) logs -f
 
-# Livekit commands
+# Livekit commands (Standalone for Development)
 livekit-up:
 	DOCKER_BUILDKIT=1 docker compose -f $(LIVEKIT_COMPOSE_FILE) up -d
 
@@ -77,10 +89,11 @@ livekit-down:
 	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
 
 livekit-logs:
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) logs -f
+	docker logs -f peekle-livekit-standalone
 
-# WebRTC Infrastructure (Coturn + LiveKit)
+# WebRTC Infrastructure (Development only - use prod-up for production)
 webrtc-up: coturn-up livekit-up
+	@echo "⚠️  Development WebRTC started. For production, use 'make prod-up'"
 
 webrtc-down: livekit-down coturn-down
 
@@ -95,9 +108,11 @@ clean:
 	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
 	docker compose -f $(PROD_COMPOSE_FILE) down
 	-docker rm -f peekle-chroma-dev peekle-ai-server-dev
+	@echo "🧹 All containers cleaned"
 
 clean-prod:
 	docker compose -f $(PROD_COMPOSE_FILE) down
+	@echo "🧹 Production containers stopped"
 
 clean-all:
 	docker compose -f $(DEV_COMPOSE_FILE) down
@@ -127,10 +142,10 @@ re-prod:
 # ===========================================
 
 help:
-	@echo "Peekle Docker Commands"
+	@echo "🎯 Peekle Docker Commands"
 	@echo ""
 	@echo "Development (Localhost):"
-	@echo "  make all / dev-up   - Start development containers (Nginx, FE, BE, Redis, LiveKit)"
+	@echo "  make all / dev-up   - Start development containers (Nginx, FE, BE, Redis)"
 	@echo "  make dev-down       - Stop development containers"
 	@echo "  make dev-logs       - View development logs"
 	@echo "  make dev-ps         - Show development container status"
@@ -140,15 +155,18 @@ help:
 	@echo "  make redis-down     - Stop Redis standalone"
 	@echo ""
 	@echo "Production (i14a408.p.ssafy.io):"
-	@echo "  make prod-up        - Start production containers"
+	@echo "  make prod-up        - 🚀 Start ALL production services (includes LiveKit)"
 	@echo "  make prod-down      - Stop production containers"
 	@echo "  make prod-logs      - View production logs"
 	@echo "  make prod-restart   - Restart production containers"
 	@echo "  make prod-ps        - Show production container status"
+	@echo "  make livekit-logs   - View LiveKit logs (after prod-up)"
 	@echo ""
-	@echo "WebRTC Infrastructure (Coturn + LiveKit):"
-	@echo "  make webrtc-up      - Start Coturn and LiveKit"
+	@echo "WebRTC Development (Standalone):"
+	@echo "  make webrtc-up      - Start Coturn + LiveKit (dev mode)"
 	@echo "  make webrtc-down    - Stop Coturn and LiveKit"
+	@echo "  make livekit-up     - Start LiveKit standalone (dev)"
+	@echo "  make livekit-down   - Stop LiveKit standalone"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean          - Stop all dev containers"
@@ -157,6 +175,10 @@ help:
 	@echo "  make fclean         - Remove all containers, images, volumes"
 	@echo "  make re             - Rebuild dev environment"
 	@echo "  make re-prod        - Rebuild prod environment"
+	@echo ""
+	@echo "💡 Quick Start:"
+	@echo "  Development:  make dev-up"
+	@echo "  Production:   make prod-up  (includes LiveKit with host network)"
 
 .PHONY: all dev-up dev-down dev-logs dev-ps \
         redis-up redis-down \

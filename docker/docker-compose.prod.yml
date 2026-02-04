@@ -83,7 +83,6 @@ services:
     container_name: peekle-backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "livekit:host-gateway"
     env_file:
       - ../apps/backend/.env
     environment:
@@ -91,7 +90,7 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
-      - LIVEKIT_URL=http://livekit:7880
+      - LIVEKIT_URL=http://localhost:7880
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - AI_SERVER_URL=http://ai-server:8000
@@ -163,19 +162,26 @@ services:
       - peekle-network
     logging: *default-logging
 
-  # LiveKit Server (SFU)
+  # ============================================
+  # LiveKit Server (SFU - WebRTC Media Server)
+  # ============================================
+  # IMPORTANT: Uses host network mode for optimal performance
+  # - Eliminates Docker NAT layer for WebRTC
+  # - Auto-discovers public IP via STUN
+  # - Connects to Redis on localhost:6379
+  # ============================================
   livekit:
     image: livekit/livekit-server:latest
-    container_name: peekle-livekit-standalone
+    container_name: peekle-livekit
     command: --config /livekit.yaml
     restart: unless-stopped
-    network_mode: "host"
+    network_mode: "host"  # Required for WebRTC performance
     volumes:
       - ./livekit/livekit.yaml:/livekit.yaml
       - nginx-certs:/etc/letsencrypt:ro
     environment:
       - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
-    user: root
+    user: root  # Required to read SSL certificates
     logging: *default-logging
 
 
