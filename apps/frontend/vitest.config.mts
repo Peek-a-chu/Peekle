@@ -21,7 +21,7 @@ const svgPlugin = () => {
 export default defineConfig({
   plugins: [react() as any, svgPlugin() as any],
   test: {
-    environment: 'jsdom',
+    environment: 'happy-dom',
     globals: true,
     setupFiles: './src/tests/setup.ts',
     exclude: [

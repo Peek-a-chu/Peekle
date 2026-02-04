@@ -60,8 +60,13 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   );
 };
 
-const LeagueProgressChart = () => {
-  const { data: allData } = useLeagueProgress();
+interface LeagueProgressChartProps {
+  initialData?: LeagueProgressData[];
+}
+
+const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
+  const { data: fetchedData } = useLeagueProgress({ skip: !!initialData });
+  const allData = initialData || fetchedData;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

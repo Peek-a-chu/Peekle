@@ -18,7 +18,7 @@ function normalizeChatType(
     return 'TALK';
   }
 
-  return rawType as ChatType;
+  return rawType;
 }
 
 export function useStudyChat(roomId: number) {
@@ -128,6 +128,7 @@ export function useStudyChat(roomId: number) {
       problemTitle?: string,
       isRealtime?: boolean,
       problemId?: number,
+      externalId?: string,
     ): void => {
       if (!socket || !currentUserId) return;
 
@@ -143,6 +144,7 @@ export function useStudyChat(roomId: number) {
           isRealtime: !!isRealtime,
           targetUserId: isRealtime ? currentUserId : undefined,
           problemId: problemId,
+          externalId: externalId,
           code, // Always include code so we can show snapshot or fallback view
           language,
           problemTitle,

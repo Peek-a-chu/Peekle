@@ -35,7 +35,7 @@ export function useWhiteboardSocket(
     enabled = opts?.enabled ?? true;
     userId = user?.id ? String(user.id) : undefined;
   } else {
-    userId = userIdOrCallback ? String(userIdOrCallback) : (user?.id ? String(user.id) : undefined);
+    userId = userIdOrCallback ? String(userIdOrCallback) : user?.id ? String(user.id) : undefined;
     onMessageReceived = callbackOrOptions as (msg: WhiteboardMessage) => void;
     enabled = options?.enabled ?? true;
   }
@@ -46,10 +46,18 @@ export function useWhiteboardSocket(
   const messageQueueRef = useRef<any[]>([]);
   const lastRevisionRef = useRef<number | null>(null);
 
+  // [Fix] Ref for callback to avoid re-subscription loops caused by unstable callback references
+  const onMessageReceivedRef = useRef(onMessageReceived);
+  useEffect(() => {
+    onMessageReceivedRef.current = onMessageReceived;
+  }, [onMessageReceived]);
+
   // [New] Flush queue when connected
   useEffect(() => {
     if (client && connected && roomId && messageQueueRef.current.length > 0) {
-      console.log(`[useWhiteboardSocket] Flushing ${messageQueueRef.current.length} queued messages`);
+      console.log(
+        `[useWhiteboardSocket] Flushing ${messageQueueRef.current.length} queued messages`,
+      );
       const queue = [...messageQueueRef.current];
       messageQueueRef.current = [];
 
@@ -93,7 +101,9 @@ export function useWhiteboardSocket(
     const chatTopic = `/topic/studies/rooms/${roomId}/chat`;
     const chatUserTopic = userId ? `/topic/studies/rooms/${roomId}/chat/${userId}` : null;
 
-    console.log(`[useWhiteboardSocket] Subscribing to ${topic}, ${chatTopic} (and ${userTopic}, ${chatUserTopic})`);
+    console.log(
+      `[useWhiteboardSocket] Subscribing to ${topic}, ${chatTopic} (and ${userTopic}, ${chatUserTopic})`,
+    );
 
     const handleMessage = (message: IMessage) => {
       try {
@@ -145,7 +155,9 @@ export function useWhiteboardSocket(
             }
           } else {
             // No revision info -> safest is to request SYNC once
-            console.warn('[useWhiteboardSocket] SYNC_NEEDED received without revision, requesting SYNC');
+            console.warn(
+              '[useWhiteboardSocket] SYNC_NEEDED received without revision, requesting SYNC',
+            );
             client.publish({
               destination: '/pub/studies/whiteboard/message',
               headers: { studyId: studyId || roomId },
@@ -166,8 +178,8 @@ export function useWhiteboardSocket(
           });
         }
 
-        if (onMessageReceived) {
-          onMessageReceived(body);
+        if (onMessageReceivedRef.current) {
+          onMessageReceivedRef.current(body);
         }
       } catch (err) {
         console.error('Failed to parse whiteboard message', err);
@@ -192,7 +204,7 @@ export function useWhiteboardSocket(
         if (userSub) userSub.unsubscribe();
         subChat.unsubscribe();
         if (userChatSub) userChatSub.unsubscribe();
-      }
+      },
     };
 
     // Always request SYNC after subscription is established
@@ -201,7 +213,7 @@ export function useWhiteboardSocket(
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
-    
+
     syncTimeoutRef.current = setTimeout(() => {
       // Only request SYNC once the private user topic subscription exists.
       // SYNC responses are sent to /topic/.../whiteboard/{userId}.
@@ -227,7 +239,16 @@ export function useWhiteboardSocket(
         subscriptionRef.current = null;
       }
     };
-  }, [client, connected, roomId, setWhiteboardOverlayOpen, onMessageReceived, enabled, userId, studyId]);
+  }, [
+    client,
+    connected,
+    roomId,
+    setWhiteboardOverlayOpen,
+    // onMessageReceived, // Removed to prevent infinite loop
+    enabled,
+    userId,
+    studyId,
+  ]);
 
   const sendMessage = useCallback(
     (payload: any) => {

@@ -27,6 +27,8 @@ describe('StudyRankingList', () => {
     scope: 'ALL' as const,
     onScopeChange: vi.fn(),
     onStudyClick: vi.fn(),
+    expandedIds: [] as number[],
+    onToggleExpand: vi.fn(),
   };
 
   it('renders ranking list items', () => {
@@ -54,21 +56,23 @@ describe('StudyRankingList', () => {
     expect(screen.getByText(/2/)).toBeInTheDocument();
   });
 
-  it('expands to show members when a list item is clicked', () => {
+  it('expands to show members when expandedIds includes the id', () => {
+    // Render with ID 4 pre-expanded
+    render(<StudyRankingList rankings={mockRankings} {...defaultProps} expandedIds={[4]} />);
+
+    // Initial state: members visible for ID 4
+    expect(screen.getByText('스터디 멤버')).toBeInTheDocument();
+  });
+
+  it('calls onToggleExpand when clicked', () => {
     render(<StudyRankingList rankings={mockRankings} {...defaultProps} />);
 
     const fourthStudyText = screen.getByText('Fourth Study');
-    // The interactive element has cursor-pointer class
     const clickableItem = fourthStudyText.closest('.cursor-pointer');
 
-    // Initial state: members hidden
-    expect(screen.queryByText('스터디 멤버')).not.toBeInTheDocument();
-
-    // Click to expand
     fireEvent.click(clickableItem || fourthStudyText);
 
-    // Expanded state: members visible
-    expect(screen.getByText('스터디 멤버')).toBeInTheDocument();
+    expect(defaultProps.onToggleExpand).toHaveBeenCalledWith(4);
   });
 
   it('displays empty state when rankings array is empty', () => {

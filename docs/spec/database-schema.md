@@ -271,6 +271,7 @@ erDiagram
 | `room_id` | BIGINT | | 스터디/게임 방 ID (Nullable) |
 | `problem_title` | VARCHAR(255) | | 문제 제목 (역정규화) |
 | `problem_tier` | VARCHAR(255) | | 문제 티어 (역정규화) |
+| `result` | VARCHAR(50) | | 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등) |
 | `code` | TEXT | | 제출한 코드 |
 | `memory` | INT | | 메모리 사용량 (KB) |
 | `execution_time` | INT | | 실행 시간 (ms) |

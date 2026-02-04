@@ -89,7 +89,7 @@ apps/backend/
 │   │   │   ├── api/          # Controllers
 │   │   │   ├── domain/        # Entities, Repositories, Services
 │   │   │   ├── global/        # Config, Exception, Utils
-│   │   │   └── infra/         # Redis, OpenVidu, External
+│   │   │   └── infra/         # Redis, LiveKit, External
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       └── application-dev.yml

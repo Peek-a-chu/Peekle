@@ -75,7 +75,7 @@ export async function getMyProfile(): Promise<UserProfile> {
   }
 }
 
-export async function getUserProfile(nickname: string): Promise<UserProfile> {
+export async function getUserProfile(nickname: string): Promise<UserProfile | null> {
   try {
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
     const cookieStore = await cookies();
@@ -94,6 +94,9 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
     });
 
     if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error('404');
+      }
       throw new Error(`Failed to fetch user profile: ${res.status}`);
     }
 
@@ -122,22 +125,16 @@ export async function getUserProfile(nickname: string): Promise<UserProfile> {
       streakCurrent: data.streakCurrent,
       streakMax: data.streakMax,
       profileImg: data.profileImg || undefined,
+      profileImgThumb: data.profileImgThumb || undefined,
       solvedCount: Number(data.solvedCount),
       isMe: data.me,
     };
-  } catch (e) {
+  } catch (e: any) {
+    if (e.message && e.message.includes('404')) {
+      return null; // Return null for 404
+    }
     console.error(`Failed to fetch profile for ${nickname}:`, e);
-    return {
-      id: '',
-      nickname: nickname,
-      bojId: '',
-      league: 'Stone',
-      leaguePoint: 0,
-      leagueGroupId: null,
-      streakCurrent: 0,
-      streakMax: 0,
-      profileImg: undefined,
-      solvedCount: 0,
-    };
+    return null; // Return null for other errors too to show error page? Or keep dummy?
+    // User wants error page. So let's return null.
   }
 }

@@ -1,79 +1,40 @@
-'use client';
+import {
+  getLeagueProgressServer,
+  getWeeklyPointSummaryServer,
+  getLeagueStatusServer,
+} from '@/api/leagueServerApi';
+import {
+  getActivityStreakServer,
+  getTimelineServer,
+  getAIRecommendationsServer,
+} from '@/api/userServerApi';
+import HomeClient from './HomeClient';
+import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
 
-import { useState } from 'react';
-import dynamic from 'next/dynamic';
-import { useAuthStore } from '@/store/auth-store';
+export default async function HomePage() {
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-const LeagueProgressChart = dynamic(() => import('@/domains/home/components/LeagueProgressChart'), {
-  ssr: false,
-  loading: () => <div className="h-[300px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
-});
-
-const ActivityStreak = dynamic(() => import('@/domains/home/components/ActivityStreak'), {
-  loading: () => <div className="h-[200px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
-});
-
-const LearningTimeline = dynamic(() => import('@/domains/home/components/LearningTimeline'), {
-  loading: () => <div className="h-[400px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
-});
-
-const AIRecommendation = dynamic(() => import('@/domains/home/components/AIRecommendation'), {
-  loading: () => <div className="h-[300px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
-});
-
-const LeagueRanking = dynamic(() => import('@/domains/home/components/LeagueRanking'), {
-  loading: () => <div className="h-[400px] w-full bg-muted/20 animate-pulse rounded-2xl" />,
-});
-
-import { CCWeeklyScore } from '@/domains/home/components/CCWeeklyScore';
-
-export default function HomePage() {
-  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  });
-  const user = useAuthStore((state) => state.user);
+  // Parallel Data Fetching
+  const [leagueProgress, streak, timeline, recommendations, weeklyScore, leagueRanking] =
+    await Promise.all([
+      getLeagueProgressServer(),
+      getActivityStreakServer(),
+      getTimelineServer(dateStr),
+      getAIRecommendationsServer(),
+      getWeeklyPointSummaryServer(dateStr),
+      getLeagueStatusServer(),
+    ]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 transition-colors duration-300">
-      {/* 벤또 그리드 레이아웃 */}
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-          {/* 왼쪽 메인 영역 */}
-          <div className="space-y-6 order-1 xl:order-1 min-w-0">
-            {/* 리그 변화 추이 */}
-            <LeagueProgressChart />
-            <div className="border border-card-border rounded-2xl bg-card overflow-hidden">
-              {/* 활동 스트릭 */}
-              <ActivityStreak onDateSelect={setSelectedDate} selectedDate={selectedDate} />
-
-              {/* 학습 타임라인 */}
-              <LearningTimeline
-                selectedDate={selectedDate}
-                showHistoryLink={true}
-                nickname={user?.nickname}
-              />
-            </div>
-            {/* AI 추천 & 주간 점수 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <AIRecommendation />
-              {/* 주간 점수 카드: AI 추천 카드 높이에 맞춤 (overflow 처리) */}
-              <div className="relative min-h-[600px]">
-                <div className="h-full md:absolute md:inset-0">
-                  <CCWeeklyScore />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 오른쪽 사이드바 - 리그 순위 */}
-          <div className="order-2 xl:order-2">
-            <div className="xl:sticky xl:top-6">
-              <LeagueRanking />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <HomeClient
+      initialLeagueProgress={leagueProgress}
+      initialStreak={streak}
+      initialTimeline={timeline}
+      initialRecommendations={recommendations}
+      initialWeeklyScore={weeklyScore}
+      initialLeagueRanking={leagueRanking || DEFAULT_LEAGUE_RANKING}
+      initialDate={dateStr}
+    />
   );
 }

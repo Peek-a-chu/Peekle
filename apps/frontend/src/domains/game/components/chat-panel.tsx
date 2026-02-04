@@ -1,13 +1,46 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Mic, MicOff, Video, VideoOff, MoreVertical } from 'lucide-react';
+import { Send, Mic, MicOff, Video, VideoOff, MoreVertical, Copy, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import type { ChatMessage, Participant } from '@/domains/game/mocks/mock-data';
+
+const PreBlock = ({ children, ...props }: any) => {
+  const preRef = useRef<HTMLPreElement>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (preRef.current) {
+      const codeText = preRef.current.innerText || '';
+      navigator.clipboard.writeText(codeText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="relative my-2 overflow-hidden rounded-md bg-zinc-950/90 border border-white/10 text-left">
+      <div className="absolute right-2 top-2 z-10">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleCopy}
+          className="h-6 w-6 text-zinc-400 hover:text-white hover:bg-white/10"
+        >
+          {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        </Button>
+      </div>
+      <pre ref={preRef} className="overflow-x-auto p-4 font-mono text-xs text-zinc-50" {...props}>
+        {children}
+      </pre>
+    </div>
+  );
+};
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -123,11 +156,30 @@ export function ChatPanel({
                       )}
                       <div
                         className={cn(
-                          'inline-block rounded-2xl px-3 py-2 text-sm',
+                          'inline-block rounded-2xl px-3 py-2 text-sm max-w-full break-words text-left',
                           isMe ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
                         )}
                       >
-                        {message.content}
+                        <ReactMarkdown
+                          components={{
+                            pre: PreBlock,
+                            code: ({ node, className, children, ...props }: any) => {
+                              return (
+                                <code
+                                  className={cn(
+                                    'rounded px-1 bg-black/10 dark:bg-white/10 font-mono text-sm',
+                                    className,
+                                  )}
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              );
+                            },
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   </div>

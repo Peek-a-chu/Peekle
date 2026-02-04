@@ -17,5 +17,7 @@ public class TimelineItemDto {
     private String language; // python, java, etc.
     private Integer memory; // KB
     private Integer executionTime; // ms
+    private String result; // 제출 결과 (맞았습니다, 틀렸습니다 등)
+    private Boolean isSuccess; // 성공 여부
     private String submittedAt;
 }

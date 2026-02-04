@@ -5,9 +5,18 @@ import Image from 'next/image';
 import Link from 'next/link';
 import LeagueIcon, { LEAGUE_NAMES, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { useLeagueRanking } from '../hooks/useDashboardData';
+import { UserIcon } from '@/components/UserIcon';
+// import defaultProfileImg from '@/assets/icons/profile.png';
 
-const LeagueRanking = () => {
-  const { data } = useLeagueRanking();
+import { LeagueRankingData } from '@/domains/league/types';
+
+interface LeagueRankingProps {
+  initialData?: LeagueRankingData;
+}
+
+const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
+  const { data: fetchedData } = useLeagueRanking(30000, { skip: !!initialData });
+  const data = initialData || fetchedData;
 
   // 현재 리그의 승급/강등 규칙 가져오기
   const rules = data.rule;
@@ -150,24 +159,12 @@ const RankingItem = ({ member }: { member: any }) => {
 
       {/* 2. 아바타 & 닉네임 */}
       <div className="flex-1 flex items-center gap-2 ml-1 min-w-0">
-        <div
-          className={`w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center border shrink-0 ${isMe ? 'border-primary/30' : 'border-border'}`}
-        >
-          {member.avatar || member.profileImgThumb ? (
-            <Image
-              src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
-              alt={member.name}
-              width={24}
-              height={24}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-              }}
-            />
-          ) : null}
-          {!member.avatar && !member.profileImgThumb && <div className="w-full h-full bg-muted" />}
-        </div>
+        <UserIcon
+          src={member.profileImgThumb}
+          nickname={member.name}
+          size={24}
+          className={isMe ? 'border-primary/30' : 'border-border'}
+        />
 
         <div className="flex items-center min-w-0 justify-center gap-1">
           <span

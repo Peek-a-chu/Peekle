@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, GripHorizontal, Minus } from 'lucide-react';
 import Image from 'next/image';
+import { UserIcon } from '@/components/UserIcon';
 import { useLeagueRanking } from '@/domains/home/hooks/useDashboardData';
 import { LeagueRankingMember } from '@/domains/league/types';
 import { LEAGUE_NAMES } from '@/components/LeagueIcon';
@@ -49,8 +50,19 @@ const getLeaguePeriodString = () => {
   return `${formatDate(startDate)} 06:00 ~ ${formatDate(targetDate)} 06:00`;
 };
 
-const CCLeagueRankingList = () => {
-  const { data, isLoading } = useLeagueRanking();
+import { LeagueRankingData } from '@/domains/league/types';
+
+interface CCLeagueRankingListProps {
+  initialData?: LeagueRankingData;
+}
+
+const CCLeagueRankingList = ({ initialData }: CCLeagueRankingListProps) => {
+  const { data: fetchedData, isLoading: isFetching } = useLeagueRanking(30000, {
+    skip: !!initialData,
+  });
+
+  const data = initialData || fetchedData;
+  const isLoading = initialData ? false : isFetching;
 
   if (isLoading) {
     return (
@@ -163,28 +175,12 @@ const RankingItem = ({ member }: { member: LeagueRankingMember }) => {
 
       {/* 2. 아바타 & 닉네임 */}
       <div className="flex-1 flex items-center gap-2 ml-1 min-w-0">
-        <div
-          className={`w-7 h-7 rounded-full overflow-hidden bg-muted flex items-center justify-center border shrink-0 ${isMe ? 'border-primary/30' : 'border-border'}`}
-        >
-          {member.avatar || member.profileImgThumb ? (
-            <Image
-              src={member.profileImgThumb || member.avatar || '/avatars/default.png'}
-              alt={member.name}
-              width={28}
-              height={28}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-              }}
-            />
-          ) : null}
-          {!member.avatar && !member.profileImgThumb && (
-            <span className="text-[10px] font-bold text-muted-foreground uppercase absolute">
-              {member.name.substring(0, 1)}
-            </span>
-          )}
-        </div>
+        <UserIcon
+          src={member.profileImgThumb}
+          nickname={member.name}
+          size={28}
+          className={isMe ? 'border-primary/30' : 'border-border'}
+        />
 
         <div className="flex items-center min-w-0 justify-center gap-1">
           <span

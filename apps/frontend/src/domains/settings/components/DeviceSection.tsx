@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Mic, MicOff, Video, VideoOff, Volume2, Circle } from 'lucide-react';
+import { Camera, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
 import { useSettingsStore } from '../hooks/useSettingsStore';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,16 @@ import { cn } from '@/lib/utils';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
 import { toast } from 'sonner';
-import type { Publisher } from 'openvidu-browser';
+import { useLocalParticipant } from '@livekit/components-react';
+import type { LocalParticipant } from 'livekit-client';
 
-const DeviceSection = () => {
+// 1. UI & Logic Component (Pure, accepts dependencies via props)
+interface DeviceSectionInnerProps {
+  localParticipant: LocalParticipant | null | undefined;
+  isGlobal?: boolean;
+}
+
+const DeviceSectionInner = ({ localParticipant, isGlobal = false }: DeviceSectionInnerProps) => {
   const {
     selectedCameraId,
     selectedMicId,
@@ -32,13 +39,16 @@ const DeviceSection = () => {
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const participants = useRoomStore((state) => state.participants);
   const updateParticipant = useRoomStore((state) => state.updateParticipant);
+
+  // Socket actions might fail if global, handled in handlers
+  // In global mode, these hooks return default/empty processing safely usually
   const { updateStatus } = useStudySocketActions();
+
   const me = participants.find((p) => p.id === currentUserId);
   const isMuted = me?.isMuted ?? false;
   const isVideoOff = me?.isVideoOff ?? false;
 
   // 카메라 미리보기 상태 및 ref
-  const [isPreviewOn, setIsPreviewOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -46,7 +56,6 @@ const DeviceSection = () => {
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [hasCheckedDevices, setHasCheckedDevices] = useState(false);
 
   // 장치 목록 가져오기
   useEffect(() => {
@@ -70,7 +79,6 @@ const DeviceSection = () => {
             let audioStream: MediaStream | null = null;
             let videoStream: MediaStream | null = null;
 
-            // 오디오 권한 요청 (스피커 라벨 포함)
             if (hasEmptyAudioLabel) {
               try {
                 audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -79,7 +87,6 @@ const DeviceSection = () => {
               }
             }
 
-            // 비디오 권한 요청
             if (hasEmptyVideoLabel) {
               try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -88,18 +95,12 @@ const DeviceSection = () => {
               }
             }
 
-            // 스트림이 활성화된 상태에서 다시 목록 조회 (활성 스트림이 있으면 권한이 확실함)
             if (audioStream || videoStream) {
               devices = await navigator.mediaDevices.enumerateDevices();
             }
 
-            // 조회 후 스트림 정리
-            if (audioStream) {
-              audioStream.getTracks().forEach((track) => track.stop());
-            }
-            if (videoStream) {
-              videoStream.getTracks().forEach((track) => track.stop());
-            }
+            if (audioStream) audioStream.getTracks().forEach((track) => track.stop());
+            if (videoStream) videoStream.getTracks().forEach((track) => track.stop());
           } catch (err) {
             console.warn('[DeviceSection] Permission check error:', err);
           }
@@ -107,25 +108,15 @@ const DeviceSection = () => {
 
         if (!mounted) return;
 
-        const videoInputs = devices.filter((device) => device.kind === 'videoinput');
-        const audioInputs = devices.filter((device) => device.kind === 'audioinput');
-        const audioOutputs = devices.filter((device) => device.kind === 'audiooutput');
-
-        setVideoDevices(videoInputs);
-        setAudioDevices(audioInputs);
-        setAudioOutputDevices(audioOutputs);
+        setVideoDevices(devices.filter((device) => device.kind === 'videoinput'));
+        setAudioDevices(devices.filter((device) => device.kind === 'audioinput'));
+        setAudioOutputDevices(devices.filter((device) => device.kind === 'audiooutput'));
       } catch (error) {
         console.error('[DeviceSection] Failed to enumerate devices:', error);
-      } finally {
-        if (mounted) {
-          setHasCheckedDevices(true);
-        }
       }
     };
 
-    getDevices();
-
-    // 장치 변경 감지
+    void getDevices();
     navigator.mediaDevices.addEventListener('devicechange', getDevices);
     return () => {
       mounted = false;
@@ -133,275 +124,258 @@ const DeviceSection = () => {
     };
   }, []);
 
+  // 카메라 미리보기 (로컬 설정값 기반)
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+
+    const startPreview = async () => {
+      if (isVideoOff && !isGlobal) {
+        // 룸룸 상태면 isVideoOff 따름
+      }
+
+      try {
+        if (selectedCameraId) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: selectedCameraId !== 'default' ? { exact: selectedCameraId } : undefined,
+            },
+          });
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            streamRef.current = stream;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to start camera preview', e);
+      }
+    };
+
+    if (!isVideoOff || isGlobal) {
+      void startPreview();
+    } else {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+      }
+    }
+
+    return () => {
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, [selectedCameraId, isVideoOff, isGlobal]);
+
   // 실제 마이크 입력 레벨
   const [micLevel, setMicLevel] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
   // 오디오 제어용 refs
   const gainNodeRef = useRef<GainNode | null>(null);
-  const micTestDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const micTestAudioRef = useRef<HTMLAudioElement | null>(null);
-  const speakerTestAudioRef = useRef<HTMLAudioElement | null>(null);
   const speakerGainNodeRef = useRef<GainNode | null>(null);
 
-  // OpenVidu publisher에서 오디오 레벨 측정 및 볼륨 제어
+  // 마이크 레벨 측정
   useEffect(() => {
-    const publisher = (window as any).__openviduPublisher as Publisher | undefined;
+    let localStream: MediaStream | null = null;
+    let stopped = false;
 
-    if (!publisher) {
-      setMicLevel(0);
-      return;
-    }
+    const startMetering = async () => {
+      try {
+        let stream: MediaStream | null = null;
+        let isLocalStream = false;
 
-    try {
-      if (!publisher.stream) {
-        setMicLevel(0);
-        return;
-      }
-
-      const stream = publisher.stream.getMediaStream();
-
-      if (!stream) {
-        setMicLevel(0);
-        return;
-      }
-
-      const audioTracks = stream.getAudioTracks();
-
-      if (audioTracks.length === 0 || isMuted) {
-        setMicLevel(0);
-        return;
-      }
-
-      // AudioContext 생성
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-
-      const audioContext = audioContextRef.current;
-      const source = audioContext.createMediaStreamSource(stream);
-
-      // GainNode 생성 (입력 볼륨 제어)
-      if (!gainNodeRef.current) {
-        gainNodeRef.current = audioContext.createGain();
-      }
-
-      const gainNode = gainNodeRef.current;
-      gainNode.gain.value = micVolume / 100; // 0-1 범위로 변환
-
-      if (!analyserRef.current) {
-        analyserRef.current = audioContext.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.8;
-        dataArrayRef.current = new Uint8Array(
-          new ArrayBuffer(analyserRef.current.frequencyBinCount),
-        );
-      }
-
-      const analyser = analyserRef.current;
-      const dataArray = dataArrayRef.current;
-
-      // source -> gainNode -> analyser 연결
-      source.connect(gainNode);
-      gainNode.connect(analyser);
-
-      const updateLevel = () => {
-        if (!analyser || !dataArray) return;
-
-        // TypeScript 타입 호환성을 위해 타입 단언 사용
-        analyser.getByteFrequencyData(dataArray as any);
-
-        // 평균 레벨 계산
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
+        // 1. LiveKit (활성 트랙)
+        if (localParticipant && !isMuted) {
+          const trackReq = Array.from(localParticipant.audioTrackPublications.values()).find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (t: any) => t.track?.kind === 'audio',
+          );
+          if (trackReq?.track?.mediaStreamTrack) {
+            stream = new MediaStream([trackReq.track.mediaStreamTrack]);
+          }
         }
-        const average = sum / dataArray.length;
 
-        // 0-100 범위로 정규화 (0-255를 0-100으로)
-        const normalizedLevel = Math.min(100, (average / 255) * 100);
-        setMicLevel(normalizedLevel);
-
-        animationFrameRef.current = requestAnimationFrame(updateLevel);
-      };
-
-      updateLevel();
-
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
+        // 2. getUserMedia (없으면 직접 요청 - 레벨 미터용)
+        if (!stream) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                deviceId: selectedMicId !== 'default' ? { exact: selectedMicId } : undefined,
+              },
+            });
+            isLocalStream = true;
+            localStream = stream;
+          } catch (e) {
+            console.warn('[DeviceSection] Failed to get local mic stream for metering:', e);
+          }
         }
-        try {
-          source.disconnect();
-          gainNode.disconnect();
-        } catch (e) {
-          // Ignore disconnect errors
-        }
-      };
-    } catch (error) {
-      console.error('[DeviceSection] Failed to measure audio level:', error);
-      setMicLevel(0);
-    }
-  }, [isMuted, micVolume]);
 
-  // 입력 볼륨 변경 시 OpenVidu publisher에 적용
+        if (stopped) {
+          if (isLocalStream && stream) stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        if (!stream) {
+          setMicLevel(0);
+          return;
+        }
+
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          setMicLevel(0);
+          return;
+        }
+
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const audioContext = audioContextRef.current;
+        if (audioContext.state === 'suspended') await audioContext.resume();
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        // Initialize gain from current micVolume (0-100 -> 0.0-1.0)
+        gainNode.gain.value = useSettingsStore.getState().micVolume / 100;
+        gainNodeRef.current = gainNode;
+
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048; // Larger FFT size for better resolution if time domain
+
+        source.connect(gainNode);
+        gainNode.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const updateLevel = () => {
+          if (stopped) return;
+          analyser.getByteTimeDomainData(dataArray);
+
+          // Calculate RMS (Root Mean Square) for volume
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            const value = dataArray[i] - 128; // Center at 0
+            sum += value * value;
+          }
+          const rms = Math.sqrt(sum / dataArray.length);
+
+          // Normalize to 0-100 (RMS usually peaks around 60-80 for loud speech)
+          const level = Math.min(100, (rms / 50) * 100);
+          setMicLevel(level);
+
+          animationFrameRef.current = requestAnimationFrame(updateLevel);
+        };
+        updateLevel();
+      } catch (err) {
+        console.warn('Metering error', err);
+        setMicLevel(0);
+      }
+    };
+
+    void startMetering();
+
+    return () => {
+      stopped = true;
+      gainNodeRef.current = null; // Clear ref
+      if (localStream) {
+        localStream.getTracks().forEach((t) => t.stop());
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isMuted, selectedMicId, localParticipant]);
+
   useEffect(() => {
     if (gainNodeRef.current) {
       gainNodeRef.current.gain.value = micVolume / 100;
     }
   }, [micVolume]);
 
-  // 출력 볼륨 변경 시 스피커 볼륨 적용
   useEffect(() => {
     if (speakerGainNodeRef.current) {
       speakerGainNodeRef.current.gain.value = speakerVolume / 100;
     }
   }, [speakerVolume]);
 
-  // 마이크/카메라 토글 핸들러
-  const handleMicToggle = () => {
-    if (!currentUserId || !me) return;
-
-    // Optimistic Update
-    const newMuted = !isMuted;
-    updateParticipant(currentUserId, { isMuted: newMuted });
-
-    // Toggle Mute (OpenVidu + Socket)
-    updateStatus(newMuted, isVideoOff);
-
-    // OpenVidu 오디오 토글도 호출
-    const toggleAudio = (window as any).__openviduToggleAudio;
-    if (toggleAudio) {
-      toggleAudio();
-    }
-  };
-
-  const handleVideoToggle = () => {
-    if (!currentUserId || !me) return;
-
-    // Optimistic Update
-    const newVideoOff = !isVideoOff;
-    updateParticipant(currentUserId, { isVideoOff: newVideoOff });
-
-    // Toggle Video (OpenVidu + Socket)
-    updateStatus(isMuted, newVideoOff);
-
-    // OpenVidu 비디오 토글도 호출
-    const toggleVideo = (window as any).__openviduToggleVideo;
-    if (toggleVideo) {
-      toggleVideo();
-    }
-  };
-
-  // 카메라 미리보기 핸들러
-  const handleCameraPreview = async () => {
-    if (isPreviewOn) {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      setIsPreviewOn(false);
+  const handleMicToggle = async () => {
+    if (isGlobal) {
+      toast.info('스터디 룸 입장 후 다시 시도해주세요.');
       return;
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: selectedCameraId !== 'default' ? { exact: selectedCameraId } : undefined,
-        },
-      });
+    if (!currentUserId || !me) return;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      streamRef.current = stream;
-      setIsPreviewOn(true);
-      toast.success('카메라 미리보기가 시작되었습니다.');
-    } catch (error: any) {
-      console.error('[DeviceSection] Failed to start camera preview:', error);
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        toast.error('카메라 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요.');
-      } else if (error.name === 'NotFoundError') {
-        toast.error('카메라를 찾을 수 없습니다.');
-      } else {
-        toast.error('카메라 미리보기를 시작할 수 없습니다.');
-      }
+    const newMuted = !isMuted;
+    updateParticipant(currentUserId, { isMuted: newMuted });
+
+    if (updateStatus) updateStatus(newMuted, isVideoOff);
+
+    if (localParticipant) {
+      await localParticipant.setMicrophoneEnabled(!newMuted);
     }
   };
 
-  // 마이크 테스트: 마이크 입력을 스피커로 출력
+  const handleVideoToggle = async () => {
+    if (isGlobal) {
+      toast.info('스터디 룸 입장 후 다시 시도해주세요.');
+      return;
+    }
+
+    if (!currentUserId || !me) return;
+
+    const newVideoOff = !isVideoOff;
+    updateParticipant(currentUserId, { isVideoOff: newVideoOff });
+
+    if (updateStatus) updateStatus(isMuted, newVideoOff);
+
+    if (localParticipant) {
+      await localParticipant.setCameraEnabled(!newVideoOff);
+    }
+  };
+
   const handleMicTest = async () => {
     if (isMicTestRunning) {
-      // 테스트 중지
       if (micTestAudioRef.current) {
         micTestAudioRef.current.pause();
-        micTestAudioRef.current.srcObject = null;
         micTestAudioRef.current = null;
       }
-      if (micTestDestinationRef.current) {
+      if (gainNodeRef.current) {
         try {
-          micTestDestinationRef.current.disconnect();
-        } catch (e) {
-          // Ignore disconnect errors
+          gainNodeRef.current.disconnect();
+        } catch {
+          // ignore
         }
-        micTestDestinationRef.current = null;
+        gainNodeRef.current = null;
       }
       toggleMicTest();
       return;
     }
 
     try {
-      const publisher = (window as any).__openviduPublisher as Publisher | undefined;
-      if (!publisher) {
-        toast.error('OpenVidu 연결을 찾을 수 없습니다. 비디오 세션에 먼저 참여해주세요.');
-        return;
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: selectedMicId !== 'default' ? { exact: selectedMicId } : undefined,
+        },
+      });
 
-      const stream = publisher.stream.getMediaStream();
-      if (!stream) {
-        toast.error('오디오 스트림을 찾을 수 없습니다.');
-        return;
-      }
-
-      const audioTracks = stream.getAudioTracks();
-
-      if (audioTracks.length === 0) {
-        toast.error('마이크 트랙을 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.');
-        return;
-      }
-
-      if (isMuted) {
-        toast.error('마이크가 꺼져 있습니다. 마이크를 켜주세요.');
-        return;
-      }
-
-      // AudioContext 생성 및 resume
       if (!audioContextRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-
       const audioContext = audioContextRef.current;
+      if (audioContext.state === 'suspended') await audioContext.resume();
 
-      // AudioContext가 suspended 상태면 resume
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
-
-      // 마이크 입력을 스피커로 연결
       const source = audioContext.createMediaStreamSource(stream);
       const destination = audioContext.createMediaStreamDestination();
 
-      // GainNode로 볼륨 제어 (입력 볼륨 적용)
       const inputGainNode = audioContext.createGain();
       inputGainNode.gain.value = micVolume / 100;
 
-      // 출력 볼륨도 적용
       const outputGainNode = audioContext.createGain();
       outputGainNode.gain.value = speakerVolume / 100;
 
@@ -409,62 +383,51 @@ const DeviceSection = () => {
       inputGainNode.connect(outputGainNode);
       outputGainNode.connect(destination);
 
-      // MediaStream을 Audio 요소로 재생
       const audio = new Audio();
       audio.srcObject = destination.stream;
-      audio.volume = 1.0; // 이미 gainNode에서 제어하므로 1.0으로 설정
-
-      // 재생 시도
-      try {
-        await audio.play();
-      } catch (playError: any) {
-        // 재생 실패 시 더 구체적인 에러 메시지
-        console.error('[DeviceSection] Audio play failed:', playError);
-        if (playError.name === 'NotAllowedError') {
-          toast.error('오디오 재생이 차단되었습니다. 브라우저 설정에서 자동 재생을 허용해주세요.');
-        } else if (playError.name === 'NotSupportedError') {
-          toast.error('오디오 형식을 지원하지 않습니다.');
-        } else {
-          toast.error('마이크 테스트를 시작할 수 없습니다. 오디오 재생 오류가 발생했습니다.');
+      audio.volume = 1.0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (selectedSpeakerId !== 'default' && (audio as any).setSinkId) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (audio as any).setSinkId(selectedSpeakerId);
+        } catch {
+          // ignore
         }
-        // 정리
-        source.disconnect();
-        inputGainNode.disconnect();
-        outputGainNode.disconnect();
-        destination.disconnect();
-        return;
       }
 
-      micTestDestinationRef.current = destination;
+      await audio.play();
       micTestAudioRef.current = audio;
+      gainNodeRef.current = inputGainNode;
       toggleMicTest();
-      toast.success('마이크 테스트가 시작되었습니다.');
-    } catch (error: any) {
-      console.error('[DeviceSection] Failed to start mic test:', error);
-      const errorMessage = error?.message || '알 수 없는 오류';
-      if (errorMessage.includes('permission') || errorMessage.includes('권한')) {
-        toast.error('마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.');
-      } else if (errorMessage.includes('not found') || errorMessage.includes('찾을 수 없')) {
-        toast.error('마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.');
-      } else {
-        toast.error(`마이크 테스트를 시작할 수 없습니다: ${errorMessage}`);
-      }
+
+      setTimeout(() => {
+        if (isMicTestRunning) {
+          if (micTestAudioRef.current) {
+            micTestAudioRef.current.pause();
+            micTestAudioRef.current = null;
+            try {
+              gainNodeRef.current?.disconnect();
+            } catch {
+              // ignore
+            }
+            toggleMicTest();
+          }
+        }
+      }, 5000);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      toast.error(`마이크 테스트 실패: ${message}`);
     }
   };
 
-  // 스피커 테스트: 데모 소리 재생
-  const handleSpeakerTest = async () => {
+  const handleSpeakerTest = () => {
     if (isSpeakerTestRunning) {
-      // 테스트 중지
-      if (speakerTestAudioRef.current) {
-        speakerTestAudioRef.current.pause();
-        speakerTestAudioRef.current = null;
-      }
       if (speakerGainNodeRef.current) {
         try {
           speakerGainNodeRef.current.disconnect();
-        } catch (e) {
-          // Ignore disconnect errors
+        } catch {
+          // ignore
         }
         speakerGainNodeRef.current = null;
       }
@@ -473,32 +436,26 @@ const DeviceSection = () => {
     }
 
     try {
-      // AudioContext 생성
       if (!audioContextRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-
       const audioContext = audioContextRef.current;
 
-      // 오실레이터로 테스트 톤 생성 (440Hz = A4 음, 880Hz = A5 음)
       const oscillator1 = audioContext.createOscillator();
       const oscillator2 = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
       oscillator1.type = 'sine';
-      oscillator1.frequency.value = 440; // A4 음
-
+      oscillator1.frequency.value = 440;
       oscillator2.type = 'sine';
-      oscillator2.frequency.value = 880; // A5 음
-
-      // 출력 볼륨 적용
+      oscillator2.frequency.value = 880;
       gainNode.gain.value = speakerVolume / 100;
 
       oscillator1.connect(gainNode);
       oscillator2.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      // 2초 후 자동 중지
       const stopTime = audioContext.currentTime + 2;
       oscillator1.start();
       oscillator1.stop(stopTime);
@@ -506,34 +463,55 @@ const DeviceSection = () => {
       oscillator2.stop(stopTime);
 
       speakerGainNodeRef.current = gainNode;
-
       toggleSpeakerTest();
 
-      // 2초 후 정리
       setTimeout(() => {
         try {
-          if (speakerGainNodeRef.current) {
-            speakerGainNodeRef.current.disconnect();
-            speakerGainNodeRef.current = null;
-          }
-        } catch (e) {
-          // Ignore disconnect errors
+          speakerGainNodeRef.current?.disconnect();
+          speakerGainNodeRef.current = null;
+        } catch {
+          // ignore
         }
-        if (isSpeakerTestRunning) {
-          toggleSpeakerTest();
-        }
+        toggleSpeakerTest();
       }, 2000);
 
-      toast.success('스피커 테스트가 시작되었습니다.');
-    } catch (error: any) {
-      console.error('[DeviceSection] Failed to start speaker test:', error);
-      const errorMessage = error?.message || '알 수 없는 오류';
-      toast.error(`스피커 테스트를 시작할 수 없습니다: ${errorMessage}`);
+      toast.success('스피커 테스트 시작');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      toast.error(`스피커 테스트 실패: ${message}`);
+    }
+  };
+
+  const handleRequestPermissions = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      stream.getTracks().forEach((t) => t.stop());
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setVideoDevices(devices.filter((device) => device.kind === 'videoinput'));
+      setAudioDevices(devices.filter((device) => device.kind === 'audioinput'));
+      setAudioOutputDevices(devices.filter((device) => device.kind === 'audiooutput'));
+
+      toast.success('장치 권한이 갱신되었습니다.');
+    } catch (e) {
+      console.warn('Permission request failed', e);
+      toast.error('권한 요청 실패. 브라우저 주소창의 자물쇠 아이콘을 눌러 권한을 허용해주세요.');
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRequestPermissions}
+          className="text-xs h-7"
+        >
+          장치 권한 재요청
+        </Button>
+      </div>
+
       {/* 카메라 섹션 */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -570,8 +548,8 @@ const DeviceSection = () => {
                 </option>
               ))
             ) : (
-              <option value="none" disabled className="bg-card text-muted-foreground">
-                {hasCheckedDevices ? '연결된 카메라가 없습니다' : '카메라를 찾는 중...'}
+              <option value="none" disabled>
+                장치 없음
               </option>
             )}
           </select>
@@ -581,35 +559,21 @@ const DeviceSection = () => {
         </div>
 
         {/* 카메라 미리보기 영역 */}
-        <div
-          onClick={handleCameraPreview}
-          className="aspect-video w-full bg-muted/50 rounded-xl border border-border flex flex-col items-center justify-center gap-3 relative overflow-hidden group cursor-pointer hover:bg-muted/70 transition-colors"
-        >
-          {isPreviewOn ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform scale-x-[-1]"
-            />
-          ) : (
-            <>
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:scale-110 transition-transform">
-                <Camera size={32} />
-              </div>
-              <span className="text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                클릭하여 카메라 미리보기
-              </span>
-            </>
-          )}
-
-          {(!isVideoOff || isPreviewOn) && (
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 bg-black/50 backdrop-blur-md rounded-full pointer-events-none">
-              <Circle size={8} className="fill-red-500 text-red-500 animate-pulse" />
-              <span className="text-[10px] text-white font-bold opacity-80 uppercase tracking-wider">
-                Preview Active
-              </span>
+        <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-border mt-2">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className={cn(
+              'w-full h-full object-cover transform scale-x-[-1]',
+              isVideoOff && !isGlobal && 'hidden',
+            )}
+          />
+          {isVideoOff && !isGlobal && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
+              <VideoOff className="w-8 h-8 mb-2 opacity-50" />
+              <span className="text-xs">카메라가 꺼져있습니다</span>
             </div>
           )}
         </div>
@@ -652,8 +616,8 @@ const DeviceSection = () => {
                   </option>
                 ))
               ) : (
-                <option value="none" disabled className="bg-card text-muted-foreground">
-                  {hasCheckedDevices ? '연결된 마이크가 없습니다' : '마이크를 찾는 중...'}
+                <option value="none" disabled>
+                  장치 없음
                 </option>
               )}
             </select>
@@ -710,29 +674,27 @@ const DeviceSection = () => {
 
       {/* 스피커 섹션 */}
       <section className="space-y-4 pt-2 border-t border-border">
-        <div className="space-y-3">
+        <div className="flex items-center justify-between">
           <label className="text-sm font-bold text-muted-foreground">스피커</label>
-          <div className="relative">
-            <select
-              value={selectedSpeakerId}
-              onChange={(e) => setSpeaker(e.target.value)}
-              className="w-full bg-muted border border-border rounded-lg pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-0 transition-all appearance-none text-foreground cursor-pointer"
-            >
-              {audioOutputDevices.length > 0 ? (
-                audioOutputDevices.map((device, index) => (
-                  <option key={device.deviceId} value={device.deviceId} className="bg-card">
-                    {device.label || `스피커 ${index + 1}`}
-                  </option>
-                ))
-              ) : (
-                <option value="none" disabled className="bg-card text-muted-foreground">
-                  {hasCheckedDevices ? '연결된 스피커가 없습니다' : '스피커를 찾는 중...'}
+        </div>
+        <div className="relative">
+          <select
+            value={selectedSpeakerId}
+            onChange={(e) => setSpeaker(e.target.value)}
+            className="w-full bg-muted border border-border rounded-lg pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-0 transition-all appearance-none text-foreground cursor-pointer"
+          >
+            {audioOutputDevices.length > 0 ? (
+              audioOutputDevices.map((device, index) => (
+                <option key={device.deviceId} value={device.deviceId} className="bg-card">
+                  {device.label || `스피커 ${index + 1}`}
                 </option>
-              )}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-              <Volume2 size={14} />
-            </div>
+              ))
+            ) : (
+              <option value="default">기본 출력 장치</option>
+            )}
+          </select>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+            <Volume2 size={14} />
           </div>
         </div>
 
@@ -753,18 +715,37 @@ const DeviceSection = () => {
         <button
           onClick={handleSpeakerTest}
           className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-all',
+            'px-4 py-2 rounded-lg text-xs font-bold border transition-all',
             isSpeakerTestRunning
-              ? 'bg-primary/15 border-primary/50 text-primary'
+              ? 'bg-primary/10 text-primary border-primary/50 animate-pulse'
               : 'bg-card text-foreground border-border hover:bg-muted',
           )}
         >
-          <Volume2 size={14} className={isSpeakerTestRunning ? 'animate-bounce' : ''} />
-          <span>{isSpeakerTestRunning ? '재생 중...' : '테스트'}</span>
+          {isSpeakerTestRunning ? '테스트 중지' : '테스트'}
         </button>
       </section>
     </div>
   );
+};
+
+// 2. Connector for LiveKit Room (Only renders when in a Room)
+const DeviceSectionConnected = () => {
+  const { localParticipant } = useLocalParticipant();
+  return <DeviceSectionInner localParticipant={localParticipant} isGlobal={false} />;
+};
+
+// 3. Main Export (Switcher)
+interface DeviceSectionProps {
+  isGlobal?: boolean;
+}
+
+const DeviceSection = ({ isGlobal = false }: DeviceSectionProps) => {
+  // If global, we cannot use LiveKit hooks. Pass null.
+  if (isGlobal) {
+    return <DeviceSectionInner localParticipant={null} isGlobal={true} />;
+  }
+  // If local, we must use LiveKit hooks to get context.
+  return <DeviceSectionConnected />;
 };
 
 export default DeviceSection;

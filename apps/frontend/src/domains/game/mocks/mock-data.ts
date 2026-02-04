@@ -106,7 +106,7 @@ export const mockGameRooms: GameRoom[] = [
     host: {
       id: 'user1',
       nickname: 'CodeMaster',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
     tags: ['골드', '구현'],
@@ -125,7 +125,7 @@ export const mockGameRooms: GameRoom[] = [
     host: {
       id: 'user2',
       nickname: 'AlgoKing',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
     tags: ['실버', 'DP'],
@@ -144,7 +144,7 @@ export const mockGameRooms: GameRoom[] = [
     host: {
       id: 'user3',
       nickname: '해론다이',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: true,
     tags: ['팀전', '브론즈'],
@@ -163,7 +163,7 @@ export const mockGameRooms: GameRoom[] = [
     host: {
       id: 'user4',
       nickname: '엔트립중',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
     tags: ['초보', '브론즈'],
@@ -182,7 +182,7 @@ export const mockGameRooms: GameRoom[] = [
     host: {
       id: 'user5',
       nickname: '스피드러너',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
     tags: ['팀전', '스피드'],
@@ -201,7 +201,7 @@ export const mockGameRooms: GameRoom[] = [
     host: {
       id: 'user6',
       nickname: 'ProCoder',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: true,
     tags: ['다이아', '고수'],
@@ -386,7 +386,7 @@ export const mockChatMessages: ChatMessage[] = [
     id: 'msg1',
     senderId: 'user1',
     senderNickname: 'CodeNinja',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '오늘 문제 어떤거요? 👀',
     timestamp: '2026-01-24T20:00:00',
   },
@@ -394,7 +394,7 @@ export const mockChatMessages: ChatMessage[] = [
     id: 'msg2',
     senderId: 'user3',
     senderNickname: '백준킹',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '그래프랑 DP 하면 좋겠습니다!',
     timestamp: '2026-01-24T20:01:00',
   },
@@ -402,7 +402,7 @@ export const mockChatMessages: ChatMessage[] = [
     id: 'msg3',
     senderId: 'user2',
     senderNickname: 'PS마스터',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: 'import heapq',
     timestamp: '2026-01-24T20:02:00',
   },
@@ -410,7 +410,7 @@ export const mockChatMessages: ChatMessage[] = [
     id: 'msg4',
     senderId: 'user2',
     senderNickname: 'PS마스터',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '이렇게 시작하면 돼요',
     timestamp: '2026-01-24T20:02:30',
   },
@@ -422,7 +422,7 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg1',
     senderId: 'user3',
     senderNickname: '해론다이',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '레드팀 화이팅! 🔥',
     timestamp: '2026-01-24T20:00:00',
     senderTeam: 'RED',
@@ -431,7 +431,7 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg2',
     senderId: 'user6',
     senderNickname: 'BlueLeader',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '블루팀도 질 수 없죠 💙',
     timestamp: '2026-01-24T20:01:00',
     senderTeam: 'BLUE',
@@ -440,7 +440,7 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg3',
     senderId: 'user4',
     senderNickname: 'RedPlayer1',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: 'DP 문제 나오면 좋겠다',
     timestamp: '2026-01-24T20:02:00',
     senderTeam: 'RED',
@@ -449,7 +449,7 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg4',
     senderId: 'user7',
     senderNickname: 'BluePlayer1',
-    senderProfileImg: '/avatars/default.png',
+    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '그래프가 더 재밌지 않나요?',
     timestamp: '2026-01-24T20:02:30',
     senderTeam: 'BLUE',
@@ -487,7 +487,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user1',
         nickname: 'AlgoKing',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'silver2',
@@ -495,9 +495,9 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user2',
         nickname: 'SpeedCoder',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
-        status: 'NOT_READY', // 준비 버튼 테스트를 위해 대기 상태로 변경
+        status: 'READY', // 카운트다운 테스트를 위해 READY로 변경
         tier: 'silver3',
       },
     ],
@@ -522,7 +522,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user2',
         nickname: 'PS마스터',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'NOT_READY',
         tier: 'gold5',
@@ -532,7 +532,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user3',
         nickname: '해론다이',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'NOT_READY',
         tier: 'bronze1',
@@ -541,7 +541,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user4',
         nickname: 'RedPlayer1',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'bronze2',
@@ -550,7 +550,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user5',
         nickname: 'RedPlayer2',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'NOT_READY',
         tier: 'bronze3',
@@ -560,7 +560,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user6',
         nickname: 'BlueLeader',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'bronze1',
@@ -569,7 +569,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user7',
         nickname: 'BluePlayer1',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'bronze2',
@@ -578,7 +578,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user8',
         nickname: 'BluePlayer2',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'NOT_READY',
         tier: 'bronze3',
@@ -606,7 +606,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user1',
         nickname: '엔트립중',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'bronze1',
@@ -633,7 +633,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user6',
         nickname: 'ProCoder',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'diamond5',
@@ -641,7 +641,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
       {
         id: 'user7',
         nickname: 'DiamondHunter',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'NOT_READY',
         tier: 'platinum2',
@@ -670,7 +670,7 @@ const defaultRoomDetail: GameRoomDetail = {
     {
       id: 'user1',
       nickname: 'CodeNinja',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
       isHost: true,
       status: 'READY',
       tier: 'gold3',
@@ -678,7 +678,7 @@ const defaultRoomDetail: GameRoomDetail = {
     {
       id: 'user2',
       nickname: 'PS마스터',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
       isHost: false,
       status: 'READY',
       tier: 'gold5',
@@ -686,7 +686,7 @@ const defaultRoomDetail: GameRoomDetail = {
     {
       id: 'user3',
       nickname: '백준킹',
-      profileImg: '/avatars/default.png',
+      profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
       isHost: false,
       status: 'NOT_READY',
       tier: 'silver1',
@@ -781,7 +781,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user1',
         nickname: 'CodeNinja',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'gold3',
@@ -791,7 +791,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user2',
         nickname: 'PS마스터',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold5',
@@ -801,7 +801,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user3',
         nickname: '알고리즘왕',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'silver1',
@@ -811,7 +811,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user4',
         nickname: 'PSiM',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold1',
@@ -821,7 +821,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user5',
         nickname: 'Coder5',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'platinum5',
@@ -831,7 +831,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user6',
         nickname: 'Coder6',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'diamond5',
@@ -841,7 +841,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user7',
         nickname: 'Coder7',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold2',
@@ -851,7 +851,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user8',
         nickname: 'Coder8',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'silver3',
@@ -899,7 +899,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user1',
         nickname: 'CodeNinja',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'silver2',
@@ -909,7 +909,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user2',
         nickname: 'PS마스터',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'silver3',
@@ -919,7 +919,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user3',
         nickname: '백준킹',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'silver1',
@@ -965,7 +965,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user3',
         nickname: '해론다이',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'gold3',
@@ -976,7 +976,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user4',
         nickname: 'RedPlayer1',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold5',
@@ -987,7 +987,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user9',
         nickname: 'RedPlayer2',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold4',
@@ -999,7 +999,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user6',
         nickname: 'BlueLeader',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold2',
@@ -1010,7 +1010,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user7',
         nickname: 'BluePlayer1',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold4',
@@ -1021,7 +1021,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user8',
         nickname: 'BluePlayer2',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold3',
@@ -1071,7 +1071,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user3',
         nickname: '해론다이',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: true,
         status: 'READY',
         tier: 'gold3',
@@ -1082,7 +1082,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user4',
         nickname: 'RedPlayer1',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold5',
@@ -1093,7 +1093,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user5',
         nickname: 'RedPlayer2',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold4',
@@ -1105,7 +1105,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user6',
         nickname: 'BlueLeader',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold2',
@@ -1116,7 +1116,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user7',
         nickname: 'BluePlayer1',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold4',
@@ -1127,7 +1127,7 @@ export const mockGamePlayStates: Record<string, GamePlayState> = {
       {
         id: 'user8',
         nickname: 'BluePlayer2',
-        profileImg: '/avatars/default.png',
+        profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
         isHost: false,
         status: 'READY',
         tier: 'gold3',

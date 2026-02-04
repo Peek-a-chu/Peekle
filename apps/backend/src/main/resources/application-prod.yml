@@ -31,6 +31,8 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}
 
-OPENVIDU_URL: ${OPENVIDU_URL:https://openvidu:4443}
-OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+livekit:
+  url: ${LIVEKIT_URL:http://localhost:7880}
+  api-key: ${LIVEKIT_API_KEY}
+  api-secret: ${LIVEKIT_API_SECRET}
 

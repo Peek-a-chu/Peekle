@@ -113,7 +113,7 @@ export function WorkbooksRightPanel({
             <span>
               Last Updated{' '}
               {(() => {
-                const d = new Date(workbook.createdAt);
+                const d = new Date(workbook.updatedAt);
                 const yyyy = d.getFullYear();
                 const mm = String(d.getMonth() + 1).padStart(2, '0');
                 const dd = String(d.getDate()).padStart(2, '0');

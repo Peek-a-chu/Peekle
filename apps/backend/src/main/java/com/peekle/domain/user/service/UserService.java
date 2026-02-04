@@ -1,5 +1,6 @@
 package com.peekle.domain.user.service;
 
+import com.peekle.domain.league.service.LeagueService;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.dto.TimelineItemDto;
 import com.peekle.domain.user.dto.UserProfileResponse;
@@ -14,7 +15,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import com.peekle.domain.submission.dto.SubmissionLogResponse;
 import com.peekle.domain.submission.entity.SubmissionLog;
-
+import com.peekle.domain.submission.dto.SubmissionHistoryFilterDto;
+import com.peekle.domain.submission.enums.SourceType;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.HashMap;
 import java.util.List;
@@ -27,33 +36,37 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepository;
     private final SubmissionLogRepository submissionLogRepository;
+    private final com.peekle.global.storage.R2StorageService r2StorageService;
+    private final LeagueService leagueService;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Transactional
     public String generateExtensionToken(Long userId, boolean forceRegenerate) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // Return existing token if already present (Single Token for Multiple Devices) and NOT forcing regeneration
+        // Return existing token if already present (Single Token for Multiple Devices)
+        // and NOT forcing regeneration
         if (!forceRegenerate && user.getExtensionToken() != null && !user.getExtensionToken().isEmpty()) {
             return user.getExtensionToken();
         }
 
         // Generate new UUID token
         String token = UUID.randomUUID().toString();
-        
+
         user.updateExtensionToken(token);
-        
+
         return token;
     }
 
     public boolean validateExtensionToken(Long userId, String token) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        
+
         if (user.getExtensionToken() == null) {
             return false;
         }
-        
+
         return user.getExtensionToken().equals(token);
     }
 
@@ -85,7 +98,7 @@ public class UserService {
         long rank = userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
 
         // 3. 필드 데이터 조회
-        long solvedCount = submissionLogRepository.countByUserId(user.getId());
+        long solvedCount = submissionLogRepository.countSolvedByUserId(user.getId());
 
         boolean isMe = currentUserId != null && currentUserId.equals(userId);
 
@@ -97,13 +110,15 @@ public class UserService {
                 .leagueName(user.getLeague().name())
                 .score((long) user.getLeaguePoint())
                 .rank((int) rank)
-                .profileImg(user.getProfileImgThumb())
+                .profileImg(user.getProfileImg())
+                .profileImgThumb(user.getProfileImgThumb())
                 .streakCurrent(user.getStreakCurrent())
                 .streakMax(user.getStreakMax())
                 .solvedCount(solvedCount)
                 .me(isMe)
                 .build();
     }
+
     public User getUserByExtensionToken(String token) {
         return userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
@@ -124,22 +139,35 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.List<com.peekle.domain.user.dto.ActivityStreakDto> getUserActivityStreakByNickname(
+            String nickname) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return getUserActivityStreak(user.getId());
+    }
+
+    @Transactional(readOnly = true)
     public java.util.List<com.peekle.domain.user.dto.ActivityStreakDto> getUserActivityStreak(Long userId) {
         // 1. 유저의 모든 제출 내역 조회 (오래된 순)
-        java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = 
-                submissionLogRepository.findAllByUserIdOrderBySubmittedAtAsc(userId);
+        java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = submissionLogRepository
+                .findAllByUserIdOrderBySubmittedAtAsc(userId);
 
         Map<String, Long> dailyCounts = new HashMap<>();
-        
+
         // 3. 일별 중복 제거를 위한 Set (하루에 같은 문제 여러 번 푼 경우 제외, 다른 날 풀면 포함)
         java.util.Set<String> dailySolvedCheck = new java.util.HashSet<>();
-            
+
         // 4. 실제 데이터로 업데이트
         for (com.peekle.domain.submission.entity.SubmissionLog log : logs) {
             Long problemId = log.getProblem().getId();
             String date = log.getSubmittedAt().toLocalDate().toString(); // YYYY-MM-DD
             String uniqueKey = date + ":" + problemId;
-            
+
+            // 성공한 제출만 카운트
+            if (log.getIsSuccess() == null || !log.getIsSuccess()) {
+                continue;
+            }
+
             // 해당 날짜에 아직 안 푼 문제인 경우에만 카운트
             if (!dailySolvedCheck.contains(uniqueKey)) {
                 dailySolvedCheck.add(uniqueKey);
@@ -155,31 +183,39 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public List<TimelineItemDto> getDailyTimelineByNickname(String nickname, String dateStr) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return getDailyTimeline(user.getId(), dateStr);
+    }
+
+    @Transactional(readOnly = true)
     public List<TimelineItemDto> getDailyTimeline(Long userId, String dateStr) {
         java.time.LocalDate date = java.time.LocalDate.parse(dateStr);
         java.time.LocalDateTime startOfDay = date.atStartOfDay();
         java.time.LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
 
-        java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = 
-                submissionLogRepository.findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
-                        userId, startOfDay, endOfDay
-                );
+        java.util.List<com.peekle.domain.submission.entity.SubmissionLog> logs = submissionLogRepository
+                .findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        userId, startOfDay, endOfDay);
 
         java.util.List<TimelineItemDto> timeline = new java.util.ArrayList<>();
         java.util.Set<String> processedKeys = new java.util.HashSet<>();
 
         for (com.peekle.domain.submission.entity.SubmissionLog log : logs) {
             com.peekle.domain.problem.entity.Problem problem = log.getProblem();
-            
+
             // String tagKey = log.getTag() != null ? log.getTag() : "null";
             // String uniqueKey = problem.getId() + ":" + tagKey;
-            
+
             // if (!processedKeys.contains(uniqueKey)) {
-            //     processedKeys.add(uniqueKey);
+            // processedKeys.add(uniqueKey);
             {
-                
-                // Use denormalized fields from SubmissionLog if available to avoid potential N+1 or extra joins if not fetched
-                // The entity definition shows problemTitle, problemTier, and now externalId exist.
+
+                // Use denormalized fields from SubmissionLog if available to avoid potential
+                // N+1 or extra joins if not fetched
+                // The entity definition shows problemTitle, problemTier, and now externalId
+                // exist.
                 String tierStr = log.getProblemTier() != null ? log.getProblemTier().toLowerCase() : "unknown";
                 String title = log.getProblemTitle() != null ? log.getProblemTitle() : problem.getTitle();
                 String problemIdStr = log.getExternalId() != null ? log.getExternalId() : problem.getExternalId();
@@ -188,7 +224,7 @@ public class UserService {
 
                 String tierName = "unknown";
                 int tierLevel = 0;
-                
+
                 String[] parts = tierStr.split(" ");
                 if (parts.length >= 2) {
                     tierName = parts[0];
@@ -200,26 +236,29 @@ public class UserService {
                 } else {
                     tierName = tierStr;
                 }
-                
+
                 timeline.add(TimelineItemDto.builder()
                         .submissionId(log.getId())
-                        .problemId(problemIdStr) 
+                        .problemId(problemIdStr)
                         .title(title)
-                        .tier(tierName) 
-                        .tierLevel(tierLevel) 
+                        .tier(tierName)
+                        .tierLevel(tierLevel)
                         .link(problemLink)
                         .tag(log.getTag()) // Map tag from log
                         .sourceType(log.getSourceType() != null ? log.getSourceType().name() : "EXTENSION")
                         .language(log.getLanguage())
                         .memory(log.getMemory())
                         .executionTime(log.getExecutionTime())
+                        .result(log.getResult())
+                        .isSuccess(log.getIsSuccess())
                         .submittedAt(log.getSubmittedAt().toString())
                         .build());
             }
         }
-        
+
         return timeline;
     }
+
     @Transactional(readOnly = true)
     public com.peekle.domain.user.dto.ExtensionStatusResponse getExtensionStatus(Long userId) {
         User user = userRepository.findById(userId)
@@ -228,33 +267,210 @@ public class UserService {
         // Check if solved today
         java.time.LocalDateTime startOfDay = java.time.LocalDate.now().atStartOfDay();
         java.time.LocalDateTime endOfDay = java.time.LocalDate.now().plusDays(1).atStartOfDay();
-        
-        List<com.peekle.domain.submission.entity.SubmissionLog> todayLogs = 
-                submissionLogRepository.findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
-                        userId, startOfDay, endOfDay
-                );
-        
+
+        List<com.peekle.domain.submission.entity.SubmissionLog> todayLogs = submissionLogRepository
+                .findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
+                        userId, startOfDay, endOfDay);
+
         boolean isSolvedToday = !todayLogs.isEmpty();
+
+        // 그룹 내 순위 및 상태 계산 (LeagueService 활용)
+        com.peekle.domain.league.dto.UserLeagueStatusDto statusDto = leagueService.getUserLeagueStatus(user);
 
         return com.peekle.domain.user.dto.ExtensionStatusResponse.builder()
                 .streakCurrent(user.getStreakCurrent())
                 .isSolvedToday(isSolvedToday)
+                .groupRank(statusDto.getGroupRank())
+                .leagueStatus(statusDto.getLeagueStatus())
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public Page<SubmissionLogResponse> getUserSubmissionsByNickname(String nickname, Pageable pageable) {
-        User user = userRepository.findByNickname(nickname)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        
-        return getUserSubmissions(user.getId(), pageable);
+    public Page<SubmissionLogResponse> getUserSubmissionsByNickname(
+            String nickname, Pageable pageable,
+            String date, String tier, String sourceType, String status) {
+
+        SubmissionHistoryFilterDto.SubmissionHistoryFilterDtoBuilder builder = SubmissionHistoryFilterDto.builder()
+                .nickname(nickname);
+
+        applyFilters(builder, date, tier, sourceType, status);
+
+        Page<SubmissionLog> logs = submissionLogRepository.findHistory(builder.build(), pageable);
+        return logs.map(SubmissionLogResponse::from);
     }
 
     @Transactional(readOnly = true)
-    public Page<SubmissionLogResponse> getUserSubmissions(Long userId, Pageable pageable) {
-        Page<SubmissionLog> logs = 
-                submissionLogRepository.findAllByUserIdOrderBySubmittedAtDesc(userId, pageable);
-        
+    public Page<SubmissionLogResponse> getUserSubmissions(
+            Long userId, Pageable pageable,
+            String date, String tier, String sourceType, String status) {
+
+        SubmissionHistoryFilterDto.SubmissionHistoryFilterDtoBuilder builder = SubmissionHistoryFilterDto.builder()
+                .userId(userId);
+
+        applyFilters(builder, date, tier, sourceType, status);
+
+        Page<SubmissionLog> logs = submissionLogRepository.findHistory(builder.build(), pageable);
         return logs.map(SubmissionLogResponse::from);
+    }
+
+    private void applyFilters(
+            SubmissionHistoryFilterDto.SubmissionHistoryFilterDtoBuilder builder,
+            String date, String tier, String sourceTypeStr, String status) {
+
+        // Date (>= date 00:00:00)
+        if (date != null && !date.isEmpty()) {
+            try {
+                java.time.LocalDate localDate = java.time.LocalDate.parse(date);
+                builder.startDate(localDate.atStartOfDay());
+                // Optional: To show only that day? Or From that day?
+                // "Simple Filter" usually implies "On that day" or "From".
+                // Let's implement ">= Date" logic for history flow.
+            } catch (Exception e) {
+                // Ignore invalid date
+            }
+        }
+
+        // Tier
+        if (tier != null && !tier.isEmpty() && !tier.equals("전체")) {
+            builder.tier(tier);
+        }
+
+        // SourceType
+        if (sourceTypeStr != null && !sourceTypeStr.equals("ALL")) {
+            try {
+                builder.sourceType(com.peekle.domain.submission.enums.SourceType.valueOf(sourceTypeStr));
+            } catch (Exception e) {
+            }
+        }
+
+        // Status
+        if (status != null && !status.isEmpty() && !status.equals("ALL")) {
+            if ("SUCCESS".equalsIgnoreCase(status)) {
+                builder.isSuccess(true);
+            } else if ("FAIL".equalsIgnoreCase(status)) {
+                builder.isSuccess(false);
+            }
+        }
+    }
+
+    @Transactional
+    public void updateUserProfile(Long userId, com.peekle.domain.user.dto.UserUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 닉네임 중복 검사 (새로운 닉네임이 입력되었고, 기존과 다를 경우)
+        if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
+            if (userRepository.findByNickname(request.getNickname()).isPresent()) {
+                throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+            }
+        }
+
+        // 백준 아이디 중복 검사 (새로운 아이디 입력시)
+        if (request.getBojId() != null && !request.getBojId().equals(user.getBojId())) {
+            if (userRepository.findByBojId(request.getBojId()).isPresent()) {
+                throw new BusinessException(ErrorCode.DUPLICATE_BOJ_ID);
+            }
+        }
+
+        // 프로필 이미지 삭제 요청 처리
+        if (Boolean.TRUE.equals(request.getIsProfileImageDeleted())) {
+            // 기존 이미지 삭제
+            if (user.getProfileImg() != null) {
+                r2StorageService.deleteFile(user.getProfileImg());
+            }
+            if (user.getProfileImgThumb() != null) {
+                r2StorageService.deleteFile(user.getProfileImgThumb());
+            }
+            // DB 업데이트 (null 설정)
+            user.deleteProfileImage();
+        }
+        // 새 이미지 업로드 처리 (삭제 요청이 아닐 때만)
+        else {
+            // 기존 프로필 이미지 삭제 (새 이미지가 들어왔고, 기존 이미지가 있다면)
+            if (request.getProfileImg() != null && user.getProfileImg() != null
+                    && !request.getProfileImg().equals(user.getProfileImg())) {
+                r2StorageService.deleteFile(user.getProfileImg());
+            }
+
+            // 기존 썸네일 이미지 삭제
+            if (request.getProfileImgThumb() != null && user.getProfileImgThumb() != null
+                    && !request.getProfileImgThumb().equals(user.getProfileImgThumb())) {
+                r2StorageService.deleteFile(user.getProfileImgThumb());
+            }
+
+            user.updateProfile(
+                    request.getNickname(),
+                    request.getBojId(),
+                    request.getProfileImg(),
+                    request.getProfileImgThumb());
+        }
+
+        // 닉네임/BOJ ID 등 다른 필드 업데이트는 위 else 블록 안의 updateProfile에서 처리되거나,
+        // 별도로 처리해야 함. updateProfile 메소드가 모든 필드를 처리하므로,
+        // 삭제 시에는 updateProfile을 호출할 때 이미지 필드를 null로 주거나,
+        // deleteProfileImage() 호출 후 이미지를 제외한 필드만 updateProfile로 처리해야 함.
+
+        // Refactoring to ensure nickname/bojId are updated regardless of image deletion
+        // but image fields are respected.
+
+        // Let's reset logic slightly to be cleaner.
+        // If deleted, we effectively set new image to null for the update call, OR use
+        // specific method.
+        // user.deleteProfileImage() sets them to null.
+        // user.updateProfile checks for nulls and DOES NOT update if null.
+        // So if we call deleteProfileImage(), we shouldn't pass image fields to
+        // updateProfile unless we want to overwrite them (which we shouldn't).
+
+        if (!Boolean.TRUE.equals(request.getIsProfileImageDeleted())) {
+            user.updateProfile(
+                    request.getNickname(),
+                    request.getBojId(),
+                    request.getProfileImg(),
+                    request.getProfileImgThumb());
+        } else {
+            user.updateProfile(
+                    request.getNickname(),
+                    request.getBojId(),
+                    null,
+                    null);
+        }
+    }
+
+    public Map<String, String> getProfileImagePresignedUrl(Long userId, String fileName, String contentType) {
+        // 파일명: profile/{userId}/{timestamp}_{fileName}
+        String objectKey = "profile/" + userId + "/" + System.currentTimeMillis() + "_" + fileName;
+        String presignedUrl = r2StorageService.generatePresignedUrl(objectKey, contentType);
+        String publicUrl = r2StorageService.getPublicUrl(objectKey);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("presignedUrl", presignedUrl);
+        response.put("publicUrl", publicUrl);
+        return response;
+    }
+
+    public boolean validateBojId(String bojId) {
+        if (bojId == null || bojId.trim().isEmpty()) {
+            return false;
+        }
+
+        String url = "https://www.acmicpc.net/user/" + bojId.trim();
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+            return response.getStatusCode() == HttpStatus.OK;
+        } catch (HttpClientErrorException.NotFound e) {
+            return false;
+        } catch (Exception e) {
+            System.err.println("Error validating BOJ ID: " + e.getMessage());
+            // 에러 발생 시(타임아웃 등)는 일단 false 처리하거나, 혹은 별도 에러 처리가 필요할 수 있음
+            // 여기서는 존재 확인이 목적이므로 에러면 확인 불가 -> false로 처리 (또는 true로 처리해서 넘길 수도 있지만 엄격하게 false)
+            return false;
+        }
     }
 }

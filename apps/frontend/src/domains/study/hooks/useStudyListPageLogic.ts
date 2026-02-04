@@ -24,8 +24,14 @@ export function useStudyListPageLogic() {
       if (process.env.NODE_ENV === 'development') {
         console.log('[useStudyListPageLogic] Fetched studies:', data);
         if (data.content && data.content.length > 0) {
-          console.log('[useStudyListPageLogic] First study:', JSON.stringify(data.content[0], null, 2));
-          console.log('[useStudyListPageLogic] First study rankingPoint:', data.content[0].rankingPoint);
+          console.log(
+            '[useStudyListPageLogic] First study:',
+            JSON.stringify(data.content[0], null, 2),
+          );
+          console.log(
+            '[useStudyListPageLogic] First study rankingPoint:',
+            data.content[0].rankingPoint,
+          );
           console.log('[useStudyListPageLogic] First study owner:', data.content[0].owner);
         }
       }

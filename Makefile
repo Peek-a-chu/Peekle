@@ -2,7 +2,7 @@ COMPOSE_FILE		    := ./docker/docker-compose.yml
 DEV_COMPOSE_FILE	    := ./docker/docker-compose.dev.yml
 PROD_COMPOSE_FILE	    := ./docker/docker-compose.prod.yml
 COTURN_COMPOSE_FILE	    := ./docker/coturn/docker-compose.yml
-OPENVIDU_COMPOSE_FILE	:= ./docker/openvidu/docker-compose.yml
+LIVEKIT_COMPOSE_FILE	:= ./docker/livekit/docker-compose.yaml
 
 # ===========================================
 # Development Commands (Localhost)
@@ -69,20 +69,20 @@ coturn-down:
 coturn-logs:
 	docker compose -f $(COTURN_COMPOSE_FILE) logs -f
 
-# OpenVidu commands
-openvidu-up:
-	DOCKER_BUILDKIT=1 docker compose -f $(OPENVIDU_COMPOSE_FILE) up -d
+# Livekit commands
+livekit-up:
+	DOCKER_BUILDKIT=1 docker compose -f $(LIVEKIT_COMPOSE_FILE) up -d
 
-openvidu-down:
-	docker compose -f $(OPENVIDU_COMPOSE_FILE) down
+livekit-down:
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
 
-openvidu-logs:
-	docker compose -f $(OPENVIDU_COMPOSE_FILE) logs -f
+livekit-logs:
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) logs -f
 
-# WebRTC Infrastructure (Coturn + OpenVidu)
-webrtc-up: coturn-up openvidu-up
+# WebRTC Infrastructure (Coturn + LiveKit)
+webrtc-up: coturn-up livekit-up
 
-webrtc-down: openvidu-down coturn-down
+webrtc-down: livekit-down coturn-down
 
 # ===========================================
 # Cleanup Commands
@@ -92,7 +92,8 @@ clean:
 	docker compose -f $(DEV_COMPOSE_FILE) down
 	docker compose -f $(COMPOSE_FILE) down
 	docker compose -f $(COTURN_COMPOSE_FILE) down
-	docker compose -f $(OPENVIDU_COMPOSE_FILE) down
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
+	-docker rm -f peekle-chroma-dev peekle-ai-server-dev
 
 clean-prod:
 	docker compose -f $(PROD_COMPOSE_FILE) down
@@ -102,14 +103,14 @@ clean-all:
 	docker compose -f $(COMPOSE_FILE) down
 	docker compose -f $(PROD_COMPOSE_FILE) down
 	docker compose -f $(COTURN_COMPOSE_FILE) down
-	docker compose -f $(OPENVIDU_COMPOSE_FILE) down
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
 
 fclean:
 	docker compose -f $(DEV_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
 	docker compose -f $(COMPOSE_FILE) down --rmi all --volumes --remove-orphans
 	docker compose -f $(PROD_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
 	docker compose -f $(COTURN_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(OPENVIDU_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
 	docker system prune --all --volumes --force
 
 re:
@@ -128,7 +129,7 @@ help:
 	@echo "Peekle Docker Commands"
 	@echo ""
 	@echo "Development (Localhost):"
-	@echo "  make all / dev-up   - Start development containers (Nginx, FE, BE, Redis, OpenVidu)"
+	@echo "  make all / dev-up   - Start development containers (Nginx, FE, BE, Redis, LiveKit)"
 	@echo "  make dev-down       - Stop development containers"
 	@echo "  make dev-logs       - View development logs"
 	@echo "  make dev-ps         - Show development container status"
@@ -144,9 +145,9 @@ help:
 	@echo "  make prod-restart   - Restart production containers"
 	@echo "  make prod-ps        - Show production container status"
 	@echo ""
-	@echo "WebRTC Infrastructure (Coturn + OpenVidu):"
-	@echo "  make webrtc-up      - Start Coturn and OpenVidu"
-	@echo "  make webrtc-down    - Stop Coturn and OpenVidu"
+	@echo "WebRTC Infrastructure (Coturn + LiveKit):"
+	@echo "  make webrtc-up      - Start Coturn and LiveKit"
+	@echo "  make webrtc-down    - Stop Coturn and LiveKit"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean          - Stop all dev containers"
@@ -160,6 +161,6 @@ help:
         redis-up redis-down \
         prod-up prod-down prod-logs prod-restart prod-build prod-ps \
         coturn-up coturn-down coturn-logs \
-        openvidu-up openvidu-down openvidu-logs \
+        livekit-up livekit-down livekit-logs \
         webrtc-up webrtc-down \
         clean clean-prod clean-all fclean re re-prod help

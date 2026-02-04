@@ -25,12 +25,14 @@ export interface CCIDEToolbarProps {
   onCopy?: () => void;
   onRefChat?: () => void;
   onSubmit?: () => void;
+  disabled?: boolean;
 
   // View Mode Props
   viewingUser?: Participant | null;
   viewMode?: ViewMode;
   targetSubmission?: TargetSubmission | null;
   onResetView?: () => void;
+  problemExternalId?: string | null;
 }
 
 export function CCIDEToolbar({
@@ -47,6 +49,8 @@ export function CCIDEToolbar({
   viewMode,
   targetSubmission,
   onResetView,
+  disabled = false,
+  problemExternalId,
 }: CCIDEToolbarProps) {
   const isRealtime = viewMode === 'SPLIT_REALTIME';
   const isSaved = viewMode === 'SPLIT_SAVED';
@@ -59,7 +63,11 @@ export function CCIDEToolbar({
         <select
           value={language}
           onChange={(e) => onLanguageChange?.(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+          disabled={disabled}
+          className={cn(
+            'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring',
+            disabled && 'opacity-50 cursor-not-allowed',
+          )}
         >
           {LANGUAGES.map((lang) => (
             <option key={lang.value} value={lang.value}>
@@ -91,7 +99,10 @@ export function CCIDEToolbar({
                   }의 저장된 코드 열람 중`}
             </span>
             {isSaved && targetSubmission && (
-              <span className="text-xs opacity-75">({targetSubmission.problemTitle})</span>
+              <span className="text-xs opacity-75">
+                ({problemExternalId ? `${problemExternalId}. ` : ''}
+                {targetSubmission.problemTitle})
+              </span>
             )}
           </div>
         )}
@@ -99,18 +110,30 @@ export function CCIDEToolbar({
 
       <div className="flex items-center gap-2">
         {/* Theme Toggle */}
-        <Button variant="ghost" size="icon" onClick={onThemeToggle} title="테마 변경">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onThemeToggle}
+          title="테마 변경"
+          disabled={disabled}
+        >
           {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </Button>
 
         {/* Copy */}
-        <Button variant="ghost" size="icon" onClick={onCopy} title="코드 복사">
+        <Button variant="ghost" size="icon" onClick={onCopy} title="코드 복사" disabled={disabled}>
           <Copy className="h-4 w-4" />
         </Button>
 
         {/* Code Reference - Always available if enabled */}
         {showChatRef && (
-          <Button variant="ghost" size="icon" onClick={onRefChat} title="코드 참조 (채팅)">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onRefChat}
+            title="코드 참조 (채팅)"
+            disabled={disabled}
+          >
             <MessageSquare className="h-4 w-4" />
           </Button>
         )}
@@ -125,6 +148,7 @@ export function CCIDEToolbar({
                 onClick={onSubmit}
                 className="gap-1 bg-[#EDF2F8] text-foreground hover:bg-[#DFE7F0]"
                 title="제출하기"
+                disabled={disabled}
               >
                 <Send className="h-3 w-3" />
                 <span className="text-xs">제출</span>

@@ -47,7 +47,7 @@ public class StudyCurriculumService {
      * 커리큘럼에 문제 추가 (오늘 날짜만 가능)
      */
     @Transactional
-    public void addProblem(Long userId, Long studyId, StudyProblemAddRequest request) {
+    public ProblemStatusResponse addProblem(Long userId, Long studyId, StudyProblemAddRequest request) {
         StudyRoom study = studyRoomRepository.findById(studyId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
@@ -102,13 +102,15 @@ public class StudyCurriculumService {
                 topic, actualProblemId, externalId);
         redisPublisher.publish(new ChannelTopic(topic),
                 SocketResponse.of("ADD", responseData));
+
+        return responseData;
     }
 
     /**
      * 커리큘럼에서 문제 삭제 (아무도 풀지 않은 경우에만)
      */
     @Transactional
-    public void removeProblem(Long userId, Long studyId, Long problemId) {
+    public ProblemStatusResponse removeProblem(Long userId, Long studyId, Long problemId) {
         // 문제 ID로 StudyProblem 찾기 (사용자가 Problem ID를 전달한다고 가정, 엔티티를 찾아야 함)
         // 하지만 날짜별로 같은 문제 ID가 여러 개 있을 수 있음.
         // '오늘'의 엔티티를 찾아야 함.
@@ -166,6 +168,8 @@ public class StudyCurriculumService {
         String topic = String.format(RedisKeyConst.TOPIC_CURRICULUM, studyId);
         redisPublisher.publish(new ChannelTopic(topic),
                 SocketResponse.of("REMOVE", responseData));
+        
+        return responseData;
     }
 
     /**

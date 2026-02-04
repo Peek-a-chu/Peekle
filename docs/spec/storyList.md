@@ -70,11 +70,11 @@
 **✅ Acceptance Criteria**
 - [ ] Coturn 서버가 표준 STUN/TURN 포트에서 수신 대기해야 한다.
 - [ ] WebRTC trickle 테스터로 테스트 시 유효한 Relay 후보를 반환해야 한다.
-- [ ] OpenVidu 서버가 외부 Coturn 서버를 사용하도록 설정되어야 한다.
+- [ ] LiveKit 서버가 외부 Coturn 서버를 사용하도록 설정되어야 한다.
 
 **🛠 Implementation Tasks**
 - [ ] Coturn Docker 컨테이너 배포 및 `turnserver.conf` 설정
-- [ ] OpenVidu 설정 파일(`AWS_URL`, `COTURN_IP`) 업데이트
+- [ ] LiveKit 설정 파일(`AWS_URL`, `COTURN_IP`) 업데이트
 - [ ] 연결 테스트 수행
 
 ## 📋 Stories
@@ -291,7 +291,7 @@
 
 **🛠 Implementation Tasks**
 - [ ] Grid Layout 퍼블리싱 (Left: List, Center: IDE, Right: Chat)
-- [ ] OpenVidu Stream 정렬 로직 (Self First + Active Speaker Sort)
+- [ ] LiveKit Stream 정렬 로직 (Self First + Active Speaker Sort)
 - [ ] `useRoomStore`에 `viewingUser` 상태 관리 추가
 
 ### 03.2. 문제 목록 및 캘린더 (Left Panel)
