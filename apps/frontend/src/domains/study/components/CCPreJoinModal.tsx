@@ -328,7 +328,7 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
 
             const update = () => {
                 if (!analyserRef.current || !dataArrayRef.current) return;
-                analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+                analyserRef.current.getByteFrequencyData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
 
                 const array = dataArrayRef.current;
                 let sum = 0;
