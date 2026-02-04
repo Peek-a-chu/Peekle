@@ -32,6 +32,10 @@ export async function handleResponse<T>(res: Response): Promise<T> {
    그래야 Access Token이 만료되어도, /refresh로 토큰을 갱신하거든요!
 
  */
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & { skipAuth?: boolean } = {},
@@ -47,6 +51,8 @@ export async function apiFetch<T>(
     ...(fetchOptions.headers as any),
   };
 
+  // Cookie 인증으로 변경되었으므로 Authorization 헤더는 선택적/초기진입용으로만 사용하거나 제거 가능
+  // 다만 기존 로직 호환성을 위해 authToken이 명시적으로 있을 때만 넣음
   if (authToken && !skipAuth) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
@@ -60,81 +66,45 @@ export async function apiFetch<T>(
   const contentType = response.headers.get('content-type') || '';
 
   if (response.status === 401) {
-    // Access token 만료 -> refresh 시도
-    const refreshUrl =
-      typeof window !== 'undefined' ? '/api/auth/refresh' : `${BACKEND_URL}/api/auth/refresh`;
-    const refreshResponse = await fetch(refreshUrl, {
-      method: 'POST',
-      credentials: 'include',
-    });
+    // 이미 갱신 중이라면 그 결과를 기다림
+    if (isRefreshing && refreshPromise) {
+      const success = await refreshPromise;
+      if (success) {
+        return retryOriginalRequest(url, fetchOptions);
+      } else {
+        return handleAuthFailure();
+      }
+    }
 
-    if (refreshResponse.ok) {
-      // 1. Refresh 성공 시, 새로운 AccessToken 추출 및 저장
+    // 갱신 시작
+    isRefreshing = true;
+    refreshPromise = (async () => {
       try {
-        const refreshJson = await refreshResponse.json();
-        if (
-          refreshJson &&
-          refreshJson.success &&
-          refreshJson.data &&
-          refreshJson.data.accessToken
-        ) {
-          setAuthToken(refreshJson.data.accessToken);
-        }
+        const refreshUrl =
+          typeof window !== 'undefined' ? '/api/auth/refresh' : `${BACKEND_URL}/api/auth/refresh`;
+        const refreshResponse = await fetch(refreshUrl, {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        return refreshResponse.ok;
       } catch (e) {
-        console.error('Failed to parse refresh response', e);
+        console.error("Token refresh error:", e);
+        return false;
+      } finally {
+        isRefreshing = false;
+        refreshPromise = null;
       }
+    })();
 
-      // 재시도
-      const retryResponse = await fetch(url, {
-        ...fetchOptions,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(fetchOptions.headers as any),
-          Authorization: authToken ? `Bearer ${authToken}` : '',
-        },
-      });
-
-      const retryText = await retryResponse.text();
-      if (!retryText) {
-        // Body is empty (e.g. 204 No Content), return generic success if status is OK
-        return {
-          success: retryResponse.ok,
-          data: null as any,
-          error: retryResponse.ok
-            ? undefined
-            : { code: 'EMPTY_RESPONSE', message: 'Empty response body' },
-        } as ApiResponse<T>;
-      }
-
-      try {
-        const json = JSON.parse(retryText);
-        // If it's the expected structure
-        if (json && typeof json === 'object' && 'success' in json) {
-          return json as ApiResponse<T>;
-        }
-        // If it's raw data
-        return { success: true, data: json, error: undefined } as ApiResponse<T>;
-      } catch (e: any) {
-        return {
-          success: false,
-          data: null,
-          error: {
-            code: 'INVALID_JSON',
-            message: `Failed to parse retry response: ${e.message}. Status: ${retryResponse.status}`,
-          },
-        };
-      }
-    } else {
-      // Refresh도 실패 -> 로그인 페이지로
+    const success = await refreshPromise;
+    if (success) {
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        window.dispatchEvent(new Event('auth:refreshed'));
       }
-      return {
-        success: false,
-        data: null,
-        error: { code: 'UNAUTHORIZED', message: 'Session expired' },
-      };
+      return retryOriginalRequest(url, fetchOptions);
+    } else {
+      return handleAuthFailure();
     }
   }
 
@@ -143,16 +113,68 @@ export async function apiFetch<T>(
   // Detect and surface a clearer error to help debugging.
   if (!contentType.includes('application/json')) {
     const text = await response.text();
-    const snippet = text.slice(0, 200).replace(/\s+/g, ' ');
+    // const snippet = text.slice(0, 200).replace(/\s+/g, ' ');
+    // HTML 응답이 오는 경우(보통 에러페이지나 로그인페이지) 처리
     return {
       success: false,
       data: null,
       error: {
         code: 'INVALID_RESPONSE',
-        message: `Expected JSON but got '${contentType || 'unknown'}' (status ${response.status}) from ${url}. Snippet: ${snippet}`,
+        message: `Expected JSON but got '${contentType || 'unknown'}' (status ${response.status})`,
       },
     };
   }
 
   return response.json() as Promise<ApiResponse<T>>;
+}
+
+async function retryOriginalRequest<T>(url: string, fetchOptions: RequestInit): Promise<ApiResponse<T>> {
+  const retryResponse = await fetch(url, {
+    ...fetchOptions,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(fetchOptions.headers as any),
+      // 재시도 시 Auth 헤더는 쿠키가 대신하므로 명시적으로 제거하거나 유지 (상황에 따라)
+      // 여기서는 authToken 변수가 업데이트되지 않으므로(쿠키방식) 제거하거나 그대로 둠
+      // 쿠키가 우선시되므로 크게 상관 없음
+    },
+  });
+
+  const retryText = await retryResponse.text();
+  if (!retryText) {
+    return {
+      success: retryResponse.ok,
+      data: null as any,
+      error: retryResponse.ok ? undefined : { code: 'EMPTY_RESPONSE', message: 'Empty response body' },
+    } as ApiResponse<T>;
+  }
+
+  try {
+    const json = JSON.parse(retryText);
+    if (json && typeof json === 'object' && 'success' in json) {
+      return json as ApiResponse<T>;
+    }
+    return { success: true, data: json, error: undefined } as ApiResponse<T>;
+  } catch (e: any) {
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: 'INVALID_JSON',
+        message: `Retry failed parse: ${e.message}`,
+      },
+    };
+  }
+}
+
+function handleAuthFailure<T>(): ApiResponse<T> {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
+  return {
+    success: false,
+    data: null,
+    error: { code: 'UNAUTHORIZED', message: 'Session expired after refresh attempt' },
+  };
 }
