@@ -5,6 +5,7 @@ export interface Workbook {
   description: string;
   problemCount: number;
   solvedCount: number;
+  failedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;
@@ -21,6 +22,7 @@ export interface WorkbookProblem {
   number: number; // 백준 문제 번호
   title: string;
   isSolved: boolean;
+  status: 'SUCCESS' | 'FAIL' | 'NONE';
   url: string;
 }
 

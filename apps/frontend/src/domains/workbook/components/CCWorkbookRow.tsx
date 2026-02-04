@@ -19,9 +19,13 @@ export function CCWorkbookRow({
   onToggleBookmark,
   className,
 }: CCWorkbookRowProps) {
-  const progress =
+  const successPercent =
     workbook.problemCount > 0
-      ? Math.round((workbook.solvedCount / workbook.problemCount) * 100)
+      ? (workbook.solvedCount / workbook.problemCount) * 100
+      : 0;
+  const failPercent =
+    workbook.problemCount > 0
+      ? (workbook.failedCount / workbook.problemCount) * 100
       : 0;
 
   return (
@@ -66,15 +70,20 @@ export function CCWorkbookRow({
       {/* 진행률 - w-24 */}
       <div className="shrink-0 w-24">
         <div className="flex items-center justify-end mb-1">
-          <span className="text-xs font-medium">
+          <span className="text-[10px] font-medium leading-none">
             <span className="text-green-500">{workbook.solvedCount}</span>
+            {workbook.failedCount > 0 && <span className="text-red-500">+{workbook.failedCount}</span>}
             <span className="text-muted-foreground">/{workbook.problemCount}</span>
           </span>
         </div>
-        <div className="h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
           <div
-            className="h-full rounded-full bg-green-500 transition-all"
-            style={{ width: `${progress}%` }}
+            className="h-full bg-green-500 transition-all"
+            style={{ width: `${successPercent}%` }}
+          />
+          <div
+            className="h-full bg-red-500 transition-all"
+            style={{ width: `${failPercent}%` }}
           />
         </div>
       </div>

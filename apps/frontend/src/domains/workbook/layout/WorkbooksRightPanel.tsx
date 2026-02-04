@@ -133,6 +133,36 @@ export function WorkbooksRightPanel({
             </pre>
           </div>
         )}
+
+        {/* 진행률 바 */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">
+              Progress
+            </span>
+            <span className="font-bold flex items-center gap-1">
+              <span className="text-green-500">{workbook.solvedCount}</span>
+              {workbook.failedCount > 0 && (
+                <span className="text-red-500">+{workbook.failedCount}</span>
+              )}
+              <span className="text-muted-foreground">/ {workbook.problemCount}</span>
+            </span>
+          </div>
+          <div className="h-2.5 bg-muted rounded-full overflow-hidden flex shadow-inner">
+            <div
+              className="h-full bg-green-500 transition-all duration-500"
+              style={{
+                width: `${workbook.problemCount > 0 ? (workbook.solvedCount / workbook.problemCount) * 100 : 0}%`,
+              }}
+            />
+            <div
+              className="h-full bg-red-500 transition-all duration-500"
+              style={{
+                width: `${workbook.problemCount > 0 ? (workbook.failedCount / workbook.problemCount) * 100 : 0}%`,
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* 문제 목록 */}
@@ -144,8 +174,10 @@ export function WorkbooksRightPanel({
           >
             {/* 풀이 상태 */}
             <div className="shrink-0">
-              {problem.isSolved ? (
+              {problem.status === 'SUCCESS' ? (
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
+              ) : problem.status === 'FAIL' ? (
+                <X className="h-5 w-5 text-red-500" />
               ) : (
                 <Circle className="h-5 w-5 text-muted-foreground/30" />
               )}

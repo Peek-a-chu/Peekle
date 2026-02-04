@@ -13,13 +13,15 @@ export interface WorkbookProblemResponse {
   tier: string;
   url: string;
   solved: boolean;
+  status?: 'SUCCESS' | 'FAIL' | 'NONE';
 }
 
 export interface WorkbookResponse {
   id: number;
   title: string;
   description: string;
-  problemCount: number;
+  solvedCount: number;
+  failedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;
@@ -35,6 +37,7 @@ export interface WorkbookListResponse {
   description: string;
   problemCount: number;
   solvedCount: number;
+  failedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;
