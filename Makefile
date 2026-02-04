@@ -41,7 +41,52 @@ prod-up:
 	# 최신 캐시 이미지를 가져오고, 없더라도 무시하여 빌드 오류 방지
 	-docker pull $${CI_REGISTRY_IMAGE:-peekle}/backend:latest
 	-docker pull $${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
+	@echo "🚀 Starting production services (includes LiveKit)..."
+	@echo ""
+	@# Step 1: Sync existing certificates from host (if any)
+	@if [ -d "/etc/letsencrypt/live" ] && [ -n "$$(sudo ls -A /etc/letsencrypt/live 2>/dev/null)" ]; then \
+		echo "📦 Found SSL certificates on host. Syncing to Docker volume..."; \
+		docker compose -f $(PROD_COMPOSE_FILE) run --rm --no-deps \
+			--entrypoint "/bin/sh -c" \
+			-v /etc/letsencrypt:/tmp/host_certs:ro \
+			certbot \
+			"cp -ans /tmp/host_certs/* /etc/letsencrypt/ 2>/dev/null || cp -rn /tmp/host_certs/* /etc/letsencrypt/ && echo '✅ Certificates synced from host'"; \
+	else \
+		echo "ℹ️  No existing certificates on host. Will auto-generate on first Nginx start."; \
+	fi
+	@echo ""
+	@# Step 2: Stop standalone LiveKit if running
+	@docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
+	@echo ""
+	@# Step 3: Build and start all services
+	@echo "🔨 Building and starting containers..."
 	DOCKER_BUILDKIT=1 docker compose -f $(PROD_COMPOSE_FILE) up --build -d
+	@echo ""
+	@# Step 4: Wait for Nginx to complete certificate setup
+	@echo "⏳ Waiting for SSL certificate setup (max 60s)..."
+	@timeout=60; \
+	elapsed=0; \
+	while [ $$elapsed -lt $$timeout ]; do \
+		if docker exec peekle-nginx test -f /etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem 2>/dev/null; then \
+			if docker exec peekle-nginx openssl x509 -in /etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem -noout -issuer 2>/dev/null | grep -qE "Let's Encrypt|ZeroSSL|Sectigo"; then \
+				echo "✅ Valid SSL certificate detected!"; \
+				break; \
+			else \
+				echo "⚠️  Self-signed certificate detected. Waiting for real certificate..."; \
+			fi; \
+		fi; \
+		sleep 2; \
+		elapsed=$$((elapsed + 2)); \
+	done
+	@echo ""
+	@echo "✨ Production deployment complete!"
+	@echo "   • Frontend:  https://i14a408.p.ssafy.io"
+	@echo "   • Backend:   https://i14a408.p.ssafy.io/api"
+	@echo "   • LiveKit:   wss://i14a408.p.ssafy.io (port 8880)"
+	@echo ""
+	@echo "📊 Check status: make prod-ps"
+	@echo "📝 View logs:    make prod-logs"
+
 
 prod-down:
 	docker compose -f $(PROD_COMPOSE_FILE) down
@@ -72,7 +117,7 @@ coturn-down:
 coturn-logs:
 	docker compose -f $(COTURN_COMPOSE_FILE) logs -f
 
-# Livekit commands
+# Livekit commands (Standalone for Development)
 livekit-up:
 	DOCKER_BUILDKIT=1 docker compose -f $(LIVEKIT_COMPOSE_FILE) up -d
 
@@ -80,10 +125,11 @@ livekit-down:
 	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
 
 livekit-logs:
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) logs -f
+	docker logs -f peekle-livekit-standalone
 
-# WebRTC Infrastructure (Coturn + LiveKit)
+# WebRTC Infrastructure (Development only - use prod-up for production)
 webrtc-up: coturn-up livekit-up
+	@echo "⚠️  Development WebRTC started. For production, use 'make prod-up'"
 
 webrtc-down: livekit-down coturn-down
 
@@ -92,28 +138,31 @@ webrtc-down: livekit-down coturn-down
 # ===========================================
 
 clean:
-	docker compose -f $(DEV_COMPOSE_FILE) down
-	docker compose -f $(COMPOSE_FILE) down
-	docker compose -f $(COTURN_COMPOSE_FILE) down
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
-	-docker rm -f peekle-chroma-dev peekle-ai-server-dev
+	docker compose -f $(DEV_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COTURN_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
+	-docker rm -f peekle-chroma-dev peekle-ai-server-dev 2>/dev/null || true
+	@echo "🧹 All containers cleaned"
 
 clean-prod:
 	docker compose -f $(PROD_COMPOSE_FILE) down
+	@echo "🧹 Production containers stopped"
 
 clean-all:
-	docker compose -f $(DEV_COMPOSE_FILE) down
-	docker compose -f $(COMPOSE_FILE) down
-	docker compose -f $(PROD_COMPOSE_FILE) down
-	docker compose -f $(COTURN_COMPOSE_FILE) down
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) down
+	docker compose -f $(DEV_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(PROD_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(COTURN_COMPOSE_FILE) down 2>/dev/null || true
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down 2>/dev/null || true
 
 fclean:
-	docker compose -f $(DEV_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(PROD_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(COTURN_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
-	docker compose -f $(LIVEKIT_COMPOSE_FILE) down --rmi all --volumes --remove-orphans
+	docker compose -f $(DEV_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(PROD_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(COTURN_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
+	docker compose -f $(LIVEKIT_COMPOSE_FILE) down --rmi all --volumes --remove-orphans 2>/dev/null || true
 	docker system prune --all --volumes --force
 
 re:
@@ -129,10 +178,10 @@ re-prod:
 # ===========================================
 
 help:
-	@echo "Peekle Docker Commands"
+	@echo "🎯 Peekle Docker Commands"
 	@echo ""
 	@echo "Development (Localhost):"
-	@echo "  make all / dev-up   - Start development containers (Nginx, FE, BE, Redis, LiveKit)"
+	@echo "  make all / dev-up   - Start development containers (Nginx, FE, BE, Redis)"
 	@echo "  make dev-down       - Stop development containers"
 	@echo "  make dev-logs       - View development logs"
 	@echo "  make dev-ps         - Show development container status"
@@ -142,15 +191,18 @@ help:
 	@echo "  make redis-down     - Stop Redis standalone"
 	@echo ""
 	@echo "Production (i14a408.p.ssafy.io):"
-	@echo "  make prod-up        - Start production containers"
+	@echo "  make prod-up        - 🚀 Start ALL production services (includes LiveKit)"
 	@echo "  make prod-down      - Stop production containers"
 	@echo "  make prod-logs      - View production logs"
 	@echo "  make prod-restart   - Restart production containers"
 	@echo "  make prod-ps        - Show production container status"
+	@echo "  make livekit-logs   - View LiveKit logs (after prod-up)"
 	@echo ""
-	@echo "WebRTC Infrastructure (Coturn + LiveKit):"
-	@echo "  make webrtc-up      - Start Coturn and LiveKit"
+	@echo "WebRTC Development (Standalone):"
+	@echo "  make webrtc-up      - Start Coturn + LiveKit (dev mode)"
 	@echo "  make webrtc-down    - Stop Coturn and LiveKit"
+	@echo "  make livekit-up     - Start LiveKit standalone (dev)"
+	@echo "  make livekit-down   - Stop LiveKit standalone"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean          - Stop all dev containers"
@@ -159,6 +211,10 @@ help:
 	@echo "  make fclean         - Remove all containers, images, volumes"
 	@echo "  make re             - Rebuild dev environment"
 	@echo "  make re-prod        - Rebuild prod environment"
+	@echo ""
+	@echo "💡 Quick Start:"
+	@echo "  Development:  make dev-up"
+	@echo "  Production:   make prod-up  (includes LiveKit with host network)"
 
 .PHONY: all dev-up dev-down dev-logs dev-ps \
         redis-up redis-down \
