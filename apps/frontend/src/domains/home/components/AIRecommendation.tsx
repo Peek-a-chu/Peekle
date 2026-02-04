@@ -13,8 +13,11 @@ interface AIRecommendationProps {
 }
 
 const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
-  const { data: fetchedData } = useAIRecommendations({ skip: !!initialData });
+  const { data: fetchedData, isLoading } = useAIRecommendations({ skip: !!initialData });
   const data = initialData || fetchedData;
+
+  // 로딩 중이거나 초기 데이터가 없는 경우의 처리
+  const showLoading = !initialData && isLoading;
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6 h-full transition-colors duration-300">
@@ -29,57 +32,68 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
 
       {/* 추천 문제 목록 */}
       <div className="space-y-4">
-        {data.map((item) => (
-          <div
-            key={item.problemId}
-            className="p-4 bg-muted/30 rounded-xl border border-border/50 hover:bg-muted/50 transition-colors"
-          >
-            {/* 문제 정보 */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm text-muted-foreground">{item.problemId}</span>
-              <span className="font-medium text-foreground">{item.title}</span>
-            </div>
+        {showLoading ? (
+          // 로딩 스켈레톤
+          [1, 2, 3].map((i) => (
+            <div key={i} className="p-4 bg-muted/10 rounded-xl border border-border/30 animate-pulse h-[140px]" />
+          ))
+        ) : data.length > 0 ? (
+          data.map((item) => (
+            <div
+              key={item.problemId}
+              className="p-4 bg-muted/30 rounded-xl border border-border/50 hover:bg-muted/50 transition-colors"
+            >
+              {/* 문제 정보 */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm text-muted-foreground">{item.problemId}</span>
+                <span className="font-medium text-foreground">{item.title}</span>
+              </div>
 
-            {/* 티어 & 태그 */}
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              {/* 백준 티어 태그 */}
-              <span
-                className="px-2 py-0.5 rounded text-xs font-medium text-white"
-                style={{ backgroundColor: BOJ_TIER_COLORS[item.tier] }}
-              >
-                {BOJ_TIER_NAMES[item.tier]} {item.tierLevel}
-              </span>
-              {item.tags.map((tag) => (
+              {/* 티어 & 태그 */}
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                {/* 백준 티어 태그 */}
                 <span
-                  key={tag}
-                  className="px-2 py-0.5 bg-muted rounded-full text-xs text-muted-foreground"
+                  className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                  style={{ backgroundColor: BOJ_TIER_COLORS[item.tier] || '#828282' }}
                 >
-                  {tag}
+                  {BOJ_TIER_NAMES[item.tier] || 'Unknown'} {item.tierLevel}
                 </span>
-              ))}
-            </div>
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 bg-muted rounded-full text-xs text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
 
-            {/* 추천 이유 */}
-            <p className="text-sm text-muted-foreground mb-3">💡 {item.reason}</p>
+              {/* 추천 이유 */}
+              <p className="text-sm text-muted-foreground mb-3">💡 {item.reason}</p>
 
-            {/* 버튼들 */}
-            <div className="flex items-center gap-2">
-              <Link
-                href={`https://www.acmicpc.net/problem/${item.problemId.replace('#', '')}`}
-                target="_blank"
-              >
-                <Button size="sm" className="gap-1">
-                  <ExternalLink className="w-3 h-3" />
-                  풀러가기
+              {/* 버튼들 */}
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`https://www.acmicpc.net/problem/${item.problemId.replace('#', '')}`}
+                  target="_blank"
+                >
+                  <Button size="sm" className="gap-1">
+                    <ExternalLink className="w-3 h-3" />
+                    풀러가기
+                  </Button>
+                </Link>
+                <Button size="sm" variant="outline" className="gap-1 border-border">
+                  <Plus className="w-3 h-3" />
+                  문제집에 추가
                 </Button>
-              </Link>
-              <Button size="sm" variant="outline" className="gap-1 border-border">
-                <Plus className="w-3 h-3" />
-                문제집에 추가
-              </Button>
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            추천할 수 있는 문제가 없습니다. <br /> 더 많은 문제를 풀어보세요!
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

@@ -37,13 +37,16 @@ def index_problems(problems):
     
     metadatas = [
         {
+            "id": str(p.get('id', '')),
+            "title": str(p.get('title', '')),
             "tier": str(p.get('tier', 'unknown')), 
+            "tags": str(p.get('tags', '')),
             "source": str(p.get('source', 'unknown'))
         } 
         for p in problems
     ]
     
-    collection.add(
+    collection.upsert(
         ids=ids,
         documents=documents,
         metadatas=metadatas

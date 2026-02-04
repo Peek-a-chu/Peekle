@@ -48,6 +48,15 @@ export async function apiFetch<T>(
     ...(fetchOptions.headers as any),
   };
 
+  if (!authToken && typeof window !== 'undefined') {
+    // 쿠키에서 access_token 추출 시도
+    const cookies = document.cookie.split(';');
+    const accessTokenCookie = cookies.find((c) => c.trim().startsWith('access_token='));
+    if (accessTokenCookie) {
+      authToken = accessTokenCookie.split('=')[1].trim();
+    }
+  }
+
   if (authToken && !skipAuth) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }

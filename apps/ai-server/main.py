@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import os
 import re
 from openai import OpenAI
-# embedding_service는 사용자 환경에 맞게 유지
 from embedding_service import search_similar_problems 
 
 app = FastAPI()
@@ -17,45 +18,71 @@ ai_client = OpenAI(
 
 # --- 데이터 모델 정의 ---
 class TagStat(BaseModel):
-    tagName: str
-    accuracyRate: float
-    attemptCount: int
+    tagName: Optional[str] = ""
+    accuracyRate: Optional[float] = 0.0
+    attemptCount: Optional[int] = 0
 
 class UserActivity(BaseModel):
-    solvedProblemTitles: List[str]
-    failedProblemTitles: List[str]
-    tagStats: List[TagStat]
-    currentTier: str
+    solvedProblemTitles: Optional[List[str]] = []
+    failedProblemTitles: Optional[List[str]] = []
+    tagStats: Optional[List[TagStat]] = []
+    currentTier: Optional[str] = "STONE"
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # 미들웨어 없이도 에러 발생 시 로그를 통해 확인 가능
+    print(f"\n[422 ERROR] Body Validation Failed!")
+    print(f"Error detail: {exc}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc), "msg": "Check field names and types."}
+    )
 
 # --- 헬퍼 함수: 러시아어 등 필터링 ---
 def is_bad_language(text):
-    # 1. 러시아어(키릴 문자) 및 기타 잡다한 특수 문자 영역 체크
-    # \u0400-\u04FF: 키릴 문자 (러시아어 등)
     if re.search('[\u0400-\u04FF]', text):
         return True
-        
-    # 2. 라틴 확장 문자 체크 (Auksinės의 'ė', 'š' 같은 문자)
-    # \u0100-\u024F: Latin Extended-A/B (유럽 언어 특수문자)
     if re.search('[\u0100-\u024F]', text):
         return True
-        
-    # 3. 중국어/일본어
     if re.search('[\u4E00-\u9FFF]', text):
         return True
-
     return False
 
 @app.post("/recommend/intelligent")
-async def get_intelligent_recommendation(activity: UserActivity):
+async def get_intelligent_recommendation(request: Request):
     try:
-        print(f"\n[DEBUG] {activity.currentTier} 티어 유저 추천 요청 수신")
+        # 1. 원본 데이터 로깅 (422 에러 원인 추적용)
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8') if body_bytes else "EMPTY"
+        print(f"\n[DEBUG] Raw Body received: '{body_str}'")
+
+        if not body_bytes:
+            print("[ERROR] Body is empty (None/Empty string)")
+            return {"recommendations": [], "error": "Empty body from client"}
+
+        # 2. JSON 파싱 및 모델 변환
+        try:
+            data = await request.json()
+            activity = UserActivity(**data)
+        except Exception as parse_err:
+            print(f"[ERROR] JSON/Pydantic mapping failed: {parse_err}")
+            # 데이터 형식이 살짝 틀려도 진행 가능하도록 최선을 다해 파싱 (Optional 필드 활용)
+            activity = UserActivity() 
+
+        # 필드 값 자체가 null(None)로 명시되어 올 경우를 위해 안전장치 추가
+        current_tier = activity.currentTier or "STONE"
+        tag_stats = activity.tagStats or []
+        solved_titles = activity.solvedProblemTitles or []
+        failed_titles = activity.failedProblemTitles or []
+
+        print(f"[DEBUG] {current_tier} 티어 유저 추천 요청 수신 (정상 파싱됨)")
         
-        # 유저 데이터 분석
-        strong_tags = [s.tagName for s in activity.tagStats if s.accuracyRate >= 0.7]
-        weak_tags = [s.tagName for s in activity.tagStats if s.accuracyRate < 0.7]
-        total_solved = len(activity.solvedProblemTitles)
+        # 유저 데이터 분석 (TagStat 모델 필드명인 tagName, accuracyRate 사용)
+        strong_tags = [s.tagName for s in tag_stats if (s.accuracyRate or 0) >= 0.7 and s.tagName]
+        weak_tags = [s.tagName for s in tag_stats if (s.accuracyRate or 0) < 0.7 and s.tagName]
+        total_solved = len(solved_titles)
         
-        is_new_user = total_solved == 0 and not activity.tagStats
+        is_new_user = total_solved == 0 and not tag_stats
         print(f"[DEBUG] 신규 유저 여부: {is_new_user}")
         
         # ---------------------------------------------------------
@@ -70,7 +97,7 @@ async def get_intelligent_recommendation(activity: UserActivity):
 
 🚨 [중요] 응답 형식:
 "키워드 | 의도" 형태로 콤마(,)로 구분해 주세요.
-- 키워드는 "알고리즘유형 난이도" 형식
+- 키워드 항목은 "알고리즘유형 난이도" 형식 (예: 구현 Bronze)
 - 의도는 아주 짧게(명사형 추천)
 
 예시:
@@ -228,10 +255,15 @@ async def get_intelligent_recommendation(activity: UserActivity):
             # 혹시나 AI가 줄 수를 못 맞췄을 경우를 대비한 안전장치
             user_reason = reasons[i] if i < len(reasons) else f"{rec['strategy_note']} 도전해보세요!"
             
+            p_meta = rec.get('metadata', {})
+            
             results.append({
-                "problem": rec['problem_info'],
+                "problemId": str(p_meta.get('id', '')),
+                "title": p_meta.get('title', ''),
+                "tier": p_meta.get('tier', ''),
+                "tags": p_meta.get('tags', ''),
                 "reason": user_reason,
-                "keyword": rec['keyword'] # 디버깅용 혹은 프론트 표시용
+                "keyword": rec['keyword'] # 디버깅용
             })
 
         print("[DEBUG] 추천 로직 완료")

@@ -8,4 +8,3 @@ public record UserActivityRequest(
         List<TagStatDto> tagStats,         // 태그별 정답률 (강점/약점 분석)
         String currentTier                 // 실력대 필터링
 ) {}
-
