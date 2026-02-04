@@ -52,6 +52,7 @@ public class SecurityConfig {
                                                 // Auth / OAuth2
                                                 .requestMatchers("/api/auth/**").permitAll()
                                                 .requestMatchers("/api/users/check-nickname").permitAll()
+                                                .requestMatchers("/api/users/check-boj-id").permitAll()
                                                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
                                                 // Extension / APIs

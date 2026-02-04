@@ -1,16 +1,13 @@
 import { ApiResponse } from '@/types/apiUtils';
-import { apiFetch } from '@/lib/api'; // Assuming apiFetch is needed or already used
+import { apiFetch } from '@/lib/api';
 import {
   LeagueRankingData,
   LeagueRankingMember,
   LeagueStat,
   WeeklyPointSummary,
   LeagueProgressData,
-  PointActivity,
 } from '@/domains/league/types';
 import { LeagueType } from '@/components/LeagueIcon';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
 
 // Backend DTO matches this structure
 export interface BackendRankingMember {
@@ -37,21 +34,13 @@ export interface LeagueStatusResponse {
 
 export async function getLeagueStatus(): Promise<LeagueRankingData | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/league/my-status`, {
-      credentials: 'include',
-    });
+    const res = await apiFetch<LeagueStatusResponse>('/api/league/my-status');
 
-    if (!res.ok) {
-      throw new Error('Failed to fetch league status');
-    }
-
-    const json: ApiResponse<LeagueStatusResponse> = await res.json();
-
-    if (!json.success || !json.data) {
+    if (!res.success || !res.data) {
       return null;
     }
 
-    const data = json.data;
+    const data = res.data;
 
     // Backend Response -> Frontend Data Mapping
     return {
@@ -84,12 +73,8 @@ export type LeagueRulesMap = Record<string, { promotePercent: number; demotePerc
 
 export async function getLeagueRules(): Promise<LeagueRulesMap | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/league/rules`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to fetch league rules');
-    const json: ApiResponse<LeagueRulesMap> = await res.json();
-    return json.data || null;
+    const res = await apiFetch<LeagueRulesMap>('/api/league/rules');
+    return res.data || null;
   } catch (error) {
     console.error('Error fetching league rules:', error);
     return null;
@@ -99,33 +84,29 @@ export async function getLeagueRules(): Promise<LeagueRulesMap | null> {
 export async function getWeeklyPointSummary(date?: string): Promise<WeeklyPointSummary | null> {
   try {
     const query = date ? `?date=${date}` : '';
-    const res = await fetch(`${API_BASE_URL}/api/league/weekly-summary${query}`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to fetch weekly summary');
-    const json: ApiResponse<WeeklyPointSummary> = await res.json();
-    return json.data || null;
+    const res = await apiFetch<WeeklyPointSummary>(`/api/league/weekly-summary${query}`);
+    return res.data || null;
   } catch (error) {
     console.error('Error fetching weekly summary:', error);
     return null;
   }
 }
 
-// Server-side exports
+// Client-side wrappers using apiFetch for consistency if used in components
+// Note: LeagueProgress and History might be used in Server Components often,
+// but if used in Client Components, this version is better.
+// If you specifically need Server Component fetching, use leagueServerApi.ts instead of this file.
 
 export async function getLeagueProgress(): Promise<LeagueProgressData[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/league/progress`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to fetch league progress');
-    const json: ApiResponse<LeagueProgressData[]> = await res.json();
-    return json.data || [];
+    const res = await apiFetch<LeagueProgressData[]>('/api/league/progress');
+    return res.data || [];
   } catch (error) {
     console.error('Error fetching league progress:', error);
     return [];
   }
 }
+
 export interface LeagueHistoryResponse {
   id: number;
   league: LeagueType;
@@ -138,28 +119,23 @@ export interface LeagueHistoryResponse {
 
 export async function getUnviewedLeagueHistory(): Promise<LeagueHistoryResponse | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/league/history/unviewed`, {
-      credentials: 'include',
-    });
-    // 404 means no unviewed history, which is fine
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error('Failed to fetch unviewed history');
-
-    const json: ApiResponse<LeagueHistoryResponse> = await res.json();
-    return json.success && json.data ? json.data : null;
+    const res = await apiFetch<LeagueHistoryResponse>('/api/league/history/unviewed');
+    // apiFetch usually throws or returns success:false if 404 depending on impl,
+    // assuming backend returns 200 with null or 404 error.
+    // If backend returns 404, apiFetch might throw. Ideally handle it.
+    if (!res.success) return null;
+    return res.data;
   } catch (error) {
-    console.warn('Checking unviewed history:', error);
+    // console.warn('Checking unviewed history:', error);
     return null;
   }
 }
 
 export async function markLeagueHistoryAsViewed(historyId: number): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/league/history/${historyId}/view`, {
+    await apiFetch(`/api/league/history/${historyId}/view`, {
       method: 'POST',
-      credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to mark history as viewed');
   } catch (error) {
     console.error('Error marking history as viewed:', error);
   }
@@ -167,12 +143,8 @@ export async function markLeagueHistoryAsViewed(historyId: number): Promise<void
 
 export async function getLeagueHistoryRanking(historyId: number): Promise<BackendRankingMember[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/league/history/${historyId}/ranking`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to fetch history ranking');
-    const json: ApiResponse<BackendRankingMember[]> = await res.json();
-    return json.data || [];
+    const res = await apiFetch<BackendRankingMember[]>(`/api/league/history/${historyId}/ranking`);
+    return res.data || [];
   } catch (error) {
     console.error('Error fetching history ranking:', error);
     return [];

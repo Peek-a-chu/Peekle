@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { Loader2 } from 'lucide-react';
@@ -26,6 +26,8 @@ import {
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
+import { CCPreJoinModal } from './CCPreJoinModal';
+import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -81,21 +83,8 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const openSettingsModal = useSettingsStore((state) => state.openModal);
 
   // [Fix] Move device settings modal open logic to after successful join or remove auto-open if causing issues on redirect.
-  // Or handle it carefully. For now, let's keep it but maybe it triggers before redirect?
-  // User asked "Make modal also not appear" likely referring to this one in context of access denied.
-  // We can make it dependent on success of fetchStudyRoom or similar state.
-  // But strictly speaking, we can just remove it from here and let user open it manually or put it in .then() of fetchStudyRoom.
+  const [isJoined, setIsJoined] = useState(false);
 
-  // However, usually we want it on entry.
-  // Let's add a state `isAccessGranted` and only open if granted.
-
-  const [isAccessGranted, setIsAccessGranted] = useState(false);
-
-  useEffect(() => {
-    if (isAccessGranted) {
-      openSettingsModal('device');
-    }
-  }, [openSettingsModal, isAccessGranted]);
 
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
@@ -149,7 +138,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   // Initialize room data (fetch participants only, room info fetched in wrapper)
   useEffect(() => {
     // Access is guaranteed by wrapper
-    setIsAccessGranted(true);
+    // Access is guaranteed by wrapper
 
     setCurrentDate(formatDate(new Date()));
 
@@ -353,11 +342,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   );
 }
 
-import { CCLiveKitWrapper } from './CCLiveKitWrapper';
+
+
+
 
 // Wrapper to provide SocketContext and handle Auth Check
 export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
+  const searchParams = useSearchParams();
   const studyId = Number(params.id) || 0;
   const router = useRouter();
   const currentUserId = useRoomStore((state) => state.currentUserId);
@@ -384,8 +376,6 @@ export function CCStudyRoomClient(): React.ReactNode {
       })
       .catch((err) => {
         console.error('[CCStudyRoomClient] Access Check Failed:', err);
-        // Error message is already toast-ed? no, StudyApi throws Error with message.
-        // We should show toast here.
         toast.error(err.message || '접근 권한이 없습니다.');
         router.replace('/study');
       })
@@ -393,6 +383,26 @@ export function CCStudyRoomClient(): React.ReactNode {
         setIsChecking(false);
       });
   }, [studyId, setRoomInfo, router]);
+
+  // State for Pre-Join
+  // Check if we came from list page with pre-selections
+  const preJoined = searchParams.get('prejoined') === 'true';
+  const paramMic = searchParams.get('mic') === 'true';
+  const paramCam = searchParams.get('cam') === 'true';
+
+  const [isJoined, setIsJoined] = useState(preJoined);
+  const roomTitle = useRoomStore((state) => state.roomTitle);
+  // If prejoined, use params. Else default (mic off, cam on).
+  const [initialMediaState, setInitialMediaState] = useState({
+    mic: preJoined ? paramMic : false,
+    cam: preJoined ? paramCam : true
+  });
+
+  const handleJoin = (mic: boolean, cam: boolean) => {
+    setInitialMediaState({ mic, cam });
+    setIsJoined(true);
+  };
+  // ...
 
   if (isChecking) {
     return (
@@ -408,10 +418,18 @@ export function CCStudyRoomClient(): React.ReactNode {
     return null;
   }
 
+  if (!isJoined) {
+    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
+  }
+
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
       <StudySocketInitiator studyId={studyId} />
-      <CCLiveKitWrapper studyId={studyId}>
+      <CCLiveKitWrapper
+        studyId={studyId}
+        initialMicEnabled={initialMediaState.mic}
+        initialCamEnabled={initialMediaState.cam}
+      >
         <StudyRoomContent studyId={studyId} />
       </CCLiveKitWrapper>
     </SocketProvider>
