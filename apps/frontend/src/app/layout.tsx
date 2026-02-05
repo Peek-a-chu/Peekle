@@ -9,6 +9,9 @@ import { ClientSessionManager } from '@/components/providers/ClientSessionManage
 export const metadata: Metadata = {
   title: 'Peekle',
   description: 'Peekle Application',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({

@@ -3,10 +3,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingUp, Calendar } from 'lucide-react';
-import Image from 'next/image';
 import { useLeagueProgress } from '../hooks/useDashboardData';
 import { LEAGUE_NAMES, LEAGUE_ORDER, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { LeagueProgressData } from '../mocks/dashboardMocks';
+import { LEAGUE_ICONS } from '@/assets/icons/league';
 
 // 한 화면에 보여줄 주 수
 const VISIBLE_WEEKS = 10;
@@ -208,20 +208,22 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
       <div className="flex">
         {/* Y축 아이콘 열 */}
         <div className="flex flex-col justify-between h-[200px] pr-2">
-          {yAxisIcons.map((league) => (
-            <div
-              key={league}
-              className="flex items-center justify-center"
-              style={{ height: `${100 / yAxisIcons.length}%` }}
-            >
-              <Image
-                src={`/icons/league/${league.toLowerCase()}.svg`}
-                alt={LEAGUE_NAMES[league as keyof typeof LEAGUE_NAMES] || LEAGUE_NAMES[league.toLowerCase() as keyof typeof LEAGUE_NAMES]}
-                width={18}
-                height={18}
-              />
-            </div>
-          ))}
+          {yAxisIcons.map((league) => {
+            const leagueKey = league.toLowerCase() as keyof typeof LEAGUE_ICONS;
+            const IconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
+            return (
+              <div
+                key={league}
+                className="flex items-center justify-center"
+                style={{ height: `${100 / yAxisIcons.length}%` }}
+              >
+                <IconAsset
+                  width={18}
+                  height={18}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* 차트 */}
