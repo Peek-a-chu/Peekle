@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { UserProfile } from '../types';
+import { LEAGUE_ICONS } from '@/assets/icons/league';
 
 interface Props {
   user: UserProfile;
@@ -9,9 +10,9 @@ interface Props {
 export function CCProfileStatsRow({ user }: Props) {
   const [imgError, setImgError] = useState(false);
 
-  // 리그 이름을 소문자로 변환하여 아이콘 파일명과 매칭 (e.g. "GOLD" -> "gold.svg")
-  const leagueKey = user.league?.toLowerCase() || 'stone';
-  const iconPath = `/icons/league/${leagueKey}.svg`;
+  // 리그 이름을 소문자로 변환하여 아이콘 매칭
+  const leagueKey = (user.league?.toLowerCase() || 'stone') as keyof typeof LEAGUE_ICONS;
+  const iconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
@@ -25,7 +26,7 @@ export function CCProfileStatsRow({ user }: Props) {
             </div>
           ) : (
             <Image
-              src={iconPath}
+              src={iconAsset}
               alt={`${user.league} tier icon`}
               width={24}
               height={24}
