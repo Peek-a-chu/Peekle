@@ -9,7 +9,7 @@ import { VolumeX, Search } from 'lucide-react';
 import { ParticipantCard } from './ParticipantCard';
 import { KickConfirmModal } from './KickConfirmModal';
 import { CCDelegateConfirmModal } from './CCDelegateConfirmModal';
-import { CCUserProfileModal } from '@/domains/profile/components/CCUserProfileModal';
+import { CCUserProfileModal } from '@/components/common/CCUserProfileModal';
 import { toast } from 'sonner';
 import { useSocketContext } from '../context/SocketContext';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
