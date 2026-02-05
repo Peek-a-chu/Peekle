@@ -523,10 +523,6 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
               scrollBeyondLastLine: false,
             }}
           />
-          {/* 코드 길이 표시 (정규화 기준) */}
-          <div className="absolute bottom-4 right-8 z-10 rounded bg-black/50 px-2 py-1 text-[10px] text-zinc-400 backdrop-blur-sm pointer-events-none">
-            Length: {(code || '').replace(/\r\n/g, '\n').trim().length} chars
-          </div>
         </div>
 
         {/* 확인 모달 */}
