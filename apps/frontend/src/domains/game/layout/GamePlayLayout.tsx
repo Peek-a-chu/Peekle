@@ -14,14 +14,15 @@ import {
   GameProblem,
   GamePlayParticipant,
   ChatMessage,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { CCGameResultModal } from '@/domains/game/components/game-result-modal/CCGameResultModal';
 
 interface GamePlayLayoutProps {
   className?: string;
   gameState: GamePlayState;
   problems: GameProblem[];
-  selectedProblemId: string | null;
-  onSelectProblem: (problemId: string) => void;
+  selectedProblemId: number | null;
+  onSelectProblem: (problemId: number) => void;
   formattedTime: string;
   code: string;
   language: string;
@@ -30,7 +31,7 @@ interface GamePlayLayoutProps {
   onSubmit: () => void;
   messages: ChatMessage[];
   participants: GamePlayParticipant[];
-  currentUserId: string;
+  currentUserId: number;
   onSendMessage: (content: string) => void;
 }
 
@@ -92,7 +93,7 @@ export function GamePlayLayout({
         mode={gameState.mode}
         teamType={gameState.teamType}
         formattedTime={formattedTime}
-        scores={gameState.scores}
+        scores={gameState.scores || { RED: 0, BLUE: 0 }}
       />
 
       {/* 메인 콘텐츠 */}
@@ -113,6 +114,7 @@ export function GamePlayLayout({
             participants={participants}
             isFolded={isLeftPanelFolded}
             onToggleFold={() => setIsLeftPanelFolded((prev) => !prev)}
+            currentUserId={currentUserId}
           />
         </div>
 
@@ -128,7 +130,7 @@ export function GamePlayLayout({
             onSubmit={onSubmit}
             selectedProblemUrl={
               problems.find((p) => p.id === selectedProblemId)
-                ? `https://www.acmicpc.net/problem/${problems.find((p) => p.id === selectedProblemId)!.problemNumber.replace('#', '')}`
+                ? `https://www.acmicpc.net/problem/${problems.find((p) => p.id === selectedProblemId)!.externalId}`
                 : undefined
             }
             micState={micState}
@@ -181,6 +183,7 @@ export function GamePlayLayout({
                   onTurnOffAllCams={handleTurnOffAllCams}
                   micState={micState}
                   camState={camState}
+                  teamType={gameState.teamType}
                 />
               </div>
             </div>
@@ -197,6 +200,40 @@ export function GamePlayLayout({
         onVideoToggle={handleMyVideoToggle}
         onSettingsClick={() => {
           console.log('Settings clicked');
+        }}
+      />
+
+      {/* 게임 결과 모달 */}
+      <CCGameResultModal
+        isOpen={gameState.status === 'END'}
+        onClose={() => { }}
+        data={{
+          participants: (gameState.result?.ranking || []).map((r, idx) => ({
+            userId: r.userId,
+            nickname: r.nickname,
+            score: r.score,
+            rank: idx + 1,
+            isMe: r.userId === currentUserId,
+            solvedCount: r.solvedCount,
+            teamId: r.teamColor,
+            profileImg: (r as any).profileImg,
+          })),
+          personalStats: {
+            pointsGained: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.gainedExp || 0,
+            correctAnswers: gameState.result?.ranking?.find(r => r.userId === currentUserId)?.solvedCount || 0,
+            totalQuestions: gameState.problems.length,
+            accuracy: gameState.problems.length > 0
+              ? Math.round(((gameState.result?.ranking?.find(r => r.userId === currentUserId)?.solvedCount || 0) / gameState.problems.length) * 100)
+              : 0,
+          },
+          leagueInfo: {
+            league: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.league || 'STONE',
+            currentExp: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.currentExp || 0,
+            gainedExp: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.gainedExp || 0,
+          },
+          mode: gameState.mode,
+          teamType: gameState.teamType,
+          playTime: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.clearTime || 0,
         }}
       />
     </div>

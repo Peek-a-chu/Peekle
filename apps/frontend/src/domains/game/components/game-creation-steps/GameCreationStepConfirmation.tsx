@@ -1,9 +1,7 @@
 import {
-  gameModes,
-  BOJ_TIERS,
-  mockWorkbooks,
   type GameCreationFormData,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { gameModes, BOJ_TIERS } from '@/domains/game/constants/game-constants';
 
 interface GameCreationStepConfirmationProps {
   formData: GameCreationFormData;
@@ -48,7 +46,7 @@ export function GameCreationStepConfirmation({ formData }: GameCreationStepConfi
           <div className="font-medium">
             {formData.problemSource === 'BOJ_RANDOM'
               ? `BOJ 랜덤 (${BOJ_TIERS.find((t) => t.id === formData.tierMin)?.name} ~ ${BOJ_TIERS.find((t) => t.id === formData.tierMax)?.name})`
-              : `문제집: ${mockWorkbooks.find((w) => w.id === formData.selectedWorkbookId)?.title || '(미선택)'}`}
+              : `문제집 (ID: ${formData.selectedWorkbookId || '(미선택)'})`}
           </div>
 
           {formData.selectedTags.length > 0 && (

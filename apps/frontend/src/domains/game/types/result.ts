@@ -1,7 +1,7 @@
 import { LeagueType } from '@/components/LeagueIcon';
 
 export interface GameParticipant {
-  userId: string;
+  userId: number;
   nickname: string;
   score: number;
   rank: number;
@@ -15,7 +15,6 @@ export interface GameParticipant {
 export interface LeagueInfo {
   league: LeagueType;
   currentExp: number;
-  maxExp: number;
   gainedExp: number;
 }
 
@@ -34,3 +33,24 @@ export interface GameResultData {
   teamType: 'INDIVIDUAL' | 'TEAM';
   playTime: number; // in seconds
 }
+
+export interface GameRoomResponse {
+  roomId: number;
+  title: string;
+  secret: boolean;
+  isSecret?: boolean;
+  status: 'WAITING' | 'PLAYING' | 'END';
+  maxPlayers: number;
+  timeLimit: number;
+  problemCount: number;
+  teamType: 'INDIVIDUAL' | 'TEAM';
+  mode: 'TIME_ATTACK' | 'SPEED_RACE';
+  host: {
+    id: number;
+    nickname: string;
+    profileImg: string;
+  };
+  tags: string[];
+  currentPlayers?: number;
+}
+

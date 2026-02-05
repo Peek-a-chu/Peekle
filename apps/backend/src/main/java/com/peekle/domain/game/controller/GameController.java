@@ -1,6 +1,8 @@
 package com.peekle.domain.game.controller;
 
 import com.peekle.domain.game.dto.request.GameCreateRequest;
+import com.peekle.domain.game.dto.request.GameEnterRequest;
+import com.peekle.domain.game.dto.request.GameKickRequest;
 import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.service.RedisGameService;
 import com.peekle.global.dto.ApiResponse;
@@ -18,7 +20,7 @@ public class GameController {
 
     @PostMapping
     public ApiResponse<Long> createRoom(@RequestBody GameCreateRequest request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId) {
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
         Long roomId = gameService.createGameRoom(request, userId);
         return ApiResponse.success(roomId);
     }
@@ -31,6 +33,29 @@ public class GameController {
     @GetMapping("/{roomId}")
     public ApiResponse<GameRoomResponse> getRoom(@PathVariable Long roomId) {
         return ApiResponse.success(gameService.getGameRoom(roomId));
+    }
+
+    /**
+     * 방 입장 API
+     */
+    @PostMapping("/{roomId}/enter")
+    public ApiResponse<Void> enterRoom(@PathVariable Long roomId,
+            @RequestBody(required = false) GameEnterRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
+        String password = request != null ? request.getPassword() : null;
+        gameService.enterGameRoom(roomId, userId, password);
+        return ApiResponse.success(null);
+    }
+
+    /**
+     * 유저 강퇴 API (방장 전용)
+     */
+    @PostMapping("/{roomId}/kick")
+    public ApiResponse<Void> kickUser(@PathVariable Long roomId,
+            @RequestBody GameKickRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long hostId) {
+        gameService.kickParticipant(roomId, hostId, request.getTargetUserId());
+        return ApiResponse.success(null);
     }
 
     /**

@@ -26,6 +26,14 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=openai_ef
 )
 
+def get_collection_count():
+    """현재 컬렉션에 저장된 문서 수 반환"""
+    try:
+        return collection.count()
+    except Exception as e:
+        print(f"[WARN] 컬렉션 카운트 조회 실패: {e}")
+        return 0
+
 def clear_collection():
     """기존 컬렉션을 완전히 삭제하고 초기화"""
     global collection

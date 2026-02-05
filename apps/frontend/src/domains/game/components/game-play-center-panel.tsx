@@ -7,13 +7,13 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import { CCIDEPanel, CCIDEPanelRef } from '@/domains/study/components/CCIDEPanel';
 import { GameVideoGrid } from '@/domains/game/components/game-video-grid';
 import { GameIDEToolbar } from '@/domains/game/components/game-ide-toolbar';
-import { GamePlayParticipant } from '@/domains/game/mocks/mock-data';
+import { GamePlayParticipant } from '@/domains/game/types/game-types';
 
 interface GamePlayCenterPanelProps {
   code: string;
   language: string;
   participants: GamePlayParticipant[];
-  currentUserId: string;
+  currentUserId: number;
   selectedProblemUrl?: string;
   onCodeChange: (code: string) => void;
   onLanguageChange: (language: string) => void;

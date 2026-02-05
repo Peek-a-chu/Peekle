@@ -13,7 +13,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -24,16 +24,17 @@ public class GameService {
     private final UserRepository userRepository;
     private final PointLogRepository pointLogRepository;
 
-    // 순위별 포인트 (1등~5등, 이후는 참가 보상)
-    private static final int[] RANK_POINTS = { 100, 80, 60, 40, 20 };
-    private static final int PARTICIPATION_POINTS = 10;
-
     /**
      * 게임 종료 후 결과 처리 (포인트 지급 및 로그 저장)
      * RedisGameService.finishGame()에서 호출됨
+     *
+     * @param gameId   게임 ID
+     * @param winner   승자 정보 (개인전: UserId, 팀전: TeamColor)
+     * @param teamType 게임 타입 (INDIVIDUAL / TEAM)
+     * @return 각 유저별 획득 경험치 (UserId -> Exp)
      */
     @Transactional
-    public void processGameResult(Long gameId) {
+    public Map<Long, Integer> processGameResult(Long gameId, String winner, String teamType) {
         log.info("🏁 Processing game result for Game ID: {}", gameId);
 
         // 1. Redis에서 랭킹 조회 (높은 점수 순)
@@ -43,29 +44,93 @@ public class GameService {
 
         if (rankingSet == null || rankingSet.isEmpty()) {
             log.warn("⚠️ No ranking data found for Game ID: {}", gameId);
-            return;
+            return Collections.emptyMap();
         }
 
         // 방 정보 조회 (메타데이터용)
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, gameId);
         String mode = (String) redisTemplate.opsForHash().get(infoKey, "mode");
-        String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType"); // "INDIVIDUAL" or "TEAM"
 
-        // 2. 순위에 따라 포인트 지급
-        int rank = 0;
+        Map<Long, Integer> gainedPointsMap = new HashMap<>();
+        int totalPlayers = rankingSet.size();
+
+        // 팀전 로직을 위한 준비
+        int[] scorePool = new int[totalPlayers];
+        for (int i = 0; i < totalPlayers; i++) {
+            scorePool[i] = (totalPlayers - i) * 10; // 1등부터 N*10, (N-1)*10 ...
+        }
+
+        // 각 유저별 기본 정보 매핑 (UserId -> RankIndex)
+        List<Long> rankedUserIds = new ArrayList<>();
         for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
-            String userIdStr = String.valueOf(entry.getValue());
-            Long userId = Long.parseLong(userIdStr);
-            Double score = entry.getScore();
+            rankedUserIds.add(Long.parseLong(String.valueOf(entry.getValue())));
+        }
 
-            // 포인트 결정 (1~5등은 차등, 그 외는 참가 보상)
-            int points = (rank < RANK_POINTS.length) ? RANK_POINTS[rank] : PARTICIPATION_POINTS;
-            final int finalRank = rank; // Lambda에서 사용하기 위해 final 변수로 캡처
+        int winTeamTotalScore = 0;
+        int loseTeamTotalScore = 0;
+        int winTeamCount = 0;
+        int loseTeamCount = 0;
+
+        // 팀전일 경우 승리팀/패배팀 점수 Pool 계산
+        if ("TEAM".equals(teamType) && winner != null) {
+            // Redis에서 팀 정보 가져오기
+            String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, gameId);
+            Map<Object, Object> teamMap = redisTemplate.opsForHash().entries(teamsKey);
+
+            for (Object obj : teamMap.values()) {
+                if (winner.equals(obj))
+                    winTeamCount++;
+                else
+                    loseTeamCount++;
+            }
+
+            // 점수 풀 분배 (상위 N명 점수 -> 승리팀, 하위 M명 점수 -> 패배팀)
+            int currentIndex = 0;
+            for (int i = 0; i < winTeamCount; i++) {
+                if (currentIndex < totalPlayers)
+                    winTeamTotalScore += scorePool[currentIndex++];
+            }
+            for (int i = 0; i < loseTeamCount; i++) {
+                if (currentIndex < totalPlayers)
+                    loseTeamTotalScore += scorePool[currentIndex++];
+            }
+        }
+
+        int rank = 0;
+        for (Long userId : rankedUserIds) {
+            int points = 0;
+
+            if ("TEAM".equals(teamType) && winner != null) {
+                // 팀전 포인트 계산
+                String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, gameId);
+                String userTeam = (String) redisTemplate.opsForHash().get(teamsKey, String.valueOf(userId));
+
+                if (winner.equals(userTeam)) {
+                    points = winTeamCount > 0 ? winTeamTotalScore / winTeamCount : 0;
+                } else {
+                    points = loseTeamCount > 0 ? loseTeamTotalScore / loseTeamCount : 0;
+                }
+            } else {
+                // 개인전 포인트 계산 (순위별 차등)
+                points = (rank < totalPlayers) ? scorePool[rank] : 10;
+            }
+
+            // 포인트가 0보다 작으면 최소 10점 (참가상) 보장 로직이 필요하다면 추가
+            if (points < 10)
+                points = 10;
+
+            final int gainedPoints = points;
+            final int finalRank = rank;
+
+            gainedPointsMap.put(userId, gainedPoints);
 
             // 유저 조회 및 포인트 업데이트
             userRepository.findById(userId).ifPresent(user -> {
                 // 리그 포인트 증가
-                user.addLeaguePoint(points);
+                user.addLeaguePoint(gainedPoints);
+                // 승급/강등 로직은 별도로 처리하거나 User 엔티티 메서드 활용
+                // 여기선 단순 포인트 증가만
+
                 userRepository.save(user);
 
                 // 포인트 로그 저장
@@ -78,18 +143,18 @@ public class GameService {
                 PointLog pointLog = new PointLog(
                         user,
                         PointCategory.GAME,
-                        points,
+                        gainedPoints,
                         description,
                         metadata);
                 pointLogRepository.save(pointLog);
 
-                log.info("💰 User {} awarded {} points (Rank: {}, Score: {})",
-                        userId, points, finalRank + 1, score);
+                log.info("💰 User {} awarded {} points (Rank: {})", userId, gainedPoints, finalRank + 1);
             });
 
             rank++;
         }
 
         log.info("✅ Game result processed. {} players received rewards.", rank);
+        return gainedPointsMap;
     }
 }

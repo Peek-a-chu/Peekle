@@ -55,6 +55,17 @@ public class StompHandler implements ChannelInterceptor {
                         log.error("[StompHandler] Invalid studyId format: {}", studyId);
                     }
                 }
+
+                // 3. Game ID 처리
+                String gameId = accessor.getFirstNativeHeader("gameId");
+                if (gameId != null) {
+                    try {
+                        sessionAttributes.put("gameId", Long.valueOf(gameId));
+                        log.info("[StompHandler] Game ID set: {}", gameId);
+                    } catch (NumberFormatException e) {
+                        log.error("[StompHandler] Invalid gameId format: {}", gameId);
+                    }
+                }
             }
         }
         return message;

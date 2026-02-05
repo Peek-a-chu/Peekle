@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   GamePlayState,
   GameProblem,
   GamePlayParticipant,
-  getMockGamePlayState,
-  getMockChatMessages,
   ChatMessage,
-} from '@/domains/game/mocks/mock-data';
+  Team,
+} from '@/domains/game/types/game-types';
+import { getGameRoom, enterGameRoom } from '@/domains/game/api/game-api';
 import { useGameTimer } from './useGameTimer';
+import { useGameSocketConnection } from './useGameSocketConnection';
+import { useAuthStore } from '@/store/auth-store';
+import { toast } from 'sonner';
 
 // 문제별 코드 상태 (언어별로 저장)
 interface ProblemCodeState {
-  [problemId: string]: {
+  [problemId: number]: {
     lastLanguage: string;
     codes: {
       [language: string]: string;
@@ -21,16 +24,15 @@ interface ProblemCodeState {
   };
 }
 
-// ... (UseGamePlayRoomReturn Interface는 그대로 유지) ...
 interface UseGamePlayRoomReturn {
   // 게임 상태
   gameState: GamePlayState | null;
   isLoading: boolean;
 
   // 선택된 문제
-  selectedProblemId: string | null;
+  selectedProblemId: number | null;
   selectedProblem: GameProblem | null;
-  selectProblem: (problemId: string) => void;
+  selectProblem: (problemId: number) => void;
 
   // 코드 상태
   currentCode: string;
@@ -44,7 +46,7 @@ interface UseGamePlayRoomReturn {
 
   // 참여자
   participants: GamePlayParticipant[];
-  currentUserId: string;
+  currentUserId: number;
 
   // 채팅
   messages: ChatMessage[];
@@ -60,66 +62,277 @@ const DEFAULT_CODE: Record<string, string> = {
   cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`,
 };
 
-export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
+export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
+  const roomId = Number(roomIdString);
+  const { user } = useAuthStore();
+  const currentUserId = user?.id || 0;
+
   const [gameState, setGameState] = useState<GamePlayState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+  const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
   const [problemCodes, setProblemCodes] = useState<ProblemCodeState>({});
   const [currentLanguage, setCurrentLanguage] = useState('python');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentUserId, setCurrentUserId] = useState('user1');
 
-  // 게임 상태 로드
+  // 소켓 연결
+  const { client, connected } = useGameSocketConnection(roomId, currentUserId);
+
+  // 초기 상태 로드 및 입장
   useEffect(() => {
-    setIsLoading(true);
-    // Mock 데이터 로드
-    const state = getMockGamePlayState(roomId);
-    if (state) {
-      setGameState(state);
-      if (state.problems.length > 0) {
-        setSelectedProblemId(state.problems[0].id);
-      }
-      const host = state.participants.find((p) => p.isHost);
-      if (host) {
-        setCurrentUserId(host.id);
-      }
-    }
-    setMessages(getMockChatMessages(roomId));
-    setIsLoading(false);
-  }, [roomId]);
+    const init = async () => {
+      setIsLoading(true);
+      try {
+        // [추가] 방 입장 처리 (멱등성 보장)
+        await enterGameRoom(roomIdString);
 
-  // ... (타이머 관련 코드는 그대로 유지되어야 하므로 아래에서 계속) ...
+        const room = await getGameRoom(roomIdString);
+        if (room) {
+          // GameRoomDetail -> GamePlayState 변환
+          const playState: GamePlayState = {
+            roomId: room.id,
+            title: room.title,
+            mode: room.mode,
+            teamType: room.teamType,
+            timeLimit: room.timeLimit, // [TEST] Seconds directly
+            remainingTime: room.timeLimit, // [TEST] Seconds directly
+            problems: room.problems || [],
+            participants: (room.participants || []).map((p: any) => ({
+              ...p,
+              score: 0,
+              solvedCount: 0,
+            })),
+          };
+          setGameState(playState);
+          if (playState.problems.length > 0) {
+            setSelectedProblemId(playState.problems[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize play room:', error);
+        toast.error('방 입장에 실패했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (roomIdString) init();
+  }, [roomIdString]);
+
+  // 소켓 구독 및 이벤트 핸들링
+  useEffect(() => {
+    if (!client || !connected) return;
+
+    // 1. Room Status Subscription
+    const roomSub = client.subscribe(`/topic/games/${roomId}/room`, (msg) => {
+      try {
+        const event = JSON.parse(msg.body);
+        const { type, data } = event;
+
+        switch (type) {
+          case 'ENTER':
+          case 'LEAVE':
+            // 참여자 목록 갱신을 위해 방 정보 다시 불러오기
+            getGameRoom(roomIdString).then((room) => {
+              if (room) {
+                setGameState((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    participants: (room.participants || []).map((p: any) => ({
+                      ...p,
+                      score: 0, // 기존 점수 유지 로직은 필요시 추가
+                      solvedCount: 0,
+                    })),
+                  };
+                });
+              }
+            });
+            break;
+          case 'START':
+            console.log('Game START event received:', data);
+            setGameState((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                status: 'PLAYING',
+                problems: (data.problems || []).map((p: any) => ({
+                  ...p,
+                  status: 'UNSOLVED',
+                })),
+              };
+            });
+            if (data.problems && data.problems.length > 0) {
+              setSelectedProblemId(data.problems[0].id);
+            }
+            break;
+          case 'SOLVED':
+            toast.success(`${data.nickname}님이 문제를 해결했습니다!`);
+            // [Fix] data.team -> data.teamColor (Backend sends teamColor)
+            updateProblemStatus(Number(data.problemId), 'SOLVED', Number(data.userId), data.teamColor);
+            break;
+          case 'SCORE_UPDATE':
+            // 팀 점수 및 개인 변동 업데이트 처리
+            break;
+          case 'GAME_END':
+            console.log('🏆 GAME_END event received:', data);
+            setGameState((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                status: 'END',
+                result: data,
+              };
+            });
+            break;
+        }
+      } catch (e) {
+        console.error('Failed to parse room event:', e);
+      }
+    });
+
+    // 2. Chat Subscription (Global)
+    const chatSub = client.subscribe(`/topic/games/${roomId}/chat/global`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type !== 'CHAT') return;
+
+        const chatData = response.data;
+        const newMsg: ChatMessage = {
+          id: `msg-${Date.now()}`,
+          senderId: Number(chatData.senderId),
+          senderNickname: chatData.senderNickname || 'Unknown',
+          profileImg: chatData.profileImg,
+          content: chatData.message, // Map backend 'message' to 'content'
+          timestamp: chatData.timestamp,
+          senderTeam: chatData.teamColor
+        };
+        setMessages((prev) => [...prev, newMsg]);
+      } catch (e) {
+        console.error('Failed to parse chat message:', e);
+      }
+    });
+
+    // 3. Ranking Subscription (Real-time Score Updates)
+    const rankingSub = client.subscribe(`/topic/games/${roomId}/ranking`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type === 'RANKING_UPDATE') {
+          const data = response.data;
+          console.log('📊 RANKING_UPDATE received:', data);
+
+          // Toast for verification (Validation Step 13)
+          const toastNickname = data.nickname || `${data.userId}번 유저`;
+          toast.info(`[점수 갱신] ${toastNickname}: ${data.score}점 (${data.solvedCount}문제)`);
+
+          setGameState((prev) => {
+            if (!prev) return null;
+
+            // 1. 참여자 정보 업데이트
+            const newParticipants = prev.participants.map((p) => {
+              if (p.id === Number(data.userId)) {
+                return {
+                  ...p,
+                  score: data.score,
+                  solvedCount: data.solvedCount,
+                };
+              }
+              return p;
+            });
+
+            // 2. 팀 점수 재계산 (팀전인 경우)
+            let newScores = prev.scores;
+            if (prev.teamType === 'TEAM') {
+              const redScore = newParticipants
+                .filter((p) => p.team === 'RED')
+                .reduce((sum, p) => sum + (p.solvedCount || 0), 0);
+              const blueScore = newParticipants
+                .filter((p) => p.team === 'BLUE')
+                .reduce((sum, p) => sum + (p.solvedCount || 0), 0);
+              newScores = { RED: redScore, BLUE: blueScore };
+            }
+
+            return {
+              ...prev,
+              participants: newParticipants,
+              scores: newScores,
+            };
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse ranking message:', e);
+      }
+    });
+
+    return () => {
+      roomSub.unsubscribe();
+      chatSub.unsubscribe();
+      rankingSub.unsubscribe();
+    };
+  }, [client, connected, roomId, roomIdString]);
+
+  const updateProblemStatus = (
+    problemId: number,
+    status: 'SOLVED' | 'UNSOLVED',
+    userId: number,
+    teamColor?: Team
+  ) => {
+    setGameState(prev => {
+      if (!prev) return null;
+
+      const solver = prev.participants.find(p => p.id === userId);
+      const nickname = solver ? solver.nickname : 'Unknown';
+
+      return {
+        ...prev,
+        problems: prev.problems.map(p =>
+          p.id === problemId
+            ? { ...p, status, solvedBy: [...(p.solvedBy || []), { id: userId, nickname, team: teamColor }] }
+            : p
+        )
+      };
+    });
+  };
+
+  // 타이머
   const isSpeedRace = gameState?.mode === 'SPEED_RACE';
   const timerInitialTime = isSpeedRace ? 0 : (gameState?.remainingTime ?? 1800);
+  const timeUpToastShownRef = useRef(false);
+
+  // Room ID가 변경되면 토스트 플래그 초기화
+  useEffect(() => {
+    timeUpToastShownRef.current = false;
+  }, [roomIdString]);
 
   const { formattedTime, time } = useGameTimer({
     initialTime: timerInitialTime,
     mode: isSpeedRace ? 'countup' : 'countdown',
     autoStart: gameState !== null,
-    onTimeUp: () => {
-      console.log('시간 종료!');
-    },
+    onTimeUp: useCallback(() => {
+      if (!isSpeedRace && !timeUpToastShownRef.current) {
+        toast.warning('시간이 종료되었습니다!');
+        timeUpToastShownRef.current = true;
+      }
+    }, [isSpeedRace]),
   });
 
   // 선택된 문제
   const selectedProblem = gameState?.problems.find((p) => p.id === selectedProblemId) ?? null;
 
-  // 현재 코드 (문제별 + 언어별 저장된 코드 혹은 기본값)
+  // 현재 코드
   const currentCode =
-    problemCodes[selectedProblemId ?? '']?.codes[currentLanguage] ?? DEFAULT_CODE[currentLanguage];
+    problemCodes[selectedProblemId ?? 0]?.codes[currentLanguage] || DEFAULT_CODE[currentLanguage];
 
   // 문제 선택
   const selectProblem = useCallback(
-    (problemId: string) => {
+    (problemId: number) => {
       setSelectedProblemId(problemId);
-      // 해당 문제의 마지막 사용 언어로 복원
-      const lastLang = problemCodes[problemId]?.lastLanguage ?? 'python';
+      const lastLang = problemCodes[problemId]?.lastLanguage || 'python';
       setCurrentLanguage(lastLang);
     },
     [problemCodes],
   );
 
-  // 코드 설정 (문제별 + 언어별 저장)
+  // 코드 설정
   const setCode = useCallback(
     (code: string) => {
       if (!selectedProblemId) return;
@@ -140,8 +353,21 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
           },
         };
       });
+
+      // 실시간 코드 동기화 발신
+      if (client && connected) {
+        client.publish({
+          destination: '/pub/games/code/update',
+          body: JSON.stringify({
+            gameId: roomId,
+            problemId: selectedProblemId,
+            code,
+            language: currentLanguage,
+          }),
+        });
+      }
     },
-    [selectedProblemId, currentLanguage],
+    [selectedProblemId, currentLanguage, client, connected, roomId],
   );
 
   // 언어 설정
@@ -167,32 +393,40 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
   // 메시지 전송
   const sendMessage = useCallback(
     (content: string) => {
-      const newMessage: ChatMessage = {
-        id: `msg-${Date.now()}`,
-        senderId: currentUserId,
-        senderNickname: '나',
-        senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=me',
-        content,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, newMessage]);
+      if (client && connected && gameState) {
+        const myTeam = gameState.participants.find((p) => p.id === currentUserId)?.team;
+
+        client.publish({
+          destination: '/pub/games/chat',
+          body: JSON.stringify({
+            gameId: roomId,
+            message: content,
+            scope: 'GLOBAL', // [Fix] Use GLOBAL to allow frontend filtering
+            teamColor: myTeam || null,
+          }),
+        });
+      }
     },
-    [currentUserId],
+    [client, connected, roomId, gameState, currentUserId],
   );
 
   // 코드 제출
   const submitCode = useCallback(() => {
     if (!selectedProblemId || !gameState) return;
 
-    // Mock: 제출 성공 시뮬레이션
-    console.log('코드 제출:', {
-      problemId: selectedProblemId,
-      code: currentCode,
-      language: currentLanguage,
-    });
-
-    // TODO: 실제 API 호출 및 결과 처리
-  }, [selectedProblemId, gameState, currentCode, currentLanguage]);
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/games/submit',
+        body: JSON.stringify({
+          gameId: roomId,
+          problemId: selectedProblemId,
+          code: currentCode,
+          language: currentLanguage,
+        }),
+      });
+      toast.info('코드를 제출했습니다. 채점 중...');
+    }
+  }, [selectedProblemId, gameState, currentCode, currentLanguage, client, connected, roomId]);
 
   return {
     gameState,
@@ -206,7 +440,7 @@ export function useGamePlayRoom(roomId: string): UseGamePlayRoomReturn {
     setLanguage,
     formattedTime,
     remainingTime: time,
-    participants: gameState?.participants ?? [],
+    participants: gameState?.participants || [],
     currentUserId,
     messages,
     sendMessage,

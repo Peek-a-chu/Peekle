@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UserIcon } from '@/components/UserIcon';
+import Image from 'next/image';
 import { Crown, Sparkles } from 'lucide-react';
 import type { GameParticipant } from '../../types/result';
 
@@ -9,7 +9,7 @@ interface CCTeamCardProps {
   team: GameParticipant[];
   teamColor: 'RED' | 'BLUE';
   isWinner: boolean;
-  mvpId?: string;
+  mvpId?: number;
   score: number;
   mode: 'SPEED_RACE' | 'TIME_ATTACK';
 }
@@ -107,12 +107,7 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
 
             {/* Profile & Name */}
             <div className="flex-1 flex items-center gap-3 overflow-hidden">
-              <UserIcon
-                src={p.profileImg}
-                nickname={p.nickname}
-                size={32}
-                className="border-border/50"
-              />
+              {/* Profile Image Removed */}
               <div className="flex flex-col min-w-0">
                 <span
                   className={`text-sm font-bold truncate ${p.isMe ? theme.text : 'text-foreground'}`}

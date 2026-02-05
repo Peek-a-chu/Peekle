@@ -40,9 +40,10 @@ export function useGameTimer({
   // autoStart가 true가 되면 타이머 시작
   useEffect(() => {
     if (autoStart && !isRunning) {
+      if (mode === 'countdown' && time <= 0) return;
       setIsRunning(true);
     }
-  }, [autoStart, isRunning]);
+  }, [autoStart, isRunning, mode, time]);
 
   // initialTime이 변경되거나 mode가 변경되면 time 업데이트
   useEffect(() => {

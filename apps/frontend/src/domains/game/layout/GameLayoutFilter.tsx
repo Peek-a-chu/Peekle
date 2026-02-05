@@ -3,11 +3,11 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GameModeCard } from '@/domains/game/components/game-mode-card';
 import {
-  gameModes,
   type GameMode,
   type TeamType,
   type GameStatus,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { gameModes } from '@/domains/game/constants/game-constants';
 
 type StatusFilter = GameStatus | 'ALL';
 

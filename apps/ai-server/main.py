@@ -6,15 +6,41 @@ from typing import List, Optional
 import os
 import re
 from openai import OpenAI
-from embedding_service import search_similar_problems 
-
-app = FastAPI()
+from contextlib import asynccontextmanager
+from embedding_service import search_similar_problems, get_collection_count
 
 # GPT-4o-mini API 클라이언트 설정
 ai_client = OpenAI(
     api_key=os.getenv("GMS_API_KEY"),
     base_url=os.getenv("GPT_BASE_URL")
 )
+
+# --- ChromaDB 초기화 체크 및 자동 로딩 ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """서버 시작 시 ChromaDB 컬렉션이 비어있으면 problems.csv 자동 로드"""
+    try:
+        count = get_collection_count()
+        print(f"[INIT] ChromaDB 컬렉션에 {count}개의 문제가 저장되어 있습니다.")
+        
+        if count == 0:
+            print("[INIT] ChromaDB가 비어있습니다. problems.csv를 자동으로 로딩합니다...")
+            from indexing import run_auto_indexing
+            run_auto_indexing()
+            print("[INIT] ChromaDB 초기화 완료!")
+        else:
+            print("[INIT] 기존 데이터 사용")
+    except Exception as e:
+        print(f"[ERROR] ChromaDB 초기화 중 오류 발생: {e}")
+        print("[WARN] 추천 기능이 제대로 작동하지 않을 수 있습니다.")
+    
+    yield  # 서버 실행
+    
+    # 종료 시 정리 작업 (필요시)
+    print("[SHUTDOWN] AI 서버 종료")
+
+app = FastAPI(lifespan=lifespan)
+
 
 # --- 데이터 모델 정의 ---
 class TagStat(BaseModel):

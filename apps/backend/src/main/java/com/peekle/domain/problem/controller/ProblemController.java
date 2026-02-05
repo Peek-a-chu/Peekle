@@ -19,8 +19,7 @@ public class ProblemController {
 
     @PostMapping("/sync")
     public ResponseEntity<String> syncProblems(
-            @RequestParam(defaultValue = "1") int startPage
-    ) {
+            @RequestParam(defaultValue = "1") int startPage) {
         new Thread(() -> problemService.fetchAndSaveAllProblems(startPage)).start();
         return ResponseEntity.ok("🚀 Problem sync started from Page " + startPage);
     }
@@ -34,8 +33,7 @@ public class ProblemController {
     @GetMapping("/search")
     public ResponseEntity<List<ProblemSearchResponse>> searchProblems(
             @RequestParam String keyword,
-            @RequestParam(defaultValue = "10") int limit
-    ) {
+            @RequestParam(defaultValue = "10") int limit) {
         List<ProblemSearchResponse> results = problemService.searchProblems(keyword, limit);
         return ResponseEntity.ok(results);
     }
@@ -47,9 +45,13 @@ public class ProblemController {
     @GetMapping("/by-external-id")
     public ApiResponse<Map<String, Long>> getProblemIdByExternalId(
             @RequestParam String externalId,
-            @RequestParam(defaultValue = "BOJ") String source
-    ) {
+            @RequestParam(defaultValue = "BOJ") String source) {
         Map<String, Long> response = problemService.getProblemIdByExternalId(externalId, source);
         return ApiResponse.success(response);
+    }
+
+    @GetMapping("/tags")
+    public ApiResponse<List<com.peekle.domain.problem.entity.Tag>> getAllTags() {
+        return ApiResponse.success(problemService.getAllTags());
     }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UserIcon } from '@/components/UserIcon';
+import Image from 'next/image';
 import { Trophy, Medal } from 'lucide-react';
 import type { GameParticipant } from '../../types/result';
 
@@ -76,12 +76,7 @@ export function CCParticipantRanking({ participants, mode, teamType }: CCPartici
                 <div className="w-10 flex justify-center shrink-0">{getRankIcon(p.rank)}</div>
 
                 <div className="flex-1 flex items-center gap-4 ml-4 overflow-hidden">
-                  <UserIcon
-                    src={p.profileImg}
-                    nickname={p.nickname}
-                    size={40}
-                    className={`border-2 ${p.rank === 1 ? 'border-yellow-500' : 'border-border'}`}
-                  />
+                  {/* Profile Image removed as requested */}
                   <span
                     className={`flex items-center text-lg font-bold truncate ${p.isMe ? 'text-yellow-400' : 'text-foreground'}`}
                   >

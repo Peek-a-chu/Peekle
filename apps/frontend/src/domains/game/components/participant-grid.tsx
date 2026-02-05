@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ParticipantCard } from './participant-card';
-import type { Participant, TeamType } from '@/domains/game/mocks/mock-data';
+import type { Participant, TeamType } from '@/domains/game/types/game-types';
 
 interface ParticipantGridProps {
   participants: Participant[];

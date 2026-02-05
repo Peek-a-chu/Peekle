@@ -58,8 +58,9 @@ public class SubmissionService {
             }
         }
 
-        // 0. 검증 (Extension 변조 방지) - AC(성공)일 때만 검증
-        if (request.getIsSuccess() && user.getBojId() != null && !user.getBojId().isEmpty()) {
+        // 0. 검증 (Extension 변조 방지) - AC(성공)일 때만 검증, 단 TEST_TOKEN이면 패스
+        if (!"TEST_TOKEN".equals(token) && request.getIsSuccess() && user.getBojId() != null
+                && !user.getBojId().isEmpty()) {
             try {
                 submissionValidator.validateSubmission(
                         String.valueOf(request.getProblemId()),
@@ -170,24 +171,24 @@ public class SubmissionService {
 
         System.out.println("✅ Submission saved! ID: " + log.getId());
 
-        // 유저가 게임 중이라면 점수 반영
-        try {
-            String userGameKey = String.format(RedisKeyConst.USER_CURRENT_GAME, user.getId());
-            Object gameIdObj = redisTemplate.opsForValue().get(userGameKey);
-
-            if (gameIdObj != null) {
-                Long gameId = Long.parseLong(String.valueOf(gameIdObj));
-                redisGameService.solveProblem(user.getId(), gameId, request.getProblemId());
-                System.out.println("🎮 Game Score Updated for Game ID: " + gameId);
-            }
-        } catch (Exception e) {
-            System.err.println("Failed to update game score: " + e.getMessage());
-        }
-
         // 성공/실패 여부에 따라 다른 응답
         boolean isAC = request.getIsSuccess() != null && request.getIsSuccess();
 
         if (isAC) {
+            // 유저가 게임 중이라면 점수 반영
+            try {
+                String userGameKey = String.format(RedisKeyConst.USER_CURRENT_GAME, user.getId());
+                Object gameIdObj = redisTemplate.opsForValue().get(userGameKey);
+
+                if (gameIdObj != null) {
+                    Long gameId = Long.parseLong(String.valueOf(gameIdObj));
+                    redisGameService.solveProblem(user.getId(), gameId, problem.getId());
+                    System.out.println("🎮 Game Score Updated for Game ID: " + gameId);
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to update game score: " + e.getMessage());
+            }
+
             // AC (맞았습니다) - 포인트 획득 가능
             return SubmissionResponse.builder()
                     .success(true)
