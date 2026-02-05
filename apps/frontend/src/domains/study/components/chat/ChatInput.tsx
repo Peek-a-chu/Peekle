@@ -35,7 +35,7 @@ export function ChatInput({ onSend, pendingCodeShare, onCancelShare }: ChatInput
   };
 
   return (
-    <div className="min-h-14 px-3 py-2 border-t bg-background flex flex-col justify-center">
+    <div className="h-14 px-3 border-t bg-background flex items-center">
       {pendingCodeShare && (
         <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-md border text-xs animate-in slide-in-from-bottom-2">
           <FileCode size={14} className="text-primary" />

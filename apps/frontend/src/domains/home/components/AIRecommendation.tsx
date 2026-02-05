@@ -131,19 +131,20 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
               <p className="text-[15px] text-muted-foreground mb-4">💡 {item.reason}</p>
 
               {/* 버튼들 */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col items-stretch gap-2">
                 <Link
                   href={`https://www.acmicpc.net/problem/${item.problemId.replace('#', '')}`}
                   target="_blank"
+                  className="w-full"
                 >
-                  <Button className="h-8 px-2.5 text-xs gap-1 bg-primary hover:bg-primary">
+                  <Button className="h-8 w-full px-2.5 text-xs gap-1 bg-primary hover:bg-primary">
                     <ExternalLink className="w-3 h-3" />
                     풀러가기
                   </Button>
                 </Link>
                 <Button
                   variant="outline"
-                  className="h-8 px-2.5 text-xs gap-1 border-border"
+                  className="h-8 w-full px-2.5 text-xs gap-1 border-border"
                   onClick={() => handleOpenModal(item.problemId, item.title)}
                 >
                   <Plus className="w-3 h-3" />
