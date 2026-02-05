@@ -189,7 +189,7 @@ export function CCProblemListPanel({
         isOpen={submissionModalOpen}
         onClose={() => setSubmissionModalOpen(false)}
         problemTitle={selectedProblem ? selectedProblem.title : ''}
-        problemNumber={selectedProblem ? selectedProblem.problemId : undefined}
+        problemExternalId={selectedProblem ? selectedProblem.externalId : undefined}
         submissions={submissions}
         onViewCode={handleViewCode}
       />
