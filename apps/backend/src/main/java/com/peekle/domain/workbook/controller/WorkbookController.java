@@ -101,6 +101,16 @@ public class WorkbookController {
         return ApiResponse.success();
     }
 
+    // 문제집에 문제 추가
+    @PostMapping("/{workbookId}/problems/{problemId}")
+    public ApiResponse<Void> addProblemToWorkbook(
+            @PathVariable Long workbookId,
+            @PathVariable Long problemId) {
+        Long userId = requireUserId();
+        workbookService.addProblemToWorkbook(userId, workbookId, problemId);
+        return ApiResponse.success();
+    }
+
     // 북마크 토글
     @PostMapping("/{workbookId}/bookmark")
     public ApiResponse<Map<String, Boolean>> toggleBookmark(

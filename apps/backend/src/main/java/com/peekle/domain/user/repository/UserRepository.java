@@ -14,7 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
 
     Optional<User> findBySocialIdAndProvider(String socialId, String provider);
 
-    Optional<User> findByBojId(String bojId);
+    java.util.List<User> findByBojId(String bojId);
 
     // 랭킹 계산용: 내 점수보다 높은 사람 수 (같은 그룹 내)
     int countByLeagueGroupId(Long leagueGroupId);

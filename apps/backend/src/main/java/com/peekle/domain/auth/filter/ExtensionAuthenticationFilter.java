@@ -1,4 +1,4 @@
-package com.peekle.global.auth.filter;
+package com.peekle.domain.auth.filter;
 
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.service.UserService;

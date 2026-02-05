@@ -1,4 +1,4 @@
-package com.peekle.global.auth.handler;
+package com.peekle.domain.auth.handler;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

@@ -1,4 +1,4 @@
-package com.peekle.global.auth.dto;
+package com.peekle.domain.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
 

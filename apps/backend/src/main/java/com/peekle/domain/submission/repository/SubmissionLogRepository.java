@@ -16,9 +16,12 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
         // [New] 특정 유저가 특정 문제에 대해 *성공한* 기록 개수 조회
         long countByUserIdAndProblemIdAndIsSuccessTrue(Long userId, Long problemId);
 
-        // 유저가 푼 문제 ID 목록을 한 번에 조회 (N+1 방지)
         @org.springframework.data.jpa.repository.Query("SELECT DISTINCT s.problem.id FROM SubmissionLog s WHERE s.user.id = :userId AND s.problem.id IN :problemIds")
-        List<Long> findSolvedProblemIds(@org.springframework.data.repository.query.Param("userId") Long userId,
+        List<Long> findAttemptedProblemIds(@org.springframework.data.repository.query.Param("userId") Long userId,
+                        @org.springframework.data.repository.query.Param("problemIds") List<Long> problemIds);
+
+        @org.springframework.data.jpa.repository.Query("SELECT DISTINCT s.problem.id FROM SubmissionLog s WHERE s.user.id = :userId AND s.isSuccess = true AND s.problem.id IN :problemIds")
+        List<Long> findSuccessProblemIds(@org.springframework.data.repository.query.Param("userId") Long userId,
                         @org.springframework.data.repository.query.Param("problemIds") List<Long> problemIds);
 
         // 레거시: 특정 유저의 총 해결 문제 수 조회 (중복 제거) - 성공 여부 무관

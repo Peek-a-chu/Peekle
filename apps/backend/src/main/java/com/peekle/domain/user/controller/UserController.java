@@ -19,14 +19,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import com.peekle.domain.user.repository.UserRepository;
-
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/users")
 public class UserController {
     private final UserService userService;
-    private final UserRepository userRepository;
 
     @GetMapping("/me")
     public ApiResponse<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Long userId) {
@@ -111,7 +108,7 @@ public class UserController {
         }
 
         // 중복 검증
-        boolean exists = userRepository.findByNickname(nickname).isPresent();
+        boolean exists = userService.existsByNickname(nickname);
         if (exists) {
             return ApiResponse.success(Map.of(
                     "available", false,

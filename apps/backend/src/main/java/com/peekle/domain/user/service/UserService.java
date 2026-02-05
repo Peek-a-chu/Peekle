@@ -124,6 +124,10 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
     }
 
+    public boolean existsByNickname(String nickname) {
+        return userRepository.findByNickname(nickname).isPresent();
+    }
+
     public Map<String, Object> getUserInfo(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -362,13 +366,6 @@ public class UserService {
         if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
             if (userRepository.findByNickname(request.getNickname()).isPresent()) {
                 throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-            }
-        }
-
-        // 백준 아이디 중복 검사 (새로운 아이디 입력시)
-        if (request.getBojId() != null && !request.getBojId().equals(user.getBojId())) {
-            if (userRepository.findByBojId(request.getBojId()).isPresent()) {
-                throw new BusinessException(ErrorCode.DUPLICATE_BOJ_ID);
             }
         }
 

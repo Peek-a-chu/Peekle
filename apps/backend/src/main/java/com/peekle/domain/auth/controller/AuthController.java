@@ -1,10 +1,10 @@
-package com.peekle.global.auth.controller;
+package com.peekle.domain.auth.controller;
 
 import com.peekle.domain.user.entity.User;
-import com.peekle.domain.user.repository.UserRepository;
-import com.peekle.global.auth.dto.SignupRequest;
-import com.peekle.global.auth.jwt.JwtTokenProvider;
-import com.peekle.global.auth.service.RefreshTokenService;
+import com.peekle.domain.auth.dto.SignupRequest;
+import com.peekle.domain.auth.jwt.JwtTokenProvider;
+import com.peekle.domain.auth.service.AuthService;
+import com.peekle.domain.auth.service.RefreshTokenService;
 import com.peekle.global.dto.ApiResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,8 +24,7 @@ public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
-    private final UserRepository userRepository;
-    private final com.peekle.domain.league.service.LeagueService leagueService;
+    private final AuthService authService;
 
     @PostMapping("/refresh")
     public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
@@ -54,8 +53,12 @@ public class AuthController {
 
         refreshTokenService.save(userId, newRefreshToken, jwtTokenProvider.getRefreshTokenExpiry());
 
-        addCookie(response, "access_token", newAccessToken, (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000));
-        addCookie(response, "refresh_token", newRefreshToken, (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000));
+        int accessExpiry = (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000);
+        int refreshExpiry = (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000);
+
+        addCookie(response, "access_token", newAccessToken, accessExpiry, "/");
+        addCookie(response, "refresh_token", newRefreshToken, refreshExpiry, "/api/auth/refresh");
+        addCookie(response, "is_authenticated", "true", refreshExpiry, "/"); // Middleware check용
 
         return ApiResponse.success(null);
     }
@@ -85,33 +88,33 @@ public class AuthController {
         String socialId = (String) signupInfo.get("socialId");
         String provider = (String) signupInfo.get("provider");
 
-        if (userRepository.findBySocialIdAndProvider(socialId, provider).isPresent()) {
+        if (authService.existsBySocialIdAndProvider(socialId, provider)) {
             return ApiResponse.error("USER_ALREADY_EXISTS", "User already registered");
         }
 
-        if (userRepository.findByNickname(signupRequest.nickname()).isPresent()) {
+        if (authService.existsByNickname(signupRequest.nickname())) {
             return ApiResponse.error("NICKNAME_DUPLICATE", "Nickname already in use");
         }
 
-        User user = new User(socialId, provider, signupRequest.nickname());
-        if (signupRequest.bojId() != null && !signupRequest.bojId().isBlank()) {
-            user.registerBojId(signupRequest.bojId());
-        }
-        userRepository.save(user); // 저장 후
-        leagueService.assignInitialLeague(user); // 리그 배정 (트랜잭션 분리되어도 됨, 혹은 여기서 호출)
+        User user = authService.signup(socialId, provider, signupRequest);
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
         refreshTokenService.save(user.getId(), refreshToken, jwtTokenProvider.getRefreshTokenExpiry());
 
-        addCookie(response, "access_token", accessToken, (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000));
-        addCookie(response, "refresh_token", refreshToken, (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000));
+        int accessExpiry = (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000);
+        int refreshExpiry = (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000);
+
+        addCookie(response, "access_token", accessToken, accessExpiry, "/");
+        addCookie(response, "refresh_token", refreshToken, refreshExpiry, "/api/auth/refresh");
+        addCookie(response, "is_authenticated", "true", refreshExpiry, "/");
 
         return ApiResponse.success(null);
     }
 
     private String extractCookie(HttpServletRequest request, String name) {
-        if (request.getCookies() == null) return null;
+        if (request.getCookies() == null)
+            return null;
         for (Cookie cookie : request.getCookies()) {
             if (name.equals(cookie.getName())) {
                 return cookie.getValue();
@@ -120,26 +123,26 @@ public class AuthController {
         return null;
     }
 
-    private void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
+    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path) {
         Cookie cookie = new Cookie(name, value);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/");
+        cookie.setSecure(false); // 개발환경 감안, Production이면 true 권장
+        cookie.setPath(path);
         cookie.setMaxAge(maxAge);
         response.addCookie(cookie);
     }
 
     private void clearAuthCookies(HttpServletResponse response) {
-        Cookie accessCookie = new Cookie("access_token", "");
-        accessCookie.setHttpOnly(true);
-        accessCookie.setPath("/");
-        accessCookie.setMaxAge(0);
-        response.addCookie(accessCookie);
+        deleteCookie(response, "access_token", "/");
+        deleteCookie(response, "refresh_token", "/api/auth/refresh");
+        deleteCookie(response, "is_authenticated", "/");
+    }
 
-        Cookie refreshCookie = new Cookie("refresh_token", "");
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setPath("/");
-        refreshCookie.setMaxAge(0);
-        response.addCookie(refreshCookie);
+    private void deleteCookie(HttpServletResponse response, String name, String path) {
+        Cookie cookie = new Cookie(name, "");
+        cookie.setHttpOnly(true);
+        cookie.setPath(path);
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 }
