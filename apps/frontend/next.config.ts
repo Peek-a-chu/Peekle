@@ -85,10 +85,31 @@ const nextConfig: NextConfig = {
       'utf-8-validate': 'commonjs utf-8-validate',
     });
 
-    config.module.rules.push({
-      test: /\.svg$/i,
-      use: ['@svgr/webpack'],
-    });
+    // SVG를 컴포넌트로도 쓰고 URL로도 쓰기 위한 설정
+    const fileLoaderRule = config.module.rules.find((rule: any) =>
+      rule.test?.test?.('.svg'),
+    );
+
+    if (fileLoaderRule) {
+      config.module.rules.push(
+        // URL로 가져오기 (import icon from './icon.svg?url')
+        {
+          ...fileLoaderRule,
+          test: /\.svg$/i,
+          resourceQuery: /url/, // *.svg?url
+        },
+        // 컴포넌트로 가져오기 (import Icon from './icon.svg')
+        {
+          test: /\.svg$/i,
+          issuer: fileLoaderRule.issuer,
+          resourceQuery: { not: [/url/] }, // *.svg?url 이 아닌 경우
+          use: ['@svgr/webpack'],
+        },
+      );
+
+      // 기존 SVG 룰에서 SVG 제외 (커스텀 룰에서 처리하므로)
+      fileLoaderRule.exclude = /\.svg$/i;
+    }
 
     return config;
   },

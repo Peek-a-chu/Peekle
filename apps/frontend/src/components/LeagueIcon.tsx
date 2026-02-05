@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { LEAGUE_ICONS } from '@/assets/icons/league';
 
 export type LeagueType =
@@ -56,10 +57,12 @@ interface LeagueIconProps {
 
 const LeagueIcon = ({ league, size = 24, className = '' }: LeagueIconProps) => {
   const safeLeague = (league?.toLowerCase() || 'stone') as keyof typeof LEAGUE_ICONS;
-  const Icon = LEAGUE_ICONS[safeLeague] || LEAGUE_ICONS.stone;
+  const iconAsset = LEAGUE_ICONS[safeLeague] || LEAGUE_ICONS.stone;
 
   return (
-    <Icon
+    <Image
+      src={iconAsset}
+      alt={LEAGUE_NAMES[safeLeague] || 'League Icon'}
       width={size}
       height={size}
       className={className}
@@ -68,3 +71,4 @@ const LeagueIcon = ({ league, size = 24, className = '' }: LeagueIconProps) => {
 };
 
 export default LeagueIcon;
+

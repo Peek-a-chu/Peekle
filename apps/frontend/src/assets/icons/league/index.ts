@@ -1,11 +1,11 @@
-import stone from './stone.svg';
-import bronze from './bronze.svg';
-import silver from './silver.svg';
-import gold from './gold.svg';
-import platinum from './platinum.svg';
-import emerald from './emerald.svg';
-import diamond from './diamond.svg';
-import ruby from './ruby.svg';
+import stone from './stone.svg?url';
+import bronze from './bronze.svg?url';
+import silver from './silver.svg?url';
+import gold from './gold.svg?url';
+import platinum from './platinum.svg?url';
+import emerald from './emerald.svg?url';
+import diamond from './diamond.svg?url';
+import ruby from './ruby.svg?url';
 
 export const LEAGUE_ICONS = {
     stone,
