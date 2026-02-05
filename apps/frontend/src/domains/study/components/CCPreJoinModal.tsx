@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, Video, VideoOff, X, Volume2, Play, Square, ChevronDown, Check, AlertCircle, Puzzle, Loader2, Link as LinkIcon, Download } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, X, Volume2, Play, Square, ChevronDown, Check, AlertCircle, Puzzle, Loader2, Link as LinkIcon, Download, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useExtensionCheck } from '@/hooks/useExtensionCheck';
 import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
@@ -32,7 +33,9 @@ interface CCPreJoinModalProps {
 }
 
 export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCPreJoinModalProps) => {
+    const router = useRouter();
     const { user } = useAuthStore();
+    const isBojLinked = !!user?.bojId;
 
     // Extension Check State
     const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
@@ -481,7 +484,7 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
                         </div>
 
                         {/* Right: Settings Panel */}
-                        <div className="flex flex-col p-6 gap-6 bg-zinc-900 overflow-y-auto">
+                        <div className="flex flex-col p-6 gap-6 bg-zinc-900 overflow-y-auto no-scrollbar">
 
                             {/* Camera Settings */}
                             <div className="space-y-3">
@@ -616,8 +619,8 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
                                         className="py-2"
                                     />
                                 </div>
-                            </div>
 
+                            </div>
                         </div>
                     </div>
 
@@ -659,7 +662,34 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
                         </div>
 
                         {/* Right: Actions */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 relative">
+                            {/* Speech Bubble (말풍선) 안내 */}
+                            {extensionStatus === 'NOT_INSTALLED' ? (
+                                <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                                    <div className="bg-blue-600 text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                                        <Puzzle size={14} />
+                                        확장 프로그램을 먼저 설치해 주세요!
+                                    </div>
+                                    <div className="w-3 h-3 bg-blue-600 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
+                                </div>
+                            ) : !isBojLinked ? (
+                                <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                                    <div className="bg-orange-500 text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                                        <AlertCircle size={14} />
+                                        프로필에서 백준 아이디를 먼저 등록해 주세요.
+                                    </div>
+                                    <div className="w-3 h-3 bg-orange-500 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
+                                </div>
+                            ) : (extensionStatus === 'INSTALLED' || extensionStatus === 'MISMATCH') && (
+                                <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                                    <div className="bg-primary text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                                        <LinkIcon size={14} />
+                                        확장 프로그램과 계정을 연동해 주세요.
+                                    </div>
+                                    <div className="w-3 h-3 bg-primary rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
+                                </div>
+                            )}
+
                             <Button
                                 variant="ghost"
                                 onClick={onCancel}
@@ -695,14 +725,22 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
                                         확장 프로그램 설치
                                     </Button>
                                 </div>
+                            ) : !isBojLinked ? (
+                                <Button
+                                    onClick={() => router.push(`/profile/${user?.nickname}`)}
+                                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-11 px-6 rounded-lg shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                >
+                                    <User size={18} className="mr-2" />
+                                    백준 아이디 등록하기 (프로필)
+                                </Button>
                             ) : (extensionStatus === 'INSTALLED' || extensionStatus === 'MISMATCH') ? (
                                 <Button
                                     onClick={handleLinkAccount}
                                     disabled={isLinking}
-                                    className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11 px-6 rounded-lg shadow-lg shadow-primary/20"
+                                    className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11 px-6 rounded-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                 >
                                     {isLinking ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LinkIcon className="w-4 h-4 mr-2" />}
-                                    계정 연동하기
+                                    확장 프로그램 연동하기
                                 </Button>
                             ) : (
                                 <Button

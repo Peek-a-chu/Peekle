@@ -169,12 +169,14 @@ div[class*='monaco-editor-overlaymessage'],
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.2);
+  background: hsl(var(--foreground) / 0.1);
+  /* More subtle, theme-aware */
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: hsl(var(--foreground) / 0.2);
+  /* Slightly more visible on hover */
 }
 
 @layer components {
@@ -255,5 +257,36 @@ div[class*='monaco-editor-overlaymessage'],
 
   .markdown-prose-invert pre {
     @apply bg-black/20 border border-white/10;
+  }
+}
+
+@layer utilities {
+  @keyframes bounce-subtle {
+
+    0%,
+    100% {
+      transform: translateY(0);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+
+    50% {
+      transform: translateY(-4px);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
+
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s infinite;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 }
