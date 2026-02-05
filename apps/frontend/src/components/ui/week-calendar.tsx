@@ -24,9 +24,11 @@ export type WeekCalendarProps = {
     selected?: Date;
     onSelect?: (date: Date | undefined) => void;
     className?: string;
+    disabled?: (date: Date) => boolean;
+    initialFocus?: boolean;
 };
 
-export function WeekCalendar({ selected, onSelect, className }: WeekCalendarProps) {
+export function WeekCalendar({ selected, onSelect, className, disabled }: WeekCalendarProps) {
     const [currentMonth, setCurrentMonth] = React.useState<Date>(
         selected || startOfMonth(new Date()),
     );
@@ -124,6 +126,7 @@ export function WeekCalendar({ selected, onSelect, className }: WeekCalendarProp
                     const isHoverEnd = hoverRange && isSameDay(day, hoverRange.end);
 
                     const isCurrentMonth = isSameMonth(day, monthStart);
+                    const isDisabled = disabled ? disabled(day) : false;
 
                     return (
                         <div
@@ -138,11 +141,13 @@ export function WeekCalendar({ selected, onSelect, className }: WeekCalendarProp
                                 !inRange && isHoverEnd && 'rounded-r-full',
                                 idx % 7 === 0 && (inRange || inHoverRange) && 'rounded-l-full',
                                 idx % 7 === 6 && (inRange || inHoverRange) && 'rounded-r-full',
+                                isDisabled && 'opacity-30 cursor-not-allowed',
                             )}
                         >
                             <button
-                                onClick={() => onSelect?.(day)}
-                                onMouseEnter={() => setHoveredDate(day)}
+                                onClick={() => !isDisabled && onSelect?.(day)}
+                                onMouseEnter={() => !isDisabled && setHoveredDate(day)}
+                                disabled={isDisabled}
                                 className={cn(
                                     buttonVariants({ variant: 'ghost' }),
                                     'h-8 w-8 p-0 font-normal rounded-full relative z-10',
@@ -150,6 +155,7 @@ export function WeekCalendar({ selected, onSelect, className }: WeekCalendarProp
                                     isToday &&
                                     'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
                                     !isToday && isCurrentMonth && 'hover:bg-accent/50',
+                                    isDisabled && 'hover:bg-transparent cursor-not-allowed',
                                 )}
                             >
                                 {format(day, 'd')}
