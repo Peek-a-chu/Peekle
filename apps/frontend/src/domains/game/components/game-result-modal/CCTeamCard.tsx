@@ -81,8 +81,8 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
           <div
             key={p.userId}
             className={`group relative flex items-center p-3 rounded-xl border transition-all ${p.isMe
-                ? `bg-background ${p.teamId === 'RED' ? 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`
-                : 'bg-background/50 border-border/50 hover:bg-background'
+              ? `bg-background ${p.teamId === 'RED' ? 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`
+              : 'bg-background/50 border-border/50 hover:bg-background'
               } ${p.userId === mvpId ? 'z-20' : 'z-0'}`}
           >
             {/* MVP/ACE Badge */}
