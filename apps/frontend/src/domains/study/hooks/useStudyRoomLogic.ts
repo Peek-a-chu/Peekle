@@ -118,6 +118,7 @@ export function useStudyRoomLogic() {
     handleSelectProblem,
     handleDateChange,
     selectedDate,
+    selectedStudyProblemId: useRoomStore.getState().selectedStudyProblemId ?? undefined,
     selectedProblemId: selectedProblemId ?? undefined,
     problems,
     historyDates,
