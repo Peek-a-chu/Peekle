@@ -15,7 +15,6 @@ public class WorkbookListResponse {
     private String description;
     private int problemCount;
     private int solvedCount;
-    private int failedCount;
     private int bookmarkCount;
 
     @JsonProperty("isBookmarked")
@@ -35,7 +34,7 @@ public class WorkbookListResponse {
         private String nickname;
     }
 
-    public static WorkbookListResponse of(Workbook workbook, int problemCount, int solvedCount, int failedCount,
+    public static WorkbookListResponse of(Workbook workbook, int problemCount, int solvedCount,
             boolean isBookmarked, boolean isOwner) {
         return WorkbookListResponse.builder()
                 .id(workbook.getId())
@@ -43,7 +42,6 @@ public class WorkbookListResponse {
                 .description(workbook.getDescription())
                 .problemCount(problemCount)
                 .solvedCount(solvedCount)
-                .failedCount(failedCount)
                 .bookmarkCount(workbook.getBookmarkCount())
                 .isBookmarked(isBookmarked)
                 .isOwner(isOwner)

@@ -103,7 +103,7 @@ const LearningTimeline = ({
 
       <div className="flex gap-6 relative">
         {/* 타임라인 목록 */}
-        <div className="w-full divide-y divide-border transition-all duration-300">
+        <div className="w-full transition-all duration-300">
           {displayedKeys.length > 0 ? (
             displayedKeys.map((problemId) => (
               <TimelineItem

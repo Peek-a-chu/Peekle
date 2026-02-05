@@ -601,6 +601,10 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
             checkInstallation={checkInstallation}
             status={status}
             isLoading={isLoading}
+            onRegisterBojId={() => {
+              setActiveTab(TABS.OVERVIEW);
+              handleEditStart();
+            }}
           />
         </div>
       )}

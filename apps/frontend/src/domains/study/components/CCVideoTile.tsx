@@ -55,15 +55,17 @@ export function CCVideoTile({ participant, className, onClick, isCurrentUser }: 
       )}
 
       {/* Overlays */}
-      <div className="absolute bottom-1 left-2 max-w-[80%]">
-        <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
-          {participant.name || participant.identity} {isCurrentUser && '(나)'}
-        </span>
+      <div className="absolute bottom-2 left-2 max-w-[85%]">
+        <div className="rounded-md bg-black/60 px-2 py-0.5 backdrop-blur-sm border border-white/10 shadow-lg">
+          <span className="truncate text-xs font-bold text-white">
+            {participant.name || participant.identity} {isCurrentUser && '(나)'}
+          </span>
+        </div>
       </div>
 
       {!isAudioEnabled && (
-        <div className="absolute top-2 right-2 rounded-full bg-black/50 p-1">
-          <MicOff className="h-3 w-3 text-red-500" />
+        <div className="absolute top-2 right-2 rounded-full bg-red-500 p-1.5 shadow-lg border border-red-600 animate-in fade-in zoom-in duration-300">
+          <MicOff className="h-4 w-4 text-white stroke-[2.5px]" />
         </div>
       )}
     </div>

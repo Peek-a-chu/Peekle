@@ -151,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data) return;
 
         nicknameEl.innerText = data.nickname || "알 수 없음";
+        document.getElementById('boj-id').innerText = data.bojId ? `boj: ${data.bojId}` : "";
         document.getElementById('league-name').innerText = data.leagueName || "Unranked";
         document.getElementById('user-score').innerText = (data.score || 0) + "점";
 

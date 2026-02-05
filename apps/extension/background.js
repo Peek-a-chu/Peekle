@@ -37,7 +37,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         }, () => {
             // Open new tab
-            const targetUrl = `https://www.acmicpc.net/submit/${request.payload.problemId}`;
+            const bojId = request.payload.externalId || request.payload.problemId;
+            const targetUrl = `https://www.acmicpc.net/submit/${bojId}`;
             chrome.tabs.create({ url: targetUrl });
             sendResponse({ success: true });
         });

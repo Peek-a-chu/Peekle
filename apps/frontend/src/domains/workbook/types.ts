@@ -5,7 +5,6 @@ export interface Workbook {
   description: string;
   problemCount: number;
   solvedCount: number;
-  failedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;

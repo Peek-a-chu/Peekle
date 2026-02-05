@@ -2,126 +2,170 @@
 
 import * as React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DayPicker, DateRange } from 'react-day-picker';
-import { startOfWeek, endOfWeek } from 'date-fns';
+import {
+    format,
+    addMonths,
+    subMonths,
+    startOfMonth,
+    endOfMonth,
+    startOfWeek,
+    endOfWeek,
+    eachDayOfInterval,
+    isSameMonth,
+    isSameDay,
+    isWithinInterval,
+} from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 
-export type WeekCalendarProps = Omit<React.ComponentProps<typeof DayPicker>, 'mode'> & {
+export type WeekCalendarProps = {
     selected?: Date;
-    onSelect?: (date: Date) => void;
+    onSelect?: (date: Date | undefined) => void;
+    className?: string;
+    disabled?: (date: Date) => boolean;
+    initialFocus?: boolean;
 };
 
-function WeekCalendar({ className, classNames, showOutsideDays = true, selected, onSelect, ...props }: WeekCalendarProps) {
-    // 내부적으로 Range로 관리하지만, 외부 인터페이스는 단일 Date(해당 주 포함 날짜)로 처리
-    const [selectedRange, setSelectedRange] = React.useState<DateRange | undefined>(
-        selected
-            ? { from: startOfWeek(selected, { locale: ko }), to: endOfWeek(selected, { locale: ko }) }
-            : undefined
+export function WeekCalendar({ selected, onSelect, className, disabled }: WeekCalendarProps) {
+    const [currentMonth, setCurrentMonth] = React.useState<Date>(
+        selected || startOfMonth(new Date()),
     );
+    const [hoveredDate, setHoveredDate] = React.useState<Date | null>(null);
 
-    // hover 시 해당 주 전체 하이라이트 효과를 위한 상태
-    const [hoverRange, setHoverRange] = React.useState<DateRange | undefined>();
+    // 현재 표시할 달의 첫날과 마지막날
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
 
-    React.useEffect(() => {
-        if (selected) {
-            setSelectedRange({
-                from: startOfWeek(selected, { locale: ko }),
-                to: endOfWeek(selected, { locale: ko }),
-            });
-        }
+    // 달력 그리드에 표시될 전체 범위 (이전/다음 달 날짜 포함)
+    // 일반적인 달력처럼 일요일부터 시작하도록 설정
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const days = eachDayOfInterval({
+        start: startDate,
+        end: endDate,
+    });
+
+    // 수요일~화요일 범위 계산 함수
+    const getWeekRange = (date: Date) => {
+        const start = startOfWeek(date, { weekStartsOn: 3 });
+        const end = endOfWeek(date, { weekStartsOn: 3 });
+        return { start, end };
+    };
+
+    // 선택된 범위
+    const range = React.useMemo(() => {
+        if (!selected) return null;
+        return getWeekRange(selected);
     }, [selected]);
 
-    const handleDayClick = (day: Date) => {
-        if (day) {
-            const from = startOfWeek(day, { locale: ko });
-            const to = endOfWeek(day, { locale: ko });
-            const newRange = { from, to };
-            setSelectedRange(newRange);
-            if (onSelect) {
-                onSelect(from); // 주 시작일 반환
-            }
-        }
-    };
+    // 호버된 범위
+    const hoverRange = React.useMemo(() => {
+        if (!hoveredDate) return null;
+        return getWeekRange(hoveredDate);
+    }, [hoveredDate]);
 
-    const handleDayEnter = (date: Date) => {
-        setHoverRange({
-            from: startOfWeek(date, { locale: ko }),
-            to: endOfWeek(date, { locale: ko })
-        });
-    };
+    const handlePreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+    const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
-    const handleDayLeave = () => {
-        setHoverRange(undefined);
-    };
-
-    // Custom modifiers to highlight the entire week
-    const modifiers = {
-        hoverRange: hoverRange,
-        selectedRange: selectedRange,
-    };
+    const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
 
     return (
-        <DayPicker
-            mode="range"
-            selected={selectedRange}
-            onDayClick={handleDayClick}
-            onDayMouseEnter={handleDayEnter}
-            onDayMouseLeave={handleDayLeave}
-            showOutsideDays={showOutsideDays}
-            locale={ko}
-            className={cn('p-3', className)}
-            classNames={{
-                months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
-                month: 'space-y-4',
-                caption: 'flex justify-center pt-1 relative items-center',
-                caption_label: 'text-sm font-medium',
-                nav: 'space-x-1 flex items-center',
-                nav_button: cn(
-                    buttonVariants({ variant: 'outline' }),
-                    'h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100',
-                ),
-                nav_button_previous: 'absolute left-1',
-                nav_button_next: 'absolute right-1',
-                table: 'w-full border-collapse space-y-1',
-                head_row: 'flex',
-                head_cell: 'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
-                row: 'flex w-full mt-2',
-                cell: 'h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
-                day: cn(
-                    buttonVariants({ variant: 'ghost' }),
-                    'h-9 w-9 p-0 font-normal aria-selected:opacity-100'
-                ),
-                day_range_start: 'day-range-start',
-                day_range_end: 'day-range-end',
-                day_selected:
-                    'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
-                day_today: 'bg-accent text-accent-foreground',
-                day_outside:
-                    'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
-                day_disabled: 'text-muted-foreground opacity-50',
-                day_range_middle: 'aria-selected:bg-accent aria-selected:text-accent-foreground',
-                day_hidden: 'invisible',
-                ...classNames,
-            }}
-            components={{
-                Chevron: ({ orientation }) =>
-                    orientation === 'left' ? (
+        <div className={cn('w-72 bg-card p-3 rounded-md border shadow-sm', className)}>
+            {/* Header */}
+            <div className="flex justify-between items-center h-9 mb-4 px-1">
+                <span className="text-sm font-semibold">
+                    {format(currentMonth, 'yyyy년 M월', { locale: ko })}
+                </span>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={handlePreviousMonth}
+                        className={cn(
+                            buttonVariants({ variant: 'ghost' }),
+                            'h-7 w-7 p-0 opacity-50 hover:opacity-100',
+                        )}
+                    >
                         <ChevronLeft className="h-4 w-4" />
-                    ) : (
+                    </button>
+                    <button
+                        onClick={handleNextMonth}
+                        className={cn(
+                            buttonVariants({ variant: 'ghost' }),
+                            'h-7 w-7 p-0 opacity-50 hover:opacity-100',
+                        )}
+                    >
                         <ChevronRight className="h-4 w-4" />
-                    ),
-            }}
-            modifiers={modifiers}
-            modifiersClassNames={{
-                hoverRange: 'bg-muted/50'
-            }}
-            {...props}
-        />
+                    </button>
+                </div>
+            </div>
+
+            {/* WeekDays Header */}
+            <div className="grid grid-cols-7 mb-2">
+                {weekDays.map((day) => (
+                    <div
+                        key={day}
+                        className="text-muted-foreground font-medium text-xs h-8 flex items-center justify-center"
+                    >
+                        {day}
+                    </div>
+                ))}
+            </div>
+
+            {/* Days Grid */}
+            <div className="grid grid-cols-7 gap-y-0.5" onMouseLeave={() => setHoveredDate(null)}>
+                {days.map((day, idx) => {
+                    const isToday = isSameDay(day, new Date());
+                    const inRange = range && isWithinInterval(day, range);
+                    const inHoverRange = hoverRange && isWithinInterval(day, hoverRange);
+
+                    const isRangeStart = range && isSameDay(day, range.start);
+                    const isRangeEnd = range && isSameDay(day, range.end);
+                    const isHoverStart = hoverRange && isSameDay(day, hoverRange.start);
+                    const isHoverEnd = hoverRange && isSameDay(day, hoverRange.end);
+
+                    const isCurrentMonth = isSameMonth(day, monthStart);
+                    const isDisabled = disabled ? disabled(day) : false;
+
+                    return (
+                        <div
+                            key={day.toISOString()}
+                            className={cn(
+                                'h-8 relative flex items-center justify-center transition-all',
+                                inRange && 'bg-accent',
+                                !inRange && inHoverRange && 'bg-accent/40',
+                                isRangeStart && 'rounded-l-full',
+                                isRangeEnd && 'rounded-r-full',
+                                !inRange && isHoverStart && 'rounded-l-full',
+                                !inRange && isHoverEnd && 'rounded-r-full',
+                                idx % 7 === 0 && (inRange || inHoverRange) && 'rounded-l-full',
+                                idx % 7 === 6 && (inRange || inHoverRange) && 'rounded-r-full',
+                                isDisabled && 'opacity-30 cursor-not-allowed',
+                            )}
+                        >
+                            <button
+                                onClick={() => !isDisabled && onSelect?.(day)}
+                                onMouseEnter={() => !isDisabled && setHoveredDate(day)}
+                                disabled={isDisabled}
+                                className={cn(
+                                    buttonVariants({ variant: 'ghost' }),
+                                    'h-8 w-8 p-0 font-normal rounded-full relative z-10',
+                                    !isCurrentMonth && 'text-muted-foreground opacity-30',
+                                    isToday &&
+                                    'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
+                                    !isToday && isCurrentMonth && 'hover:bg-accent/50',
+                                    isDisabled && 'hover:bg-transparent cursor-not-allowed',
+                                )}
+                            >
+                                {format(day, 'd')}
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
 }
-WeekCalendar.displayName = 'WeekCalendar';
 
-export { WeekCalendar };
+WeekCalendar.displayName = 'WeekCalendar';
