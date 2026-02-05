@@ -27,7 +27,7 @@ export function CCRightPanel({
   const totalCount = useRoomStore((state) => state.participants.length);
 
   return (
-    <div className={cn('flex h-full flex-col', className)}>
+    <div className={cn('flex h-full flex-col border-l border-border', className)} data-tour="right-panel">
       {/* Tab Headers */}
       <div className="flex bg-card border-b border-border items-center h-14 shrink-0">
         <Button
@@ -48,6 +48,7 @@ export function CCRightPanel({
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground hover:text-foreground',
           )}
+          data-tour="chat-tab"
         >
           채팅
         </button>
@@ -60,6 +61,7 @@ export function CCRightPanel({
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground hover:text-foreground',
           )}
+          data-tour="participants-tab"
         >
           참여자 ({onlineCount}/{totalCount})
         </button>
