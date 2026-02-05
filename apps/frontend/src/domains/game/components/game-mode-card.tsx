@@ -2,7 +2,7 @@
 
 import { Timer, Zap, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { GameMode, TeamType } from '@/domains/game/mocks/mock-data';
+import type { GameMode, TeamType } from '@/domains/game/types/game-types';
 
 interface GameModeCardProps {
   mode: GameMode;
