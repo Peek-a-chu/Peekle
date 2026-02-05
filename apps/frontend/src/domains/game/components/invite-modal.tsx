@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 interface InviteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  roomId: string;
+  roomId: string | number;
 }
 
 export function InviteModal({ open, onOpenChange, roomId }: InviteModalProps) {

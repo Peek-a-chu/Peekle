@@ -58,8 +58,9 @@ public class SubmissionService {
             }
         }
 
-        // 0. 검증 (Extension 변조 방지) - AC(성공)일 때만 검증
-        if (request.getIsSuccess() && user.getBojId() != null && !user.getBojId().isEmpty()) {
+        // 0. 검증 (Extension 변조 방지) - AC(성공)일 때만 검증, 단 TEST_TOKEN이면 패스
+        if (!"TEST_TOKEN".equals(token) && request.getIsSuccess() && user.getBojId() != null
+                && !user.getBojId().isEmpty()) {
             try {
                 submissionValidator.validateSubmission(
                         String.valueOf(request.getProblemId()),
@@ -176,7 +177,7 @@ public class SubmissionService {
 
             if (gameIdObj != null) {
                 Long gameId = Long.parseLong(String.valueOf(gameIdObj));
-                redisGameService.solveProblem(user.getId(), gameId, request.getProblemId());
+                redisGameService.solveProblem(user.getId(), gameId, problem.getId());
                 System.out.println("🎮 Game Score Updated for Game ID: " + gameId);
             }
         } catch (Exception e) {

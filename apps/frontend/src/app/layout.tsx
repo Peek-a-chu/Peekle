@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { GameSocketProvider } from '@/domains/game/context/GameSocketContext';
 
 export const metadata: Metadata = {
   title: 'Peekle',
@@ -74,11 +75,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background">
         <QueryProvider>
-          <ThemeProvider>
-            {children}
-            <SettingsModal />
-          </ThemeProvider>
-          <Toaster />
+          <GameSocketProvider>
+            <ThemeProvider>
+              {children}
+              <SettingsModal />
+            </ThemeProvider>
+            <Toaster />
+          </GameSocketProvider>
         </QueryProvider>
       </body>
     </html>

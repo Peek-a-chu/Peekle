@@ -1,8 +1,9 @@
 // 게임 모드 타입
 export type GameMode = 'TIME_ATTACK' | 'SPEED_RACE';
 export type TeamType = 'INDIVIDUAL' | 'TEAM';
-export type GameStatus = 'WAITING' | 'PLAYING';
+export type GameStatus = 'WAITING' | 'PLAYING' | 'END';
 export type ParticipantStatus = 'NOT_READY' | 'READY';
+
 export type Team = 'RED' | 'BLUE';
 
 // 참여자 인터페이스
@@ -21,8 +22,9 @@ export interface ChatMessage {
   id: string;
   senderId: string;
   senderNickname: string;
-  senderProfileImg: string;
+  profileImg: string;
   content: string;
+
   timestamp: string;
   senderTeam?: Team; // 팀전일 경우에만 사용
 }
@@ -45,8 +47,10 @@ export interface GameRoom {
   };
   isPrivate: boolean;
   tags: string[];
-  createdAt: string;
+  // createdAt: string; // 백엔드 미지원으로 제거
 }
+
+
 
 // 게임방 상세 정보 (대기방용)
 export interface GameRoomDetail extends Omit<GameRoom, 'host'> {
@@ -109,8 +113,8 @@ export const mockGameRooms: GameRoom[] = [
       profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
-    tags: ['골드', '구현'],
-    createdAt: '2026-01-21T14:30:00',
+    tags: ['BFS', '골드'],
+    // createdAt: '2024-01-20T10:00:00Z',
   },
   {
     id: '2',
@@ -128,8 +132,8 @@ export const mockGameRooms: GameRoom[] = [
       profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
-    tags: ['실버', 'DP'],
-    createdAt: '2026-01-21T14:25:00',
+    tags: ['구현', '실버'],
+    // createdAt: '2024-01-20T10:05:00Z',
   },
   {
     id: '3',
@@ -147,8 +151,8 @@ export const mockGameRooms: GameRoom[] = [
       profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: true,
-    tags: ['팀전', '브론즈'],
-    createdAt: '2026-01-21T14:20:00',
+    tags: ['초보자', '브론즈'],
+    // createdAt: '2024-01-20T10:20:00Z',
   },
   {
     id: '4',
@@ -167,7 +171,7 @@ export const mockGameRooms: GameRoom[] = [
     },
     isPrivate: false,
     tags: ['초보', '브론즈'],
-    createdAt: '2026-01-21T14:15:00',
+    // createdAt: '2026-01-21T14:15:00',
   },
   {
     id: '5',
@@ -185,8 +189,8 @@ export const mockGameRooms: GameRoom[] = [
       profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     },
     isPrivate: false,
-    tags: ['팀전', '스피드'],
-    createdAt: '2026-01-21T14:10:00',
+    tags: ['DP', '플래티넘'],
+    // createdAt: '2024-01-20T10:10:00Z',
   },
   {
     id: '6',
@@ -205,8 +209,8 @@ export const mockGameRooms: GameRoom[] = [
     },
     isPrivate: true,
     tags: ['다이아', '고수'],
-    createdAt: '2026-01-21T14:05:00',
   },
+
 ];
 
 // 필터링 함수
@@ -384,17 +388,17 @@ export const defaultGameCreationForm: GameCreationFormData = {
 export const mockChatMessages: ChatMessage[] = [
   {
     id: 'msg1',
-    senderId: 'user1',
-    senderNickname: 'CodeNinja',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
-    content: '오늘 문제 어떤거요? 👀',
+    senderId: 'user3',
+    senderNickname: '해론다이',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    content: '안녕하세요! 게임 시작해요',
     timestamp: '2026-01-24T20:00:00',
   },
   {
     id: 'msg2',
-    senderId: 'user3',
-    senderNickname: '백준킹',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    senderId: 'user4',
+    senderNickname: 'RedPlayer1',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '그래프랑 DP 하면 좋겠습니다!',
     timestamp: '2026-01-24T20:01:00',
   },
@@ -402,7 +406,7 @@ export const mockChatMessages: ChatMessage[] = [
     id: 'msg3',
     senderId: 'user2',
     senderNickname: 'PS마스터',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: 'import heapq',
     timestamp: '2026-01-24T20:02:00',
   },
@@ -410,8 +414,10 @@ export const mockChatMessages: ChatMessage[] = [
     id: 'msg4',
     senderId: 'user2',
     senderNickname: 'PS마스터',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '이렇게 시작하면 돼요',
+
+
     timestamp: '2026-01-24T20:02:30',
   },
 ];
@@ -422,7 +428,7 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg1',
     senderId: 'user3',
     senderNickname: '해론다이',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '레드팀 화이팅! 🔥',
     timestamp: '2026-01-24T20:00:00',
     senderTeam: 'RED',
@@ -431,7 +437,7 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg2',
     senderId: 'user6',
     senderNickname: 'BlueLeader',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '블루팀도 질 수 없죠 💙',
     timestamp: '2026-01-24T20:01:00',
     senderTeam: 'BLUE',
@@ -440,17 +446,19 @@ export const mockTeamChatMessages: ChatMessage[] = [
     id: 'team-msg3',
     senderId: 'user4',
     senderNickname: 'RedPlayer1',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: 'DP 문제 나오면 좋겠다',
     timestamp: '2026-01-24T20:02:00',
     senderTeam: 'RED',
   },
+
   {
     id: 'team-msg4',
     senderId: 'user7',
     senderNickname: 'BluePlayer1',
-    senderProfileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
+    profileImg: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=peekle',
     content: '그래프가 더 재밌지 않나요?',
+
     timestamp: '2026-01-24T20:02:30',
     senderTeam: 'BLUE',
   },
@@ -480,7 +488,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
     problemCount: 5,
     isPrivate: false,
     tags: ['실버', 'DP'],
-    createdAt: '2026-01-21T14:25:00',
+    // createdAt: '2026-01-21T14:25:00',
     tierMin: 'silver5',
     tierMax: 'silver1',
     participants: [
@@ -515,7 +523,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
     problemCount: 8,
     isPrivate: true,
     tags: ['팀전', '브론즈'],
-    createdAt: '2026-01-21T14:20:00',
+    // createdAt: '2026-01-21T14:20:00',
     tierMin: 'bronze5',
     tierMax: 'bronze1',
     participants: [
@@ -599,7 +607,6 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
     problemCount: 15,
     isPrivate: false,
     tags: ['초보', '브론즈'],
-    createdAt: '2026-01-21T14:15:00',
     tierMin: 'bronze5',
     tierMax: 'silver5',
     participants: [
@@ -626,7 +633,7 @@ const mockGameRoomDetails: Record<string, GameRoomDetail> = {
     problemCount: 5,
     isPrivate: false,
     tags: ['다이아', '그래프'],
-    createdAt: '2026-01-21T14:05:00',
+    // createdAt: '2026-01-21T14:05:00',
     tierMin: 'platinum1',
     tierMax: 'diamond5',
     participants: [
@@ -663,7 +670,7 @@ const defaultRoomDetail: GameRoomDetail = {
   problemCount: 1,
   isPrivate: false,
   tags: ['구현', '백트래킹'],
-  createdAt: '2026-01-24T19:30:00',
+  // createdAt: '2026-01-24T19:30:00',
   tierMin: 'gold5',
   tierMax: 'gold1',
   participants: [

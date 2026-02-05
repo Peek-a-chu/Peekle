@@ -35,11 +35,9 @@ export function useGameCreationForm(
 
     // 모드에 따른 기본값 설정
     if (teamType === 'TEAM') {
-      // 팀전: 짝수만 가능, 최소 4명
-      const newMaxPlayers = Math.max(
-        4,
-        formData.maxPlayers % 2 === 0 ? formData.maxPlayers : formData.maxPlayers + 1,
-      );
+      // 팀전: 짝수만 가능, 최소 4명, 최대 8명 (4vs4)
+      let newMaxPlayers = formData.maxPlayers % 2 === 0 ? formData.maxPlayers : formData.maxPlayers + 1;
+      newMaxPlayers = Math.min(8, Math.max(4, newMaxPlayers));
       updateForm('maxPlayers', newMaxPlayers);
       setMaxPlayersInput(String(newMaxPlayers));
     }
@@ -55,7 +53,7 @@ export function useGameCreationForm(
     let clamped: number;
     if (formData.teamType === 'TEAM') {
       const evenValue = Math.round(value / 2) * 2;
-      clamped = Math.min(12, Math.max(4, evenValue));
+      clamped = Math.min(8, Math.max(4, evenValue));
     } else {
       clamped = Math.min(8, Math.max(2, value));
     }
@@ -80,7 +78,7 @@ export function useGameCreationForm(
     const value = maxPlayersInput === '' ? 0 : Number(maxPlayersInput);
     if (formData.teamType === 'TEAM') {
       const evenValue = Math.round(value / 2) * 2;
-      const clamped = Math.min(12, Math.max(4, evenValue));
+      const clamped = Math.min(8, Math.max(4, evenValue));
       updateForm('maxPlayers', clamped);
       setMaxPlayersInput(String(clamped));
     } else {

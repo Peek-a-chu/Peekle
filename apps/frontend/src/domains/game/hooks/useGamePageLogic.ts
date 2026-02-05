@@ -1,14 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { getGameRooms, createGameRoom, enterGameRoom, type GameCreateRequest } from '@/domains/game/api/game-api';
 import {
-  mockGameRooms,
   filterGameRooms,
   type GameRoom,
   type GameMode,
   type TeamType,
   type GameStatus,
+  type GameCreationFormData,
 } from '@/domains/game/mocks/mock-data';
+
 
 export type StatusFilter = GameStatus | 'ALL';
 
@@ -24,15 +26,30 @@ export function useGamePageLogic() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<GameRoom | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [rooms, setRooms] = useState<GameRoom[]>([]);
+
+  // 방 목록 조회
+  const refreshRooms = useCallback(async () => {
+    const data = await getGameRooms();
+    setRooms(data);
+  }, []);
+
+  // 초기 데이터 로딩
+  useEffect(() => {
+    refreshRooms();
+  }, [refreshRooms]);
+
 
   const filteredRooms = useMemo(() => {
-    return filterGameRooms(mockGameRooms, {
+    return filterGameRooms(rooms, {
+
       mode: selectedMode || undefined,
       teamType: selectedTeamType || undefined,
       status: statusFilter,
       search: searchQuery,
     });
-  }, [selectedMode, selectedTeamType, statusFilter, searchQuery]);
+  }, [rooms, selectedMode, selectedTeamType, statusFilter, searchQuery]);
+
 
   const handleModeSelect = (mode: GameMode, teamType: TeamType) => {
     if (selectedMode === mode && selectedTeamType === teamType) {
@@ -45,7 +62,7 @@ export function useGamePageLogic() {
     }
   };
 
-  const handleRoomClick = (room: GameRoom) => {
+  const handleRoomClick = async (room: GameRoom) => {
     // 진행 중인 방은 입장 불가
     if (room.status === 'PLAYING') {
       toast.error('진행 중인 방에는 입장할 수 없습니다');
@@ -57,18 +74,61 @@ export function useGamePageLogic() {
       setSelectedRoom(room);
       setPasswordModalOpen(true);
     } else {
-      // 공개 방일 경우 바로 대기방으로 이동
-      router.push(`/game/${room.id}`);
+      // 공개 방일 경우 입장 API 호출 후 성공 시 이동
+      try {
+        const success = await enterGameRoom(room.id);
+        if (success) {
+          router.push(`/game/${room.id}`);
+        } else {
+          toast.error('방 입장에 실패했습니다.');
+        }
+      } catch (error: any) {
+        toast.error(error.message || '방 입장에 실패했습니다.');
+      }
     }
   };
 
-  const handlePasswordSubmit = (password: string) => {
-    // TODO: 비밀번호 검증 API 호출
-    console.log('Entering room with password:', selectedRoom?.id, password);
-    setPasswordModalOpen(false);
-    // 비밀번호 검증 후 대기방으로 이동
-    if (selectedRoom) {
-      router.push(`/game/${selectedRoom.id}`);
+  const handlePasswordSubmit = async (password: string) => {
+    if (!selectedRoom) return;
+
+    try {
+      const success = await enterGameRoom(selectedRoom.id, password);
+      if (success) {
+        setPasswordModalOpen(false);
+        router.push(`/game/${selectedRoom.id}`);
+      } else {
+        toast.error('비밀번호가 일치하지 않거나 입장에 실패했습니다.');
+      }
+    } catch (error: any) {
+      toast.error(error.message || '입장에 실패했습니다.');
+    }
+  };
+
+  const handleCreateRoom = async (formData: GameCreationFormData) => {
+    // GameCreationFormData -> GameCreateRequest 변환
+    const requestData: GameCreateRequest = {
+      title: formData.title,
+      mode: formData.mode,
+      teamType: formData.teamType,
+      maxPlayers: formData.maxPlayers,
+      timeLimit: formData.timeLimit,
+      problemCount: formData.problemCount,
+      password: formData.password || undefined, // 빈 문자열이면 undefined 처리
+      problemSource: formData.problemSource,
+      tierMin: formData.tierMin,
+      tierMax: formData.tierMax,
+      selectedWorkbookId: formData.selectedWorkbookId || undefined, // null -> undefined 변환
+      selectedTags: formData.selectedTags,
+    };
+
+    const roomId = await createGameRoom(requestData);
+    if (roomId) {
+      toast.success('방이 생성되었습니다.');
+      setCreateModalOpen(false);
+      await refreshRooms();
+      router.push(`/game/${roomId}`);
+    } else {
+      toast.error('방 생성에 실패했습니다.');
     }
   };
 
@@ -96,6 +156,8 @@ export function useGamePageLogic() {
     handleModeSelect,
     handleRoomClick,
     handlePasswordSubmit,
+    handleCreateRoom,
+    refreshRooms,
     resetFilters,
   };
 }

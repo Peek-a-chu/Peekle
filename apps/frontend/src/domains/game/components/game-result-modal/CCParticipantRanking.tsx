@@ -70,41 +70,23 @@ export function CCParticipantRanking({ participants, mode, teamType }: CCPartici
               )}
 
               <div
-                className={`relative flex items-center py-4 px-5 rounded-xl border ${
-                  p.isMe ? `bg-card ${borderColor}` : 'bg-card border-border/40 hover:bg-accent/5'
-                }`}
+                className={`relative flex items-center py-4 px-5 rounded-xl border ${p.isMe ? `bg-card ${borderColor}` : 'bg-card border-border/40 hover:bg-accent/5'
+                  }`}
               >
                 <div className="w-10 flex justify-center shrink-0">{getRankIcon(p.rank)}</div>
 
                 <div className="flex-1 flex items-center gap-4 ml-4 overflow-hidden">
-                  <div
-                    className={`w-10 h-10 rounded-full overflow-hidden border-2 ${
-                      p.rank === 1 ? 'border-yellow-500' : 'border-border'
-                    }`}
-                  >
-                    {p.profileImg ? (
-                      <Image
-                        src={p.profileImg}
-                        alt={p.nickname}
-                        width={40}
-                        height={40}
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-muted" />
-                    )}
-                  </div>
+                  {/* Profile Image removed as requested */}
                   <span
                     className={`flex items-center text-lg font-bold truncate ${p.isMe ? 'text-yellow-400' : 'text-foreground'}`}
                   >
                     {/* Team Badge */}
                     {teamType === 'TEAM' && p.teamId && (
                       <span
-                        className={`mr-2 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
-                          p.teamId === 'RED'
-                            ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                            : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                        }`}
+                        className={`mr-2 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${p.teamId === 'RED'
+                          ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                          : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                          }`}
                       >
                         {p.teamId}
                       </span>

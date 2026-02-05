@@ -29,17 +29,29 @@ public class GameWebSocketListener {
         Object userIdObj = attributes.get("userId");
         Object gameIdObj = attributes.get("gameId");
 
-        if (userIdObj != null && gameIdObj != null) {
+        if (userIdObj != null) {
             Long userId = Long.parseLong(String.valueOf(userIdObj));
-            Long gameId = Long.parseLong(String.valueOf(gameIdObj));
 
-            log.info("[Game] User disconnected from game. Game ID: {}, User ID: {}", gameId, userId);
+            // [Modified] 세션에 gameId가 없으면 Redis에서 조회 (비정상 종료 대비)
+            if (gameIdObj == null) {
+                gameIdObj = gameService.getUserCurrentGameId(userId);
+                if (gameIdObj != null) {
+                    log.info("[Game] Found missing gameId {} for user {} from Redis", gameIdObj, userId);
+                }
+            }
 
-            try {
-                // 게임 방 퇴장 처리 (자동 위임, 빈 방 삭제 등 포함)
-                gameService.exitGameRoom(gameId, userId);
-            } catch (Exception e) {
-                log.error("[Game] Error during disconnect cleanup", e);
+            if (gameIdObj != null) {
+                Long gameId = Long.parseLong(String.valueOf(gameIdObj));
+
+                log.info("[Game] User disconnected from game. Game ID: {}, User ID: {}", gameId, userId);
+
+                try {
+                    // 게임 방 퇴장 처리 (자동 위임, 빈 방 삭제 등 포함)
+                    // [Modified] 단순 퇴장이 아니라 상태에 따라 처리 (재접속 지원)
+                    gameService.handleDisconnect(gameId, userId);
+                } catch (Exception e) {
+                    log.error("[Game] Error during disconnect cleanup", e);
+                }
             }
         }
     }
