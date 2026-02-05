@@ -9,6 +9,7 @@ import PeopleIcon from '@/assets/icons/people.svg';
 import TrophyIcon from '@/assets/icons/trophy.svg';
 import ZoomIcon from '@/assets/icons/zoom.svg';
 import { UserIcon } from '@/components/UserIcon';
+import { CCUserProfileModal } from '@/components/common/CCUserProfileModal';
 
 interface StudyRankingListProps {
   rankings: RankResponse[];
@@ -67,8 +68,21 @@ export function StudyRankingList({
   children,
   isLoading = false,
 }: StudyRankingListProps): React.ReactNode {
+  const [selectedUserNickname, setSelectedUserNickname] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleUserClick = (nickname: string) => {
+    setSelectedUserNickname(nickname);
+    setIsProfileModalOpen(true);
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto space-y-4">
+      <CCUserProfileModal
+        nickname={selectedUserNickname}
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
       {children}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -207,7 +221,8 @@ export function StudyRankingList({
                           return (
                             <div
                               key={member.userId}
-                              className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm"
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md cursor-pointer transition-all hover:bg-slate-50"
+                              onClick={() => handleUserClick(member.nickname)}
                             >
                               <div className="flex items-center gap-3">
                                 {displayImg ? (
