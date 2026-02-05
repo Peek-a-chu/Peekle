@@ -10,7 +10,7 @@ export function StudyLayoutLeftPanel() {
     problems,
     handleAddProblem,
     handleSelectProblem,
-    selectedProblemId,
+    selectedStudyProblemId,
     historyDates,
     submissions,
     fetchSubmissions,
@@ -33,7 +33,7 @@ export function StudyLayoutLeftPanel() {
           onDateChange={setSelectedDate}
           onAddProblem={handleAddProblem}
           onSelectProblem={handleSelectProblem}
-          selectedProblemId={selectedProblemId}
+          selectedStudyProblemId={selectedStudyProblemId}
           onToggleFold={toggleLeftPanel}
           isFolded={isLeftPanelFolded}
           submissions={submissions}
