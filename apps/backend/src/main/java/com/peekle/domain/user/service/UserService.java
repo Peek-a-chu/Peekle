@@ -95,7 +95,7 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // 2. 랭킹 계산 (동일 그룹 내 혹은 전체)
-        long rank = userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
+        long rank = userRepository.countRankGlobal(user.getLeaguePoint(), user.getUpdatedAt()) + 1;
 
         // 3. 필드 데이터 조회
         long solvedCount = submissionLogRepository.countSolvedByUserId(user.getId());
