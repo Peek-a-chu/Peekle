@@ -64,6 +64,7 @@ export function CCIDEToolbar({
           value={language}
           onChange={(e) => onLanguageChange?.(e.target.value)}
           disabled={disabled}
+          data-tour="ide-language"
           className={cn(
             'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring',
             disabled && 'opacity-50 cursor-not-allowed',
@@ -79,6 +80,7 @@ export function CCIDEToolbar({
         {/* View Mode Banner - Conditional (Next to Select) */}
         {isViewingOther && (
           <div
+            data-tour="ide-viewmode-banner"
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium animate-in fade-in slide-in-from-left-2 duration-300',
               // Realtime: Pink Badge
@@ -116,12 +118,20 @@ export function CCIDEToolbar({
           onClick={onThemeToggle}
           title="테마 변경"
           disabled={disabled}
+          data-tour="ide-theme-toggle"
         >
           {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </Button>
 
         {/* Copy */}
-        <Button variant="ghost" size="icon" onClick={onCopy} title="코드 복사" disabled={disabled}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onCopy}
+          title="코드 복사"
+          disabled={disabled}
+          data-tour="ide-copy"
+        >
           <Copy className="h-4 w-4" />
         </Button>
 
@@ -133,6 +143,7 @@ export function CCIDEToolbar({
             onClick={onRefChat}
             title="코드 참조 (채팅)"
             disabled={disabled}
+            data-tour="ide-ref-chat"
           >
             <MessageSquare className="h-4 w-4" />
           </Button>
@@ -149,6 +160,7 @@ export function CCIDEToolbar({
                 className="gap-1 bg-[#EDF2F8] text-foreground hover:bg-[#DFE7F0]"
                 title="제출하기"
                 disabled={disabled}
+                data-tour="ide-submit"
               >
                 <Send className="h-3 w-3" />
                 <span className="text-xs">제출</span>
@@ -159,7 +171,13 @@ export function CCIDEToolbar({
 
         {/* View Only Mine Button (Visible only when Viewing Other) */}
         {isViewingOther && (
-          <Button size="sm" variant="secondary" onClick={onResetView} className="ml-2 font-medium">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onResetView}
+            className="ml-2 font-medium"
+            data-tour="ide-reset-view"
+          >
             내 코드만 보기
           </Button>
         )}
