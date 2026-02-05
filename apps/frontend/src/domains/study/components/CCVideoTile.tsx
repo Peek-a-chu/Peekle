@@ -11,9 +11,16 @@ interface CCVideoTileProps {
   className?: string;
   onClick?: () => void;
   isCurrentUser?: boolean;
+  displayName?: string;
 }
 
-export function CCVideoTile({ participant, className, onClick, isCurrentUser }: CCVideoTileProps) {
+export function CCVideoTile({
+  participant,
+  className,
+  onClick,
+  isCurrentUser,
+  displayName,
+}: CCVideoTileProps) {
   // Use hook to track camera state reactively
   const videoTracks = useParticipantTracks([Track.Source.Camera], participant.identity);
   const videoTrackRef = videoTracks[0]; // Requesting only Camera, so first one is it
@@ -57,7 +64,7 @@ export function CCVideoTile({ participant, className, onClick, isCurrentUser }: 
       {/* Overlays */}
       <div className="absolute bottom-1 left-2 max-w-[80%]">
         <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
-          {participant.name || participant.identity} {isCurrentUser && '(나)'}
+          {displayName || participant.name || participant.identity} {isCurrentUser && '(나)'}
         </span>
       </div>
 
