@@ -64,8 +64,9 @@ export function CCControlBar({
                 size="icon"
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
-                  !isMuted && 'bg-primary text-primary-foreground hover:bg-primary/90',
-                  isMuted && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                  isMuted
+                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 )}
                 onClick={handleMicToggle}
               >
@@ -88,8 +89,9 @@ export function CCControlBar({
                 size="icon"
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
-                  !isVideoOff && 'bg-primary text-primary-foreground hover:bg-primary/90',
-                  isVideoOff && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                  isVideoOff
+                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 )}
                 onClick={handleVideoToggle}
               >
@@ -114,7 +116,7 @@ export function CCControlBar({
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
                   isWhiteboardActive
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
                 )}
                 onClick={onWhiteboardToggle}
               >
