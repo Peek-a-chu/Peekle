@@ -59,6 +59,7 @@ export interface RoomState {
 
   // Problem State
   selectedProblemId: number | null;
+  selectedStudyProblemId: number | null;  // StudyProblem PK for submission
   selectedProblemTitle: string | null;
   selectedProblemExternalId: string | null; // Added
 
@@ -128,7 +129,7 @@ export interface RoomActions {
   // Problem Actions
   setSelectedProblemId: (id: number | null) => void;
   setSelectedProblemTitle: (title: string | null) => void;
-  setSelectedProblem: (id: number | null, title: string | null, externalId?: string | null) => void;
+  setSelectedProblem: (studyProblemId: number | null, problemId: number | null, title: string | null, externalId?: string | null) => void;
 
   // Chat Actions
   setPendingCodeShare: (
@@ -184,6 +185,7 @@ const initialState: RoomState = {
   isWhiteboardOverlayOpen: false,
 
   selectedProblemId: null,
+  selectedStudyProblemId: null,
   selectedProblemTitle: null,
   selectedProblemExternalId: null,
 
@@ -248,9 +250,10 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
 
   setSelectedProblemId: (id): void => set({ selectedProblemId: id }),
   setSelectedProblemTitle: (title): void => set({ selectedProblemTitle: title }),
-  setSelectedProblem: (id, title, externalId = null): void =>
+  setSelectedProblem: (studyProblemId, problemId, title, externalId = null): void =>
     set({
-      selectedProblemId: id,
+      selectedStudyProblemId: studyProblemId,
+      selectedProblemId: problemId,
       selectedProblemTitle: title,
       selectedProblemExternalId: externalId,
     }),
