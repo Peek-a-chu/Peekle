@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { generateInviteCode } from '@/domains/study/api/studyApi';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 
 interface CCInviteModalProps {
   isOpen: boolean;
@@ -23,41 +24,21 @@ interface CCInviteModalProps {
 
 export function CCInviteModal({ isOpen, onClose }: CCInviteModalProps) {
   const roomId = useRoomStore((state) => state.roomId);
-  const storeInviteCode = useRoomStore((state) => state.inviteCode);
-  const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
-  const [inviteCode, setInviteCode] = useState(storeInviteCode);
   const [copied, setCopied] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch invite code when modal opens
-  useEffect(() => {
-    if (isOpen && roomId) {
-      // If we already have an invite code in store, use it
-      if (storeInviteCode) {
-        setInviteCode(storeInviteCode);
-        return;
-      }
+  const { data, isLoading } = useQuery({
+    queryKey: ['inviteCode', roomId],
+    queryFn: () => {
+      if (!roomId) throw new Error('Room ID is required');
+      return generateInviteCode(roomId);
+    },
+    enabled: !!roomId && isOpen,
+    staleTime: 4.5 * 60 * 1000, // 4분 30초 (백엔드 TTL 5분보다 짧게)
+    gcTime: 5 * 60 * 1000, // 5분
+    refetchOnWindowFocus: false, // 창 포커스 시 재요청 방지
+  });
 
-      // Otherwise, fetch from API
-      setIsLoading(true);
-      generateInviteCode(roomId)
-        .then((result) => {
-          const code = result.inviteCode;
-          setInviteCode(code);
-          // Update store for future use
-          setRoomInfo({ inviteCode: code });
-        })
-        .catch((err) => {
-          const message =
-            err instanceof Error ? err.message : '초대 코드를 불러오는데 실패했습니다';
-          toast.error(message);
-          console.error('Failed to generate invite code:', err);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    }
-  }, [isOpen, roomId, storeInviteCode, setRoomInfo]);
+  const inviteCode = data?.inviteCode;
 
   // Reset when modal closes
   useEffect(() => {
