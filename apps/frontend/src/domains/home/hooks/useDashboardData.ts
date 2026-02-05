@@ -146,7 +146,7 @@ export const useTimeline = (
       }
     };
     fetchData();
-  }, [date]);
+  }, [date, nickname]);
 
   return { data, isLoading };
 };

@@ -27,6 +27,7 @@ interface Props {
   isMe: boolean;
   initialStreak?: ActivityStreakData[];
   initialTimeline?: TimelineItemData[];
+  initialDate?: string;
 }
 
 interface ValidateResponse {
@@ -43,11 +44,11 @@ const TABS = {
 
 type TabKey = (typeof TABS)[keyof typeof TABS];
 
-export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Props) {
+export function CCProfileView({ user, isMe, initialStreak, initialTimeline, initialDate }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>(TABS.OVERVIEW);
   const [selectedDate, setSelectedDate] = useState<string | null>(
-    new Date().toISOString().split('T')[0],
+    initialDate || new Date().toISOString().split('T')[0],
   );
 
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -586,7 +587,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline }: Pr
               selectedDate={selectedDate}
               showHistoryLink={isMe}
               nickname={optimisticUser.nickname}
-              initialData={initialTimeline}
+              initialData={selectedDate === initialDate ? initialTimeline : undefined}
             />
           </div>
         </div>

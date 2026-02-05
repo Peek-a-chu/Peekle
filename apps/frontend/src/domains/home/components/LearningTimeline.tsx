@@ -23,8 +23,8 @@ const LearningTimeline = ({
 }: LearningTimelineProps) => {
   const { data: fetchedData } = useTimeline(selectedDate || '', nickname, { skip: !!initialData });
   const rawData = initialData || fetchedData;
-  // 목데이터를 볼 수 있게 데이터가 비어있을 경우 MOCK_TIMELINE을 사용하도록 임시 수정
-  const data = rawData.length > 0 ? rawData : MOCK_TIMELINE;
+  // 데이터가 비어있을 경우 MOCK_TIMELINE을 사용하지 않도록 수정 (빈 배열 허용)
+  const data = rawData;
   const [expanded, setExpanded] = useState(false);
 
   // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
