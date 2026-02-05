@@ -289,9 +289,26 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'ROOM_INFO': {
-            const { title, description, role } = data;
+            const { title, description, role, members } = data;
             setRoomInfo({ roomTitle: title, roomDescription: description, myRole: role });
-            // toast.info('스터디 정보가 갱신되었습니다.');
+
+            // [Fix] Sync participants strictly from server info
+            if (members && Array.isArray(members)) {
+              console.log('[StudySocket] Syncing participants from ROOM_INFO:', members);
+
+              // Map DTO to Store Interface
+              const mappedMembers = members.map((m: any) => ({
+                id: m.userId,
+                nickname: m.nickname,
+                profileImage: m.profileImg,
+                isOwner: m.role === 'OWNER',
+                isOnline: m.online ?? m.isOnline, // Handle both cases
+                isMuted: false,   // Default
+                isVideoOff: false // Default
+              }));
+
+              setParticipants(mappedMembers);
+            }
             break;
           }
           case 'INFO': {
