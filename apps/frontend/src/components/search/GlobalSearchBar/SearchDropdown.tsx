@@ -50,8 +50,8 @@ export function SearchDropdown({
 
     if (isLoading) {
         return (
-            <div className="absolute top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                <div className="p-4 text-center text-sm text-gray-500">검색 중...</div>
+            <div className="absolute top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-input bg-background shadow-lg">
+                <div className="p-4 text-center text-sm text-muted-foreground">검색 중...</div>
             </div>
         );
     }
@@ -61,7 +61,7 @@ export function SearchDropdown({
     }
 
     return (
-        <div className="absolute top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-input bg-background shadow-lg">
             <div className="max-h-[400px] overflow-y-auto">
                 {suggestions.map((suggestion, index) => (
                     <button
@@ -69,21 +69,21 @@ export function SearchDropdown({
                         type="button"
                         onClick={() => onSelect(suggestion)}
                         className={cn(
-                            'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors',
-                            selectedIndex === index ? 'bg-[#E24EA0]/10 text-[#E24EA0]' : 'hover:bg-gray-50',
+                            'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors outline-none',
+                            selectedIndex === index ? 'bg-primary/10 text-primary' : 'hover:bg-accent hover:text-accent-foreground',
                         )}
                     >
                         <span className="flex-shrink-0">{getSuggestionIcon(suggestion)}</span>
                         <div className="flex-1">
                             <div className="font-medium">
                                 {suggestion.type === 'problem' && suggestion.externalId && (
-                                    <span className="text-[#E24EA0] mr-1.5 break-normal">
+                                    <span className="text-primary mr-1.5 break-normal">
                                         #{suggestion.externalId}
                                     </span>
                                 )}
                                 {suggestion.title}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                                 {getSuggestionTypeLabel(suggestion.type)}
                                 {suggestion.tier && ` · ${suggestion.tier}`}
                             </div>
