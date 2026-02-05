@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import type { Problem } from '@/domains/study/types';
 import { useStudyStore } from '@/domains/study/store/useStudyStore';
 import { useStudyLayout } from './useStudyLayout';
-import { useProblems, type Problem } from './useProblems';
-import { type DailyProblem } from '@/domains/study/types';
+import { useProblems } from './useProblems';
 import { useProblemDates } from './useProblemDates';
 import { useSubmissions } from './useSubmissions';
 import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
@@ -93,8 +93,8 @@ export function useStudyRoomLogic() {
     console.log('Settings clicked');
   };
 
-  const handleSelectProblem = (problem: DailyProblem) => {
-    setSelectedProblem(problem.id, problem.problemId, problem.title);
+  const handleSelectProblem = (problem: Problem) => {
+    setSelectedProblem(problem.problemId, problem.title);
     console.log('Selected problem:', problem.title);
   };
 
