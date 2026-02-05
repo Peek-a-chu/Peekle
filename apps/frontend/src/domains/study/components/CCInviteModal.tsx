@@ -102,7 +102,11 @@ export function CCInviteModal({ isOpen, onClose }: CCInviteModalProps) {
           </Button>
         </div>
         <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>
+          <Button
+            variant="secondary"
+            className="dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
+            onClick={onClose}
+          >
             닫기
           </Button>
         </div>
