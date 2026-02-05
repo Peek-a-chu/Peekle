@@ -1,14 +1,12 @@
 import pandas as pd
 from embedding_service import index_problems, clear_collection
 
-def run():
-    print("기존 데이터를 초기화하고 인덱싱을 시작합니다...")
-    clear_collection()
-    
-    print("태그 정보가 포함된 CSV 파일에서 데이터를 가져오는 중...")
+def run_auto_indexing():
+    """서버 시작 시 자동으로 호출되는 초기화 함수 (clear 없이 추가만)"""
+    print("[AUTO-INDEX] CSV 파일에서 데이터를 가져오는 중...")
     try:
         # 1. CSV 읽기
-        df = pd.read_csv('problems.csv', quotechar='"', skipinitialspace=True)
+        df = pd.read_csv('./problems.csv', quotechar='"', skipinitialspace=True)
         
         # 컬럼명 소문자로 정규화
         df.columns = [c.strip().replace('"', '').replace("'", "").lower() for c in df.columns]
@@ -32,10 +30,10 @@ def run():
 
         total = len(problems)
         if total == 0:
-            print("인덱싱할 데이터가 CSV에 없습니다.")
+            print("[AUTO-INDEX] 인덱싱할 데이터가 CSV에 없습니다.")
             return
 
-        print(f"총 {total}개의 문제를 새로운 지식 창고(ChromaDB)에 인덱싱합니다.")
+        print(f"[AUTO-INDEX] 총 {total}개의 문제를 ChromaDB에 인덱싱합니다.")
         
         # 3. 100개씩 나눠서 처리 (Batch Processing)
         batch_size = 100
@@ -44,14 +42,22 @@ def run():
             index_problems(batch)
             
             current_pos = min(i + batch_size, total)
-            print(f"진행 중... ({current_pos}/{total})")
+            print(f"[AUTO-INDEX] 진행 중... ({current_pos}/{total})")
 
-        print("태그 기반 인덱싱 완료! 이제 훨씬 똑똑한 추천이 가능합니다.")
+        print("[AUTO-INDEX] 인덱싱 완료!")
         
     except FileNotFoundError:
-        print("problems.csv 파일을 찾을 수 없습니다.")
+        print("[ERROR] problems.csv 파일을 찾을 수 없습니다.")
+        raise
     except Exception as e:
-        print(f"오류 발생: {e}")
+        print(f"[ERROR] 인덱싱 중 오류 발생: {e}")
+        raise
+
+def run():
+    """수동 실행용 함수 - 기존 데이터 초기화 후 재인덱싱"""
+    print("기존 데이터를 초기화하고 인덱싱을 시작합니다...")
+    clear_collection()
+    run_auto_indexing()
 
 if __name__ == "__main__":
     run()
