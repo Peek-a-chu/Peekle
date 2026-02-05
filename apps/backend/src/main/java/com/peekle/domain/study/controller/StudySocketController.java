@@ -17,7 +17,6 @@ import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -34,7 +33,6 @@ import java.util.List;
 public class StudySocketController {
 
         private final RedisPublisher redisPublisher;
-        private final RedisTemplate<String, Object> redisTemplate;
         private final StringRedisTemplate stringRedisTemplate;
         private final StudyRoomService studyRoomService;
         private final StudyMemberRepository studyMemberRepository;
@@ -83,11 +81,32 @@ public class StudySocketController {
                 String currentActiveStudy = stringRedisTemplate.opsForValue().get(activeStudyKey);
 
                 if (currentActiveStudy != null && !String.valueOf(studyId).equals(currentActiveStudy)) {
-                        log.warn("User {} is already in study {}", userId, currentActiveStudy);
-                        messagingTemplate.convertAndSend(
-                                        "/topic/studies/" + studyId + "/video-token/" + userId,
-                                        SocketResponse.of("ERROR", "이미 다른 스터디에 참여 중입니다."));
-                        return;
+                        log.info("Switching study: User {} moved from {} to {}", userId, currentActiveStudy, studyId);
+
+                        try {
+                                Long oldStudyId = Long.valueOf(currentActiveStudy);
+                                String oldOnlineKey = "study:" + oldStudyId + ":online_users";
+
+                                // 1. Remove from old study presence
+                                stringRedisTemplate.opsForSet().remove(oldOnlineKey, userId.toString());
+
+                                // 2. Notify old study members
+                                redisPublisher.publish(
+                                                new ChannelTopic("topic/studies/rooms/" + oldStudyId),
+                                                SocketResponse.of("LEAVE", userId));
+
+                                // 3. Clean up if empty
+                                Long remainingUsers = stringRedisTemplate.opsForSet().size(oldOnlineKey);
+                                if (remainingUsers != null && remainingUsers == 0) {
+                                        log.info("Study Room {} is empty (Switch). Scheduling whiteboard cleanup...",
+                                                        oldStudyId);
+                                        whiteboardService.scheduleCleanup(oldStudyId);
+                                }
+                        } catch (NumberFormatException e) {
+                                log.warn("Invalid format for old study ID: {}", currentActiveStudy);
+                                // Delete invalid key and proceed
+                                stringRedisTemplate.delete(activeStudyKey);
+                        }
                 }
 
                 // Mark as Active
@@ -95,6 +114,13 @@ public class StudySocketController {
                 stringRedisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
                 // 2. LiveKit 및 초기화 (Bundled)
+                try {
+                        // 화상 연결 중복 방지 (기존 연결 종료)
+                        mediaService.evictUser(studyId, userId);
+                } catch (Exception e) {
+                        log.warn("Pre-evict failed: {}", e.getMessage());
+                }
+
                 try {
                         String token = mediaService.createAccessToken(studyId, userId, getUserNickname(userId));
                         log.info("Generated LiveKit token for user {}, study {}", userId, studyId);
@@ -119,7 +145,8 @@ public class StudySocketController {
 
                         // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
-                                        .getDailyProblems(userId, studyId, java.time.LocalDate.now());
+                                        .getDailyProblems(userId, studyId,
+                                                        java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/curriculum/" + userId,
                                         SocketResponse.of("CURRICULUM", curriculum));
