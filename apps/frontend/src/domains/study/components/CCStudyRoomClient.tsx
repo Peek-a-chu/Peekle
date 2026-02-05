@@ -116,7 +116,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
 
   // Global state for selected problem
-  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
+  const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
 
@@ -270,6 +270,12 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     console.log('Whiteboard tile clicked (Overlay toggle)');
   };
 
+  // [Submission state] Clear any pending extension submission on mount
+  useEffect(() => {
+    // Notify the extension to clear any stale pending submissions when entering a study room
+    window.postMessage({ type: 'PEEKLE_CLEAR_PENDING' }, '*');
+  }, []);
+
   const handleSelectProblem = (problem: Problem): void => {
     console.log('[StudyRoomClient] Selecting problem:', problem);
     // Ensure ID is a valid number
@@ -279,7 +285,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       return;
     }
     // Extract studyProblemId from the problem (added by API)
-    const studyProblemId = (problem as any).studyProblemId || null;
+    const studyProblemId = (problem as any).studyProblemId || (problem as any).id || null;
     setSelectedProblem(
       studyProblemId,
       pId,
@@ -323,7 +329,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
             onAddProblem={addProblem}
             onRemoveProblem={deleteProblem}
             onSelectProblem={handleSelectProblem}
-            selectedProblemId={selectedProblemId ?? undefined}
+            selectedStudyProblemId={selectedStudyProblemId ?? undefined}
             onToggleFold={handleToggleLeftPanel}
             isFolded={isLeftPanelFolded}
             submissions={submissions}

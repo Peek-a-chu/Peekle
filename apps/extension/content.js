@@ -944,4 +944,8 @@ window.addEventListener('message', async (event) => {
             console.error('[Peekle] Failed to save theme settings:', e);
         }
     }
+    if (event.data?.type === 'PEEKLE_CLEAR_PENDING') {
+        console.log('[Peekle Content] Received PEEKLE_CLEAR_PENDING. Notifying background.');
+        chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_SUBMISSION' });
+    }
 });
