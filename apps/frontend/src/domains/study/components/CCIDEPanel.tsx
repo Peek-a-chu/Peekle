@@ -328,8 +328,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleSubmit = (): void => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
-        const { selectedProblemId, selectedProblemExternalId } = useRoomStore.getState();
-        const { selectedStudyProblemId, selectedProblemExternalId } = useRoomStore.getState();
+        const { selectedProblemId, selectedStudyProblemId, selectedProblemExternalId } =
+          useRoomStore.getState();
 
         if (!selectedStudyProblemId) {
           toast.error('선택된 문제가 없습니다.');
