@@ -160,9 +160,9 @@ export function CCAddProblemModal({
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto border rounded-md min-h-[200px] mb-4">
+        <div className="flex-1 overflow-y-auto border rounded-md min-h-[200px] flex flex-col mb-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
               검색 중...
             </div>
