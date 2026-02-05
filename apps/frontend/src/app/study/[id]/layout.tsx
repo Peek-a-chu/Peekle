@@ -1,5 +1,6 @@
 import 'server-only';
 import { ReactNode } from 'react';
+import { DesktopOnlyOverlay } from '@/components/common/DesktopOnlyOverlay';
 
 interface StudyLayoutProps {
   children: ReactNode;
@@ -12,5 +13,10 @@ interface StudyLayoutProps {
  */
 export default function StudyLayout({ children }: StudyLayoutProps) {
   // Render without LNB - full width layout for immersive study room experience
-  return <div className="min-h-screen w-full">{children}</div>;
+  return (
+    <div className="min-h-screen w-full">
+      <DesktopOnlyOverlay />
+      {children}
+    </div>
+  );
 }
