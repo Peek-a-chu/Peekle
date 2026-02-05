@@ -117,7 +117,12 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
 
       // [Feature] Set Selected Problem if metadata has problemId, regardless of target
       if (message.metadata.problemId) {
-        setSelectedProblem(message.metadata.problemId, message.metadata.problemTitle || '');
+        setSelectedProblem(
+          message.metadata.problemId,
+          null, // Actual problemId might not be available in metadata
+          message.metadata.problemTitle || '',
+          message.metadata.externalId,
+        );
       }
 
       // If the target is Me -> Reset to Only Mine
@@ -151,10 +156,10 @@ export function ChatMessageItem({ message, isMine }: ChatMessageItemProps) {
   const displayContent =
     isRefCodeMessage && message.content
       ? message.content
-          // Strip leading [CODE:lang] prefix
-          .replace(/^\[CODE:[^\]]+\]\s*/i, '')
-          // Strip trailing "Ref: ..." part
-          .replace(/\s*Ref:.*$/i, '')
+        // Strip leading [CODE:lang] prefix
+        .replace(/^\[CODE:[^\]]+\]\s*/i, '')
+        // Strip trailing "Ref: ..." part
+        .replace(/\s*Ref:.*$/i, '')
       : message.content;
 
   return (

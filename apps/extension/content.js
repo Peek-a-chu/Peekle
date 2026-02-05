@@ -4,6 +4,8 @@
  */
 
 
+console.log(`[Peekle Content] Script loaded on: ${window.location.href}`);
+
 let observer = null;
 const pendingSubmissions = new Set(); // Track IDs that are currently being judged
 const sentSubmissions = new Set(); // Track IDs already sent to backend to prevent duplicates
@@ -94,9 +96,18 @@ function scanForSuccess() {
 
         // 3. Filter: Only process finished states (exclude 'ce' - compile error)
         // Send: ac, wa, rte, tle, mle, ole (맞았습니다, 틀렸습니다, 런타임 에러, 시간 초과, 메모리 초과, 출력 초과)
+        // 3. Filter: Only process finished states (exclude 'ce' - compile error)
+        // Send: ac, wa, rte, tle, mle, ole (맞았습니다, 틀렸습니다, 런타임 에러, 시간 초과, 메모리 초과, 출력 초과)
         const finishedStates = ['ac', 'wa', 'rte', 'tle', 'mle', 'ole'];
         if (!finishedStates.includes(resultColor)) {
             // Unknown, partial state, or compile error - skip it
+            return;
+        }
+
+        // Additional Check: If text contains "%", it is likely still processing (e.g. "맞았습니다 (99%)")
+        // Wait for final state without parens/percentage
+        if (resultText.includes('%')) {
+            // console.log(`[Peekle] Result contains %, waiting... (${resultText})`);
             return;
         }
 
@@ -152,9 +163,10 @@ function scanForSuccess() {
                         chrome.runtime.sendMessage({
                             type: 'SOLVED',
                             payload: {
-                                problemId,
-                                submitId, username, timestamp: new Date().toISOString(), result: resultText, isSuccess, memory, time, language,
-                                code: null
+                                ...submissionData,
+                                // If this is from a pending task, confirm context
+                                studyId: task ? task.studyId : null,
+                                sourceType: task ? task.sourceType : 'EXTENSION'
                             }
                         });
                     } catch (e) { }
@@ -179,15 +191,27 @@ if (statusTable) {
 
 async function checkForPendingSubmission() {
     // Only run on submission pages
-    if (!window.location.href.includes('/submit/')) return;
+    if (!window.location.href.includes('/submit/')) {
+        console.log("Peekle: Not a submission page, skipping check.");
+        return;
+    }
+
+    console.log("Peekle: Submission page detected. Checking for pending tasks...");
 
     // Safety check: if context is invalidated, stop
-    if (!chrome || !chrome.storage || !chrome.storage.local) return;
+    if (!chrome || !chrome.storage || !chrome.storage.local) {
+        console.error("Peekle: Chrome extension context missing/invalidated.");
+        return;
+    }
 
     // Get the problem ID from URL
     const urlMatches = window.location.href.match(/\/submit\/(\d+)/);
-    if (!urlMatches) return;
+    if (!urlMatches) {
+        console.log("Peekle: Could not extract problem ID from URL.");
+        return;
+    }
     const currentProblemId = urlMatches[1];
+    console.log(`Peekle: Current problem ID is ${currentProblemId}`);
 
     try {
         // Check storage for pending tasks
@@ -196,18 +220,32 @@ async function checkForPendingSubmission() {
 
         console.log("Peekle: Storage check result:", task);
 
-        if (task && task.problemId === currentProblemId) {
-            console.log("Peekle: Found pending task, injecting...");
-            // Clear the task so it doesn't run again on reload
-            // await chrome.storage.local.remove('pending_submission');
+        if (task) {
+            console.log(`Peekle: Task found for problem ${task.problemId}. Current page is ${currentProblemId}.`);
+            // Prioritize externalId (BOJ ID) for comparison, fallback to problemId
+            const pendingBojId = task.externalId || task.problemId;
 
-            // Do NOT remove the task immediately. 
-            // We need to keep 'studyId' in pending_submission so that:
-            // 1. Typically the popup shows the correct status (Study Mode)
-            // 2. The background script knows where to send the submission (Study API)
+            if (String(pendingBojId) === String(currentProblemId)) {
+                // Check if already consumed to prevent loop
+                if (task.consumed) {
+                    console.log("Peekle: Task already consumed. Skipping injection.");
+                    return;
+                }
 
-            // Inject script to manipulate the page
-            injectFillerScript(task.code, task.language);
+                console.log("Peekle: Problem IDs match! Injecting script...");
+
+                // Mark as consumed but KEEP in storage so SOLVED event can read studyId
+                await chrome.storage.local.set({
+                    'pending_submission': { ...task, consumed: true }
+                });
+
+                // Inject script to manipulate the page
+                injectFillerScript(task.code, task.language);
+            } else {
+                console.log("Peekle: Problem IDs do NOT match. Skipping injection.");
+            }
+        } else {
+            console.log("Peekle: No pending submission task found in storage.");
         }
     } catch (e) {
         console.warn("Peekle: Context invalidated during storage access", e);
@@ -874,18 +912,18 @@ window.addEventListener('message', async (event) => {
     // Handle Auto-Submission Request from Frontend
     if (event.data?.type === 'PEEKLE_SUBMIT_CODE') {
         console.log('[Peekle Content] Received PEEKLE_SUBMIT_CODE:', event.data);
-        const { problemId, externalId, code, language, studyId } = event.data.payload;
-        if (!problemId || !code) {
-            console.error('[Peekle Content] Missing problemId or code');
+        const { studyProblemId, externalId, code, language, sourceType } = event.data.payload;
+        if (!externalId || !code) {
+            console.error('[Peekle Content] Missing externalId or code');
             return;
         }
 
-        console.log(`[Peekle] Processing auto-submit for problem: ${problemId} (${externalId}) ${studyId ? `(Study: ${studyId})` : ''}`);
+        console.log(`[Peekle] Processing auto-submit for BOJ: ${externalId} ${studyProblemId ? `(StudyProblem: ${studyProblemId})` : ''}`);
 
         // Send to background to save (bypasses direct storage permission issues on localhost)
         chrome.runtime.sendMessage({
             type: 'SAVE_PENDING_SUBMISSION',
-            payload: { problemId, externalId, code, language, studyId }
+            payload: { studyProblemId, externalId, code, language, sourceType: sourceType || 'EXTENSION' }
         }, (response) => {
             if (response && response.success) {
                 console.log('[Peekle] Storage saved via background, background will open tab.');
@@ -905,5 +943,9 @@ window.addEventListener('message', async (event) => {
         } catch (e) {
             console.error('[Peekle] Failed to save theme settings:', e);
         }
+    }
+    if (event.data?.type === 'PEEKLE_CLEAR_PENDING') {
+        console.log('[Peekle Content] Received PEEKLE_CLEAR_PENDING. Notifying background.');
+        chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_SUBMISSION' });
     }
 });

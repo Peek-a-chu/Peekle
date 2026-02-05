@@ -29,17 +29,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         handleSolvedSubmission(request.payload, sender);
         return true;
     } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
-        console.log('Background: Saving pending submission and opening tab:', request.payload);
+        console.log('[Background] Received SAVE_PENDING_SUBMISSION:', request.payload);
+
         chrome.storage.local.set({
             'pending_submission': {
                 ...request.payload,
+                // Ensure sourceType is preserved or default to EXTENSION
+                sourceType: request.payload.sourceType || 'EXTENSION',
                 timestamp: Date.now()
             }
         }, () => {
+            console.log('[Background] pending_submission saved to storage.');
             // Open new tab
             const bojId = request.payload.externalId || request.payload.problemId;
             const targetUrl = `https://www.acmicpc.net/submit/${bojId}`;
+            console.log(`[Background] Opening new tab: ${targetUrl}`);
             chrome.tabs.create({ url: targetUrl });
+            sendResponse({ success: true });
+        });
+        return true;
+    } else if (request.type === 'CLEAR_PENDING_SUBMISSION') {
+        console.log('[Background] Received CLEAR_PENDING_SUBMISSION. Clearing storage.');
+        chrome.storage.local.remove('pending_submission', () => {
             sendResponse({ success: true });
         });
         return true;
@@ -76,13 +87,13 @@ async function getProblemInfo(problemId) {
 
 
 
-async function sendToBackend(data, studyId = null) {
+async function sendToBackend(data, studyProblemId = null) {
     try {
-        const url = studyId
-            ? `${API_BASE_URL}/api/studies/${studyId}/submit`
+        const url = studyProblemId
+            ? `${API_BASE_URL}/api/studies/problems/${studyProblemId}/submit`
             : `${API_BASE_URL}/api/submissions/`;
 
-        console.log(`Sending submission to ${studyId ? 'Study' : 'General'} backend:`, data);
+        console.log(`Sending submission to ${studyProblemId ? 'Study' : 'General'} backend:`, data);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -107,7 +118,7 @@ async function sendToBackend(data, studyId = null) {
 }
 
 async function handleSolvedSubmission(payload, sender) {
-    const { submitId, problemId, result, isSuccess, username, memory, time, language, code } = payload;
+    const { submitId, problemId, result, isSuccess, username, memory, time, language, code, studyId, sourceType } = payload;
 
     // Retrieve both processed history and pending context
     chrome.storage.local.get([PROCESSED_SUBMISSIONS_KEY, 'pending_submission'], async (items) => {
@@ -126,26 +137,23 @@ async function handleSolvedSubmission(payload, sender) {
         const problemInfo = await getProblemInfo(problemId);
 
         // --- Context Detection (Study vs. General) ---
-        let targetStudyId = null;
-        console.log('[Debug] Checking Context. Pending:', pending, 'Current Problem:', problemId);
+        // Use studyId and sourceType from payload (already sent by content.js)
+        let targetStudyId = studyId || null;
+        let targetSourceType = sourceType || 'EXTENSION';
 
-        // If there's a pending task and the problemId matches, use that studyId
-        if (pending) {
-            const pendingPid = String(pending.problemId);
+        console.log(`[Debug] Context from payload - StudyId: ${targetStudyId}, SourceType: ${targetSourceType}`);
+
+        // Clean up pending_submission if it exists and matches
+        if (pending && !pending.consumed) {
+            console.log('[Debug] Pending submission still active (not consumed). Skipping cleanup.');
+        } else if (pending) {
+            const pendingBojId = String(pending.externalId || pending.problemId);
             const currentPid = String(problemId);
 
-            console.log(`[Debug] Comparing IDs - Pending: ${pendingPid}, Current: ${currentPid}, Match: ${pendingPid === currentPid}`);
-
-            if (pendingPid === currentPid) {
-                targetStudyId = pending.studyId;
-                console.log(`[Debug] Matching pending context found. Target Study ID: ${targetStudyId}`);
-                // Clear pending task after matching
+            if (pendingBojId === currentPid) {
+                console.log(`[Debug] Cleaning up matching pending submission for problem ${problemId}`);
                 chrome.storage.local.remove('pending_submission');
-            } else {
-                console.log(`[Debug] IDs do not match or pending is invalid.`);
             }
-        } else {
-            console.log(`[Debug] No pending submission found in storage.`);
         }
 
         // --- Send to Backend (Peekle) ---
@@ -194,8 +202,8 @@ async function handleSolvedSubmission(payload, sender) {
             submitId: submitId,
             extensionToken,
             roomId: targetStudyId ? parseInt(targetStudyId) : null,
-            sourceType: targetStudyId ? "STUDY" : "EXTENSION"
-        }, targetStudyId); // Pass studyId if exists
+            sourceType: targetSourceType
+        }, pending?.studyProblemId || null); // Pass studyProblemId if exists
 
         // Save to storage
         processed[submitId] = {
@@ -234,6 +242,23 @@ async function handleSolvedSubmission(payload, sender) {
 }
 
 // Cleanup pending submission if user navigates away from the problem page
+function cleanupStalePendingSubmissions() {
+    chrome.storage.local.get(['pending_submission'], (data) => {
+        const pending = data.pending_submission;
+        if (pending && pending.timestamp) {
+            const fiveMinutes = 5 * 60 * 1000;
+            if (Date.now() - pending.timestamp > fiveMinutes) {
+                console.log('[Background] Clearing stale pending submission (older than 5 mins)');
+                chrome.storage.local.remove('pending_submission');
+            }
+        }
+    });
+}
+
+// Run cleanup periodically
+setInterval(cleanupStalePendingSubmissions, 60000); // Every minute
+
+// Cleanup pending submission if user navigates away from the problem page
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.url) {
         chrome.storage.local.get(['pending_submission'], (data) => {
@@ -245,8 +270,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
                 if (bojSubmitMatch) {
                     const navigatedProblemId = bojSubmitMatch[1];
-                    if (String(navigatedProblemId) !== String(pending.problemId)) {
-                        console.log(`User navigated to different problem ${navigatedProblemId}. Clearing pending study context.`);
+                    // Check externalId first (BOJ ID), then fallback to problemId (internal DB ID)
+                    const pendingBojId = pending.externalId || pending.problemId;
+
+                    if (String(navigatedProblemId) !== String(pendingBojId)) {
+                        console.log(`User navigated to different problem ${navigatedProblemId} (Pending: ${pendingBojId}). Clearing pending study context.`);
                         chrome.storage.local.remove('pending_submission');
                     }
                 }

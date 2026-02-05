@@ -88,6 +88,7 @@ public class StudyCurriculumService {
                 String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(actualProblemId);
 
                 ProblemStatusResponse responseData = ProblemStatusResponse.builder()
+                                .studyProblemId(studyProblem.getId())
                                 .problemId(actualProblemId)
                                 .externalId(externalId)
                                 .title(title)
@@ -156,6 +157,7 @@ public class StudyCurriculumService {
 
                 // 웹소켓을 통해 알림
                 ProblemStatusResponse responseData = ProblemStatusResponse.builder()
+                                .studyProblemId(target.getId())
                                 .problemId(deletedProblemId)
                                 .externalId(externalId)
                                 .title(title)
@@ -218,6 +220,7 @@ public class StudyCurriculumService {
                         int solvedCount = (int) solvedUsers.stream().distinct().count();
 
                         return ProblemStatusResponse.builder()
+                                        .studyProblemId(sp.getId())
                                         .problemId(sp.getProblemId())
                                         .externalId(externalId)
                                         .title(title)

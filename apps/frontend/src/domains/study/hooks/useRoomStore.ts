@@ -58,7 +58,8 @@ export interface RoomState {
   isWhiteboardOverlayOpen: boolean;
 
   // Problem State
-  selectedProblemId: number | null;
+  selectedStudyProblemId: number | null; // Renamed from selectedProblemId (StudyProblem PK)
+  selectedProblemId: number | null;      // Added: Actual problemId (e.g. 1000)
   selectedProblemTitle: string | null;
   selectedProblemExternalId: string | null; // Added
 
@@ -70,6 +71,7 @@ export interface RoomState {
     problemTitle?: string;
     problemId?: number; // Add problemId
     externalId?: string; // Add externalId
+    problemExternalId?: string; // Added for explicit mapping
     isRealtime?: boolean;
   } | null;
   replyingTo: {
@@ -126,9 +128,14 @@ export interface RoomActions {
   setWhiteboardOverlayOpen: (isOpen: boolean) => void;
 
   // Problem Actions
-  setSelectedProblemId: (id: number | null) => void;
+  setSelectedStudyProblemId: (id: number | null) => void;
   setSelectedProblemTitle: (title: string | null) => void;
-  setSelectedProblem: (id: number | null, title: string | null, externalId?: string | null) => void;
+  setSelectedProblem: (
+    studyProblemId: number | null,
+    problemId: number | null,
+    title: string | null,
+    externalId?: string | null,
+  ) => void;
 
   // Chat Actions
   setPendingCodeShare: (
@@ -139,6 +146,7 @@ export interface RoomActions {
       problemTitle?: string;
       problemId?: number; // Add problemId
       externalId?: string;
+      problemExternalId?: string; // Added for explicit mapping
       isRealtime?: boolean;
     } | null,
   ) => void;
@@ -183,6 +191,7 @@ const initialState: RoomState = {
   whiteboardMessage: null,
   isWhiteboardOverlayOpen: false,
 
+  selectedStudyProblemId: null,
   selectedProblemId: null,
   selectedProblemTitle: null,
   selectedProblemExternalId: null,
@@ -246,11 +255,12 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
   setWhiteboardMessage: (message): void => set({ whiteboardMessage: message }),
   setWhiteboardOverlayOpen: (isOpen): void => set({ isWhiteboardOverlayOpen: isOpen }),
 
-  setSelectedProblemId: (id): void => set({ selectedProblemId: id }),
+  setSelectedStudyProblemId: (id): void => set({ selectedStudyProblemId: id }),
   setSelectedProblemTitle: (title): void => set({ selectedProblemTitle: title }),
-  setSelectedProblem: (id, title, externalId = null): void =>
+  setSelectedProblem: (studyProblemId, problemId, title, externalId = null): void =>
     set({
-      selectedProblemId: id,
+      selectedStudyProblemId: studyProblemId,
+      selectedProblemId: problemId,
       selectedProblemTitle: title,
       selectedProblemExternalId: externalId,
     }),

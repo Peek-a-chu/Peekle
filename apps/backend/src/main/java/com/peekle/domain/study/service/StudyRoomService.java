@@ -6,8 +6,10 @@ import com.peekle.domain.study.dto.http.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
 import com.peekle.domain.study.dto.http.response.*;
 import com.peekle.domain.study.entity.StudyMember;
+import com.peekle.domain.study.entity.StudyProblem;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
+import com.peekle.domain.study.repository.StudyProblemRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
 import com.peekle.domain.submission.dto.SubmissionRequest;
 import com.peekle.domain.submission.dto.SubmissionResponse;
@@ -37,6 +39,7 @@ public class StudyRoomService {
 
         private final StudyRoomRepository studyRoomRepository;
         private final StudyMemberRepository studyMemberRepository;
+        private final StudyProblemRepository studyProblemRepository;
         private final InviteCodeService inviteCodeService;
         private final StringRedisTemplate redisTemplate;
         private final UserRepository userRepository;
@@ -296,14 +299,37 @@ public class StudyRoomService {
         }
 
         @Transactional
-        public SubmissionResponse submitStudyProblem(Long studyId, SubmissionRequest request) {
-                System.out.println("[StudyRoomService] Processing study submission for studyId: " + studyId);
+        public SubmissionResponse submitStudyProblem(Long studyProblemId, SubmissionRequest request) {
+                System.out.println(
+                                "[StudyRoomService] Processing study submission for studyProblemId: " + studyProblemId);
 
-                // 1. 일반 제출 처리 (검증 및 저장)
+                // 1. StudyProblem 조회 (studyId와 problemId 추출)
+                StudyProblem studyProblem = studyProblemRepository.findById(studyProblemId)
+                                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
+
+                Long studyId = studyProblem.getStudy().getId();
+                Long problemId = studyProblem.getProblemId();
+
+                System.out.println("[StudyRoomService] Extracted - StudyId: " + studyId + ", ProblemId: " + problemId);
+
+                // 2. Request에 스터디 컨텍스트 설정
+                request.setRoomId(studyId);
+                request.setSourceType("STUDY");
+
+                // 3. 일반 제출 처리 (검증 및 저장)
                 SubmissionResponse response = submissionService.saveGeneralSubmission(request);
 
                 if (response.isSuccess()) {
                         System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
+
+                        // 스터디 점수 업데이트 (Transactional)
+                        if (response.getEarnedPoints() > 0) {
+                                StudyRoom studyRoom = studyProblem.getStudy(); // 이미 조회한 StudyProblem에서 가져옴
+                                studyRoom.addRankingPoint(response.getEarnedPoints());
+                                System.out.println("[StudyRoomService] Updated ranking point for study " + studyId
+                                                + ": +" + response.getEarnedPoints());
+                        }
+
                         // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
                         // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
                 } else {
