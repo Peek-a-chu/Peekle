@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
 import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout';
-import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
-import { mockGameResult } from '../mocks/resultMock';
+// import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
 
 interface GamePlayContainerProps {
   roomId: string;
@@ -62,7 +61,8 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
         onSendMessage={sendMessage}
       />
 
-      {/* [임시] 결과 모달 테스트 버튼 */}
+      {/* [임시] 결과 모달 테스트 버튼 - mockGameResult가 정의되지 않아 주석 처리 */}
+      {/* 
       <button
         onClick={() => setIsResultModalOpen(true)}
         className="fixed bottom-20 left-6 z-50 bg-primary/80 hover:bg-primary text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm backdrop-blur-sm transition-all active:scale-95 flex items-center gap-2"
@@ -70,13 +70,18 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
         <span className="text-base">🏁</span>
         결과 모달 테스트
       </button>
+      */}
 
-      {/* 게임 결과 모달 */}
-      <CCGameResultModal
-        isOpen={isResultModalOpen}
-        onClose={() => setIsResultModalOpen(false)}
-        data={mockGameResult}
-      />
+      {/* 게임 결과 모달 -Step 15에서 정식 구현 예정 */}
+      {/* 
+      {isResultModalOpen && (
+        <CCGameResultModal
+          isOpen={isResultModalOpen}
+          onClose={() => setIsResultModalOpen(false)}
+          data={null as any}
+        />
+      )}
+      */}
     </>
   );
 }

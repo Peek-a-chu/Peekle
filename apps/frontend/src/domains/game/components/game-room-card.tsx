@@ -4,7 +4,7 @@ import { Users, Clock, FileText, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { GameRoom } from '@/domains/game/mocks/mock-data';
+import type { GameRoom } from '@/domains/game/types/game-types';
 
 interface GameRoomCardProps {
   room: GameRoom;
@@ -62,7 +62,7 @@ export function GameRoomCard({ room, onClick }: GameRoomCardProps) {
           </div>
           <div className="flex items-center gap-1">
             <Clock className="h-4 w-4" />
-            <span>{room.timeLimit}분</span>
+            <span>{Math.floor(room.timeLimit / 60)}분</span>
           </div>
           <div className="flex items-center gap-1">
             <FileText className="h-4 w-4" />

@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { GamePlayParticipant } from '@/domains/game/mocks/mock-data';
+import { GamePlayParticipant } from '@/domains/game/types/game-types';
 import { MicOff, VideoOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface GameVideoGridProps {
   participants: GamePlayParticipant[];
-  currentUserId: string;
+  currentUserId: number;
   className?: string;
   micState?: Record<string, boolean>;
   camState?: Record<string, boolean>;

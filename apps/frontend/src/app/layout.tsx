@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { GameSocketProvider } from '@/domains/game/context/GameSocketContext';
 import { ClientSessionManager } from '@/components/providers/ClientSessionManager';
 
 export const metadata: Metadata = {
@@ -78,12 +79,14 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background">
         <QueryProvider>
-          <ThemeProvider>
-            <ClientSessionManager />
-            {children}
-            <SettingsModal isGlobal={true} />
-          </ThemeProvider>
-          <Toaster />
+          <GameSocketProvider>
+            <ThemeProvider>
+                <ClientSessionManager />
+              {children}
+              <SettingsModal isGlobal={true}/>
+            </ThemeProvider>
+            <Toaster />
+          </GameSocketProvider>
         </QueryProvider>
       </body>
     </html>

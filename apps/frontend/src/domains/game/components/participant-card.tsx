@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserIcon } from '@/components/UserIcon';
-import type { Participant } from '@/domains/game/mocks/mock-data';
+import type { Participant } from '@/domains/game/types/game-types';
 
 interface ParticipantCardProps {
   participant?: Participant;

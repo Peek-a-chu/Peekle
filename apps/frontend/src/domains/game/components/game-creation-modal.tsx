@@ -4,7 +4,7 @@ import { Zap, Settings, FileText, CheckCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { type GameCreationFormData } from '@/domains/game/mocks/mock-data';
+import { type GameCreationFormData } from '@/domains/game/types/game-types';
 import { useGameCreationForm } from '@/domains/game/hooks/useGameCreationForm';
 
 // Steps Components

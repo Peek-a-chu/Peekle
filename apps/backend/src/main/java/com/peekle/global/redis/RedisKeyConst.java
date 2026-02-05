@@ -111,7 +111,9 @@ public class RedisKeyConst {
     public static final String GAME_USER_SCORE = "game:%d:user:%d:score";
 
     // 토픽 (Pub/Sub)
-    public static final String TOPIC_GAME_SOLVED = "topic/games/%d/solved";
     public static final String TOPIC_GAME_RANKING = "topic/games/%d/ranking";
+
+    // 게임 내 문제 목록 (List) -> game:%d:problems
+    public static final String GAME_PROBLEMS = "game:%d:problems";
 
 }

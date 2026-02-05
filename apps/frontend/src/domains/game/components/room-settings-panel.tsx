@@ -32,7 +32,7 @@ export function RoomSettingsPanel({
           {/* 제한 시간 */}
           <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-background p-3">
             <Clock className="mb-1 h-4 w-4 text-muted-foreground" />
-            <span className="text-xl font-bold text-foreground">{timeLimit}분</span>
+            <span className="text-xl font-bold text-foreground">{Math.floor(timeLimit / 60)}분</span>
             <span className="text-xs text-muted-foreground">제한 시간</span>
           </div>
 

@@ -31,7 +31,8 @@ export function CCPersonalStats({ stats, playTime, mode, isOpen }: CCPersonalSta
     }
   }, [isOpen]);
 
-  const minutes = Math.floor(playTime / 60);
+  const hours = Math.floor(playTime / 3600);
+  const minutes = Math.floor((playTime % 3600) / 60);
   const seconds = playTime % 60;
 
   const isAllCorrect = correctAnswers === totalQuestions;
@@ -40,9 +41,8 @@ export function CCPersonalStats({ stats, playTime, mode, isOpen }: CCPersonalSta
     <div className="grid grid-cols-2 gap-4 w-full px-2 mt-0">
       {/* 맞춘/푼 문제 (슬램 후 깜빡임) */}
       <div
-        className={`relative flex flex-col items-center justify-center p-2.5 bg-transparent rounded-lg border-[6px] border-double border-green-500 select-none ${
-          isSlammed1 ? 'animate-pulse' : 'animate-slam-effect opacity-0'
-        }`}
+        className={`relative flex flex-col items-center justify-center p-2.5 bg-transparent rounded-lg border-[6px] border-double border-green-500 select-none ${isSlammed1 ? 'animate-pulse' : 'animate-slam-effect opacity-0'
+          }`}
         style={{ animationDelay: isSlammed1 ? '0s' : '0.7s' }}
       >
         <div className="flex items-center gap-2 text-green-500 mb-1">
@@ -69,9 +69,8 @@ export function CCPersonalStats({ stats, playTime, mode, isOpen }: CCPersonalSta
 
       {/* 플레이 타임 (슬램 후 깜빡임) */}
       <div
-        className={`relative flex flex-col items-center justify-center p-2.5 bg-transparent rounded-lg border-[6px] border-double border-purple-500 select-none ${
-          isSlammed2 ? 'animate-pulse' : 'animate-slam-effect opacity-0'
-        }`}
+        className={`relative flex flex-col items-center justify-center p-2.5 bg-transparent rounded-lg border-[6px] border-double border-purple-500 select-none ${isSlammed2 ? 'animate-pulse' : 'animate-slam-effect opacity-0'
+          }`}
         style={{ animationDelay: isSlammed2 ? '0s' : '1.2s' }}
       >
         <div className="flex items-center gap-2 text-purple-500 mb-1">
@@ -79,6 +78,12 @@ export function CCPersonalStats({ stats, playTime, mode, isOpen }: CCPersonalSta
           <span className="text-[14px] font-black uppercase tracking-widest">걸린 시간</span>
         </div>
         <div className="text-3xl font-black text-purple-500 tracking-tighter flex items-baseline justify-center">
+          {hours > 0 && (
+            <>
+              {hours}
+              <span className="text-lg font-bold ml-0.5 mr-2 opacity-70">h</span>
+            </>
+          )}
           {minutes}
           <span className="text-lg font-bold ml-0.5 mr-2 opacity-70">m</span>
           {seconds}
