@@ -24,12 +24,17 @@ export interface SubmissionSuccessUser {
 }
 
 export interface DailyProblem {
-  problemId: number;
+  id: number; // PK of StudyProblem
+  problemId: number; // PK of Problem
   externalId?: string; // BOJ problem number (e.g. "1000")
   title: string;
   tier: string;
   solvedMemberCount: number;
   totalMemberCount: number;
+  number?: number;
+  tags?: string[];
+  status?: 'success' | 'fail' | 'not_started';
+  url?: string;
 }
 
 export interface StudyMember {
