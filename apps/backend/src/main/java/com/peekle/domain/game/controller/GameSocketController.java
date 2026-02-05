@@ -96,6 +96,16 @@ public class GameSocketController {
         gameService.loadCode(request, userId);
     }
 
+    // 코드 제출 알림 (길이 저장용)
+    @MessageMapping("/games/submit")
+    public void submit(@Payload com.peekle.domain.game.dto.request.GameSubmitRequest request,
+            SimpMessageHeaderAccessor headerAccessor) {
+        Long userId = getUserId(headerAccessor);
+        if (userId == null)
+            return;
+        gameService.submitCode(request, userId);
+    }
+
     // 강퇴
     @MessageMapping("/games/kick")
     public void kick(@Payload com.peekle.domain.game.dto.request.GameKickRequest request,

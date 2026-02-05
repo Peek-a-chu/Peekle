@@ -26,7 +26,7 @@ import {
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
-import { CCPreJoinModal } from './CCPreJoinModal';
+import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {

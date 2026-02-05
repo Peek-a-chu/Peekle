@@ -128,6 +128,7 @@ export function GamePlayLayout({
             onCodeChange={onCodeChange}
             onLanguageChange={onLanguageChange}
             onSubmit={onSubmit}
+            externalId={problems.find((p) => p.id === selectedProblemId)?.externalId}
             selectedProblemUrl={
               problems.find((p) => p.id === selectedProblemId)
                 ? `https://www.acmicpc.net/problem/${problems.find((p) => p.id === selectedProblemId)!.externalId}`

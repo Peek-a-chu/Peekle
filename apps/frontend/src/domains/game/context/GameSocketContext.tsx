@@ -35,7 +35,7 @@ export function GameSocketProvider({ children }: { children: React.ReactNode }) 
             return;
         }
 
-        let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        let baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8080';
         if (baseUrl.startsWith('https://') && (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))) {
             baseUrl = baseUrl.replace('https://', 'http://');
         }
@@ -62,6 +62,31 @@ export function GameSocketProvider({ children }: { children: React.ReactNode }) 
         newClient.onConnect = (frame) => {
             console.log('[GlobalSocket] Connected');
             setConnected(true);
+
+            // [Anti-Cheat] 유저별 경고 알림 구독
+            // pathname에서 gameId 추출 (/game/123 -> 123)
+            const gameIdMatch = window.location.pathname.match(/\/game\/(\d+)/);
+            if (gameIdMatch && userId) {
+                const gameId = gameIdMatch[1];
+                const alertTopic = `/topic/games/${gameId}/alert/${userId}`;
+                console.log(`[GlobalSocket] Subscribing to alerts: ${alertTopic}`);
+
+                newClient.subscribe(alertTopic, (message) => {
+                    try {
+                        const payload = JSON.parse(message.body);
+                        if (payload.type === 'CHEATING_DETECTED') {
+                            import('sonner').then(({ toast }) => {
+                                toast.error(payload.data || "부정행위가 감지되었습니다!", {
+                                    duration: 5000,
+                                    position: 'top-center',
+                                });
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse alert message", e);
+                    }
+                });
+            }
         };
 
         newClient.onStompError = (frame) => {

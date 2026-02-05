@@ -450,7 +450,7 @@ export const CCPreJoinModal = ({ roomTitle, description, onJoin, onCancel }: CCP
                             <h2 className="text-lg font-semibold text-zinc-100">{roomTitle}</h2>
                             {/* Helper: Dimmer text */}
                             <div className="flex items-center gap-2 text-xs text-zinc-500">
-                                <span>{description || '스터디 멤버들과 함께 공부해보세요'}</span>
+                                <span>{description || '멤버들과 함께 진행해 보세요'}</span>
                             </div>
                         </div>
                         {onCancel && (
