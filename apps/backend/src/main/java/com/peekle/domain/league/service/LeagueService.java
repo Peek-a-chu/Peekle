@@ -186,10 +186,10 @@ public class LeagueService {
 
     public int getUserRank(User user) {
         if (user.getLeagueGroupId() != null) {
-            return (int) userRepository.countByLeagueGroupIdAndLeaguePointGreaterThan(
-                    user.getLeagueGroupId(), user.getLeaguePoint()) + 1;
+            return (int) userRepository.countRankByLeagueGroupId(
+                    user.getLeagueGroupId(), user.getLeaguePoint(), user.getUpdatedAt()) + 1;
         } else {
-            return (int) userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
+            return (int) userRepository.countRankGlobal(user.getLeaguePoint(), user.getUpdatedAt()) + 1;
         }
     }
 
@@ -249,11 +249,12 @@ public class LeagueService {
 
         if (user.getLeagueGroupId() != null) {
             // 리그 그룹이 배정된 경우 해당 그룹 내 랭킹 조회
-            groupUsers = userRepository.findTop100ByLeagueGroupIdOrderByLeaguePointDesc(user.getLeagueGroupId());
+            groupUsers = userRepository
+                    .findTop100ByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(user.getLeagueGroupId());
             totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
         } else {
             // 그룹이 없는 경우(배치고사 전 등) 임시로 같은 티어 전체 조회 (Top 10)
-            groupUsers = userRepository.findTop100ByLeagueOrderByLeaguePointDesc(user.getLeague());
+            groupUsers = userRepository.findTop100ByLeagueOrderByLeaguePointDescUpdatedAtAsc(user.getLeague());
             totalGroupMembers = (int) userRepository.countByLeague(user.getLeague());
         }
 
@@ -453,8 +454,8 @@ public class LeagueService {
                 .findBySeasonWeek(currentSeasonWeek);
 
         for (com.peekle.domain.league.entity.LeagueGroup group : groups) {
-            // 그룹 내 모든 유저를 점수 기준으로 정렬
-            List<User> users = userRepository.findByLeagueGroupIdOrderByLeaguePointDesc(group.getId());
+            // 그룹 내 모든 유저를 점수 기준(동점시 업데이트순)으로 정렬
+            List<User> users = userRepository.findByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(group.getId());
             int groupSize = users.size();
 
             // 3명 이하 그룹은 스킵 (다음 주 재배정 대기)
@@ -689,8 +690,8 @@ public class LeagueService {
 
         if (user.getLeagueGroupId() != null) {
             // 그룹 내 순위 계산
-            groupRank = (int) userRepository.countByLeagueGroupIdAndLeaguePointGreaterThan(
-                    user.getLeagueGroupId(), user.getLeaguePoint()) + 1;
+            groupRank = (int) userRepository.countRankByLeagueGroupId(
+                    user.getLeagueGroupId(), user.getLeaguePoint(), user.getUpdatedAt()) + 1;
 
             // 그룹 총 인원
             int totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
@@ -715,7 +716,7 @@ public class LeagueService {
 
                 // 점수 차이 계산을 위해 그룹 유저 조회
                 List<User> groupUsers = userRepository
-                        .findTop100ByLeagueGroupIdOrderByLeaguePointDesc(user.getLeagueGroupId());
+                        .findTop100ByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(user.getLeagueGroupId());
 
                 // 승급권/유지권 분류
                 List<User> promoters = new ArrayList<>();

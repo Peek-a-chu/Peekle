@@ -33,6 +33,7 @@ export default async function UserProfilePage({ params }: Props) {
       isMe={user.isMe ?? false}
       initialStreak={streak}
       initialTimeline={timeline}
+      initialDate={dateStr}
     />
   );
 }

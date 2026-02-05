@@ -14,28 +14,44 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
 
     Optional<User> findBySocialIdAndProvider(String socialId, String provider);
 
-    java.util.List<User> findByBojId(String bojId);
+    Optional<User> findByBojId(String bojId);
 
     // 랭킹 계산용: 내 점수보다 높은 사람 수 (같은 그룹 내)
     int countByLeagueGroupId(Long leagueGroupId);
 
     long countByLeague(LeagueTier league);
 
-    long countByLeagueGroupIdAndLeaguePointGreaterThan(Long leagueGroupId, Integer leaguePoint);
+    // 기존: 점수만 비교
+    // long countByLeagueGroupIdAndLeaguePointGreaterThan(Long leagueGroupId,
+    // Integer leaguePoint);
+    // 변경: 점수 > 내점수 OR (점수 == 내점수 AND 업데이트 < 내업데이트)
+    @Query("SELECT COUNT(u) FROM User u WHERE u.leagueGroupId = :leagueGroupId AND (u.leaguePoint > :point OR (u.leaguePoint = :point AND u.updatedAt < :updatedAt))")
+    long countRankByLeagueGroupId(@org.springframework.data.repository.query.Param("leagueGroupId") Long leagueGroupId,
+            @org.springframework.data.repository.query.Param("point") Integer point,
+            @org.springframework.data.repository.query.Param("updatedAt") java.time.LocalDateTime updatedAt);
 
     // TODO: 리그 만들면 그룹 랭킹으로 해야해용
     // 전체 랭킹 (그룹 없을 때)
-    long countByLeaguePointGreaterThan(int leaguePoint);
+    // long countByLeaguePointGreaterThan(int leaguePoint);
+    @Query("SELECT COUNT(u) FROM User u WHERE (u.leaguePoint > :point OR (u.leaguePoint = :point AND u.updatedAt < :updatedAt))")
+    long countRankGlobal(@org.springframework.data.repository.query.Param("point") Integer point,
+            @org.springframework.data.repository.query.Param("updatedAt") java.time.LocalDateTime updatedAt);
 
     // 랭킹 리스트 조회
-    java.util.List<User> findTop100ByLeagueGroupIdOrderByLeaguePointDesc(Long leagueGroupId);
+    // java.util.List<User> findTop100ByLeagueGroupIdOrderByLeaguePointDesc(Long
+    // leagueGroupId);
+    java.util.List<User> findTop100ByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(Long leagueGroupId);
 
-    java.util.List<User> findTop100ByLeagueOrderByLeaguePointDesc(LeagueTier league);
+    // java.util.List<User> findTop100ByLeagueOrderByLeaguePointDesc(LeagueTier
+    // league);
+    java.util.List<User> findTop100ByLeagueOrderByLeaguePointDescUpdatedAtAsc(LeagueTier league);
 
     Optional<User> findByExtensionToken(String token);
 
     // Season management
-    java.util.List<User> findByLeagueGroupIdOrderByLeaguePointDesc(Long leagueGroupId);
+    // java.util.List<User> findByLeagueGroupIdOrderByLeaguePointDesc(Long
+    // leagueGroupId);
+    java.util.List<User> findByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(Long leagueGroupId);
 
     // AI 추천용 활성 유저 조회
     @Query("SELECT u FROM User u WHERE u.isDeleted = false")
