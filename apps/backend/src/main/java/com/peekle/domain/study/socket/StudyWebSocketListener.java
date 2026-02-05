@@ -82,6 +82,28 @@ public class StudyWebSocketListener {
 
             log.info("[Study] User disconnected from study. Study ID: {}, User ID: {}", studyId, userId);
 
+            // [Fix] Session Validation
+            String currentSessionId = event.getSessionId(); // Use event ID directly
+            String sessionKey = String.format(RedisKeyConst.USER_SESSION, userId);
+            String initialSessionId = stringRedisTemplate.opsForValue().get(sessionKey);
+
+            log.info("[Study] Disconnect Check - User: {}, Current: {}, Active: {}", userId, currentSessionId,
+                    initialSessionId);
+
+            if (currentSessionId != null && initialSessionId != null && !currentSessionId.equals(initialSessionId)) {
+                log.info("[Study] Disconnect ignored. New session active. (Current: {}, Active: {})", currentSessionId,
+                        initialSessionId);
+                return;
+            }
+
+            // Session Clean up (Only delete if it matches)
+            if (currentSessionId != null && currentSessionId.equals(initialSessionId)) {
+                log.info("[Study] Session Match. Cleaning up session key.");
+                stringRedisTemplate.delete(sessionKey);
+            } else if (initialSessionId == null) {
+                log.info("[Study] No active session found. Proceeding with disconnect cleanup.");
+            }
+
             // 1. 스터디 방 온라인 유저 목록에서 제거
             String onlineKey = "study:" + studyId + ":online_users";
             stringRedisTemplate.opsForSet().remove(onlineKey, userId.toString());
