@@ -152,9 +152,14 @@ const LeagueRuleModal = ({
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-muted-foreground">구간 정보</span>
-                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded">
-                    * 인원은 올림(Ceiling) 처리
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded">
+                      * 인원은 올림(Ceiling) 처리
+                    </span>
+                    <span className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded font-medium">
+                      * 0점인 경우 순위와 관계없이 승급 불가
+                    </span>
+                  </div>
                 </div>
 
                 {/* 승급 */}

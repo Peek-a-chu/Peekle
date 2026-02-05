@@ -275,12 +275,23 @@ public class LeagueService {
         List<LeagueRankingMemberDto> members = new ArrayList<>();
         int currentRank = 1;
         for (User u : groupUsers) {
-            LeagueStatus status = LeagueStatus.STAY;
+            LeagueStatus status;
 
-            if (currentRank <= promoteCount) {
-                status = LeagueStatus.PROMOTE;
-            } else if (currentRank > (totalGroupMembers - demoteCount)) {
-                status = LeagueStatus.DEMOTE;
+            // 0점인 경우 순위와 상관없이 승급 불가 (STAY 혹은 DEMOTE만 가능)
+            if (u.getLeaguePoint() <= 0) {
+                if (currentRank > (totalGroupMembers - demoteCount)) {
+                    status = LeagueStatus.DEMOTE;
+                } else {
+                    status = LeagueStatus.STAY;
+                }
+            } else {
+                if (currentRank <= promoteCount) {
+                    status = LeagueStatus.PROMOTE;
+                } else if (currentRank > (totalGroupMembers - demoteCount)) {
+                    status = LeagueStatus.DEMOTE;
+                } else {
+                    status = LeagueStatus.STAY;
+                }
             }
 
             members.add(LeagueRankingMemberDto.builder()
@@ -461,8 +472,8 @@ public class LeagueService {
                 User user = users.get(i);
                 int rank = i + 1;
 
-                // 승급/강등/유지 판정
-                String result = determineSeasonResult(rank, users.size(), user.getLeague());
+                // 승급/강등/유지 판정 (현재 점수 포함)
+                String result = determineSeasonResult(rank, users.size(), user.getLeague(), user.getLeaguePoint());
 
                 // 히스토리 저장
                 LeagueHistory history = LeagueHistory
@@ -561,8 +572,8 @@ public class LeagueService {
      * - 7-9명: 상위 2명 승급, 하위 2명 강등
      * - 10명 이상: 30% 승급/강등
      */
-    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier) {
-        // 안전 장치: 3명 이하는 변동 없음
+    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier, int userPoint) {
+        // 안전 장치: 3명 이하는 변동 없음, 혹은 0점인 경우 승급 불가
         if (totalUsers <= 3) {
             return "MAINTAINED";
         }
@@ -587,8 +598,8 @@ public class LeagueService {
             demoteCount = Math.min(demoteCount, totalUsers - promoteCount - 1);
         }
 
-        // 상위 promoteCount명: 승급 (단, 최상위 티어는 제외)
-        if (rank <= promoteCount && currentTier != LeagueTier.RUBY) {
+        // 상위 promoteCount명: 승급 (단, 최상위 티어 제외 및 점수가 0점보다 커야 함)
+        if (userPoint > 0 && rank <= promoteCount && currentTier != LeagueTier.RUBY) {
             return "PROMOTED";
         }
 
@@ -693,11 +704,13 @@ public class LeagueService {
                 int demoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getDemotePercent() / 100.0));
                 demoteCount = Math.min(demoteCount, totalGroupMembers - promoteCount - 1);
 
-                // 상태 결정
-                if (groupRank <= promoteCount) {
+                // 상태 결정 (0점 초과여야 승급 가능)
+                if (user.getLeaguePoint() > 0 && groupRank <= promoteCount) {
                     leagueStatus = LeagueStatus.PROMOTE;
                 } else if (groupRank > (totalGroupMembers - demoteCount)) {
                     leagueStatus = LeagueStatus.DEMOTE;
+                } else {
+                    leagueStatus = LeagueStatus.STAY;
                 }
 
                 // 점수 차이 계산을 위해 그룹 유저 조회
