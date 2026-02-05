@@ -72,7 +72,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   // We can also initialize store with props?
   useEffect(() => {
-    if (studyId) setRoomInfo({ roomId: studyId, roomTitle: '' });
+    if (studyId) setRoomInfo({ roomId: studyId });
   }, [studyId, setRoomInfo]);
 
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
@@ -278,7 +278,23 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       console.warn('[StudyRoomClient] Invalid problem ID:', problem.problemId);
       return;
     }
-    setSelectedProblem(pId, problem.title, problem.externalId || String((problem as any).number));
+    const externalId = problem.externalId || String((problem as any).number || '');
+    setSelectedProblem(pId, problem.title, externalId);
+
+    // Notify extension/host to navigate using external ID (if supported)
+    if (externalId) {
+      window.postMessage(
+        {
+          type: 'PEEKLE_SELECT_PROBLEM',
+          payload: {
+            externalId,
+            studyId,
+            url: `https://www.acmicpc.net/problem/${externalId}`,
+          },
+        },
+        '*',
+      );
+    }
   };
 
   const handleDateChange = (date: Date): void => {
@@ -418,9 +434,9 @@ export function CCStudyRoomClient(): React.ReactNode {
     return null;
   }
 
-  if (!isJoined) {
-    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
-  }
+  // if (!isJoined) {
+  //   return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
+  // }
 
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>
