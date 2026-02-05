@@ -4,7 +4,7 @@ import { Users, Clock, FileText, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { GameRoom } from '@/domains/game/mocks/mock-data';
+import type { GameRoom } from '@/domains/game/types/game-types';
 
 interface GameRoomCardProps {
   room: GameRoom;

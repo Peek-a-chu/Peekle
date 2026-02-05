@@ -4,10 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
-  BOJ_TIERS,
   type ProblemSource,
   type GameCreationFormData,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { BOJ_TIERS } from '@/domains/game/constants/game-constants';
 import { getWorkbooks, type WorkbookListResponse } from '@/domains/workbook/api/workbookApi';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';

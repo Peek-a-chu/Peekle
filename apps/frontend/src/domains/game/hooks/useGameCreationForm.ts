@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 import {
-  defaultGameCreationForm,
   type GameMode,
   type TeamType,
   type GameCreationFormData,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { defaultGameCreationForm } from '@/domains/game/constants/game-constants';
 
 export function useGameCreationForm(
   onSubmit?: (formData: GameCreationFormData) => void,

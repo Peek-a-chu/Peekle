@@ -11,6 +11,7 @@ export interface Participant {
     isHost: boolean;
     status: ParticipantStatus;
     team?: Team;
+    tier?: string;
 }
 
 export interface GameRoom {
@@ -36,6 +37,7 @@ export interface GameRoomDetail extends GameRoom {
     participants: Participant[];
     tierMin: string;
     tierMax: string;
+    problems?: GameProblem[];
 }
 
 export interface ChatMessage {
@@ -94,4 +96,45 @@ export interface GameResult {
     teamRanking?: Record<string, number>;
     winner?: string; // userId or teamColor
     teamType?: TeamType;
+}
+
+// UI용 타입들 (기존 mock-data에서 이동)
+export interface GameModeInfo {
+    mode: GameMode;
+    teamType: TeamType;
+    title: string;
+    description: string;
+}
+
+export interface TierInfo {
+    id: string;
+    name: string;
+    color: string;
+}
+
+export interface Workbook {
+    id: string;
+    title: string;
+    description: string;
+    problemCount: number;
+    creator: string;
+    isBookmarked: boolean;
+}
+
+export type ProblemSource = 'BOJ_RANDOM' | 'WORKBOOK';
+
+export interface GameCreationFormData {
+    title: string;
+    isPrivate: boolean;
+    password: string;
+    mode: GameMode;
+    teamType: TeamType;
+    maxPlayers: number;
+    timeLimit: number;
+    problemCount: number;
+    problemSource: ProblemSource;
+    tierMin: string;
+    tierMax: string;
+    selectedTags: string[];
+    selectedWorkbookId: string | null;
 }

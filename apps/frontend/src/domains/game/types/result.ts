@@ -1,7 +1,7 @@
 import { LeagueType } from '@/components/LeagueIcon';
 
 export interface GameParticipant {
-  userId: string;
+  userId: number;
   nickname: string;
   score: number;
   rank: number;

@@ -97,7 +97,7 @@ export async function getGameRooms(): Promise<GameRoom[]> {
 /**
  * 게임 방 상세 조회 (대기방용)
  */
-export async function getGameRoom(roomId: string): Promise<GameRoomDetail | null> {
+export async function getGameRoom(roomId: string | number): Promise<GameRoomDetail | null> {
     try {
         const response = await apiFetch<GameRoomDetailResponse>(`/api/games/${roomId}`);
         if (!response.success || !response.data) {
@@ -146,7 +146,7 @@ export async function getGameRoom(roomId: string): Promise<GameRoomDetail | null
 /**
  * 게임 방 생성
  */
-export async function createGameRoom(data: GameCreateRequest): Promise<string | null> {
+export async function createGameRoom(data: GameCreateRequest): Promise<number | null> {
     try {
         const response = await apiFetch<number>('/api/games', {
             method: 'POST',
@@ -158,7 +158,7 @@ export async function createGameRoom(data: GameCreateRequest): Promise<string | 
             return null;
         }
 
-        return String(response.data);
+        return response.data;
     } catch (error) {
         console.error('Error creating game room:', error);
         return null;
@@ -168,7 +168,7 @@ export async function createGameRoom(data: GameCreateRequest): Promise<string | 
 /**
  * 게임 방 입장
  */
-export async function enterGameRoom(roomId: string, password?: string): Promise<boolean> {
+export async function enterGameRoom(roomId: string | number, password?: string): Promise<boolean> {
     try {
         const response = await apiFetch<void>(`/api/games/${roomId}/enter`, {
             method: 'POST',
@@ -177,7 +177,7 @@ export async function enterGameRoom(roomId: string, password?: string): Promise<
 
         if (!response.success) {
             console.error('Failed to enter game room:', response.error);
-            throw new Error(response.error);
+            throw new Error(response.error?.message || '방 입장에 실패했습니다.');
         }
 
         return true;
@@ -190,7 +190,7 @@ export async function enterGameRoom(roomId: string, password?: string): Promise<
 /**
  * 유저 강퇴 (방장 전용)
  */
-export async function kickUser(roomId: string, targetUserId: string): Promise<boolean> {
+export async function kickUser(roomId: string | number, targetUserId: string | number): Promise<boolean> {
     try {
         const response = await apiFetch<void>(`/api/games/${roomId}/kick`, {
             method: 'POST',

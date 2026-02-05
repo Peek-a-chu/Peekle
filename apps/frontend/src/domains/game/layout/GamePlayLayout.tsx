@@ -209,7 +209,7 @@ export function GamePlayLayout({
         onClose={() => { }}
         data={{
           participants: (gameState.result?.ranking || []).map((r, idx) => ({
-            userId: String(r.userId),
+            userId: r.userId,
             nickname: r.nickname,
             score: r.score,
             rank: idx + 1,

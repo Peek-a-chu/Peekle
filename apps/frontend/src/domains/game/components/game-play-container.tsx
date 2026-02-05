@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
 import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout';
-import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
-// import { mockGameResult } from '../mocks/resultMock';
+// import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
 
 interface GamePlayContainerProps {
   roomId: string;

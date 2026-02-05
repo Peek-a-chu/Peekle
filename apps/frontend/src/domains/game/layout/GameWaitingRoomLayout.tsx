@@ -24,7 +24,7 @@ const teamLabels = {
 interface GameWaitingRoomLayoutProps {
   room: GameRoomDetail;
   messages: ChatMessage[];
-  currentUserId: string;
+  currentUserId: number;
   isHost: boolean;
   isReady: boolean;
   isCountingDown: boolean;
@@ -35,7 +35,7 @@ interface GameWaitingRoomLayoutProps {
   onCancelReady: () => void;
   onStartGame: () => void;
   onCountdownComplete: () => void;
-  onKickParticipant: (participantId: string) => void;
+  onKickParticipant: (participantId: number) => void;
   onChangeTeam: () => void;
 }
 

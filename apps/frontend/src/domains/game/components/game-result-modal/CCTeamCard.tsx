@@ -9,7 +9,7 @@ interface CCTeamCardProps {
   team: GameParticipant[];
   teamColor: 'RED' | 'BLUE';
   isWinner: boolean;
-  mvpId?: string;
+  mvpId?: number;
   score: number;
   mode: 'SPEED_RACE' | 'TIME_ATTACK';
 }

@@ -3,13 +3,13 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { getGameRooms, createGameRoom, enterGameRoom, type GameCreateRequest } from '@/domains/game/api/game-api';
 import {
-  filterGameRooms,
   type GameRoom,
   type GameMode,
   type TeamType,
   type GameStatus,
   type GameCreationFormData,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { filterGameRooms } from '@/domains/game/utils/game-utils';
 
 
 export type StatusFilter = GameStatus | 'ALL';
