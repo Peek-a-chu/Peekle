@@ -16,9 +16,9 @@ div[class*='monaco-editor-overlaymessage'],
 }
 
 @layer base {
-  html {
+  /* html {
     scrollbar-gutter: stable;
-  }
+  } */
 
   :root {
     --background: 0 0% 100%;
