@@ -46,6 +46,7 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
        @Query(nativeQuery = true, value = "SELECT id, source, external_id, title, tier, url FROM problems p " +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
+                     "AND p.title REGEXP '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
                      "ORDER BY RAND() LIMIT :limit")
        List<Problem> findRandomProblemsByTiers(@Param("tiers") List<String> tiers, @Param("limit") int limit);
 
@@ -53,6 +54,7 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
                      +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
+                     "AND p.title REGEXP '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
                      "AND EXISTS (" +
                      "    SELECT 1 FROM problem_tags pt " +
                      "    JOIN tags t ON pt.tag_id = t.id " +
