@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { ClientSessionManager } from '@/components/providers/ClientSessionManager';
 
 export const metadata: Metadata = {
   title: 'Peekle',
@@ -75,6 +76,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background">
         <QueryProvider>
           <ThemeProvider>
+            <ClientSessionManager />
             {children}
             <SettingsModal isGlobal={true} />
           </ThemeProvider>

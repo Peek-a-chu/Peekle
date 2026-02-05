@@ -1,4 +1,4 @@
-package com.peekle.global.auth.dto;
+package com.peekle.domain.auth.dto;
 
 import java.util.Map;
 

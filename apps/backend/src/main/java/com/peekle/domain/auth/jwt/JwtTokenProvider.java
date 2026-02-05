@@ -1,4 +1,4 @@
-package com.peekle.global.auth.jwt;
+package com.peekle.domain.auth.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

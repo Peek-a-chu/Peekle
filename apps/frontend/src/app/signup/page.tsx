@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { signup as signupApi } from '@/api/authApi';
 import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi } from '@/api/userApi';
 
@@ -221,13 +221,6 @@ function SignupForm() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 font-sans">
       <div className="w-full max-w-[440px] px-4">
         <div className="relative bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl shadow-slate-200/50 rounded-3xl p-8 md:p-10 space-y-6">
-          {/* X 버튼 */}
-          <Link href="/">
-            <button className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-pink-50/80 transition-all duration-200 group">
-              <X className="w-5 h-5" />
-            </button>
-          </Link>
-
           <div className="text-center space-y-2">
             <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
               회원가입
@@ -295,6 +288,16 @@ function SignupForm() {
               {isSubmitting ? '가입 중...' : '가입 완료'}
             </button>
           </form>
+
+          {/* 뒤로 가기 버튼 */}
+          <div className="pt-2">
+            <Link href="/">
+              <button className="w-full h-11 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 transition-colors duration-200 text-sm font-medium group">
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" />
+                <span>메인으로 돌아가기</span>
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-package com.peekle.global.auth.service;
+package com.peekle.domain.auth.service;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;

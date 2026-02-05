@@ -13,6 +13,7 @@ export interface WorkbookProblemResponse {
   tier: string;
   url: string;
   solved: boolean;
+  status?: 'SUCCESS' | 'FAIL' | 'NONE';
 }
 
 export interface WorkbookResponse {
@@ -20,6 +21,8 @@ export interface WorkbookResponse {
   title: string;
   description: string;
   problemCount: number;
+  solvedCount: number;
+  failedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;
@@ -35,6 +38,7 @@ export interface WorkbookListResponse {
   description: string;
   problemCount: number;
   solvedCount: number;
+  failedCount: number;
   bookmarkCount: number;
   isBookmarked: boolean;
   isOwner: boolean;
@@ -167,6 +171,20 @@ export async function deleteWorkbook(workbookId: number): Promise<void> {
 
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to delete workbook');
+  }
+}
+
+// 문제집에 문제 추가
+export async function addProblemToWorkbook(
+  workbookId: number,
+  problemId: number,
+): Promise<void> {
+  const response = await apiFetch<void>(`/api/workbooks/${workbookId}/problems/${problemId}`, {
+    method: 'POST',
+  });
+
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to add problem to workbook');
   }
 }
 

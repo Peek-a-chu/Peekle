@@ -62,11 +62,14 @@ public class WorkbookService {
 
         // 3. 응답 생성
         List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
-        return WorkbookResponse.of(workbook, false, true, problemResponses);
+        int solvedCount = (int) problemResponses.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
+        int failedCount = (int) problemResponses.stream().filter(p -> "FAIL".equals(p.getStatus())).count();
+        return WorkbookResponse.of(workbook, false, true, solvedCount, failedCount, problemResponses);
     }
 
     // 문제집 목록 조회
-    public Page<WorkbookListResponse> getWorkbooks(Long userId, String tab, String keyword, String sort, Pageable pageable) {
+    public Page<WorkbookListResponse> getWorkbooks(Long userId, String tab, String keyword, String sort,
+            Pageable pageable) {
         Page<Workbook> workbooks;
 
         // 로그인하지 않은 사용자는 MY/BOOKMARKED 탭 접근 불가 - 빈 결과 반환
@@ -95,20 +98,31 @@ public class WorkbookService {
                 .distinct()
                 .toList();
 
-        // 유저가 푼 문제 ID 목록 조회
-        Set<Long> solvedProblemIds = (userId != null && !allProblemIds.isEmpty())
-                ? new HashSet<>(submissionLogRepository.findSolvedProblemIds(userId, allProblemIds))
+        // 유저가 실제 성공한 문제 ID 목록 조회
+        Set<Long> successProblemIds = (userId != null && !allProblemIds.isEmpty())
+                ? new HashSet<>(submissionLogRepository.findSuccessProblemIds(userId, allProblemIds))
+                : Set.of();
+
+        // 유저가 시도한 문제 ID 목록 조회
+        Set<Long> attemptedProblemIds = (userId != null && !allProblemIds.isEmpty())
+                ? new HashSet<>(submissionLogRepository.findAttemptedProblemIds(userId, allProblemIds))
                 : Set.of();
 
         List<WorkbookListResponse> content = workbooks.getContent().stream()
                 .map(workbook -> {
                     int problemCount = workbook.getProblems().size();
                     int solvedCount = (int) workbook.getProblems().stream()
-                            .filter(wp -> solvedProblemIds.contains(wp.getProblem().getId()))
+                            .filter(wp -> successProblemIds.contains(wp.getProblem().getId()))
                             .count();
-                    boolean isBookmarked = user != null && workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
+                    int failedCount = (int) workbook.getProblems().stream()
+                            .filter(wp -> !successProblemIds.contains(wp.getProblem().getId())
+                                    && attemptedProblemIds.contains(wp.getProblem().getId()))
+                            .count();
+                    boolean isBookmarked = user != null
+                            && workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
                     boolean isOwner = user != null && workbook.getCreator().getId().equals(userId);
-                    return WorkbookListResponse.of(workbook, problemCount, solvedCount, isBookmarked, isOwner);
+                    return WorkbookListResponse.of(workbook, problemCount, solvedCount, failedCount, isBookmarked,
+                            isOwner);
                 })
                 .toList();
 
@@ -137,8 +151,10 @@ public class WorkbookService {
         }
 
         List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
+        int solvedCount = (int) problemResponses.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
+        int failedCount = (int) problemResponses.stream().filter(p -> "FAIL".equals(p.getStatus())).count();
 
-        return WorkbookResponse.of(workbook, isBookmarked, isOwner, problemResponses);
+        return WorkbookResponse.of(workbook, isBookmarked, isOwner, solvedCount, failedCount, problemResponses);
     }
 
     // 문제집 수정
@@ -168,8 +184,10 @@ public class WorkbookService {
 
         boolean isBookmarked = workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
         List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
+        int solvedCount = (int) problemResponses.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
+        int failedCount = (int) problemResponses.stream().filter(p -> "FAIL".equals(p.getStatus())).count();
 
-        return WorkbookResponse.of(workbook, isBookmarked, true, problemResponses);
+        return WorkbookResponse.of(workbook, isBookmarked, true, solvedCount, failedCount, problemResponses);
     }
 
     // 문제집 삭제
@@ -184,6 +202,41 @@ public class WorkbookService {
         }
 
         workbook.deactivate();
+    }
+
+    // 문제집에 단일 문제 추가
+    @Transactional
+    public void addProblemToWorkbook(Long userId, Long workbookId, Long problemId) {
+        Workbook workbook = workbookRepository.findById(workbookId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKBOOK_NOT_FOUND));
+
+        // 권한 체크
+        if (!workbook.getCreator().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+
+        // 중복 체크
+        boolean exists = workbook.getProblems().stream()
+                .anyMatch(wp -> wp.getProblem().getId().equals(problemId));
+
+        if (exists) {
+            throw new BusinessException(ErrorCode.PROBLEM_ALREADY_ADDED);
+        }
+
+        // 마지막 인덱스 계산
+        int lastIndex = workbook.getProblems().size();
+
+        WorkbookProblem workbookProblem = WorkbookProblem.builder()
+                .workbook(workbook)
+                .problem(problem)
+                .orderIndex(lastIndex)
+                .build();
+
+        workbook.addProblem(workbookProblem);
+        workbookRepository.save(workbook);
     }
 
     // 북마크 토글
@@ -249,21 +302,31 @@ public class WorkbookService {
         // 로그인하지 않은 경우: 모든 문제를 미풀이로 표시
         if (userId == null || workbookProblems.isEmpty()) {
             return workbookProblems.stream()
-                    .map(wp -> WorkbookProblemResponse.of(wp, false))
+                    .map(wp -> WorkbookProblemResponse.of(wp, "NONE"))
                     .toList();
         }
 
-        // 로그인한 경우: 유저가 푼 문제 ID 목록 조회
+        // 로그인한 경우: 유저가 푼 문제 ID 목록 조회 (성공/시도 구분)
         List<Long> problemIds = workbookProblems.stream()
                 .map(wp -> wp.getProblem().getId())
                 .toList();
 
-        Set<Long> solvedProblemIds = new HashSet<>(
-                submissionLogRepository.findSolvedProblemIds(userId, problemIds)
-        );
+        Set<Long> successIds = new HashSet<>(
+                submissionLogRepository.findSuccessProblemIds(userId, problemIds));
+        Set<Long> attemptedIds = new HashSet<>(
+                submissionLogRepository.findAttemptedProblemIds(userId, problemIds));
 
         return workbookProblems.stream()
-                .map(wp -> WorkbookProblemResponse.of(wp, solvedProblemIds.contains(wp.getProblem().getId())))
+                .map(wp -> {
+                    Long pid = wp.getProblem().getId();
+                    String status = "NONE";
+                    if (successIds.contains(pid)) {
+                        status = "SUCCESS";
+                    } else if (attemptedIds.contains(pid)) {
+                        status = "FAIL";
+                    }
+                    return WorkbookProblemResponse.of(wp, status);
+                })
                 .toList();
     }
 }

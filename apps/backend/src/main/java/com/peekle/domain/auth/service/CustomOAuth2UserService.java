@@ -1,6 +1,6 @@
-package com.peekle.global.auth.service;
+package com.peekle.domain.auth.service;
 
-import com.peekle.global.auth.dto.*;
+import com.peekle.domain.auth.dto.*;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;

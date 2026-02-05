@@ -33,7 +33,7 @@ public class User extends BaseTimeEntity {
 
     // ... fields ...
 
-    @Column(unique = true)
+    @Column
     private String bojId; // 백준 아이디
 
     @Column(unique = true, length = 100)
