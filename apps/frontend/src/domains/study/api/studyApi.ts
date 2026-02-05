@@ -44,8 +44,14 @@ export async function fetchStudyRoom(
 }
 
 // 2. Chat History
-export async function fetchStudyChats(studyId: number): Promise<ChatMessageResponse[]> {
-  const res = await apiFetch<{ content: ChatMessageResponse[] }>(`/api/studies/${studyId}/chats`);
+export async function fetchStudyChats(
+  studyId: number,
+  page = 0,
+  size = 50,
+): Promise<ChatMessageResponse[]> {
+  const res = await apiFetch<{ content: ChatMessageResponse[] }>(
+    `/api/studies/${studyId}/chats?page=${page}&size=${size}`,
+  );
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to fetch chats');
   }
