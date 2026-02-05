@@ -278,7 +278,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       console.warn('[StudyRoomClient] Invalid problem ID:', problem.problemId);
       return;
     }
-    setSelectedProblem(pId, problem.title, problem.externalId || String((problem as any).number));
+    // Extract studyProblemId from the problem (added by API)
+    const studyProblemId = (problem as any).studyProblemId || null;
+    setSelectedProblem(
+      studyProblemId,
+      pId,
+      problem.title,
+      problem.externalId || String((problem as any).number),
+    );
   };
 
   const handleDateChange = (date: Date): void => {

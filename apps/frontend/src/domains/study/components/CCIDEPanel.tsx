@@ -326,25 +326,23 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleSubmit = (): void => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
-        const { selectedProblemId, selectedProblemExternalId } = useRoomStore.getState();
+        const { selectedStudyProblemId, selectedProblemExternalId } = useRoomStore.getState();
 
-        if (!selectedProblemId) {
+        if (!selectedStudyProblemId) {
           toast.error('선택된 문제가 없습니다.');
           return;
         }
-
-        const problemId = String(selectedProblemId);
 
         // 확장 프로그램에 메시지 전송 (확장 프로그램이 수신 후 스토리지 저장 -> 페이지 이동 처리)
         window.postMessage(
           {
             type: 'PEEKLE_SUBMIT_CODE',
             payload: {
-              problemId,
-              externalId: selectedProblemExternalId,
+              studyProblemId: selectedStudyProblemId,  // StudyProblem PK
+              externalId: selectedProblemExternalId,   // BOJ 문제 번호
               code: value,
-              language: language, // 'python', 'java', 'cpp' 등
-              studyId: studyId, // <--- Inject Study ID from params
+              language: language,
+              sourceType: 'STUDY',
             },
           },
           '*',

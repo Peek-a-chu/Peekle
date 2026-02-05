@@ -47,19 +47,16 @@ public class StudyRoomController {
         return ApiResponse.success(response);
     }
 
-    // 스터디 문제 제출 (가상의 submitStudyProblem 메서드 추가)
-    // 이 메서드는 요청에 따라 새로 추가된 것으로 가정합니다.
-    @PostMapping("/{studyId}/submit")
+    // 스터디 문제 제출 - studyProblemId 기반으로 변경
+    @PostMapping("/problems/{studyProblemId}/submit")
     public ApiResponse<SubmissionResponse> submitStudyProblem(
-            @PathVariable Long studyId,
-            @RequestBody SubmissionRequest request, // Assuming SubmissionRequest DTO exists
+            @PathVariable Long studyProblemId,
+            @RequestBody SubmissionRequest request,
             Principal principal) {
-        System.out.println("[DEBUG] Received Study Specific Submission for Study: " + studyId);
+        System.out.println("[DEBUG] Received Study Specific Submission for StudyProblem: " + studyProblemId);
         System.out.println("[DEBUG] Request: " + request);
 
-        // Assuming studyRoomService has a submitStudyProblem method
-        // And SubmissionResponse DTO exists
-        SubmissionResponse response = studyRoomService.submitStudyProblem(studyId, request);
+        SubmissionResponse response = studyRoomService.submitStudyProblem(studyProblemId, request);
         return ApiResponse.success(response);
     }
 

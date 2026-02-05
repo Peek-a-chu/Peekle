@@ -12,6 +12,8 @@ import java.time.LocalDate;
 @ToString
 public class ProblemStatusResponse {
 
+    private Long studyProblemId; // StudyProblem 엔티티의 PK
+
     private Long problemId;
 
     private String externalId; // BOJ problem number (e.g. "1000")
@@ -32,8 +34,10 @@ public class ProblemStatusResponse {
     // private List<String> solvedMembers;
 
     @Builder
-    public ProblemStatusResponse(Long problemId, String externalId, String title, String tier, LocalDate assignedDate,
+    public ProblemStatusResponse(Long studyProblemId, Long problemId, String externalId, String title, String tier,
+            LocalDate assignedDate,
             int solvedMemberCount, int totalMemberCount, boolean isSolvedByMe) {
+        this.studyProblemId = studyProblemId;
         this.problemId = problemId;
         this.externalId = externalId;
         this.title = title;
