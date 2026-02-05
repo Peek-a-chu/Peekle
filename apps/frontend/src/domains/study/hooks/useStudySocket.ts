@@ -402,6 +402,33 @@ export const useStudySocketSubscription = (studyId: number) => {
             setVideoToken(token);
             break;
           }
+          case 'SOLVED': {
+            // Problem Solved - trigger refetch & toast
+            const { problemId, userId: solverId, nickname, earnedPoints } = data;
+            console.log('[StudySocket] SOLVED event:', data);
+
+            // Refetch curriculum to update status (green check, user count)
+            window.dispatchEvent(
+              new CustomEvent('study-curriculum-updated', {
+                detail: { studyId },
+              }),
+            );
+
+            // Toast notification
+            // If I am the solver, message might be different or handled by API response.
+            // But API response covers the submitter. This broadcast covers EVERYONE.
+            // Avoid duplicate toast for submitter if API response already toasted?
+            // Usually API response handles success toast.
+            // But here we can just show generic info.
+            if (solverId !== useRoomStore.getState().currentUserId) {
+              toast.success(`${nickname}님이 문제를 해결했습니다!`);
+            } else {
+              // For me, maybe redundant if UI already showed it, but socket is faster/surer.
+              // Let's show it or rely on existing success feedback.
+              // Existing submit logic shows toast probably.
+            }
+            break;
+          }
           case 'ERROR': {
             // Error from server
             const errorMessage =
