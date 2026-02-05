@@ -30,7 +30,7 @@ public class RecommendationService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final SubmissionLogRepository logRepository;
     private final UserRepository userRepository;
-    private final RestClient aiRestClient; // AiConfig에서 만든 Bean 주입
+    private final RestClient aiRestClient; 
     private final ObjectMapper objectMapper;
 
     private static final String REDIS_KEY_PREFIX = "user:recommend:";

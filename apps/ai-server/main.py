@@ -159,7 +159,7 @@ async def get_intelligent_recommendation(request: Request):
             kw = item["keyword"]
             strategy_note = item["strategy_note"]
             
-            # 후보군 넉넉히 검색
+
             search_results = search_similar_problems(kw, n_results=7)
             
             if search_results['documents'] and search_results['documents'][0]:
@@ -187,7 +187,7 @@ async def get_intelligent_recommendation(request: Request):
         # 3단계: 추천 사유 생성 (문제 정보 + 1단계 전략 메모 전달)
         # ---------------------------------------------------------
         
-        # 프롬프트에 전달할 맥락 구성: "문제 제목 (추천 의도: ...)" 형태
+
         context_lines = []
         for i, rec in enumerate(final_recommendations):
             context_lines.append(f"{i+1}. 문제: {rec['problem_info']} (추천 의도: {rec['strategy_note']})")
@@ -271,5 +271,4 @@ async def get_intelligent_recommendation(request: Request):
 
     except Exception as e:
         print(f"[ERROR] 추천 로직 오류: {str(e)}")
-        # 실제 운영시에는 e를 그대로 내보내기보다 "추천 생성 중 오류 발생" 등으로 감싸는 것이 좋음
         raise HTTPException(status_code=500, detail=str(e))

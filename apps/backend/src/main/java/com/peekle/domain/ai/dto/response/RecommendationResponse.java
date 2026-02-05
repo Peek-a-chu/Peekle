@@ -8,8 +8,8 @@ public record RecommendationResponse(
     public record RecommendedProblem(
         String id,
         String title,
-        String tierType,  // "bronze", "silver", "gold" 등
-        Integer tierLevel, // 1~5
+        String tierType,  
+        Integer tierLevel, 
         List<String> tags,
         String reason
     ) {}

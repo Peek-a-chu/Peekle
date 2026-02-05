@@ -14,8 +14,8 @@ public record AiApiResponse(
     public record AiRecommendedProblem(
         String problemId,
         String title,
-        String tier,    // "Gold 4" 또는 "Gold IV" 등
-        String tags,    // "구현, 그리디"
+        String tier,    
+        String tags,   
         String reason,
         String keyword
     ) {}
