@@ -48,6 +48,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true });
         });
         return true;
+    } else if (request.type === 'CLEAR_PENDING_SUBMISSION') {
+        console.log('[Background] Received CLEAR_PENDING_SUBMISSION. Clearing storage.');
+        chrome.storage.local.remove('pending_submission', () => {
+            sendResponse({ success: true });
+        });
+        return true;
     }
     return true; // Keep channel open
 });
@@ -234,6 +240,23 @@ async function handleSolvedSubmission(payload, sender) {
 
     });
 }
+
+// Cleanup pending submission if user navigates away from the problem page
+function cleanupStalePendingSubmissions() {
+    chrome.storage.local.get(['pending_submission'], (data) => {
+        const pending = data.pending_submission;
+        if (pending && pending.timestamp) {
+            const fiveMinutes = 5 * 60 * 1000;
+            if (Date.now() - pending.timestamp > fiveMinutes) {
+                console.log('[Background] Clearing stale pending submission (older than 5 mins)');
+                chrome.storage.local.remove('pending_submission');
+            }
+        }
+    });
+}
+
+// Run cleanup periodically
+setInterval(cleanupStalePendingSubmissions, 60000); // Every minute
 
 // Cleanup pending submission if user navigates away from the problem page
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {

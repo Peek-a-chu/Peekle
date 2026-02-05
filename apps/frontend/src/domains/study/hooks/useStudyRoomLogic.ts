@@ -94,7 +94,8 @@ export function useStudyRoomLogic() {
   };
 
   const handleSelectProblem = (problem: Problem) => {
-    setSelectedProblem(problem.problemId, problem.title);
+    const studyProblemId = (problem as any).id || (problem as any).studyProblemId;
+    setSelectedProblem(studyProblemId, problem.problemId, problem.title, (problem as any).externalId);
     console.log('Selected problem:', problem.title);
   };
 
