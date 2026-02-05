@@ -51,7 +51,7 @@ export function CCControlBar({
     <TooltipProvider>
       <div
         className={cn(
-          'relative flex items-center justify-center border-t border-border bg-card px-4 py-3',
+          'relative flex h-14 items-center justify-center border-t border-border bg-card px-4',
           className,
         )}
       >
@@ -60,12 +60,12 @@ export function CCControlBar({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={isMuted ? 'destructive' : 'ghost'}
+                variant="ghost"
                 size="icon"
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
                   isMuted
-                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    ? 'bg-muted text-muted-foreground hover:bg-muted/80'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 )}
                 onClick={handleMicToggle}
@@ -85,12 +85,12 @@ export function CCControlBar({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={isVideoOff ? 'destructive' : 'ghost'}
+                variant="ghost"
                 size="icon"
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
                   isVideoOff
-                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    ? 'bg-muted text-muted-foreground hover:bg-muted/80'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 )}
                 onClick={handleVideoToggle}
@@ -133,7 +133,7 @@ export function CCControlBar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95"
+                className="h-12 w-12 rounded-full bg-muted text-muted-foreground hover:bg-muted/90 border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95"
                 onClick={handleSettingsClick}
               >
                 <Settings className="h-5 w-5" strokeWidth={2.25} />
