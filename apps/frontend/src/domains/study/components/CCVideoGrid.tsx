@@ -22,6 +22,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   // [Added] To control whiteboard split View from within Grid if needed, or rely on Parent
   const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
+  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
 
   const sortedParticipants = [...participants].sort((a, b) => {
     if (a.isLocal) return -1;
@@ -45,6 +46,11 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
     if (userId === currentUserId) {
       resetToOnlyMine();
     } else {
+      if (!selectedProblemId) {
+        toast.error('문제를 선택안하면 상대방 코드를 볼수없습니다.');
+        return;
+      }
+
       const p = roomStoreParticipants.find((p) => p.id === userId);
       if (p) {
         viewRealtimeCode(p);
@@ -56,6 +62,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
 
   return (
     <div
+      data-tour="video-grid"
       className={cn(
         'flex gap-2 overflow-x-auto border-b border-border bg-card p-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
         className,
