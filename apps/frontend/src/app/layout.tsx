@@ -5,10 +5,14 @@ import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { GameSocketProvider } from '@/domains/game/context/GameSocketContext';
+import { ClientSessionManager } from '@/components/providers/ClientSessionManager';
 
 export const metadata: Metadata = {
   title: 'Peekle',
   description: 'Peekle Application',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
@@ -77,8 +81,9 @@ export default function RootLayout({
         <QueryProvider>
           <GameSocketProvider>
             <ThemeProvider>
+                <ClientSessionManager />
               {children}
-              <SettingsModal />
+              <SettingsModal isGlobal={true}/>
             </ThemeProvider>
             <Toaster />
           </GameSocketProvider>

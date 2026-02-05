@@ -1,12 +1,13 @@
 import { cookies } from 'next/headers';
 import { SubmissionHistory } from '../types';
 
-// 필터링 옵션 인터페이스
-export interface HistoryFilter {
-  startDate?: string;
-  endDate?: string;
+export interface FetchHistoryParams {
   tier?: string;
+  date?: string;
   sourceType?: string;
+  status?: string;
+  page?: number;
+  size?: number;
 }
 
 interface SubmissionLogResponse {
@@ -25,12 +26,12 @@ interface SubmissionLogResponse {
   sourceDetail: string;
   code: string;
   result: string; // 제출 결과
+  isSuccess: boolean; // 성공 여부
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function getSubmissionHistory(
-  _nickname: string,
-  _filter?: HistoryFilter,
+export async function fetchUserHistory(
+  nickname: string,
+  { tier, date, sourceType, status, page = 0, size = 20 }: FetchHistoryParams,
 ): Promise<SubmissionHistory[]> {
   try {
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
@@ -44,10 +45,19 @@ export async function getSubmissionHistory(
       headers['Cookie'] = `access_token=${accessToken}`;
     }
 
-    const url =
-      _nickname && _nickname !== 'me'
-        ? `${backendUrl}/api/users/${_nickname}/history?page=0&size=20`
-        : `${backendUrl}/api/users/me/history?page=0&size=20`;
+    // URL Construction
+    const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', page.toString());
+    if (size !== undefined) params.append('size', size.toString());
+    if (tier && tier !== '전체') params.append('tier', tier);
+    if (date) params.append('date', date);
+    if (sourceType && sourceType !== 'ALL') params.append('sourceType', sourceType);
+    if (status && status !== 'ALL') params.append('status', status);
+
+    const endpoint =
+      nickname && nickname !== 'me' ? `/api/users/${nickname}/history` : `/api/users/me/history`;
+
+    const url = `${backendUrl}${endpoint}?${params.toString()}`;
 
     const res = await fetch(url, {
       method: 'GET',
@@ -76,15 +86,19 @@ export async function getSubmissionHistory(
 
       // Timestamp formatting - Convert to KST (UTC+9)
       const formattedDate = item.submittedAt
-        ? new Date(item.submittedAt).toLocaleString('ko-KR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-          timeZone: 'Asia/Seoul',
-        }).replace(/\. /g, '.').replace(/\.$/, '').replace(', ', ' ')
+        ? new Date(item.submittedAt)
+            .toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Seoul',
+            })
+            .replace(/\. /g, '.')
+            .replace(/\.$/, '')
+            .replace(', ', ' ')
         : '';
 
       return {
@@ -95,13 +109,14 @@ export async function getSubmissionHistory(
         language: item.language || 'Unknown',
         memory: `${item.memory || 0}KB`,
         time: `${item.executionTime || 0}ms`,
-        isSuccess: item.result?.includes('맞았습니다') ?? false, // result로부터 계산
+        isSuccess: item.isSuccess ?? false, // Backend value used directly
+        result: item.result, // Raw Result Mapping
         timestamp: formattedDate,
         sourceType,
         sourceDetail: item.sourceDetail,
         code: item.code,
       };
-    });
+    }); // End map
   } catch (e) {
     console.error('Error fetching submission history:', e);
     return [];

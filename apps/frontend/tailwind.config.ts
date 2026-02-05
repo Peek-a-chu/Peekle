@@ -62,6 +62,12 @@ const config: Config = {
           DEFAULT: 'hsl(var(--warning) / <alpha-value>)',
           foreground: 'hsl(var(--warning-foreground) / <alpha-value>)',
         },
+        // New Surface Hierarchy Tokens
+        'surface-2': 'hsl(var(--surface-2) / <alpha-value>)',
+        'surface-3': 'hsl(var(--surface-3) / <alpha-value>)',
+        'border-strong': 'hsl(var(--border-strong) / <alpha-value>)',
+        'border-divider': 'hsl(var(--border-divider) / <alpha-value>)',
+        'text-faint': 'hsl(var(--text-faint) / <alpha-value>)',
       },
 
       borderRadius: {

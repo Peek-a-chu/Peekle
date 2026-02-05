@@ -34,7 +34,8 @@ public class WorkbookListResponse {
         private String nickname;
     }
 
-    public static WorkbookListResponse of(Workbook workbook, int problemCount, int solvedCount, boolean isBookmarked, boolean isOwner) {
+    public static WorkbookListResponse of(Workbook workbook, int problemCount, int solvedCount,
+            boolean isBookmarked, boolean isOwner) {
         return WorkbookListResponse.builder()
                 .id(workbook.getId())
                 .title(workbook.getTitle())

@@ -16,32 +16,39 @@ export function CCStudyRankingBoard(): React.ReactNode {
   const [totalElements, setTotalElements] = useState(0);
   const [scope, setScope] = useState<'ALL' | 'MINE'>('ALL');
   const [topThreeRankings, setTopThreeRankings] = useState<RankResponse[]>([]);
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
 
   const pageSize = 10;
-
-  // Fetch top 3 rankings once on mount and persist them
-  useEffect(() => {
-    const fetchTopThree = async () => {
-      try {
-        const data = await getRankings(0, 3, undefined, 'ALL');
-        setTopThreeRankings(data.content);
-      } catch (error) {
-        console.error('Failed to fetch top rankings:', error);
-        setTopThreeRankings([]);
-      }
-    };
-    void fetchTopThree();
-  }, []); // Empty dependency array - only run once on mount
 
   useEffect(() => {
     const fetchRankings = async (): Promise<void> => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await getRankings(currentPage, pageSize, undefined, scope);
-        setRankings(data.content);
-        setTotalPages(data.totalPages);
-        setTotalElements(data.totalElements);
+        // If we are on Page 0 and ALL scope, we can get top 3 from the main list.
+        // Otherwise, we need to ensure top 3 exists (fetch if missing).
+        const isPageZeroAndAll = currentPage === 0 && scope === 'ALL';
+        const needTopThree = topThreeRankings.length === 0 && !isPageZeroAndAll;
+
+        const mainQueryPromise = getRankings(currentPage, pageSize, undefined, scope);
+        const topThreeQueryPromise = needTopThree
+          ? getRankings(0, 3, undefined, 'ALL')
+          : Promise.resolve(null);
+
+        const [mainData, topThreeData] = await Promise.all([
+          mainQueryPromise,
+          topThreeQueryPromise,
+        ]);
+
+        setRankings(mainData.content);
+        setTotalPages(mainData.totalPages);
+        setTotalElements(mainData.totalElements);
+
+        if (isPageZeroAndAll) {
+          setTopThreeRankings(mainData.content.slice(0, 3));
+        } else if (topThreeData) {
+          setTopThreeRankings(topThreeData.content);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch rankings');
         setRankings([]);
@@ -51,10 +58,12 @@ export function CCStudyRankingBoard(): React.ReactNode {
     };
 
     void fetchRankings();
-  }, [currentPage, scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, scope]); // topThreeRankings is excluded to prevent loop
 
   const handlePageChange = (page: number): void => {
     setCurrentPage(page);
+    setExpandedIds([]); // Collapse all when page changes
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -62,11 +71,21 @@ export function CCStudyRankingBoard(): React.ReactNode {
     if (scope === newScope) return;
     setScope(newScope);
     setCurrentPage(0);
+    setExpandedIds([]); // Collapse all when scope changes
+  };
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   };
 
   const handleStudyClick = (studyId: number): void => {
-    // TODO: S8-2에서 상세 모달 구현
-    console.log('Study clicked:', studyId);
+    if (scope !== 'ALL') setScope('ALL');
+    if (currentPage !== 0) setCurrentPage(0);
+
+    // Expand the clicked study if not already expanded
+    setExpandedIds((prev) => (prev.includes(studyId) ? prev : [...prev, studyId]));
   };
 
   if (error) {
@@ -83,6 +102,8 @@ export function CCStudyRankingBoard(): React.ReactNode {
     <div className="space-y-8">
       <StudyRankingList
         rankings={rankings}
+        expandedIds={expandedIds}
+        onToggleExpand={toggleExpand}
         onStudyClick={handleStudyClick}
         scope={scope}
         onScopeChange={handleScopeChange}

@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useLeagueProgress } from '../hooks/useDashboardData';
 import { LEAGUE_NAMES, LEAGUE_ORDER, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { LeagueProgressData } from '../mocks/dashboardMocks';
+import { LEAGUE_ICONS } from '@/assets/icons/league';
 
 // 한 화면에 보여줄 주 수
 const VISIBLE_WEEKS = 10;
@@ -60,8 +61,13 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   );
 };
 
-const LeagueProgressChart = () => {
-  const { data: allData } = useLeagueProgress();
+interface LeagueProgressChartProps {
+  initialData?: LeagueProgressData[];
+}
+
+const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
+  const { data: fetchedData } = useLeagueProgress({ skip: !!initialData });
+  const allData = initialData || fetchedData;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -168,9 +174,8 @@ const LeagueProgressChart = () => {
           <button
             onClick={handlePrev}
             disabled={!canGoPrev}
-            className={`p-1 rounded-full transition-colors ${
-              canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
-            }`}
+            className={`p-1 rounded-full transition-colors ${canGoPrev ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
           >
             <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -192,9 +197,8 @@ const LeagueProgressChart = () => {
           <button
             onClick={handleNext}
             disabled={!canGoNext}
-            className={`p-1 rounded-full transition-colors ${
-              canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
-            }`}
+            className={`p-1 rounded-full transition-colors ${canGoNext ? 'hover:bg-muted cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
           >
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -205,26 +209,30 @@ const LeagueProgressChart = () => {
       <div className="flex">
         {/* Y축 아이콘 열 */}
         <div className="flex flex-col justify-between h-[200px] pr-2">
-          {yAxisIcons.map((league) => (
-            <div
-              key={league}
-              className="flex items-center justify-center"
-              style={{ height: `${100 / yAxisIcons.length}%` }}
-            >
-              <Image
-                src={`/icons/league/${league}.svg`}
-                alt={LEAGUE_NAMES[league]}
-                width={18}
-                height={18}
-              />
-            </div>
-          ))}
+          {yAxisIcons.map((league) => {
+            const leagueKey = league.toLowerCase() as keyof typeof LEAGUE_ICONS;
+            const iconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
+            return (
+              <div
+                key={league}
+                className="flex items-center justify-center"
+                style={{ height: `${100 / yAxisIcons.length}%` }}
+              >
+                <Image
+                  src={iconAsset}
+                  alt={LEAGUE_NAMES[league as keyof typeof LEAGUE_NAMES]}
+                  width={18}
+                  height={18}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* 차트 */}
         <div className="flex-1 h-[200px] min-w-0">
           {mounted && (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <AreaChart data={visibleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorLeague" x1="0" y1="0" x2="0" y2="1">

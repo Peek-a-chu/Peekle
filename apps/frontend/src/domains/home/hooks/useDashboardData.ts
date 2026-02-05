@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 import {
   MOCK_LEAGUE_PROGRESS,
   MOCK_ACTIVITY_STREAK,
@@ -10,18 +11,29 @@ import {
   AIRecommendationData,
 } from '../mocks/dashboardMocks';
 import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
-import { LeagueRankingData } from '@/domains/league/types';
-import { getLeagueStatus, getLeagueRules, LeagueRulesMap, getWeeklyPointSummary, WeeklyPointSummary } from '@/app/api/leagueApi';
+import { LeagueRankingData, WeeklyPointSummary } from '@/domains/league/types';
+import {
+  getLeagueStatus,
+  getLeagueRules,
+  LeagueRulesMap,
+  getWeeklyPointSummary,
+} from '@/api/leagueApi';
 
 // 리그 변화 추이 데이터
-export const useLeagueProgress = (): { data: LeagueProgressData[]; isLoading: boolean } => {
+export const useLeagueProgress = (options?: {
+  skip?: boolean;
+}): { data: LeagueProgressData[]; isLoading: boolean } => {
   const [data, setData] = useState<LeagueProgressData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (options?.skip) {
+      setIsLoading(false);
+      return;
+    }
     const fetchData = async () => {
       try {
-        const result = await import('@/app/api/leagueApi').then(m => m.getLeagueProgress());
+        const result = await import('@/api/leagueApi').then((m) => m.getLeagueProgress());
         setData(result);
       } catch (error) {
         console.error('Failed to fetch league progress:', error);
@@ -37,14 +49,17 @@ export const useLeagueProgress = (): { data: LeagueProgressData[]; isLoading: bo
 };
 
 // 활동 스트릭 데이터
-export const useActivityStreak = (): { data: ActivityStreakData[]; isLoading: boolean } => {
+export const useActivityStreak = (
+  nickname?: string,
+): { data: ActivityStreakData[]; isLoading: boolean } => {
   const [data, setData] = useState<ActivityStreakData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/users/me/streak');
+        const endpoint = nickname ? `/api/users/${nickname}/streak` : '/api/users/me/streak';
+        const response = await fetch(endpoint);
         if (response.ok) {
           const json = await response.json();
           if (json.success && json.data) {
@@ -67,12 +82,21 @@ export const useActivityStreak = (): { data: ActivityStreakData[]; isLoading: bo
 };
 
 // 학습 타임라인 데이터
-export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading: boolean } => {
+export const useTimeline = (
+  date: string,
+  nickname?: string,
+  options?: { skip?: boolean },
+): { data: TimelineItemData[]; isLoading: boolean } => {
   const [data, setData] = useState<TimelineItemData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (options?.skip) {
+        setIsLoading(false);
+        return;
+      }
+
       if (!date) {
         setIsLoading(false);
         return;
@@ -80,7 +104,10 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
 
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/users/me/timeline?date=${date}`);
+        const endpoint = nickname
+          ? `/api/users/${nickname}/timeline?date=${date}`
+          : `/api/users/me/timeline?date=${date}`;
+        const response = await fetch(endpoint);
         if (response.ok) {
           const json = await response.json();
           if (json.success && json.data) {
@@ -103,7 +130,8 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
               memory: item.memory,
               executionTime: item.executionTime,
               result: item.result, // 제출 결과
-              submittedAt: item.submittedAt
+              isSuccess: item.isSuccess, // 성공 여부 매핑
+              submittedAt: item.submittedAt,
             }));
             setData(mappedData);
           } else {
@@ -118,19 +146,65 @@ export const useTimeline = (date: string): { data: TimelineItemData[]; isLoading
       }
     };
     fetchData();
-  }, [date]);
+  }, [date, nickname]);
 
   return { data, isLoading };
 };
 
-// AI 추천 문제 데이터
-export const useAIRecommendations = (): { data: AIRecommendationData[]; isLoading: boolean } => {
-  // TODO: API 연동 시 fetch/useSWR로 변경
-  return { data: MOCK_AI_RECOMMENDATIONS, isLoading: false };
+// AI 추천 문제 데이터 (토큰 인증 & 데이터 매핑 적용)
+export const useAIRecommendations = (options?: { skip?: boolean }): { data: AIRecommendationData[]; isLoading: boolean } => {
+  const [data, setData] = useState<AIRecommendationData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (options?.skip) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+
+        // apiFetch를 사용하면 Authorization 헤더가 자동으로 붙습니다.
+        const response = await apiFetch<any[]>('/api/recommendations/daily');
+
+        if (response.success && response.data) {
+          const list = response.data;
+
+          const mappedData: AIRecommendationData[] = list.map((item: any) => ({
+            problemId: `#${item.id}`,
+            title: item.title,
+            tier: item.tierType ? item.tierType.toLowerCase() : 'bronze',
+            tierLevel: item.tierLevel || 1,
+            tags: item.tags || [],
+            reason: item.reason || 'AI 추천 문제',
+          }));
+
+          setData(mappedData);
+        } else {
+          console.warn('AI Recommendation API failed:', response.error);
+          setData(MOCK_AI_RECOMMENDATIONS);
+        }
+      } catch (e) {
+        console.error('Failed to fetch AI recommendations:', e);
+        setData(MOCK_AI_RECOMMENDATIONS);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [options?.skip]);
+
+  return { data, isLoading };
 };
 
 // 주간 점수 데이터
-export const useWeeklyScore = (date?: string): { data: WeeklyPointSummary | null; isLoading: boolean } => {
+export const useWeeklyScore = (
+  date?: string,
+  options?: { skip?: boolean },
+): { data: WeeklyPointSummary | null; isLoading: boolean } => {
   const [data, setData] = useState<WeeklyPointSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -156,11 +230,18 @@ export const useWeeklyScore = (date?: string): { data: WeeklyPointSummary | null
 };
 
 // 리그 순위 데이터
-export const useLeagueRanking = (refreshInterval = 30000): { data: LeagueRankingData; isLoading: boolean } => {
+export const useLeagueRanking = (
+  refreshInterval = 30000,
+  options?: { skip?: boolean },
+): { data: LeagueRankingData; isLoading: boolean } => {
   const [data, setData] = useState<LeagueRankingData>(DEFAULT_LEAGUE_RANKING);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (options?.skip) {
+      setIsLoading(false);
+      return;
+    }
     const fetchData = async (isPoll = false) => {
       try {
         const result = await getLeagueStatus();

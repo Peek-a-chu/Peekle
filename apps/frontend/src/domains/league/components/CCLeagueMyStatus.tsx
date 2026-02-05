@@ -5,6 +5,7 @@ import { Trophy, Clock } from 'lucide-react';
 import LeagueIcon, { LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { useLeagueRanking, useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
 import LeagueRuleModal from './LeagueRuleModal';
+import { LeagueRankingData, WeeklyPointSummary } from '@/domains/league/types';
 
 // UTC 기준 매주 화요일 21:00 (한국시간 수요일 06:00) 계산
 const getNextTuesday2100UTC = () => {
@@ -94,9 +95,17 @@ const LeagueTimer = ({ targetDate }: { targetDate: Date }) => {
   );
 };
 
-const CCLeagueMyStatus = () => {
-  const { data: rankingData } = useLeagueRanking();
-  const { data: weeklyData } = useWeeklyScore();
+interface CCLeagueMyStatusProps {
+  initialLeagueRanking?: LeagueRankingData;
+  initialWeeklyScore?: WeeklyPointSummary | null;
+}
+
+const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeagueMyStatusProps) => {
+  const { data: fetchedRanking } = useLeagueRanking(30000, { skip: !!initialLeagueRanking });
+  const { data: fetchedWeekly } = useWeeklyScore(undefined, { skip: !!initialWeeklyScore });
+
+  const rankingData = initialLeagueRanking || fetchedRanking;
+  const weeklyData = initialWeeklyScore || fetchedWeekly;
 
   // 실제 데이터 사용
   const myRank = rankingData.myRank;

@@ -221,7 +221,9 @@ function SolvedByList({
 
   return (
     <div className="mt-2 flex items-center gap-2">
-      <div className="flex -space-x-1.5">{solvedBy.slice(0, 5).map((s) => renderUserIcon(s.id))}</div>
+      <div className="flex -space-x-1.5">
+        {solvedBy.slice(0, 5).map((s) => renderUserIcon(s.id))}
+      </div>
       {solvedBy.length > 5 && (
         <span className="text-[10px] text-muted-foreground">+{solvedBy.length - 5}</span>
       )}

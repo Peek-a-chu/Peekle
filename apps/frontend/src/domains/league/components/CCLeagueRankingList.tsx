@@ -50,8 +50,19 @@ const getLeaguePeriodString = () => {
   return `${formatDate(startDate)} 06:00 ~ ${formatDate(targetDate)} 06:00`;
 };
 
-const CCLeagueRankingList = () => {
-  const { data, isLoading } = useLeagueRanking();
+import { LeagueRankingData } from '@/domains/league/types';
+
+interface CCLeagueRankingListProps {
+  initialData?: LeagueRankingData;
+}
+
+const CCLeagueRankingList = ({ initialData }: CCLeagueRankingListProps) => {
+  const { data: fetchedData, isLoading: isFetching } = useLeagueRanking(30000, {
+    skip: !!initialData,
+  });
+
+  const data = initialData || fetchedData;
+  const isLoading = initialData ? false : isFetching;
 
   if (isLoading) {
     return (

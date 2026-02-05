@@ -24,14 +24,14 @@ These files contain **mandatory patterns and conventions** that MUST be followed
 ```
 apps/frontend/     # Next.js 15 + TypeScript (pnpm)
 apps/backend/      # Spring Boot 3.4 + Java 21 (Gradle)
-docker/            # Redis, Coturn, OpenVidu services
+docker/            # Redis, Coturn, LiveKit services
 docs/spec/         # PRD, architecture, API specs, story docs
 ```
 
 ### Tech Stack
 - **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind, Shadcn/UI, TanStack Query, Zustand
 - **Backend**: Spring Boot 3.4, MySQL 8.0, Redis 7.x, Spring Security + OAuth2 + JWT
-- **Real-time**: STOMP WebSocket (chat/signaling), OpenVidu (WebRTC media)
+- **Real-time**: STOMP WebSocket (chat/signaling), LiveKit (WebRTC media)
 - **Package Managers**: pnpm 10.28.1 (frontend), Gradle 8.x (backend)
 
 ### Data Flow Pattern
@@ -62,10 +62,10 @@ pnpm type-check           # TypeScript validation
 
 ### Infrastructure (from project root)
 ```bash
-make webrtc-up            # Start Coturn + OpenVidu
+make webrtc-up            # Start Coturn + LiveKit
 make webrtc-down          # Stop WebRTC services
 make coturn-logs          # View Coturn logs
-make openvidu-logs        # View OpenVidu logs
+make livekit-logs         # View LiveKit logs
 ```
 
 ---
@@ -172,9 +172,9 @@ import SearchSVG from '@/assets/icons/search.svg';
 ## 🔌 Key Integration Points
 
 ### WebRTC Flow (Study/Game Rooms)
-1. Frontend requests session: `POST /api/sessions` → Backend proxies to OpenVidu → returns `sessionId`
+1. Frontend requests session: `POST /api/sessions` → Backend proxies to LiveKit → returns `sessionId`
 2. Frontend requests token: `POST /api/sessions/{id}/connections` → Backend returns `token`
-3. Frontend connects to OpenVidu media server using token
+3. Frontend connects to LiveKit media server using token
 
 ### Extension Handshake (Chrome Extension ↔ Web App)
 Uses `window.postMessage` for security:
@@ -248,7 +248,7 @@ All APIs return standardized format:
 
 ### Infrastructure
 - `docker/coturn/turnserver.conf` - TURN server config (WebRTC NAT traversal)
-- `docker/openvidu/docker-compose.yml` - Media server setup
+- `docker/livekit/docker-compose.yaml` - Media server setup
 - `Makefile` - WebRTC infrastructure management commands
 
 ---
@@ -259,7 +259,7 @@ All APIs return standardized format:
 2. **Naming conventions**: Reference `.github/instructions/toss-frontend-rule.instructions.md`
 3. **API changes**: Update `docs/spec/api-spec.md` and backend contracts simultaneously
 4. **New features**: Check `docs/spec/epics/` for story acceptance criteria and dependencies
-5. **WebRTC issues**: Verify Coturn/OpenVidu are running (`make webrtc-up`), check logs
+5. **WebRTC issues**: Verify Coturn/LiveKit are running (`make webrtc-up`), check logs
 6. **State management**: Use TanStack Query for server data, Zustand for local UI state only
 7. **Form validation**: Choose field-level (independent) or form-level (Zod schema) based on interdependencies
 8. **Component organization**: Start in `Domains/{Feature}/`, promote to `Components/` only when reused

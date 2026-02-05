@@ -10,6 +10,7 @@ interface Props {
   checkInstallation: () => void;
   status: ExtensionStatus;
   isLoading: boolean;
+  onRegisterBojId?: () => void;
 }
 
 interface TokenResponse {
@@ -19,13 +20,24 @@ interface TokenResponse {
   };
 }
 
-export function CCExtensionGuide({ user, checkInstallation, extensionToken, status, isLoading }: Props) {
+export function CCExtensionGuide({
+  user,
+  checkInstallation,
+  extensionToken,
+  status,
+  isLoading,
+  onRegisterBojId,
+}: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showManualGuide, setShowManualGuide] = useState(false);
 
   // Modal State
-  const [modal, setModal] = useState<{ isOpen: boolean; message: string; variant?: 'default' | 'destructive' }>({
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    message: string;
+    variant?: 'default' | 'destructive';
+  }>({
     isOpen: false,
     message: '',
     variant: 'default',
@@ -36,6 +48,7 @@ export function CCExtensionGuide({ user, checkInstallation, extensionToken, stat
     isOpen: false,
     regenerate: false,
   });
+  const [showBojNudge, setShowBojNudge] = useState(false);
 
   // 폴링을 위한 로컬 상태는 유지 (설치 감지용)
   const [isPolling, setIsPolling] = useState(false);
@@ -88,6 +101,12 @@ export function CCExtensionGuide({ user, checkInstallation, extensionToken, stat
 
   // 공통 연동 함수 (regenerate 옵션만 다르게)
   const handleLinkAccount = async (regenerate: boolean) => {
+    // BOJ 닉네임 등록 여부 확인
+    if (!user.bojId) {
+      setShowBojNudge(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/users/me/extension-token', {
@@ -329,119 +348,22 @@ export function CCExtensionGuide({ user, checkInstallation, extensionToken, stat
       <div className="mt-10 flex gap-3">
         {status === 'NOT_INSTALLED' && (
           <div className="flex flex-col gap-4 w-full items-center">
-
             <div className="flex gap-3">
               <button
-                onClick={() => setShowManualGuide(true)}
-                className="px-5 py-2.5 bg-muted text-foreground border border-border rounded-lg text-sm font-bold hover:bg-muted/80 flex items-center gap-2 shadow-sm"
-              >
-                🛠️ 수동 설치 가이드
-              </button>
-
-              <button
-                onClick={handleInstallClick}
+                onClick={() => {
+                  window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
+                  handleInstallClick();
+                }}
                 className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 shadow-sm"
               >
-                {isPolling ? '⏳ 확인 중...' : '🔄 설치 완료 후 확인하기'}
+                {isPolling ? '⏳ 확인 중...' : '📥 스토어에서 다운로드'}
               </button>
             </div>
-            {isPolling && <p className="text-xs text-muted-foreground animate-pulse">확장 프로그램이 설치되면 자동으로 감지합니다...</p>}
-          </div>
-        )}
-
-        {/* Manual Installation Modal */}
-        {showManualGuide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl border border-border flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
-              {/* Modal Header */}
-              <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
-                <div>
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    🛠️ 개발자 버전 수동 설치 가이드
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    스토어 배포 전, 임시로 사용할 수 있는 개발자 버전 설치 방법입니다.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowManualGuide(false)}
-                  className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 overflow-y-auto">
-                <ol className="space-y-6 text-sm text-foreground">
-                  <li className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-base">1</div>
-                    <div className="flex flex-col gap-2 flex-1">
-                      <p className="font-bold text-base">확장 프로그램 파일 다운로드</p>
-                      <p className="text-muted-foreground">아래 버튼을 눌러 설치 파일을 다운로드 받으세요.</p>
-                      <a
-                        href="https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip"
-                        className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 border border-blue-100 px-4 py-3 rounded-lg hover:bg-blue-100 transition-colors w-fit font-bold"
-                      >
-                        📥 peekle-extension.zip 다운로드
-                      </a>
-                    </div>
-                  </li>
-
-                  <li className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-base">2</div>
-                    <div className="flex-1">
-                      <p className="font-bold text-base">압축 해제</p>
-                      <p className="text-muted-foreground">다운로드 받은 <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-xs">zip</span> 파일의 압축을 풀어주세요.</p>
-                    </div>
-                  </li>
-
-                  <li className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-base">3</div>
-                    <div className="flex-1">
-                      <p className="font-bold text-base">확장 프로그램 관리 페이지 접속</p>
-                      <p className="text-muted-foreground mb-2">Chrome 주소창에 아래 주소를 입력하여 이동하세요.</p>
-                      <div
-                        className="bg-muted px-4 py-3 rounded-lg text-sm font-mono flex items-center justify-between cursor-pointer hover:bg-muted/80 group border border-border"
-                        onClick={() => {
-                          navigator.clipboard.writeText('chrome://extensions');
-                          setModal({ isOpen: true, message: '주소가 복사되었습니다!', variant: 'default' });
-                        }}
-                      >
-                        <span>chrome://extensions</span>
-                        <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">클릭하여 복사</span>
-                      </div>
-                    </div>
-                  </li>
-
-                  <li className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-base">4</div>
-                    <div className="flex-1">
-                      <p className="font-bold text-base">개발자 모드 활성화</p>
-                      <p className="text-muted-foreground">우측 상단의 <span className="font-bold text-foreground bg-yellow-100 dark:bg-yellow-900/30 px-1 py-0.5 rounded">개발자 모드</span> 토글 스위치를 켜주세요.</p>
-                    </div>
-                  </li>
-
-                  <li className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-base">5</div>
-                    <div className="flex-1">
-                      <p className="font-bold text-base">압축 해제된 확장 프로그램 로드</p>
-                      <p className="text-muted-foreground">좌측 상단의 <span className="font-bold text-foreground">"압축 해제된 확장 프로그램을 로드합니다"</span> 버튼을 클릭하고,<br />방금 압축을 푼 <span className="font-bold text-foreground">폴더</span>를 선택해주세요.</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="p-6 border-t border-border bg-muted/10 flex justify-end">
-                <button
-                  onClick={() => setShowManualGuide(false)}
-                  className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 transition-colors"
-                >
-                  닫기
-                </button>
-              </div>
-            </div>
+            {isPolling && (
+              <p className="text-xs text-muted-foreground animate-pulse">
+                확장 프로그램이 설치되면 자동으로 감지합니다...
+              </p>
+            )}
           </div>
         )}
 
@@ -510,6 +432,27 @@ export function CCExtensionGuide({ user, checkInstallation, extensionToken, stat
         variant={modal.variant}
       />
 
+      <ActionModal
+        isOpen={showBojNudge}
+        onClose={() => setShowBojNudge(false)}
+        onConfirm={() => {
+          setShowBojNudge(false);
+          onRegisterBojId?.();
+        }}
+        title="BOJ 닉네임 등록 필요"
+        description={
+          <>
+            확장 프로그램을 연동하려면 먼저 <strong>백준(BOJ) 닉네임</strong>을 등록해야 합니다.
+            <br />
+            <br />
+            프로필 수정 화면에서 닉네임을 등록하고 다시 시도해주세요.
+          </>
+        }
+        confirmText="등록하러 가기"
+        cancelText="나중에"
+        variant="default"
+      />
+
       {/* Confirmation Modal for Token Regeneration */}
       <ActionModal
         isOpen={confirmModal.isOpen}
@@ -519,12 +462,14 @@ export function CCExtensionGuide({ user, checkInstallation, extensionToken, stat
           void handleLinkAccount(confirmModal.regenerate);
         }}
         title="토큰 재발급"
-        description={<>
-          토큰을 재발급하시겠습니까?
-          <br />
-          <br />
-          기존에 연동된 기기에서는 로그아웃 처리됩니다.
-        </>}
+        description={
+          <>
+            토큰을 재발급하시겠습니까?
+            <br />
+            <br />
+            기존에 연동된 기기에서는 로그아웃 처리됩니다.
+          </>
+        }
         confirmText="재발급"
         cancelText="취소"
         variant="destructive"

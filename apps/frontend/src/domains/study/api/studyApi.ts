@@ -23,7 +23,6 @@ export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
   return roomData.members.map((m: any) => ({
     ...m,
     id: m.userId, // Map userId to id for Store
-    odUid: m.odUid, // Real OpenVidu UID from server
     // Use role from JSON or fallback to ownerId check
     isOwner: m.role === 'OWNER' || (ownerId && m.userId === ownerId),
     isMuted: false,

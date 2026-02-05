@@ -133,7 +133,12 @@ public class LeagueService {
         int totalEarnedPoints = 0;
 
         // 1. 문제 풀이 기본 점수 (최초 1회)
-        long successCount = submissionLogRepository.countByUserIdAndProblemId(user.getId(), problem.getId());
+        // 기존: long successCount =
+        // submissionLogRepository.countByUserIdAndProblemId(user.getId(),
+        // problem.getId());
+        // 변경: 성공한 제출만 카운트 (실패 후 성공 시에도 1이 되어야 함)
+        long successCount = submissionLogRepository.countByUserIdAndProblemIdAndIsSuccessTrue(user.getId(),
+                problem.getId());
 
         if (successCount == 1) {
             int problemPoints = calculateProblemPoint(problem.getTier());
@@ -181,10 +186,10 @@ public class LeagueService {
 
     public int getUserRank(User user) {
         if (user.getLeagueGroupId() != null) {
-            return (int) userRepository.countByLeagueGroupIdAndLeaguePointGreaterThan(
-                    user.getLeagueGroupId(), user.getLeaguePoint()) + 1;
+            return (int) userRepository.countRankByLeagueGroupId(
+                    user.getLeagueGroupId(), user.getLeaguePoint(), user.getUpdatedAt()) + 1;
         } else {
-            return (int) userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
+            return (int) userRepository.countRankGlobal(user.getLeaguePoint(), user.getUpdatedAt()) + 1;
         }
     }
 
@@ -244,11 +249,12 @@ public class LeagueService {
 
         if (user.getLeagueGroupId() != null) {
             // 리그 그룹이 배정된 경우 해당 그룹 내 랭킹 조회
-            groupUsers = userRepository.findTop100ByLeagueGroupIdOrderByLeaguePointDesc(user.getLeagueGroupId());
+            groupUsers = userRepository
+                    .findTop100ByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(user.getLeagueGroupId());
             totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
         } else {
             // 그룹이 없는 경우(배치고사 전 등) 임시로 같은 티어 전체 조회 (Top 10)
-            groupUsers = userRepository.findTop100ByLeagueOrderByLeaguePointDesc(user.getLeague());
+            groupUsers = userRepository.findTop100ByLeagueOrderByLeaguePointDescUpdatedAtAsc(user.getLeague());
             totalGroupMembers = (int) userRepository.countByLeague(user.getLeague());
         }
 
@@ -270,12 +276,23 @@ public class LeagueService {
         List<LeagueRankingMemberDto> members = new ArrayList<>();
         int currentRank = 1;
         for (User u : groupUsers) {
-            LeagueStatus status = LeagueStatus.STAY;
+            LeagueStatus status;
 
-            if (currentRank <= promoteCount) {
-                status = LeagueStatus.PROMOTE;
-            } else if (currentRank > (totalGroupMembers - demoteCount)) {
-                status = LeagueStatus.DEMOTE;
+            // 0점인 경우 순위와 상관없이 승급 불가 (STAY 혹은 DEMOTE만 가능)
+            if (u.getLeaguePoint() <= 0) {
+                if (currentRank > (totalGroupMembers - demoteCount)) {
+                    status = LeagueStatus.DEMOTE;
+                } else {
+                    status = LeagueStatus.STAY;
+                }
+            } else {
+                if (currentRank <= promoteCount) {
+                    status = LeagueStatus.PROMOTE;
+                } else if (currentRank > (totalGroupMembers - demoteCount)) {
+                    status = LeagueStatus.DEMOTE;
+                } else {
+                    status = LeagueStatus.STAY;
+                }
             }
 
             members.add(LeagueRankingMemberDto.builder()
@@ -437,8 +454,8 @@ public class LeagueService {
                 .findBySeasonWeek(currentSeasonWeek);
 
         for (com.peekle.domain.league.entity.LeagueGroup group : groups) {
-            // 그룹 내 모든 유저를 점수 기준으로 정렬
-            List<User> users = userRepository.findByLeagueGroupIdOrderByLeaguePointDesc(group.getId());
+            // 그룹 내 모든 유저를 점수 기준(동점시 업데이트순)으로 정렬
+            List<User> users = userRepository.findByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(group.getId());
             int groupSize = users.size();
 
             // 3명 이하 그룹은 스킵 (다음 주 재배정 대기)
@@ -456,8 +473,8 @@ public class LeagueService {
                 User user = users.get(i);
                 int rank = i + 1;
 
-                // 승급/강등/유지 판정
-                String result = determineSeasonResult(rank, users.size(), user.getLeague());
+                // 승급/강등/유지 판정 (현재 점수 포함)
+                String result = determineSeasonResult(rank, users.size(), user.getLeague(), user.getLeaguePoint());
 
                 // 히스토리 저장
                 LeagueHistory history = LeagueHistory
@@ -556,8 +573,8 @@ public class LeagueService {
      * - 7-9명: 상위 2명 승급, 하위 2명 강등
      * - 10명 이상: 30% 승급/강등
      */
-    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier) {
-        // 안전 장치: 3명 이하는 변동 없음
+    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier, int userPoint) {
+        // 안전 장치: 3명 이하는 변동 없음, 혹은 0점인 경우 승급 불가
         if (totalUsers <= 3) {
             return "MAINTAINED";
         }
@@ -582,8 +599,8 @@ public class LeagueService {
             demoteCount = Math.min(demoteCount, totalUsers - promoteCount - 1);
         }
 
-        // 상위 promoteCount명: 승급 (단, 최상위 티어는 제외)
-        if (rank <= promoteCount && currentTier != LeagueTier.RUBY) {
+        // 상위 promoteCount명: 승급 (단, 최상위 티어 제외 및 점수가 0점보다 커야 함)
+        if (userPoint > 0 && rank <= promoteCount && currentTier != LeagueTier.RUBY) {
             return "PROMOTED";
         }
 
@@ -673,8 +690,8 @@ public class LeagueService {
 
         if (user.getLeagueGroupId() != null) {
             // 그룹 내 순위 계산
-            groupRank = (int) userRepository.countByLeagueGroupIdAndLeaguePointGreaterThan(
-                    user.getLeagueGroupId(), user.getLeaguePoint()) + 1;
+            groupRank = (int) userRepository.countRankByLeagueGroupId(
+                    user.getLeagueGroupId(), user.getLeaguePoint(), user.getUpdatedAt()) + 1;
 
             // 그룹 총 인원
             int totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
@@ -688,16 +705,18 @@ public class LeagueService {
                 int demoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getDemotePercent() / 100.0));
                 demoteCount = Math.min(demoteCount, totalGroupMembers - promoteCount - 1);
 
-                // 상태 결정
-                if (groupRank <= promoteCount) {
+                // 상태 결정 (0점 초과여야 승급 가능)
+                if (user.getLeaguePoint() > 0 && groupRank <= promoteCount) {
                     leagueStatus = LeagueStatus.PROMOTE;
                 } else if (groupRank > (totalGroupMembers - demoteCount)) {
                     leagueStatus = LeagueStatus.DEMOTE;
+                } else {
+                    leagueStatus = LeagueStatus.STAY;
                 }
 
                 // 점수 차이 계산을 위해 그룹 유저 조회
                 List<User> groupUsers = userRepository
-                        .findTop100ByLeagueGroupIdOrderByLeaguePointDesc(user.getLeagueGroupId());
+                        .findTop100ByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(user.getLeagueGroupId());
 
                 // 승급권/유지권 분류
                 List<User> promoters = new ArrayList<>();

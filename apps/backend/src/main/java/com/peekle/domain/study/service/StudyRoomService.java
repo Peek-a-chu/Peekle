@@ -4,11 +4,7 @@ import com.peekle.domain.study.aop.CheckStudyOwner;
 import com.peekle.domain.study.dto.http.request.StudyRoomCreateRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
-import com.peekle.domain.study.dto.http.response.StudyInviteCodeResponse;
-import com.peekle.domain.study.dto.http.response.StudyMemberResponse;
-import com.peekle.domain.study.dto.http.response.StudyRoomCreateResponse;
-import com.peekle.domain.study.dto.http.response.StudyRoomListResponse;
-import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
+import com.peekle.domain.study.dto.http.response.*;
 import com.peekle.domain.study.entity.StudyMember;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
@@ -24,13 +20,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Collections;
-import java.util.Map;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,7 +38,7 @@ public class StudyRoomService {
         private final StudyRoomRepository studyRoomRepository;
         private final StudyMemberRepository studyMemberRepository;
         private final InviteCodeService inviteCodeService;
-        private final RedisTemplate<String, String> redisTemplate;
+        private final StringRedisTemplate redisTemplate;
         private final UserRepository userRepository;
         private final SubmissionService submissionService;
 
@@ -155,11 +150,6 @@ public class StudyRoomService {
                 // 3. 이미 참여 중인지 확인
                 if (studyMemberRepository.existsByStudyAndUser_Id(studyRoom, userId)) {
                         throw new BusinessException(ErrorCode.ALREADY_JOINED_STUDY);
-                }
-
-                // 4. (New) 다른 스터디 참여 중인지 확인
-                if (studyMemberRepository.existsByUser_Id(userId)) {
-                        throw new BusinessException(ErrorCode.ALREADY_PARTICIPATING_IN_OTHER_STUDY);
                 }
 
                 User user = userRepository.findById(userId)
@@ -281,7 +271,6 @@ public class StudyRoomService {
         private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom, Long currentUserId) {
                 // 1. 전체 멤버 조회
                 List<StudyMember> members = studyMemberRepository.findAllByStudy(studyRoom);
-
 
                 // 2. Redis Presence 조회
                 String onlineUsersKey = "study:" + studyRoom.getId() + ":online_users";

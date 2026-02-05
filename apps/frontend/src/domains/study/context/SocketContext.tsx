@@ -3,13 +3,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { useAuthStore } from '@/store/auth-store';
 
 interface SocketContextType {
   client: Client | null;
   connected: boolean;
 }
 
-const SocketContext = createContext<SocketContextType>({
+export const SocketContext = createContext<SocketContextType>({
   client: null,
   connected: false,
 });
@@ -23,6 +24,7 @@ interface SocketProviderProps {
 }
 
 export function SocketProvider({ children, roomId, userId }: SocketProviderProps) {
+  const accessToken = useAuthStore((state) => state.accessToken);
   const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
   const clientRef = React.useRef<Client | null>(null);
@@ -55,18 +57,16 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
         return;
       }
 
-      // 백엔드 SockJS 엔드포인트 (http 프로토콜 사용)
-      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      // 백엔드 SockJS 엔드포인트
+      // Nginx를 사용하는 HTTPS 환경에서는 https://로 시작하는 URL이 주입됩니다.
+      // NEXT_PUBLIC_SOCKET_URL은 도메인 루트(https://...)를 가리켜야 합니다.
+      const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://localhost';
 
-      // 로컬 개발 환경에서 https로 설정된 경우 http로 강제 변환 (SSL 연결 오류 방지)
-      if (
-        baseUrl.startsWith('https://') &&
-        (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))
-      ) {
-        baseUrl = baseUrl.replace('https://', 'http://');
-      }
-
+      // sockjs-client는 상대경로(/ws-stomp) 또는 절대경로(https://...) 모두 지원합니다.
+      // Nginx에서 /ws-stomp 경로를 백엔드로 라우팅하고 있으므로, /api/ws-stomp가 아닌 /ws-stomp를 사용해야 합니다.
+      // 따라서 NEXT_PUBLIC_API_URL(/api 포함) 대신 NEXT_PUBLIC_SOCKET_URL(도메인만)을 사용합니다.
       const socketUrl = `${baseUrl}/ws-stomp`;
+
       const connectKey = `${socketUrl}|${String(roomId)}|${String(userId)}`;
 
       // If we already have an active client for the same (url, roomId, userId), do nothing.
@@ -100,6 +100,7 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
         connectHeaders: {
           userId: String(userId),
           studyId: String(roomId),
+          Authorization: accessToken ? `Bearer ${accessToken}` : '',
         },
         debug: (str) => {
           if (process.env.NODE_ENV === 'development') {

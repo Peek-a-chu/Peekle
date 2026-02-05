@@ -72,7 +72,7 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
   };
 
   const displayTierName = formatLeagueName(displayLeague);
-  const displayScore = showInitial ? (initialScore || 0) : (myMember?.score || 0);
+  const displayScore = showInitial ? initialScore || 0 : myMember?.score || 0;
 
   // Rank/Status info (only available when loaded)
   const displayRank = !isLoading ? data.myRank : 0;

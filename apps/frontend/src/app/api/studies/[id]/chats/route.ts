@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       Cookie: request.headers.get('cookie') || '',
       'Content-Type': 'application/json',
     };
-    
+
     if (authHeader) {
       headers['Authorization'] = authHeader;
     }
@@ -23,11 +23,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // Content-Type 확인
     const contentType = res.headers.get('content-type') || '';
-    
+
     // HTML이 반환된 경우 (에러 페이지 등)
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      console.error(`[API Route] Non-JSON response from backend: ${contentType}`, text.slice(0, 200));
+      console.error(
+        `[API Route] Non-JSON response from backend: ${contentType}`,
+        text.slice(0, 200),
+      );
       return NextResponse.json(
         {
           success: false,

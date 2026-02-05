@@ -28,4 +28,3 @@ describe('whiteboard utils', () => {
     expect(WHITEBOARD_TEXT_PLACEHOLDER.length).toBeGreaterThan(0);
   });
 });
-

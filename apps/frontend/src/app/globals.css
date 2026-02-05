@@ -19,6 +19,7 @@ div[class*='monaco-editor-overlaymessage'],
   html {
     scrollbar-gutter: stable;
   }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -43,8 +44,16 @@ div[class*='monaco-editor-overlaymessage'],
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 32% 95%;
+
+    /* Border System - Slate-based for white backgrounds */
+    --border: 215 16% 47%;
+    /* Slate tone, opacity handled by classes */
+    --border-divider: 215 16% 47%;
+    /* Same base, lower opacity in usage */
+    --border-strong: 215 16% 47%;
+    /* Same base, higher opacity for focus */
     --input: 214.3 32% 95%;
+
     --ring: 327 73% 60%;
     --radius: 0.5rem;
 
@@ -56,25 +65,57 @@ div[class*='monaco-editor-overlaymessage'],
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 218 11% 65%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 218 11% 65%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 218 11% 65%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 75%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* 3-Level Surface System - Maximum brightness separation for borderless design */
+    --background: 217 50% 5%;
+    /* #070B14 - Page base (darkest) */
+    --card: 220 45% 10%;
+    /* #121829 - Large cards */
+    --surface-2: 220 48% 20%;
+    /* #293B5C - Nested panels (wide gap from card) */
+    --surface-3: 220 46% 26%;
+    /* #364C6E - Hover/active (most distinct) */
 
+    /* Text Hierarchy - 3 Levels */
+    --foreground: 0 0% 92%;
+    /* Primary text (brightest) */
+    --card-foreground: 0 0% 92%;
+    --popover-foreground: 0 0% 92%;
+    --muted-foreground: 0 0% 68%;
+    /* Labels (medium) */
+    --text-faint: 0 0% 48%;
+    /* Helper text (dimmest) */
+
+    /* Border System - Gray base (opacity in components) */
+    --border: 0 0% 60%;
+    /* Medium gray */
+    --border-strong: 0 0% 70%;
+    /* Lighter gray for focus */
+    --input: 220 48% 20%;
+    /* Same as surface-2 for inputs */
+
+    /* Primary color is user-selected theme (keep dynamic) */
+    --primary-foreground: 210 40% 98%;
+
+    /* Secondary/Muted uses surface-2 */
+    --secondary: 220 48% 20%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 220 48% 20%;
+
+    /* Accent uses surface-3 for subtle highlights */
+    --accent: 220 46% 26%;
+    --accent-foreground: 210 40% 98%;
+
+    /* Destructive */
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Popover uses card surface */
+    --popover: 220 45% 10%;
+
+    /* Ring uses subtle white */
+    --ring: 0 0% 84%;
+
+    /* Semantic Status Colors */
     --success: 142 71% 45%;
     --success-foreground: 142 71% 95%;
     --warning: 38 92% 50%;
@@ -84,7 +125,11 @@ div[class*='monaco-editor-overlaymessage'],
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-offset-2;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
   }
 
   body {
@@ -124,15 +169,18 @@ div[class*='monaco-editor-overlaymessage'],
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.2);
+  background: hsl(var(--foreground) / 0.1);
+  /* More subtle, theme-aware */
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: hsl(var(--foreground) / 0.2);
+  /* Slightly more visible on hover */
 }
 
 @layer components {
+
   /* Common Markdown Styles */
   .markdown-prose {
     @apply text-sm leading-relaxed break-words;
@@ -209,5 +257,36 @@ div[class*='monaco-editor-overlaymessage'],
 
   .markdown-prose-invert pre {
     @apply bg-black/20 border border-white/10;
+  }
+}
+
+@layer utilities {
+  @keyframes bounce-subtle {
+
+    0%,
+    100% {
+      transform: translateY(0);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+
+    50% {
+      transform: translateY(-4px);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
+
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s infinite;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 }

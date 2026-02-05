@@ -26,9 +26,10 @@ spring:
   flyway:
     enabled: false # 개발용: Flyway 비활성화
 
-# OpenVidu 설정 (로컬 실행 시 localhost 사용)
-OPENVIDU_URL: http://localhost:8443
-OPENVIDU_SECRET: ${OPENVIDU_SECRET:MY_SECRET}
+livekit:
+  url: ${LIVEKIT_URL:http://localhost:7880} # 환경변수 없으면 로컬호스트 사용
+  api-key: ${LIVEKIT_API_KEY:devkey}
+  api-secret: ${LIVEKIT_API_SECRET:peekle_livekit_secret_at_least_32_chars_long}
 
 springwolf:
   docket:

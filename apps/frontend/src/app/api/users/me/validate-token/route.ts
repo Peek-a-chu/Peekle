@@ -22,7 +22,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ token }),
     });
 
     if (!result.success) {

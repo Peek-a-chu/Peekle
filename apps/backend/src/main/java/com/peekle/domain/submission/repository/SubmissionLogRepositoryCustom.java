@@ -8,4 +8,8 @@ public interface SubmissionLogRepositoryCustom {
     // 유저별 최신 제출 내역 조회 (Pagination 지원)
     Page<SubmissionLog> findLatestSubmissionsByRoomIdAndProblemId(
             Long roomId, Long problemId, Pageable pageable);
+
+    // 필터링 조회
+    Page<SubmissionLog> findHistory(com.peekle.domain.submission.dto.SubmissionHistoryFilterDto filter,
+            Pageable pageable);
 }

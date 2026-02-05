@@ -129,7 +129,7 @@ public class StudyChatService {
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
 
-                    // 0페이지를 위해 최신순으로 뒤집기
+                    // 0페이지를 위해 최신순으로 뒤집기 (DESC)
                     Collections.reverse(fastList);
 
                     if (fastList.size() >= pageSize) {
@@ -141,6 +141,11 @@ public class StudyChatService {
 
         // 폴백 또는 이전 페이지: DB 조회
         Page<StudyChatLog> dbPage = studyChatRepository.findAllByStudyIdOrderByCreatedAtDesc(studyId, pageable);
-        return dbPage.map(ChatMessageResponse::from);
+        // DB는 이미 DESC 정렬
+        List<ChatMessageResponse> dbList = dbPage.getContent().stream()
+                .map(ChatMessageResponse::from)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(dbList, pageable, dbPage.getTotalElements());
     }
 }

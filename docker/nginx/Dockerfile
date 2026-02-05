@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
-# Install certbot and dependencies
-RUN apk add --no-cache certbot certbot-nginx openssl
+# Install certbot, acme.sh dependencies
+RUN apk add --no-cache certbot certbot-nginx openssl curl socat
 
 # Remove default config
 RUN rm /etc/nginx/conf.d/default.conf

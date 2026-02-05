@@ -16,7 +16,7 @@ export function CCWorkbookEmpty({
     <div
       className={cn(
         'flex flex-col items-center justify-center h-full text-muted-foreground gap-4',
-        className
+        className,
       )}
     >
       <BookOpen className="h-16 w-16 text-pink-200" strokeWidth={1} />

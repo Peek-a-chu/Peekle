@@ -44,17 +44,24 @@ public class DataInitConfig {
         @Bean
         public CommandLineRunner initData() {
                 return args -> {
-                        // Reset Sequence for H2
+                        // Reset Sequence for H2 dynamically based on existing data
                         try {
-                                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN id RESTART WITH 100");
-                                jdbcTemplate.execute("ALTER TABLE study_rooms ALTER COLUMN id RESTART WITH 100");
+                                Long maxUserId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM users", Long.class);
+                                if (maxUserId == null) maxUserId = 0L;
+                                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN id RESTART WITH " + (maxUserId + 1));
+
+                                Long maxRoomId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM study_rooms", Long.class);
+                                if (maxRoomId == null) maxRoomId = 0L;
+                                jdbcTemplate.execute("ALTER TABLE study_rooms ALTER COLUMN id RESTART WITH " + (maxRoomId + 1));
                         } catch (Exception e) {
-                                // Ignore if table/sequence doesn't exist or syntax error (failsafe)
+                                // Ignore if table doesn't exist yet or other issues
                                 System.out.println("Failed to reset H2 sequence: " + e.getMessage());
                         }
 
                         // 1. User Mock Data (20 members)
-                        if (userRepository.count() == 0) {
+                        // Using findBySocialIdAndProvider check instead of count() to be more robust
+                        // and removing the risky sequence reset which might cause collisions
+                        if (userRepository.findBySocialIdAndProvider("kakao_1", "KAKAO").isEmpty()) {
                                 User user1 = User.builder().nickname("AlgorithmKing").provider("KAKAO")
                                                 .socialId("kakao_1").bojId("boj_king")
                                                 .profileImg("https://api.dicebear.com/9.x/pixel-art/svg?seed=King")
@@ -372,27 +379,27 @@ public class DataInitConfig {
 
                                         SubmissionLog l1 = SubmissionLog.create(
                                                         targetUser, p1000, SourceType.EXTENSION, "A+B", "Bronze V",
-                                                        "1000", null, "맞았습니다",
+                                                        "1000", null, "맞았습니다", true,
                                                         "a, b = map(int, input().split())\\nprint(a+b)", 31120, 40,
                                                         "Python", LocalDateTime.now().minusDays(5));
 
                                         SubmissionLog l2 = SubmissionLog.create(
                                                         targetUser, p2557, SourceType.STUDY, "Hello World", "Bronze V",
-                                                        "2557", "알고리즘 스터디", "맞았습니다",
+                                                        "2557", "알고리즘 스터디", "맞았습니다", true,
                                                         "#include <iostream>\\nusing namespace std;\\nint main() { cout << \"Hello World!\"; return 0; }",
                                                         2020, 0, "C++", LocalDateTime.now().minusDays(3));
                                         l2.setRoomId(101L);
 
                                         SubmissionLog l3 = SubmissionLog.create(
                                                         targetUser, p1920, SourceType.GAME, "수 찾기", "Silver IV", "1920",
-                                                        "개인전", "맞았습니다",
+                                                        "개인전", "맞았습니다", true,
                                                         "import java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        // Solution...\\n    }\\n}",
                                                         128000, 1200, "Java", LocalDateTime.now().minusDays(1));
                                         l3.setRoomId(201L);
 
                                         SubmissionLog l4 = SubmissionLog.create(
                                                         targetUser, p1149, SourceType.GAME, "RGB거리", "Silver I", "1149",
-                                                        "팀전", "틀렸습니다",
+                                                        "팀전", "틀렸습니다", false,
                                                         "import java.io.*;\\n// Wrong Solution...", 14536, 120, "Java",
                                                         LocalDateTime.now().minusHours(1));
                                         l4.setRoomId(202L);
@@ -400,7 +407,7 @@ public class DataInitConfig {
                                         // Case 5: 개인 풀이 (EXTENSION)
                                         SubmissionLog l5 = SubmissionLog.create(
                                                         targetUser, p1920, SourceType.EXTENSION, "수 찾기", "Silver IV",
-                                                        "1920", null, "맞았습니다",
+                                                        "1920", null, "맞았습니다", true,
                                                         "// Personal Solution\\nimport java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        // ...\\n    }\\n}",
                                                         130000, 500, "Java", LocalDateTime.now().minusDays(2));
 

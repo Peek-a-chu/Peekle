@@ -7,6 +7,7 @@ export interface Problem {
   title: string;
   tier: string;
   tags: string[];
+  externalId: string;
 }
 
 export interface Workbook {
@@ -21,9 +22,8 @@ export interface User {
   userId: number;
   handle: string;
   tier: string;
-  profileImage?: string;
+  profileImg?: string;
   league: string;
-  score: number;
 }
 
 export interface SearchData {
@@ -91,16 +91,14 @@ export async function fetchSearchResults(params: SearchParams): Promise<SearchRe
   // Map backend response to frontend interface
   const searchResult = res.data;
   const innerData = searchResult.data || {};
-
   const rawUsers = innerData.users || [];
 
   const mappedUsers = rawUsers.map((user: any) => ({
     userId: user.userId,
     handle: user.nickname || user.handle, // Map nickname to handle
-    tier: user.tier,
-    profileImage: user.profileImg || user.profileImage, // Map profileImg to profileImage
+    tier: user.tier || user.league || 'Unranked', // Fallback to league for color coding
+    profileImg: user.profileImg || user.profileImage, // Map profileImg to profileImg
     league: user.league || user.tier || 'Unranked', // Use tier as league if league is missing
-    score: user.score || 0, // Default value
   }));
 
   const mappedData: SearchData = {

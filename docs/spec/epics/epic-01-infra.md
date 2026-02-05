@@ -63,7 +63,7 @@ Nginx 리버스 프록시를 통해 Frontend/Backend가 서비스되어야 한�
 **🛠 Implementation Tasks**
 [x] Frontend Dockerfile 작성 (Multi-stage build)
 [x] Backend Dockerfile 작성 (Spring Boot)
-[x] docker-compose.prod.yml 작성 (Nginx, Frontend, Backend, Redis, OpenVidu, Coturn)
+[x] docker-compose.prod.yml 작성 (Nginx, Frontend, Backend, Redis, LiveKit)
 [x] Nginx 설정 파일 및 Dockerfile 작성 (SSL 자동 생성 로직 포함)
 [x] `.gitlab-ci.yml` 작성 (lint -> build -> deploy stages)
 [x] GitLab CI/CD Variables 설정 (SSH_PRIVATE_KEY, EC2_HOST, EC2_USER)
@@ -88,26 +88,24 @@ Jenkins 빌드 성공/실패 시 상태와 링크가 포함된 메시지가 채�
 [ ] MatterMost 채널 생성 및 Webhook 설정
 [ ] Jenkins 파이프라인 `post { success/failure }` 블록에 알림 스크립트 추가
 
-### S2-5. WebRTC 인프라 (Coturn) (DevOps)
+### S2-5. WebRTC 인프라 (LiveKit) (DevOps)
 
 🧾User Story
 
-사용자로서, 내 비디오 트래픽을 릴레이할 TURN 서버가 필요하다.
-
-엄격한 방화벽 뒤에 있어도 스터디 룸에 연결할 수 있어야 하기 때문이다.
+사용자로서, 고품질의 실시간 화상 통신을 위해 WebRTC 서버가 필요하다.
+기존 LiveKit의 한계를 극복하고, 확장성 있는 SFU 아키텍처를 구축하기 위함이다.
 
 ✅ Acceptance Criteria
 
-Coturn 서버가 표준 STUN/TURN 포트에서 수신 대기해야 한다.
-
-WebRTC trickle 테스터로 테스트 시 유효한 Relay 후보를 반환해야 한다.
-
-OpenVidu 서버가 외부 Coturn 서버를 사용하도록 설정되어야 한다.
+LiveKit 서버가 표준 포트(7880, 7881, 7882 등)에서 수신 대기해야 한다.
+LiveKit이 외부 Coturn 서버(또는 내장 TURN)를 사용하여 NAT를 통과해야 한다.
+로컬 및 배포 환경에서 LiveKit 클라이언트 SDK로 접속이 성공해야 한다.
 
 **🛠 Implementation Tasks**
 [x] Coturn Docker 컨테이너 배포 및 `turnserver.conf` 설정
-[x] OpenVidu 설정 파일(`AWS_URL`, `COTURN_IP`) 업데이트
-[x] 연결 테스트 수행
+[ ] LiveKit Docker Compose 설정 (`livekit.yaml` 포함)
+[ ] LiveKit 서버 배포 및 Redis 연동
+[ ] LiveKit 연결 테스트 (Token 발급 및 미디어 송수신)
 
 ### S2-8. 성능 및 빌드 최적화 (Optimization)
 

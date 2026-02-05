@@ -874,18 +874,18 @@ window.addEventListener('message', async (event) => {
     // Handle Auto-Submission Request from Frontend
     if (event.data?.type === 'PEEKLE_SUBMIT_CODE') {
         console.log('[Peekle Content] Received PEEKLE_SUBMIT_CODE:', event.data);
-        const { problemId, code, language, studyId } = event.data.payload;
+        const { problemId, externalId, code, language, studyId } = event.data.payload;
         if (!problemId || !code) {
             console.error('[Peekle Content] Missing problemId or code');
             return;
         }
 
-        console.log(`[Peekle] Processing auto-submit for problem: ${problemId} ${studyId ? `(Study: ${studyId})` : ''}`);
+        console.log(`[Peekle] Processing auto-submit for problem: ${problemId} (${externalId}) ${studyId ? `(Study: ${studyId})` : ''}`);
 
         // Send to background to save (bypasses direct storage permission issues on localhost)
         chrome.runtime.sendMessage({
             type: 'SAVE_PENDING_SUBMISSION',
-            payload: { problemId, code, language, studyId }
+            payload: { problemId, externalId, code, language, studyId }
         }, (response) => {
             if (response && response.success) {
                 console.log('[Peekle] Storage saved via background, background will open tab.');

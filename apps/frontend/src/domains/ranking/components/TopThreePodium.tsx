@@ -4,6 +4,7 @@ import { Trophy, Medal, Award } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
+import { UserIcon } from '@/components/UserIcon';
 
 interface TopThreePodiumProps {
   rankings: RankResponse[];
@@ -18,15 +19,26 @@ const MemberIcons = ({
   limit?: number;
 }): React.ReactNode => (
   <div className="flex items-center justify-center -space-x-2">
-    {members.slice(0, limit).map((m) => (
-      <img
-        key={m.userId}
-        src={m.profileImg || `https://api.dicebear.com/9.x/pixel-art/svg?seed=${m.nickname}`}
-        alt={m.nickname}
-        className="h-6 w-6 rounded-full border-2 border-background bg-muted"
-        title={m.nickname}
-      />
-    ))}
+    {members.slice(0, limit).map((m) => {
+      const displayImg = m.profileImgThumb || m.profileImg;
+      return displayImg ? (
+        <img
+          key={m.userId}
+          src={encodeURI(displayImg)}
+          alt={m.nickname}
+          className="h-6 w-6 rounded-full border-2 border-background bg-muted"
+          title={m.nickname}
+        />
+      ) : (
+        <div
+          key={m.userId}
+          className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold text-slate-500"
+          title={m.nickname}
+        >
+          {m.nickname.charAt(0)}
+        </div>
+      );
+    })}
     {members.length > limit && (
       <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold">
         +{members.length - limit}

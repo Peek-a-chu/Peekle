@@ -4,35 +4,48 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
-import { TimelineItemData } from '../mocks/dashboardMocks';
 import { useTimeline } from '../hooks/useDashboardData';
+import { TimelineItemData, MOCK_TIMELINE } from '../mocks/dashboardMocks';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
   selectedDate: string | null;
   showHistoryLink?: boolean;
   nickname?: string;
+  initialData?: TimelineItemData[];
 }
 
-const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: LearningTimelineProps) => {
-  const { data } = useTimeline(selectedDate || '');
+const LearningTimeline = ({
+  selectedDate,
+  showHistoryLink = false,
+  nickname,
+  initialData,
+}: LearningTimelineProps) => {
+  const { data: fetchedData } = useTimeline(selectedDate || '', nickname, { skip: !!initialData });
+  const rawData = initialData || fetchedData;
+  // 데이터가 비어있을 경우 MOCK_TIMELINE을 사용하지 않도록 수정 (빈 배열 허용)
+  const data = rawData;
   const [expanded, setExpanded] = useState(false);
 
   // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
-  const groupedDataMap = data.reduce((acc, item) => {
-    if (!acc[item.problemId]) {
-      acc[item.problemId] = [];
-    }
-    acc[item.problemId].push(item);
-    return acc;
-  }, {} as Record<string, typeof data>);
+  const groupedDataMap = data.reduce(
+    (acc, item) => {
+      if (!acc[item.problemId]) {
+        acc[item.problemId] = [];
+      }
+      acc[item.problemId].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof data>,
+  );
 
   // 각 그룹 내에서 정답(AC)을 최우선으로, 그 다음 최신순으로 정렬
-  Object.keys(groupedDataMap).forEach(problemId => {
+  Object.keys(groupedDataMap).forEach((problemId) => {
     groupedDataMap[problemId].sort((a, b) => {
       // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
-      const aIsSuccess = a.result?.includes('맞았습니다') ?? false;
-      const bIsSuccess = b.result?.includes('맞았습니다') ?? false;
+      // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
+      const aIsSuccess = a.isSuccess ?? false;
+      const bIsSuccess = b.isSuccess ?? false;
 
       if (aIsSuccess !== bIsSuccess) {
         return bIsSuccess ? 1 : -1;
@@ -78,7 +91,10 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: L
         </div>
 
         {showHistoryLink && nickname && (
-          <Link href={`/profile/${nickname}/history`} className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1">
+          <Link
+            href={`/profile/${nickname}/history`}
+            className="ml-auto text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-muted flex items-center gap-1"
+          >
             <span className="text-xs font-medium">풀이 내역 조회</span>
             <ChevronRight className="w-5 h-5" />
           </Link>
@@ -87,13 +103,14 @@ const LearningTimeline = ({ selectedDate, showHistoryLink = false, nickname }: L
 
       <div className="flex gap-6 relative">
         {/* 타임라인 목록 */}
-        <div className="w-full divide-y divide-border transition-all duration-300">
+        <div className="w-full transition-all duration-300">
           {displayedKeys.length > 0 ? (
             displayedKeys.map((problemId) => (
               <TimelineItem
                 key={problemId}
                 items={groupedDataMap[problemId]}
                 onSelect={handleSelect}
+                isMe={showHistoryLink}
               />
             ))
           ) : (

@@ -37,7 +37,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         }, () => {
             // Open new tab
-            const targetUrl = `https://www.acmicpc.net/submit/${request.payload.problemId}`;
+            const bojId = request.payload.externalId || request.payload.problemId;
+            const targetUrl = `https://www.acmicpc.net/submit/${bojId}`;
             chrome.tabs.create({ url: targetUrl });
             sendResponse({ success: true });
         });
@@ -251,5 +252,37 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
                 }
             }
         });
+    }
+});
+
+// --- Auto-Injection on Install ---
+// 확장 프로그램 설치/업데이트 시 현재 열려 있는 탭(프론트엔드)에 content script 강제 주입
+chrome.runtime.onInstalled.addListener(async () => {
+    console.log('[Background] Extension Installed/Updated. Injecting content scripts...');
+
+    // 타겟 URL 패턴 (프론트엔드 도메인)
+    // manifest.json의 host_permissions에 해당 도메인이 있어야 함
+    const targetPattern = IS_LOCAL ? 'http://localhost:3000/*' : 'https://i14a408.p.ssafy.io/*';
+
+    try {
+        // 프론트엔드 탭 찾기
+        const tabs = await chrome.tabs.query({ url: targetPattern });
+
+        for (const tab of tabs) {
+            if (tab.id) {
+                console.log(`[Background] Injecting script into tab ${tab.id} (${tab.url})`);
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['content.js']
+                    });
+                } catch (e) {
+                    // 이미 주입되어 있거나 권한 문제 등 발생 시 무시
+                    console.warn(`[Background] Failed to inject into tab ${tab.id}:`, e);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Background] Error during auto-injection:', e);
     }
 });
