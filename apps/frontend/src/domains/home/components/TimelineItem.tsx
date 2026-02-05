@@ -42,7 +42,7 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
   const isMainSuccess = mainItem.result?.includes('맞았습니다') ?? false;
 
   return (
-    <div className="border border-border rounded-lg mb-2 overflow-hidden bg-card transition-all hover:border-primary/50">
+    <div className="border border-border/50 rounded-lg mb-2 overflow-hidden bg-card transition-all hover:border-primary/50">
       {/* 1. Accordion Header (Summary Line) */}
       <div
         className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -77,7 +77,7 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
 
         <div className="flex items-center gap-3">
           {/* 요약 배지 (최신 기록 기준) */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded border border-border">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded border border-border leading-tight">
             {hasMultiple && (
               <span className="font-bold text-primary mr-1 border-r border-border pr-2">
                 {items.length} submissions
@@ -108,7 +108,7 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
 
           {/* 확장 토글 아이콘 */}
           {hasMultiple ? (
-            <div className="p-1 text-muted-foreground">
+            <div className="p-1.5 text-muted-foreground flex items-center justify-center">
               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           ) : (
@@ -118,7 +118,10 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
                 e.stopPropagation();
                 if (isMe) onSelect(mainItem);
               }}
-              className={`p-1.5 transition-colors ${isMe ? 'text-muted-foreground hover:text-primary' : 'text-muted-foreground/30 cursor-not-allowed'}`}
+              className={`p-1.5 transition-colors rounded-md flex items-center justify-center ${isMe
+                ? 'text-muted-foreground hover:text-primary hover:bg-accent'
+                : 'text-muted-foreground/30 cursor-not-allowed'
+                }`}
               title={isMe ? '풀이 상세 보기' : '비공개'}
             >
               <FileText className="w-4 h-4" />

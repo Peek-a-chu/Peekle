@@ -23,6 +23,7 @@ export default function GamesPage(): React.ReactNode {
     handleModeSelect,
     handleRoomClick,
     handlePasswordSubmit,
+    handleCreateRoom,
     resetFilters,
   } = useGamePageLogic();
 
@@ -55,10 +56,7 @@ export default function GamesPage(): React.ReactNode {
       <GameCreationModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
-        onSubmit={(formData) => {
-          console.log('게임 생성 완료:', formData);
-          // TODO: 실제로는 생성된 방으로 이동
-        }}
+        onSubmit={handleCreateRoom}
       />
 
       {/* 비밀번호 입력 모달 */}

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Mic, MicOff, Video, VideoOff, Pencil, Settings } from 'lucide-react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLocalParticipant } from '@livekit/components-react';
 
 interface CCControlBarProps {
@@ -47,77 +48,101 @@ export function CCControlBar({
   };
 
   return (
-    <div
-      className={cn(
-        'relative flex items-center justify-center border-t border-border bg-card px-4 py-2',
-        className,
-      )}
-      data-tour="control-bar"
-    >
-      {/* Center Controls - Media */}
-      <div className="flex items-center gap-4">
-        {/* Mic Control */}
-        <Button
-          variant={isMuted ? 'destructive' : 'default'}
-          size="icon"
-          className={cn(
-            'h-12 w-12 rounded-full transition-colors',
-            isVideoOff
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90',
-          )}
-          onClick={handleMicToggle}
-          aria-label={isMuted ? '마이크 켜기' : '마이크 끄기'}
-        >
-          {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-        </Button>
+    <TooltipProvider>
+      <div
+        className={cn(
+          'relative flex items-center justify-center border-t border-border bg-card px-4 py-3',
+          className,
+        )}
+      >
+        {/* Center Controls - Media */}
+        <div className="flex items-center gap-4">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isMuted ? 'destructive' : 'ghost'}
+                size="icon"
+                className={cn(
+                  'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
+                  !isMuted && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                  isMuted && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                )}
+                onClick={handleMicToggle}
+              >
+                {isMuted ? (
+                  <MicOff className="h-6 w-6" strokeWidth={2.25} />
+                ) : (
+                  <Mic className="h-6 w-6" strokeWidth={2.25} />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{isMuted ? '마이크 켜기' : '마이크 끄기'}</p>
+            </TooltipContent>
+          </Tooltip>
 
-        {/* Video Control */}
-        <Button
-          variant="default"
-          size="icon"
-          className={cn(
-            'h-12 w-12 rounded-full transition-colors',
-            isVideoOff
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90',
-          )}
-          onClick={handleVideoToggle}
-          aria-label={isVideoOff ? '비디오 켜기' : '비디오 끄기'}
-        >
-          {isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
-        </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isVideoOff ? 'destructive' : 'ghost'}
+                size="icon"
+                className={cn(
+                  'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
+                  !isVideoOff && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                  isVideoOff && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                )}
+                onClick={handleVideoToggle}
+              >
+                {isVideoOff ? (
+                  <VideoOff className="h-6 w-6" strokeWidth={2.25} />
+                ) : (
+                  <Video className="h-6 w-6" strokeWidth={2.25} />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{isVideoOff ? '카메라 켜기' : '비디오 끄기'}</p>
+            </TooltipContent>
+          </Tooltip>
 
-        {/* Whiteboard Control */}
-        <Button
-          variant={isWhiteboardActive ? 'default' : 'ghost'}
-          size="icon"
-          className={cn(
-            'h-12 w-12 rounded-full transition-colors',
-            isWhiteboardActive
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-          )}
-          onClick={onWhiteboardToggle}
-          aria-label={isWhiteboardActive ? '화이트보드 끄기' : '화이트보드 켜기'}
-        >
-          <Pencil className="h-6 w-6" />
-        </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isWhiteboardActive ? 'default' : 'ghost'}
+                size="icon"
+                className={cn(
+                  'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
+                  isWhiteboardActive
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
+                )}
+                onClick={onWhiteboardToggle}
+              >
+                <Pencil className="h-6 w-6" strokeWidth={2.25} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{isWhiteboardActive ? '화이트보드 끄기' : '화이트보드 켜기'}</p>
+            </TooltipContent>
+          </Tooltip>
 
-        {/* Settings Control */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            'h-12 w-12 rounded-full transition-colors',
-            'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-          )}
-          onClick={handleSettingsClick}
-          aria-label="설정"
-        >
-          <Settings className="h-6 w-6" />
-        </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95"
+                onClick={handleSettingsClick}
+              >
+                <Settings className="h-5 w-5" strokeWidth={2.25} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>기기 설정</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

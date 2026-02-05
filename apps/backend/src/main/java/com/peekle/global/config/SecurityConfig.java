@@ -1,11 +1,11 @@
 package com.peekle.global.config;
 
-import com.peekle.global.auth.handler.OAuth2FailureHandler;
-import com.peekle.global.auth.handler.OAuth2SuccessHandler;
-import com.peekle.global.auth.jwt.JwtAuthenticationFilter;
-import com.peekle.global.auth.filter.ExtensionAuthenticationFilter;
-import com.peekle.global.auth.repository.HttpCookieOAuth2AuthorizationRequestRepository;
-import com.peekle.global.auth.service.CustomOAuth2UserService;
+import com.peekle.domain.auth.handler.OAuth2FailureHandler;
+import com.peekle.domain.auth.handler.OAuth2SuccessHandler;
+import com.peekle.domain.auth.jwt.JwtAuthenticationFilter;
+import com.peekle.domain.auth.filter.ExtensionAuthenticationFilter;
+import com.peekle.domain.auth.repository.HttpCookieOAuth2AuthorizationRequestRepository;
+import com.peekle.domain.auth.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -79,6 +79,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/workbooks/**").permitAll() // [TEST] 문제집 API
                                                 .requestMatchers("/api/dev/users/**").permitAll()
                                                 .requestMatchers("/api/ranks/**").permitAll()
+                                                .requestMatchers("/api/recommendations/**").permitAll()
 
                                                 // WebSocket
                                                 .requestMatchers("/ws-stomp/**").permitAll()

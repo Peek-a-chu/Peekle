@@ -156,7 +156,8 @@
 
 <body>
     <h3>
-        <span>Peekle <span class="brand-color">.</span> <span id="local-badge" style="display:none; font-size:10px; background:#ff4444; color:white; padding:2px 6px; border-radius:4px; vertical-align:middle; margin-left:4px;">LOCAL</span></span>
+        <span>Peekle <span class="brand-color">.</span> <span id="local-badge"
+                style="display:none; font-size:10px; background:#ff4444; color:white; padding:2px 6px; border-radius:4px; vertical-align:middle; margin-left:4px;">LOCAL</span></span>
         <button id="refresh-btn" style="background:none; border:none; cursor:pointer; font-size:14px;">🔄</button>
     </h3>
 
@@ -166,6 +167,7 @@
             <div>
                 <div class="nickname" id="nickname">연동 확인 중...</div>
                 <div style="font-size:12px; color:var(--primary); font-weight:600;" id="league-name">-</div>
+                <div id="boj-id" style="font-size:11px; color:var(--muted-foreground); margin-top: 2px;"></div>
             </div>
         </div>
 
@@ -177,6 +179,10 @@
             <div class="stat-item">
                 <div class="stat-label">현재 순위</div>
                 <div class="stat-value" id="user-rank">-</div>
+            </div>
+            <div class="stat-item" style="grid-column: 1 / -1;">
+                <div class="stat-label">현재 상태</div>
+                <div class="stat-value" id="context-status" style="font-size: 15px; color: var(--primary);">일반 모드</div>
             </div>
             <div class="stat-item" style="grid-column: 1 / -1;">
                 <div style="font-size: 11px; color: var(--muted-foreground); margin-bottom: 4px;">

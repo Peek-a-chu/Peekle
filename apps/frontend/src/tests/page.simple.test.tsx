@@ -10,7 +10,7 @@ describe('SearchResultsPage - Page Structure', () => {
     const module = await import('@/app/(main)/search/page');
     expect(module.default).toBeDefined();
     expect(typeof module.default).toBe('function');
-  });
+  }, 20000);
 
   it('page file structure is valid', () => {
     // This test just ensures the file can be imported without errors

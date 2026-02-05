@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   type ViewMode,
   type Participant,
@@ -57,131 +58,155 @@ export function CCIDEToolbar({
   const isViewingOther = viewMode !== 'ONLY_MINE';
 
   return (
-    <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
-      <div className="flex items-center gap-3">
-        {/* Language Select - Always Visible */}
-        <select
-          value={language}
-          onChange={(e) => onLanguageChange?.(e.target.value)}
-          disabled={disabled}
-          data-tour="ide-language"
-          className={cn(
-            'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring',
-            disabled && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          {LANGUAGES.map((lang) => (
-            <option key={lang.value} value={lang.value}>
-              {lang.label}
-            </option>
-          ))}
-        </select>
-
-        {/* View Mode Banner - Conditional (Next to Select) */}
-        {isViewingOther && (
-          <div
-            data-tour="ide-viewmode-banner"
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium animate-in fade-in slide-in-from-left-2 duration-300',
-              // Realtime: Pink Badge
-              isRealtime && 'bg-pink-100 text-pink-700',
-              // Saved: Blue/Indigo Badge (Green is usually for success, saved file feels more like Blue/Gray, but sticking to design request or standard)
-              isSaved && 'bg-indigo-100 text-indigo-700',
-            )}
-          >
-            {isRealtime ? <Eye className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-            <span>
-              {isRealtime
-                ? `${viewingUser?.nickname}의 코드 실시간 열람 중`
-                : `${targetSubmission?.username}${
-                    targetSubmission?.username === 'PS러버' ||
-                    targetSubmission?.username === 'CodeNinja'
-                      ? ' (Bot)'
-                      : ''
-                  }의 저장된 코드 열람 중`}
-            </span>
-            {isSaved && targetSubmission && (
-              <span className="text-xs opacity-75">
-                ({problemExternalId ? `${problemExternalId}. ` : ''}
-                {targetSubmission.problemTitle})
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        {/* Theme Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onThemeToggle}
-          title="테마 변경"
-          disabled={disabled}
-          data-tour="ide-theme-toggle"
-        >
-          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-        </Button>
-
-        {/* Copy */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onCopy}
-          title="코드 복사"
-          disabled={disabled}
-          data-tour="ide-copy"
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
-
-        {/* Code Reference - Always available if enabled */}
-        {showChatRef && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRefChat}
-            title="코드 참조 (채팅)"
+    <TooltipProvider>
+      <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
+        <div className="flex items-center gap-3">
+          {/* Language Select - Always Visible */}
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange?.(e.target.value)}
             disabled={disabled}
-            data-tour="ide-ref-chat"
-          >
-            <MessageSquare className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Standard Tools (Hidden when Viewing Other) */}
-        {!isViewingOther && (
-          <>
-            {/* Submit */}
-            {showSubmit && (
-              <Button
-                size="sm"
-                onClick={onSubmit}
-                className="gap-1 bg-[#EDF2F8] text-foreground hover:bg-[#DFE7F0]"
-                title="제출하기"
-                disabled={disabled}
-                data-tour="ide-submit"
-              >
-                <Send className="h-3 w-3" />
-                <span className="text-xs">제출</span>
-              </Button>
+            className={cn(
+              'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring text-strong font-medium',
+              disabled && 'opacity-50 cursor-not-allowed',
             )}
-          </>
-        )}
-
-        {/* View Only Mine Button (Visible only when Viewing Other) */}
-        {isViewingOther && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={onResetView}
-            className="ml-2 font-medium"
-            data-tour="ide-reset-view"
           >
-            내 코드만 보기
-          </Button>
-        )}
+            {LANGUAGES.map((lang) => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+
+          {/* View Mode Banner - Conditional (Next to Select) */}
+          {isViewingOther && (
+            <div
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold animate-in fade-in slide-in-from-left-2 duration-300 shadow-sm border',
+                // Realtime: Pink Badge
+                isRealtime && 'bg-pink-100/80 text-pink-700 border-pink-200',
+                // Saved: Indigo Badge
+                isSaved && 'bg-indigo-100/80 text-indigo-700 border-indigo-200',
+              )}
+            >
+              {isRealtime ? (
+                <Eye className="h-4 w-4 stroke-[2.5px]" />
+              ) : (
+                <Archive className="h-4 w-4 stroke-[2.5px]" />
+              )}
+              <span>
+                {isRealtime
+                  ? `${viewingUser?.nickname}의 코드 실시간 열람 중`
+                  : `${targetSubmission?.username}${
+                      targetSubmission?.username === 'PS러버' ||
+                      targetSubmission?.username === 'CodeNinja'
+                        ? ' (Bot)'
+                        : ''
+                    }의 저장된 코드 열람 중`}
+              </span>
+              {isSaved && targetSubmission && (
+                <span className="text-xs opacity-75 font-normal">
+                  ({problemExternalId ? `${problemExternalId}. ` : ''}
+                  {targetSubmission.problemTitle})
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onThemeToggle}
+                disabled={disabled}
+                className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+              >
+                {theme === 'light' ? (
+                  <Moon className="h-[22px] w-[22px] stroke-[2px]" />
+                ) : (
+                  <Sun className="h-[22px] w-[22px] stroke-[2px]" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>테마 변경</TooltipContent>
+          </Tooltip>
+
+          {/* Copy */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onCopy}
+                disabled={disabled}
+                className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+              >
+                <Copy className="h-[22px] w-[22px] stroke-[2px]" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              코드 복사 <span className="ml-1 opacity-60 text-xs">Ctrl+C</span>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Code Reference - Always available if enabled */}
+          {showChatRef && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onRefChat}
+                  disabled={disabled}
+                  className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                >
+                  <MessageSquare className="h-[22px] w-[22px] stroke-[2px]" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>코드 참조 (채팅)</TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Standard Tools (Hidden when Viewing Other) */}
+          {!isViewingOther && (
+            <>
+              {/* Submit */}
+              {showSubmit && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={onSubmit}
+                      disabled={disabled}
+                      className="ml-1 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-95 px-4 h-10 border border-primary-foreground/10"
+                    >
+                      <Send className="h-4 w-4 stroke-[2.5px]" />
+                      <span className="font-bold text-sm">제출</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>문제 제출하기</TooltipContent>
+                </Tooltip>
+              )}
+            </>
+          )}
+
+          {/* View Only Mine Button (Visible only when Viewing Other) */}
+          {isViewingOther && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onResetView}
+              className="ml-2 px-4 h-10 font-bold border border-border shadow-sm hover:scale-105 active:scale-95 transition-all"
+            >
+              내 코드만 보기
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

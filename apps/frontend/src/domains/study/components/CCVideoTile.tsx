@@ -69,8 +69,8 @@ export function CCVideoTile({
       </div>
 
       {!isAudioEnabled && (
-        <div className="absolute top-2 right-2 rounded-full bg-black/50 p-1">
-          <MicOff className="h-3 w-3 text-red-500" />
+        <div className="absolute top-2 right-2 rounded-full bg-red-500 p-1.5 shadow-lg border border-red-600 animate-in fade-in zoom-in duration-300">
+          <MicOff className="h-4 w-4 text-white stroke-[2.5px]" />
         </div>
       )}
     </div>

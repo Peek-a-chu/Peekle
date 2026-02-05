@@ -7,14 +7,15 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import { CCIDEPanel, CCIDEPanelRef } from '@/domains/study/components/CCIDEPanel';
 import { GameVideoGrid } from '@/domains/game/components/game-video-grid';
 import { GameIDEToolbar } from '@/domains/game/components/game-ide-toolbar';
-import { GamePlayParticipant } from '@/domains/game/mocks/mock-data';
+import { GamePlayParticipant } from '@/domains/game/types/game-types';
 
 interface GamePlayCenterPanelProps {
   code: string;
   language: string;
   participants: GamePlayParticipant[];
-  currentUserId: string;
+  currentUserId: number;
   selectedProblemUrl?: string;
+  externalId?: string; // Add externalId prop
   onCodeChange: (code: string) => void;
   onLanguageChange: (language: string) => void;
   onSubmit: () => void;
@@ -29,6 +30,7 @@ export function GamePlayCenterPanel({
   participants,
   currentUserId,
   selectedProblemUrl,
+  externalId,
   onCodeChange,
   onLanguageChange,
   onSubmit,
@@ -53,13 +55,28 @@ export function GamePlayCenterPanel({
   };
 
   const handleSubmit = () => {
-    // 코드 복사 먼저 수행 (사용자 편의)
+    // 1. 코드 복사 (사용자 편의)
     void idePanelRef.current?.handleCopy();
 
+    // 2. 게임 서버에 제출 알림
     onSubmit();
 
-    // 백준 제출 페이지로 이동 (/problem/ -> /submit/)
-    if (selectedProblemUrl) {
+    // 3. 확장 프로그램 자동 제출 요청
+    if (externalId) {
+      window.postMessage(
+        {
+          type: 'PEEKLE_SUBMIT_CODE',
+          payload: {
+            externalId: externalId,
+            code: code,
+            language: language,
+            sourceType: 'GAME',
+          },
+        },
+        '*',
+      );
+    } else if (selectedProblemUrl) {
+      // Fallback: URL에서 추출 시도 (구형 로직 대응용)
       let submitUrl = selectedProblemUrl;
       if (submitUrl.includes('/problem/')) {
         submitUrl = submitUrl.replace('/problem/', '/submit/');
@@ -129,6 +146,7 @@ export function GamePlayCenterPanel({
             onLanguageChange={onLanguageChange}
             onThemeChange={setTheme}
             onCodeChange={onCodeChange} // 코드 변경 시 상위 컴포넌트(problemCodes)에 저장
+            sourceType="GAME"
           />
         </div>
       </div>

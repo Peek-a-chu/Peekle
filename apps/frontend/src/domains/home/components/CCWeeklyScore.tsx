@@ -9,6 +9,7 @@ import {
   Award,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Calendar as CalendarIcon,
 } from 'lucide-react';
 import { WeeklyPointSummary } from '@/domains/league/types';
@@ -37,13 +38,6 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
     const d = new Date();
     return format(d, 'yyyy-MM-dd');
   });
-
-  // 2. externalDate가 변경되면 displayDate도 업데이트 (부모와의 동기화)
-  useEffect(() => {
-    if (externalDate) {
-      setDisplayDate(externalDate);
-    }
-  }, [externalDate]);
 
   // 3. API 호출은 displayDate 기준
   const { data: fetchedData, isLoading: networkLoading } = useWeeklyScore(displayDate);
@@ -87,8 +81,8 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
 
   // 날짜 범위 포맷팅
   const dateObj = new Date(displayDate);
-  const start = startOfWeek(dateObj, { locale: ko });
-  const end = endOfWeek(dateObj, { locale: ko });
+  const start = startOfWeek(dateObj, { weekStartsOn: 3 });
+  const end = endOfWeek(dateObj, { weekStartsOn: 3 });
   const dateRangeStr = `${format(start, 'M월 d일')} ~ ${format(end, 'M월 d일')}`;
 
   // 활동 아이콘 매핑
@@ -137,15 +131,15 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
       </div>
 
       {/* 기간 표시 & 내비게이션 */}
-      <div className="mb-4 flex items-center justify-center gap-2 flex-shrink-0">
+      <div className="mb-6 flex items-center justify-center gap-3 flex-shrink-0">
         <Button
           variant="ghost"
           size="icon"
           onClick={handlePrevWeek}
-          className="h-8 w-8 rounded-full hover:bg-accent"
+          className="h-9 w-9 rounded-full hover:bg-accent transition-all active:scale-95 border border-transparent hover:border-border"
           title="이전 주"
         >
-          <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          <ChevronLeft className="w-5 h-5 text-muted-foreground" />
         </Button>
 
         <Popover>
@@ -153,15 +147,16 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
             <Button
               variant="outline"
               className={cn(
-                "h-9 px-4 py-1 rounded-full border-border bg-muted/30 hover:bg-muted/50 text-foreground font-medium flex items-center gap-2",
+                "h-10 px-6 rounded-full border-border bg-muted/20 hover:bg-muted/40 text-foreground font-semibold flex items-center gap-2 transition-all shadow-sm",
                 !displayDate && "text-muted-foreground"
               )}
             >
-              <span>{dateRangeStr}</span>
-              <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground opacity-70" />
+              <CalendarIcon className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-sm">{dateRangeStr}</span>
+              <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="center">
+          <PopoverContent className="w-auto p-0" align="center" side="bottom" sideOffset={8}>
             <WeekCalendar
               selected={new Date(displayDate)}
               onSelect={handleDateSelect}
@@ -177,23 +172,29 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
           onClick={handleNextWeek}
           disabled={isNextWeekFuture()}
           className={cn(
-            "h-8 w-8 rounded-full",
-            isNextWeekFuture() ? "opacity-20" : "hover:bg-accent cursor-pointer"
+            "h-9 w-9 rounded-full transition-all active:scale-95 border border-transparent",
+            isNextWeekFuture()
+              ? "opacity-20 grayscale cursor-not-allowed"
+              : "hover:bg-accent hover:border-border cursor-pointer"
           )}
           title="다음 주"
         >
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </Button>
       </div>
 
       {/* 주간 총점 */}
-      <div className="bg-secondary/50 rounded-xl p-4 mb-4 text-center border border-border shadow-sm transition-all duration-300 flex-shrink-0">
-        <p className="text-xs text-muted-foreground font-medium mb-1">주간 점수</p>
-        <div className="flex items-center justify-center gap-1">
-          <p className="text-3xl font-black text-primary tracking-tight">
-            {data.totalScore.toLocaleString()}
-          </p>
-          <span className="text-sm font-bold text-primary/70 mt-2">점</span>
+      <div className="relative group mb-6 flex-shrink-0">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+        <div className="relative bg-secondary/30 backdrop-blur-sm rounded-2xl p-6 text-center border border-primary/10 shadow-md transition-all duration-300">
+          <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mb-2">Weekly Activity Score</p>
+          <div className="flex items-center justify-center gap-2">
+            <Trophy className="w-6 h-6 text-yellow-500/80 animate-pulse" />
+            <p className="text-4xl font-black text-foreground tracking-tighter">
+              {data.totalScore.toLocaleString()}
+            </p>
+            <span className="text-lg font-bold text-muted-foreground/60 self-end mb-1">pts</span>
+          </div>
         </div>
       </div>
 
@@ -206,29 +207,32 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
           </span>
         </div>
 
-        <div className="custom-scrollbar overflow-y-auto pr-2 flex-1">
+        <div className="custom-scrollbar overflow-y-auto pr-2 flex-1 space-y-2">
           {data.activities.length > 0 ? (
             data.activities.map((activity, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between py-3 border-b border-border last:border-b-0 hover:bg-muted/30 px-2 rounded-lg transition-colors"
+                className="group flex items-center justify-between py-3 px-3 hover:bg-muted/50 rounded-xl transition-all border border-border/50 bg-muted/10 hover:border-primary/50 duration-200"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-muted/50 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-muted/80 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-200">
                     {getIcon(activity.category, activity.description)}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground line-clamp-1">
+                    <p className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
                       {activity.description.replace(/^Solved problem: /, '')}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground font-medium">
                       {getRelativeTime(activity.createdAt)}
                     </p>
                   </div>
                 </div>
-                <span className="text-sm font-bold text-emerald-500 shrink-0">
-                  +{activity.amount}점
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-black text-emerald-500 shrink-0">
+                    +{activity.amount}
+                  </span>
+                  <span className="text-[9px] font-bold text-muted-foreground/50 uppercase">points</span>
+                </div>
               </div>
             ))
           ) : (

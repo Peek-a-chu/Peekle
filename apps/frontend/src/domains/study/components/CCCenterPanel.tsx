@@ -58,6 +58,7 @@ export function CCCenterPanel({
   );
   const roomId = useRoomStore((state) => state.roomId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
+  const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
   const selectedProblemExternalId = useRoomStore((state) => state.selectedProblemExternalId);
@@ -79,10 +80,10 @@ export function CCCenterPanel({
   // [Problem Selection] Save current code before switching, then request new problem's code
   const handleCodeChange = (code: string): void => {
     myLatestCodeRef.current = code;
-    if (socket && roomId && selectedProblemId) {
+    if (socket && roomId && selectedStudyProblemId) {
       socket.publish({
         destination: '/pub/ide/update',
-        body: JSON.stringify({ problemId: selectedProblemId, code }),
+        body: JSON.stringify({ problemId: selectedStudyProblemId, code }),
       });
     }
   };
@@ -166,7 +167,7 @@ export function CCCenterPanel({
                     viewMode === 'SPLIT_SAVED' ? targetSubmission?.username : viewingUser?.nickname;
 
                   let resolvedProblemTitle = currentSelectedProblemTitle || 'Unknown Problem';
-                  let resolvedProblemId = useRoomStore.getState().selectedProblemId ?? undefined;
+                  let resolvedProblemId = useRoomStore.getState().selectedStudyProblemId ?? undefined;
 
                   if (viewMode === 'SPLIT_SAVED' && targetSubmission) {
                     const isBot =
@@ -188,6 +189,7 @@ export function CCCenterPanel({
                     ownerName: ownerName || 'Unknown',
                     problemTitle: resolvedProblemTitle,
                     problemId: resolvedProblemId,
+                    problemExternalId: selectedProblemId ? String(selectedProblemId) : undefined, // Using actual problemId as externalId fallback
                     externalId: selectedProblemExternalId || undefined,
                     isRealtime: viewMode === 'SPLIT_REALTIME',
                   });
@@ -207,7 +209,7 @@ export function CCCenterPanel({
                       useRoomStore.getState().setPendingCodeShare({
                         ...currentPending,
                         problemTitle: currentSelectedProblemTitle || 'Unknown Problem',
-                        problemId: useRoomStore.getState().selectedProblemId ?? undefined,
+                        problemId: useRoomStore.getState().selectedStudyProblemId ?? undefined,
                         externalId: selectedProblemExternalId || undefined,
                         isRealtime: true, // Own code is treated as realtime capable
                       });

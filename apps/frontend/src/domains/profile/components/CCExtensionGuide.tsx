@@ -10,6 +10,7 @@ interface Props {
   checkInstallation: () => void;
   status: ExtensionStatus;
   isLoading: boolean;
+  onRegisterBojId?: () => void;
 }
 
 interface TokenResponse {
@@ -25,6 +26,7 @@ export function CCExtensionGuide({
   extensionToken,
   status,
   isLoading,
+  onRegisterBojId,
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
@@ -46,6 +48,7 @@ export function CCExtensionGuide({
     isOpen: false,
     regenerate: false,
   });
+  const [showBojNudge, setShowBojNudge] = useState(false);
 
   // 폴링을 위한 로컬 상태는 유지 (설치 감지용)
   const [isPolling, setIsPolling] = useState(false);
@@ -98,6 +101,12 @@ export function CCExtensionGuide({
 
   // 공통 연동 함수 (regenerate 옵션만 다르게)
   const handleLinkAccount = async (regenerate: boolean) => {
+    // BOJ 닉네임 등록 여부 확인
+    if (!user.bojId) {
+      setShowBojNudge(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/users/me/extension-token', {
@@ -184,22 +193,22 @@ export function CCExtensionGuide({
       {/* Status Banner */}
       <div
         className={`rounded-lg p-5 mb-8 flex items-start gap-4 ${status === 'LINKED'
-            ? 'bg-green-500/10 border border-green-500/20'
-            : status === 'MISMATCH'
-              ? 'bg-orange-500/10 border border-orange-500/20'
-              : status === 'INSTALLED'
-                ? 'bg-blue-500/10 border border-blue-500/20'
-                : 'bg-muted border border-border'
+          ? 'bg-green-500/10 border border-green-500/20'
+          : status === 'MISMATCH'
+            ? 'bg-orange-500/10 border border-orange-500/20'
+            : status === 'INSTALLED'
+              ? 'bg-blue-500/10 border border-blue-500/20'
+              : 'bg-muted border border-border'
           }`}
       >
         <div
           className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${status === 'LINKED'
-              ? 'text-green-600 dark:text-green-400'
-              : status === 'MISMATCH'
-                ? 'text-orange-600 dark:text-orange-400'
-                : status === 'INSTALLED'
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-muted-foreground'
+            ? 'text-green-600 dark:text-green-400'
+            : status === 'MISMATCH'
+              ? 'text-orange-600 dark:text-orange-400'
+              : status === 'INSTALLED'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-muted-foreground'
             }`}
         >
           {status === 'LINKED'
@@ -213,12 +222,12 @@ export function CCExtensionGuide({
         <div>
           <h3
             className={`font-bold text-sm ${status === 'LINKED'
-                ? 'text-green-700 dark:text-green-300'
-                : status === 'MISMATCH'
-                  ? 'text-orange-700 dark:text-orange-300'
-                  : status === 'INSTALLED'
-                    ? 'text-blue-700 dark:text-blue-300'
-                    : 'text-foreground'
+              ? 'text-green-700 dark:text-green-300'
+              : status === 'MISMATCH'
+                ? 'text-orange-700 dark:text-orange-300'
+                : status === 'INSTALLED'
+                  ? 'text-blue-700 dark:text-blue-300'
+                  : 'text-foreground'
               }`}
           >
             {status === 'LINKED'
@@ -231,12 +240,12 @@ export function CCExtensionGuide({
           </h3>
           <p
             className={`text-sm mt-1 ${status === 'LINKED'
-                ? 'text-green-600/80 dark:text-green-400/80'
-                : status === 'MISMATCH'
-                  ? 'text-orange-600/80 dark:text-orange-400/80'
-                  : status === 'INSTALLED'
-                    ? 'text-blue-600/80 dark:text-blue-400/80'
-                    : 'text-muted-foreground'
+              ? 'text-green-600/80 dark:text-green-400/80'
+              : status === 'MISMATCH'
+                ? 'text-orange-600/80 dark:text-orange-400/80'
+                : status === 'INSTALLED'
+                  ? 'text-blue-600/80 dark:text-blue-400/80'
+                  : 'text-muted-foreground'
               }`}
           >
             {status === 'LINKED'
@@ -265,10 +274,10 @@ export function CCExtensionGuide({
             {/* Step Circle */}
             <div
               className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${s.isDone
-                  ? 'bg-green-500 text-white'
-                  : s.isActive
-                    ? 'bg-foreground text-background'
-                    : 'bg-muted text-muted-foreground'
+                ? 'bg-green-500 text-white'
+                : s.isActive
+                  ? 'bg-foreground text-background'
+                  : 'bg-muted text-muted-foreground'
                 }`}
             >
               {s.isDone ? '✓' : s.step}
@@ -421,6 +430,27 @@ export function CCExtensionGuide({
         title="알림"
         description={modal.message}
         variant={modal.variant}
+      />
+
+      <ActionModal
+        isOpen={showBojNudge}
+        onClose={() => setShowBojNudge(false)}
+        onConfirm={() => {
+          setShowBojNudge(false);
+          onRegisterBojId?.();
+        }}
+        title="BOJ 닉네임 등록 필요"
+        description={
+          <>
+            확장 프로그램을 연동하려면 먼저 <strong>백준(BOJ) 닉네임</strong>을 등록해야 합니다.
+            <br />
+            <br />
+            프로필 수정 화면에서 닉네임을 등록하고 다시 시도해주세요.
+          </>
+        }
+        confirmText="등록하러 가기"
+        cancelText="나중에"
+        variant="default"
       />
 
       {/* Confirmation Modal for Token Regeneration */}

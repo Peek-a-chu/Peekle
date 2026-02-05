@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { getOAuthLoginUrl } from '@/api/authApi';
 
 export default function LoginPage() {
@@ -15,12 +15,6 @@ export default function LoginPage() {
       {/* 2. 로그인 카드 (글래스모피즘) */}
       <div className="w-full max-w-[440px] z-10 px-4">
         <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl rounded-3xl p-8 md:p-10 space-y-8">
-          {/* X 버튼 */}
-          <Link href="/">
-            <button className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200 group">
-              <X className="w-5 h-5" />
-            </button>
-          </Link>
           {/* --- 헤더 --- */}
           <div className="text-center space-y-6">
             <div className="space-y-2">
@@ -88,6 +82,16 @@ export default function LoginPage() {
               </div>
               <span className="text-[15px]">Google로 계속하기</span>
             </button>
+          </div>
+
+          {/* 뒤로 가기 버튼 */}
+          <div className="pt-4">
+            <Link href="/">
+              <button className="w-full h-11 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium group">
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" />
+                <span>메인으로 돌아가기</span>
+              </button>
+            </Link>
           </div>
         </div>
 

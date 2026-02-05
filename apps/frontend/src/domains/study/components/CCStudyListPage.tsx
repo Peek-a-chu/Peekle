@@ -8,7 +8,7 @@ import { CCStudyCard } from '@/domains/study/components/CCStudyCard';
 import { CCJoinStudyModal } from '@/domains/study/components/CCJoinStudyModal';
 import { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
 import type { StudyListContent } from '@/domains/study/types';
-import { CCPreJoinModal } from './CCPreJoinModal';
+import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 

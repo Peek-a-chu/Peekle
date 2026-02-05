@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { useTimeline } from '../hooks/useDashboardData';
-import { TimelineItemData } from '../mocks/dashboardMocks';
+import { TimelineItemData, MOCK_TIMELINE } from '../mocks/dashboardMocks';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
@@ -22,7 +22,9 @@ const LearningTimeline = ({
   initialData,
 }: LearningTimelineProps) => {
   const { data: fetchedData } = useTimeline(selectedDate || '', nickname, { skip: !!initialData });
-  const data = initialData || fetchedData;
+  const rawData = initialData || fetchedData;
+  // 데이터가 비어있을 경우 MOCK_TIMELINE을 사용하지 않도록 수정 (빈 배열 허용)
+  const data = rawData;
   const [expanded, setExpanded] = useState(false);
 
   // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
@@ -101,7 +103,7 @@ const LearningTimeline = ({
 
       <div className="flex gap-6 relative">
         {/* 타임라인 목록 */}
-        <div className="w-full divide-y divide-border transition-all duration-300">
+        <div className="w-full transition-all duration-300">
           {displayedKeys.length > 0 ? (
             displayedKeys.map((problemId) => (
               <TimelineItem

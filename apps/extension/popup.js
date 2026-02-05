@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (result.userData) updateUI(result.userData);
                 fetchFreshData(result.peekle_token);
+                checkContextStatus(); // Check for pending context
             } else {
                 // [미연동 상태]
                 loggedInBtns.style.display = 'none';
@@ -151,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data) return;
 
         nicknameEl.innerText = data.nickname || "알 수 없음";
+        document.getElementById('boj-id').innerText = data.bojId ? `boj: ${data.bojId}` : "";
         document.getElementById('league-name').innerText = data.leagueName || "Unranked";
         document.getElementById('user-score').innerText = (data.score || 0) + "점";
 
@@ -271,5 +273,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusText.style.color = 'var(--muted-foreground)';
             }
         }
+    }
+
+    // Helper: Check Context (Study/Game/Extension)
+    function checkContextStatus() {
+        chrome.storage.local.get(['pending_submission'], (result) => {
+            const contextEl = document.getElementById('context-status');
+            if (contextEl && result.pending_submission) {
+                const task = result.pending_submission;
+                const type = task.sourceType || 'EXTENSION';
+
+                if (type === 'STUDY') {
+                    contextEl.innerText = `📚 스터디 진행 중`;
+                    contextEl.style.color = 'var(--primary)';
+                } else if (type === 'GAME') {
+                    contextEl.innerText = `🎮 게임 진행 중`;
+                    contextEl.style.color = '#f97316'; // Orange
+                } else {
+                    contextEl.innerText = `📝 문제 풀이 중`;
+                    contextEl.style.color = 'var(--foreground)';
+                }
+
+                if (task.consumed) {
+                    contextEl.innerText += " (제출 대기)";
+                }
+            } else if (contextEl) {
+                contextEl.innerText = `대기 중인 작업 없음`;
+                contextEl.style.color = 'var(--muted-foreground)';
+            }
+        });
     }
 });

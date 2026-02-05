@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { signup as signupApi } from '@/api/authApi';
 import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi } from '@/api/userApi';
 
@@ -176,20 +176,20 @@ function SignupForm() {
       case 'invalid':
         return 'text-red-500';
       case 'checking':
-        return 'text-slate-400';
+        return 'text-muted-foreground';
       default:
-        return 'text-slate-400';
+        return 'text-muted-foreground';
     }
   };
 
   const getInputBorderColor = () => {
     switch (validation.status) {
       case 'valid':
-        return 'border-green-300 focus:ring-green-200 focus:border-green-400';
+        return 'border-green-500/50 focus:ring-green-500/20 focus:border-green-500';
       case 'invalid':
-        return 'border-red-300 focus:ring-red-200 focus:border-red-400';
+        return 'border-red-500/50 focus:ring-red-500/20 focus:border-red-500';
       default:
-        return 'border-slate-200 focus:ring-pink-200 focus:border-pink-300';
+        return 'border-border focus:ring-primary/20 focus:border-primary/50';
     }
   };
 
@@ -200,46 +200,39 @@ function SignupForm() {
       case 'invalid':
         return 'text-red-500';
       case 'checking':
-        return 'text-slate-400';
+        return 'text-muted-foreground';
       default:
-        return 'text-slate-400';
+        return 'text-muted-foreground';
     }
   };
 
   const getBojInputBorderColor = () => {
     switch (bojValidation.status) {
       case 'valid':
-        return 'border-green-300 focus:ring-green-200 focus:border-green-400';
+        return 'border-green-500/50 focus:ring-green-500/20 focus:border-green-500';
       case 'invalid':
-        return 'border-red-300 focus:ring-red-200 focus:border-red-400';
+        return 'border-red-500/50 focus:ring-red-500/20 focus:border-red-500';
       default:
-        return 'border-slate-200 focus:ring-pink-200 focus:border-pink-300';
+        return 'border-border focus:ring-primary/20 focus:border-primary/50';
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background font-sans selection:bg-primary/20 selection:text-primary">
       <div className="w-full max-w-[440px] px-4">
-        <div className="relative bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl shadow-slate-200/50 rounded-3xl p-8 md:p-10 space-y-6">
-          {/* X 버튼 */}
-          <Link href="/">
-            <button className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-pink-50/80 transition-all duration-200 group">
-              <X className="w-5 h-5" />
-            </button>
-          </Link>
-
+        <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 shadow-2xl rounded-3xl p-8 md:p-10 space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-xl md:text-2xl font-extrabold text-foreground tracking-tight">
               회원가입
             </h1>
-            <p className="text-slate-500 text-[15px]">
+            <p className="text-muted-foreground text-[15px]">
               힐끔힐끔코딩에서 사용할 정보를 입력해주세요
             </p>
           </div>
 
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="block text-sm font-medium text-foreground/80 mb-1.5">
                 닉네임 <span className="text-red-400">*</span>
               </label>
               <input
@@ -247,13 +240,13 @@ function SignupForm() {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder="2~12자 한글/영문/숫자"
-                className={`w-full h-11 px-4 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all ${getInputBorderColor()}`}
+                className={`w-full h-11 px-4 bg-background border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 transition-all ${getInputBorderColor()}`}
                 maxLength={12}
               />
               {validation.message && (
                 <p className={`mt-1.5 text-sm ${getValidationColor()}`}>
                   {validation.status === 'checking' && (
-                    <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin mr-1.5 align-middle" />
+                    <span className="inline-block w-3 h-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mr-1.5 align-middle" />
                   )}
                   {validation.message}
                 </p>
@@ -261,20 +254,20 @@ function SignupForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                백준 아이디 <span className="text-slate-400 font-normal">(선택)</span>
+              <label className="block text-sm font-medium text-foreground/80 mb-1.5">
+                백준 아이디 <span className="text-muted-foreground font-normal">(선택)</span>
               </label>
               <input
                 type="text"
                 value={bojId}
                 onChange={(e) => setBojId(e.target.value)}
                 placeholder="백준 아이디를 입력하세요"
-                className={`w-full h-11 px-4 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all ${getBojInputBorderColor()}`}
+                className={`w-full h-11 px-4 bg-background border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 transition-all ${getBojInputBorderColor()}`}
               />
               {bojValidation.message && (
                 <p className={`mt-1.5 text-sm ${getBojValidationColor()}`}>
                   {bojValidation.status === 'checking' && (
-                    <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin mr-1.5 align-middle" />
+                    <span className="inline-block w-3 h-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mr-1.5 align-middle" />
                   )}
                   {bojValidation.message}
                 </p>
@@ -295,6 +288,16 @@ function SignupForm() {
               {isSubmitting ? '가입 중...' : '가입 완료'}
             </button>
           </form>
+
+          {/* 뒤로 가기 버튼 */}
+          <div className="pt-2">
+            <Link href="/">
+              <button className="w-full h-11 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium group">
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" />
+                <span>메인으로 돌아가기</span>
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

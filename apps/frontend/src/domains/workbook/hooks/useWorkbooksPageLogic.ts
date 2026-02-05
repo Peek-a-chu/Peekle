@@ -44,14 +44,13 @@ function mapWorkbookListToWorkbook(item: WorkbookListResponse): Workbook {
 }
 
 function mapWorkbookResponseToWorkbook(item: WorkbookResponse): Workbook {
-  const solvedCount = item.problems?.filter((p) => p.solved).length ?? 0;
   return {
     id: String(item.id),
     number: item.id,
     title: item.title,
     description: item.description || '',
     problemCount: item.problemCount,
-    solvedCount,
+    solvedCount: item.solvedCount,
     bookmarkCount: item.bookmarkCount,
     isBookmarked: item.isBookmarked,
     isOwner: item.isOwner,
@@ -71,6 +70,7 @@ function mapProblemsToWorkbookProblems(problems: WorkbookResponse['problems']): 
     number: p.number,
     title: p.title,
     isSolved: p.solved,
+    status: p.status || 'NONE',
     url: p.url,
   }));
 }
@@ -274,10 +274,10 @@ export function useWorkbooksPageLogic(
             prev.map((w) =>
               w.id === id
                 ? {
-                    ...w,
-                    isBookmarked: result.isBookmarked,
-                    bookmarkCount: result.isBookmarked ? w.bookmarkCount + 1 : w.bookmarkCount - 1,
-                  }
+                  ...w,
+                  isBookmarked: result.isBookmarked,
+                  bookmarkCount: result.isBookmarked ? w.bookmarkCount + 1 : w.bookmarkCount - 1,
+                }
                 : w,
             ),
           );
@@ -288,12 +288,12 @@ export function useWorkbooksPageLogic(
           setSelectedWorkbookDetail((prev) =>
             prev
               ? {
-                  ...prev,
-                  isBookmarked: result.isBookmarked,
-                  bookmarkCount: result.isBookmarked
-                    ? prev.bookmarkCount + 1
-                    : prev.bookmarkCount - 1,
-                }
+                ...prev,
+                isBookmarked: result.isBookmarked,
+                bookmarkCount: result.isBookmarked
+                  ? prev.bookmarkCount + 1
+                  : prev.bookmarkCount - 1,
+              }
               : null,
           );
         }

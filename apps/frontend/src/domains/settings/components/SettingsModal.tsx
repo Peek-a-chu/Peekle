@@ -75,7 +75,7 @@ const SettingsModal = ({ isGlobal = false }: SettingsModalProps) => {
         </div>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto min-h-0 bg-card/50">
+        <main className="flex-1 overflow-y-auto min-h-0 bg-card/50 no-scrollbar">
           <div className="max-w-3xl mx-auto p-5">
             {activeTab === 'theme' ? <ThemeSection /> : <DeviceSection isGlobal={isGlobal} />}
           </div>

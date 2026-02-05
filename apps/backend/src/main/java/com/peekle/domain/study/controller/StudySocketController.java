@@ -17,7 +17,6 @@ import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -34,7 +33,6 @@ import java.util.List;
 public class StudySocketController {
 
         private final RedisPublisher redisPublisher;
-        private final RedisTemplate<String, Object> redisTemplate;
         private final StringRedisTemplate stringRedisTemplate;
         private final StudyRoomService studyRoomService;
         private final StudyMemberRepository studyMemberRepository;
@@ -83,19 +81,61 @@ public class StudySocketController {
                 String currentActiveStudy = stringRedisTemplate.opsForValue().get(activeStudyKey);
 
                 if (currentActiveStudy != null && !String.valueOf(studyId).equals(currentActiveStudy)) {
-                        log.warn("User {} is already in study {}", userId, currentActiveStudy);
-                        messagingTemplate.convertAndSend(
-                                        "/topic/studies/" + studyId + "/video-token/" + userId,
-                                        SocketResponse.of("ERROR", "이미 다른 스터디에 참여 중입니다."));
-                        return;
+                        log.info("Switching study: User {} moved from {} to {}", userId, currentActiveStudy, studyId);
+
+                        try {
+                                Long oldStudyId = Long.valueOf(currentActiveStudy);
+                                String oldOnlineKey = "study:" + oldStudyId + ":online_users";
+
+                                // 1. Remove from old study presence
+                                stringRedisTemplate.opsForSet().remove(oldOnlineKey, userId.toString());
+
+                                // 2. Notify old study members
+                                redisPublisher.publish(
+                                                new ChannelTopic("topic/studies/rooms/" + oldStudyId),
+                                                SocketResponse.of("LEAVE", userId));
+
+                                // 3. Clean up if empty
+                                Long remainingUsers = stringRedisTemplate.opsForSet().size(oldOnlineKey);
+                                if (remainingUsers != null && remainingUsers == 0) {
+                                        log.info("Study Room {} is empty (Switch). Scheduling whiteboard cleanup...",
+                                                        oldStudyId);
+                                        whiteboardService.scheduleCleanup(oldStudyId);
+                                }
+                        } catch (NumberFormatException e) {
+                                log.warn("Invalid format for old study ID: {}", currentActiveStudy);
+                                // Delete invalid key and proceed
+                                stringRedisTemplate.delete(activeStudyKey);
+                        }
                 }
 
                 // Mark as Active
                 stringRedisTemplate.opsForValue().set(activeStudyKey, String.valueOf(studyId));
                 stringRedisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
 
+                // [Fix] Session Tracking for Online Status
+                String sessionId = headerAccessor.getSessionId();
+                if (sessionId != null) {
+                        String sessionKey = String.format(com.peekle.global.redis.RedisKeyConst.USER_SESSION, userId);
+                        stringRedisTemplate.opsForValue().set(sessionKey, sessionId);
+
+                        log.info("[Study] User Entered. Saved Session ID. User: {}, Session: {}", userId, sessionId);
+                } else {
+                        log.warn("[Study] User Entered but Session ID is NULL! User: {}", userId);
+                }
+
+                log.info("[Study] Enter Flow - Step 1: Media Evict Start");
                 // 2. LiveKit 및 초기화 (Bundled)
                 try {
+                        // 화상 연결 중복 방지 (기존 연결 종료)
+                        mediaService.evictUser(studyId, userId);
+                        log.info("[Study] Enter Flow - Step 1: Media Evict Success");
+                } catch (Exception e) {
+                        log.warn("Pre-evict failed: {}", e.getMessage());
+                }
+
+                try {
+                        log.info("[Study] Enter Flow - Step 2: Token Gen Start");
                         String token = mediaService.createAccessToken(studyId, userId, getUserNickname(userId));
                         log.info("Generated LiveKit token for user {}, study {}", userId, studyId);
 
@@ -110,6 +150,7 @@ public class StudySocketController {
                 }
 
                 try {
+                        log.info("[Study] Enter Flow - Step 3: Room/Curriculum Info");
                         // 2. Room Info
                         StudyRoomResponse roomInfo = studyRoomService
                                         .getStudyRoom(userId, studyId);
@@ -119,7 +160,8 @@ public class StudySocketController {
 
                         // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
-                                        .getDailyProblems(userId, studyId, java.time.LocalDate.now());
+                                        .getDailyProblems(userId, studyId,
+                                                        java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/curriculum/" + userId,
                                         SocketResponse.of("CURRICULUM", curriculum));
@@ -141,6 +183,7 @@ public class StudySocketController {
                         } catch (Exception e) {
                                 log.error("Whiteboard Restore Failed", e);
                         }
+                        log.info("[Study] Enter Flow - Step 3: Info Success");
                 } catch (Exception e) {
                         log.error("Enter Init Fail", e);
                         messagingTemplate.convertAndSend(
@@ -150,6 +193,7 @@ public class StudySocketController {
 
                 // 5. [SYSTEM CHAT] 입장 메시지 전송 (초기화 여부 무관)
                 try {
+                        log.info("[Study] Enter Flow - Step 4: Chat");
                         String nickname = "알 수 없는 사용자";
                         try {
                                 nickname = userRepository.findById(userId)
@@ -169,9 +213,12 @@ public class StudySocketController {
                 }
 
                 // 3. Pub/Sub (ENTER event)
+                log.info("[Study] Enter Flow - Step 5: Publishing ENTER");
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + studyId),
                                 SocketResponse.of("ENTER", userId));
+
+                log.info("[Study] Enter Flow - Finished");
         }
 
         // 스터디 정보 수정

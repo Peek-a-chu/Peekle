@@ -95,7 +95,7 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // 2. 랭킹 계산 (동일 그룹 내 혹은 전체)
-        long rank = userRepository.countByLeaguePointGreaterThan(user.getLeaguePoint()) + 1;
+        long rank = userRepository.countRankGlobal(user.getLeaguePoint(), user.getUpdatedAt()) + 1;
 
         // 3. 필드 데이터 조회
         long solvedCount = submissionLogRepository.countSolvedByUserId(user.getId());
@@ -122,6 +122,10 @@ public class UserService {
     public User getUserByExtensionToken(String token) {
         return userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+    }
+
+    public boolean existsByNickname(String nickname) {
+        return userRepository.findByNickname(nickname).isPresent();
     }
 
     public Map<String, Object> getUserInfo(Long userId) {
@@ -282,6 +286,7 @@ public class UserService {
                 .isSolvedToday(isSolvedToday)
                 .groupRank(statusDto.getGroupRank())
                 .leagueStatus(statusDto.getLeagueStatus())
+                .bojId(user.getBojId())
                 .build();
     }
 
@@ -362,13 +367,6 @@ public class UserService {
         if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
             if (userRepository.findByNickname(request.getNickname()).isPresent()) {
                 throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-            }
-        }
-
-        // 백준 아이디 중복 검사 (새로운 아이디 입력시)
-        if (request.getBojId() != null && !request.getBojId().equals(user.getBojId())) {
-            if (userRepository.findByBojId(request.getBojId()).isPresent()) {
-                throw new BusinessException(ErrorCode.DUPLICATE_BOJ_ID);
             }
         }
 

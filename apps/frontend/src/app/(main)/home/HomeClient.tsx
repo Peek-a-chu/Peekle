@@ -73,27 +73,24 @@ export default function HomeClient({
                 initialData={initialStreak}
               />
 
-              {/* 학습 타임라인 (selectedDate가 initialDate와 다르면 클라이언트 fetch, 같으면 initialData 사용) */}
-              <LearningTimeline
-                selectedDate={selectedDate}
-                showHistoryLink={true}
-                nickname={user?.nickname}
-                initialData={selectedDate === initialDate ? initialTimeline : undefined}
-              />
-            </div>
-            {/* AI 추천 & 주간 점수 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <AIRecommendation initialData={initialRecommendations} />
-              <div className="relative min-h-[600px]">
-                <div className="h-full md:absolute md:inset-0">
-                  <CCWeeklyScore
-                    initialData={initialWeeklyScore}
-                    selectedDate={selectedDate || undefined}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+                            {/* 학습 타임라인 (selectedDate가 initialDate와 다르면 클라이언트 fetch, 같으면 initialData 사용) */}
+                            <LearningTimeline
+                                selectedDate={selectedDate}
+                                showHistoryLink={true}
+                                nickname={user?.nickname}
+                                initialData={selectedDate === initialDate ? initialTimeline : undefined}
+                            />
+                        </div>
+                        {/* AI 추천 & 주간 점수 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <AIRecommendation />
+                            <div className="relative min-h-[600px]">
+                                <div className="h-full md:absolute md:inset-0">
+                                    <CCWeeklyScore selectedDate={selectedDate || undefined} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
           {/* 오른쪽 사이드바 - 리그 순위 */}
           <div className="order-2 xl:order-2">

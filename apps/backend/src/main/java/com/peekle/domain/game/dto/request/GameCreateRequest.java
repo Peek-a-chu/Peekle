@@ -22,5 +22,7 @@ public class GameCreateRequest {
     private String problemSource; // "BOJ_RANDOM" or "WORKBOOK"
     private String tierMin; // e.g. "bronze5"
     private String tierMax; // e.g. "gold5"
+
     private String selectedWorkbookId; // Frontend provided ID (String to match 'wb1' example or generic ID)
+    private java.util.List<String> selectedTags; // Frontend provided tags
 }

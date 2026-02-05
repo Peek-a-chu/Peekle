@@ -11,4 +11,5 @@ public class ExtensionStatusResponse {
     private Boolean isSolvedToday;
     private Integer groupRank; // 그룹 내 순위
     private LeagueStatus leagueStatus; // 승급/유지/강등 상태
+    private String bojId;
 }

@@ -241,7 +241,7 @@ export function CCProfileHeader({
               ) : (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary/50 text-muted-foreground">
                   <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                  <span>연동 안됨</span>
+                  <span>BOJ 연동 안됨</span>
                 </div>
               )}
             </div>

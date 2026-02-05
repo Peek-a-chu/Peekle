@@ -16,7 +16,7 @@ export type { DailyProblem as Problem } from '@/domains/study/types';
 
 export interface CCProblemListPanelProps {
   problems?: DailyProblem[];
-  selectedProblemId?: number;
+  selectedStudyProblemId?: number;
   onSelectProblem?: (problem: DailyProblem) => void;
   className?: string;
   onToggleFold: () => void;
@@ -37,7 +37,7 @@ export interface CCProblemListPanelProps {
 
 export function CCProblemListPanel({
   problems = [],
-  selectedProblemId,
+  selectedStudyProblemId,
   onSelectProblem,
   className,
   onToggleFold,
@@ -171,7 +171,7 @@ export function CCProblemListPanel({
                 <li key={key}>
                   <CCProblemCard
                     problem={problem}
-                    isSelected={selectedProblemId === problem.problemId}
+                    isSelected={selectedStudyProblemId === problem.problemId}
                     onSelect={() => onSelectProblem?.(problem)}
                     onOpenSubmission={handleOpenSubmission}
                     onRemove={

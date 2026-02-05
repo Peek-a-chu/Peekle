@@ -123,32 +123,15 @@ export const useStudySocketSubscription = (studyId: number) => {
   useEffect(() => {
     if (!client || !connected || !studyId) return;
 
-    // 1. Enter Study (currentUserId가 있으면 즉시, 없으면 나중에 재시도)
+
+    // 1. Enter Study Helper
     const sendEnter = () => {
-      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId });
+      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId: currentUserIdRef.current });
       client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
     };
 
-    // currentUserId가 있으면 즉시 ENTER 전송, 없으면 나중에 재시도
-    if (currentUserId) {
-      sendEnter();
-    } else {
-      // currentUserId가 설정될 때까지 기다렸다가 ENTER 전송
-      const checkAndEnter = () => {
-        const userId = useRoomStore.getState().currentUserId;
-        if (userId) {
-          console.log('[StudySocket] currentUserId available, sending ENTER');
-          sendEnter();
-          clearInterval(enterInterval);
-        }
-      };
-      const enterInterval = setInterval(checkAndEnter, 500);
-
-      // 5초 후 타임아웃
-      setTimeout(() => {
-        clearInterval(enterInterval);
-      }, 5000);
-    }
+    // Note: We do NOT send ENTER here immediately.
+    // We wait for `subscribeToPrivateTopics` to succeed first.
 
     // 2. Subscribe Public Room Topic
     const publicTopic = `/topic/studies/rooms/${studyId}`;
@@ -171,26 +154,29 @@ export const useStudySocketSubscription = (studyId: number) => {
     let videoTokenSubscription: any = null;
 
     const subscribeToPrivateTopics = () => {
-      // 기존 구독 해제
-      if (privateSubscription) {
-        privateSubscription.unsubscribe();
-        privateSubscription = null;
-      }
-      if (videoTokenSubscription) {
-        videoTokenSubscription.unsubscribe();
-        videoTokenSubscription = null;
-      }
+      // Use Ref to ensure we escape stale closures if called via interval
+      const effectiveUserId = currentUserIdRef.current;
 
       // currentUserId가 있으면 구독 생성
-      if (currentUserId) {
-        const privateTopic = `/topic/studies/${studyId}/info/${currentUserId}`;
+      if (effectiveUserId) {
+        // 중복 구독 방지: 이미 구독 중이고, ID가 같다면 패스
+        if (privateSubscription) {
+          // 하지만 ID가 바뀌었을 수도 있으므로 (거의 없지만) 확인할 수도 있음.
+          // 여기선 단순화를 위해 기존 구독 해제 후 재구독 (아래 로직)
+          privateSubscription.unsubscribe();
+        }
+        if (videoTokenSubscription) {
+          videoTokenSubscription.unsubscribe();
+        }
+
+        const privateTopic = `/topic/studies/${studyId}/info/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Private:', privateTopic);
         privateSubscription = client.subscribe(privateTopic, (message) => {
           handleSocketMessage(message);
         });
 
         // 3-1. Subscribe Private Error Topic
-        const errorTopic = `/topic/studies/${studyId}/error/${currentUserId}`;
+        const errorTopic = `/topic/studies/${studyId}/error/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Error:', errorTopic);
         const errorSub = client.subscribe(errorTopic, (message) => {
           handleSocketMessage(message);
@@ -203,11 +189,17 @@ export const useStudySocketSubscription = (studyId: number) => {
         };
 
         // 4. Subscribe Video Token Topic
-        const videoTokenTopic = `/topic/studies/${studyId}/video-token/${currentUserId}`;
+        const videoTokenTopic = `/topic/studies/${studyId}/video-token/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Video Token:', videoTokenTopic);
         videoTokenSubscription = client.subscribe(videoTokenTopic, (message) => {
           handleSocketMessage(message);
         });
+
+        // [Fix] Subscription Complete -> Send ENTER
+        // 구독이 *완료된 후*에 입장 메시지를 보내야 응답(VIDEO_TOKEN)을 받을 수 있음
+        // STOMP subscribe는 클라이언트 측에서 즉시 처리되므로 바로 보내도 됨.
+        console.log('[StudySocket] Subscription ready, sending ENTER');
+        sendEnter();
       }
     };
 
@@ -290,9 +282,26 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'ROOM_INFO': {
-            const { title, description, role } = data;
+            const { title, description, role, members } = data;
             setRoomInfo({ roomTitle: title, roomDescription: description, myRole: role });
-            // toast.info('스터디 정보가 갱신되었습니다.');
+
+            // [Fix] Sync participants strictly from server info
+            if (members && Array.isArray(members)) {
+              console.log('[StudySocket] Syncing participants from ROOM_INFO:', members);
+
+              // Map DTO to Store Interface
+              const mappedMembers = members.map((m: any) => ({
+                id: m.userId,
+                nickname: m.nickname,
+                profileImage: m.profileImg,
+                isOwner: m.role === 'OWNER',
+                isOnline: m.online ?? m.isOnline, // Handle both cases
+                isMuted: false,   // Default
+                isVideoOff: false // Default
+              }));
+
+              setParticipants(mappedMembers);
+            }
             break;
           }
           case 'INFO': {
@@ -413,6 +422,33 @@ export const useStudySocketSubscription = (studyId: number) => {
             const token = data;
             console.log('[StudySocket] Received VIDEO_TOKEN');
             setVideoToken(token);
+            break;
+          }
+          case 'SOLVED': {
+            // Problem Solved - trigger refetch & toast
+            const { problemId, userId: solverId, nickname, earnedPoints } = data;
+            console.log('[StudySocket] SOLVED event:', data);
+
+            // Refetch curriculum to update status (green check, user count)
+            window.dispatchEvent(
+              new CustomEvent('study-curriculum-updated', {
+                detail: { studyId },
+              }),
+            );
+
+            // Toast notification
+            // If I am the solver, message might be different or handled by API response.
+            // But API response covers the submitter. This broadcast covers EVERYONE.
+            // Avoid duplicate toast for submitter if API response already toasted?
+            // Usually API response handles success toast.
+            // But here we can just show generic info.
+            if (solverId !== useRoomStore.getState().currentUserId) {
+              toast.success(`${nickname}님이 문제를 해결했습니다!`);
+            } else {
+              // For me, maybe redundant if UI already showed it, but socket is faster/surer.
+              // Let's show it or rely on existing success feedback.
+              // Existing submit logic shows toast probably.
+            }
             break;
           }
           case 'ERROR': {

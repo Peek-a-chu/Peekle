@@ -20,9 +20,9 @@ export function CCWorkbookCard({
   className,
 }: CCWorkbookCardProps) {
   // 0/0일 때 NaN 방지
-  const progress =
+  const successPercent =
     workbook.problemCount > 0
-      ? Math.round((workbook.solvedCount / workbook.problemCount) * 100)
+      ? (workbook.solvedCount / workbook.problemCount) * 100
       : 0;
 
   return (
@@ -63,20 +63,18 @@ export function CCWorkbookCard({
 
             {/* 프로그래스바 */}
             <div className="mt-3">
-              <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex items-center justify-between text-[10px] mb-1 leading-none">
                 <span className="text-muted-foreground">진행률</span>
-                <span className="font-medium text-foreground">{progress}%</span>
+                <span className="font-medium">
+                  <span className="text-green-500">{workbook.solvedCount}</span>
+                  <span className="text-muted-foreground">/{workbook.problemCount}</span>
+                </span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                {progress > 0 && (
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-all',
-                      progress === 100 ? 'bg-green-500' : 'bg-primary',
-                    )}
-                    style={{ width: `${progress}%` }}
-                  />
-                )}
+              <div className="h-2 bg-muted rounded-full overflow-hidden flex">
+                <div
+                  className="h-full bg-green-500 transition-all"
+                  style={{ width: `${successPercent}%` }}
+                />
               </div>
             </div>
           </div>

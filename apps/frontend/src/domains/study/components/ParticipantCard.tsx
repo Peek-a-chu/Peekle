@@ -102,8 +102,8 @@ export function ParticipantCard({
       className={cn(
         'group relative flex items-center justify-between rounded-xl border p-3 shadow-sm transition-all duration-200',
         isOnline
-          ? 'bg-card border-border hover:border-pink-300 hover:shadow-md hover:bg-pink-50/30'
-          : 'bg-muted/30 border-transparent opacity-70 grayscale-[0.5]',
+          ? 'bg-card border-border hover:border-pink-300 hover:shadow-md hover:bg-pink-50/10'
+          : 'bg-muted/10 border-transparent opacity-80 grayscale-[0.3]',
       )}
     >
       <div className="flex items-center gap-3 min-w-0">
@@ -133,7 +133,7 @@ export function ParticipantCard({
           <div className="flex items-center gap-1.5">
             <span
               className={cn(
-                'truncate font-semibold text-sm',
+                'truncate font-bold text-sm',
                 isMe ? 'text-foreground' : 'text-foreground/90',
               )}
             >
@@ -149,9 +149,9 @@ export function ParticipantCard({
       <div className="flex items-center gap-1.5">
         {/* Status Icons (Online only) - Always visible if condition meets */}
         {isOnline && (
-          <div className="flex items-center gap-1.5 mr-1">
-            {participant.isMuted && <MicOff className="h-3.5 w-3.5 text-red-500" />}
-            {participant.isVideoOff && <VideoOff className="h-3.5 w-3.5 text-red-500" />}
+          <div className="flex items-center gap-2 mr-1">
+            {participant.isMuted && <MicOff className="h-4 w-4 text-red-500 stroke-[2.5px]" />}
+            {participant.isVideoOff && <VideoOff className="h-4 w-4 text-red-500 stroke-[2.5px]" />}
           </div>
         )}
 

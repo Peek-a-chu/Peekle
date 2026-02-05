@@ -133,10 +133,12 @@ const RankingItem = ({ member }: { member: any }) => {
     : 'hover:bg-surface-3/50 border-transparent px-2 transition-colors';
 
   return (
-    <div
+    <Link
+      href={`/profile/${member.name}`}
       className={`
                 relative flex items-center py-1.5 transition-all 
                 border-t border-t-white/[0.02] first:border-t-0
+                hover:no-underline
                 ${rowClass}
             `}
     >
@@ -176,7 +178,7 @@ const RankingItem = ({ member }: { member: any }) => {
           {member.score.toLocaleString()}
         </span>
       </div>
-    </div>
+    </Link>
   );
 };
 

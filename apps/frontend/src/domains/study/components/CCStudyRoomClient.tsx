@@ -26,7 +26,7 @@ import {
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
-import { CCPreJoinModal } from './CCPreJoinModal';
+import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
@@ -85,7 +85,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   // [Fix] Move device settings modal open logic to after successful join or remove auto-open if causing issues on redirect.
   const [isJoined, setIsJoined] = useState(false);
 
-
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
   const setWhiteboardOpenedBy = useRoomStore((state) => state.setWhiteboardOpenedBy);
@@ -116,7 +115,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
 
   // Global state for selected problem
-  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
+  const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
 
@@ -270,6 +269,12 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     console.log('Whiteboard tile clicked (Overlay toggle)');
   };
 
+  // [Submission state] Clear any pending extension submission on mount
+  useEffect(() => {
+    // Notify the extension to clear any stale pending submissions when entering a study room
+    window.postMessage({ type: 'PEEKLE_CLEAR_PENDING' }, '*');
+  }, []);
+
   const handleSelectProblem = (problem: Problem): void => {
     console.log('[StudyRoomClient] Selecting problem:', problem);
     // Ensure ID is a valid number
@@ -278,23 +283,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       console.warn('[StudyRoomClient] Invalid problem ID:', problem.problemId);
       return;
     }
-    const externalId = problem.externalId || String((problem as any).number || '');
-    setSelectedProblem(pId, problem.title, externalId);
-
-    // Notify extension/host to navigate using external ID (if supported)
-    if (externalId) {
-      window.postMessage(
-        {
-          type: 'PEEKLE_SELECT_PROBLEM',
-          payload: {
-            externalId,
-            studyId,
-            url: `https://www.acmicpc.net/problem/${externalId}`,
-          },
-        },
-        '*',
-      );
-    }
+    // Extract studyProblemId from the problem (added by API)
+    const studyProblemId = (problem as any).studyProblemId || (problem as any).id || null;
+    setSelectedProblem(
+      studyProblemId,
+      pId,
+      problem.title,
+      problem.externalId || String((problem as any).number),
+    );
   };
 
   const handleDateChange = (date: Date): void => {
@@ -332,7 +328,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
             onAddProblem={addProblem}
             onRemoveProblem={deleteProblem}
             onSelectProblem={handleSelectProblem}
-            selectedProblemId={selectedProblemId ?? undefined}
+            selectedStudyProblemId={selectedStudyProblemId ?? undefined}
             onToggleFold={handleToggleLeftPanel}
             isFolded={isLeftPanelFolded}
             submissions={submissions}
@@ -357,10 +353,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     </>
   );
 }
-
-
-
-
 
 // Wrapper to provide SocketContext and handle Auth Check
 export function CCStudyRoomClient(): React.ReactNode {
@@ -411,7 +403,7 @@ export function CCStudyRoomClient(): React.ReactNode {
   // If prejoined, use params. Else default (mic off, cam on).
   const [initialMediaState, setInitialMediaState] = useState({
     mic: preJoined ? paramMic : false,
-    cam: preJoined ? paramCam : true
+    cam: preJoined ? paramCam : true,
   });
 
   const handleJoin = (mic: boolean, cam: boolean) => {

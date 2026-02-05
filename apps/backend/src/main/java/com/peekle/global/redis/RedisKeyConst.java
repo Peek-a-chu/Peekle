@@ -98,6 +98,9 @@ public class RedisKeyConst {
     // 문제 해결 여부 (Set) -> game:{gameId}:problem:{problemId}:solved
     public static final String GAME_SOLVED_PROBLEM = "game:%d:problem:%d:solved";
 
+    // User Session (Value) -> user:{userId}:session -> sessionId
+    public static final String USER_SESSION = "user:%d:session";
+
     // 실시간 랭킹(ZSet) -> game:{gameId}:ranking
     public static final String GAME_RANKING = "game:%d:ranking";
 
@@ -108,7 +111,15 @@ public class RedisKeyConst {
     public static final String GAME_USER_SCORE = "game:%d:user:%d:score";
 
     // 토픽 (Pub/Sub)
-    public static final String TOPIC_GAME_SOLVED = "topic/games/%d/solved";
     public static final String TOPIC_GAME_RANKING = "topic/games/%d/ranking";
+
+    // 게임 내 문제 목록 (List) -> game:%d:problems
+    public static final String GAME_PROBLEMS = "game:%d:problems";
+
+    // 게임 제출 예상 코드 길이 (Value) -> game:%d:problem:%d:user:%d:expected_length
+    public static final String GAME_EXPECTED_LENGTH = "game:%d:problem:%d:user:%d:expected_length";
+
+    // 게임 내 경고 알림 (Pub/Sub) -> topic/games/%d/alert/%d
+    public static final String TOPIC_GAME_ALERT = "topic/games/%d/alert/%d";
 
 }

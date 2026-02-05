@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RoomSettingsPanel } from '../components/room-settings-panel';
 import { ParticipantGrid } from '../components/participant-grid';
-import { ChatPanel } from '../components/chat-panel';
+import { WaitingRoomChatPanel } from '../components/WaitingRoomChatPanel';
 import { InviteModal } from '../components/invite-modal';
 import { GameCountdownOverlay } from '../components/game-countdown-overlay';
-import type { GameRoomDetail, ChatMessage } from '@/domains/game/mocks/mock-data';
+import type { GameRoomDetail, ChatMessage } from '@/domains/game/types/game-types';
 
 const modeLabels = {
   TIME_ATTACK: '타임어택',
@@ -24,7 +24,7 @@ const teamLabels = {
 interface GameWaitingRoomLayoutProps {
   room: GameRoomDetail;
   messages: ChatMessage[];
-  currentUserId: string;
+  currentUserId: number;
   isHost: boolean;
   isReady: boolean;
   isCountingDown: boolean;
@@ -35,7 +35,7 @@ interface GameWaitingRoomLayoutProps {
   onCancelReady: () => void;
   onStartGame: () => void;
   onCountdownComplete: () => void;
-  onKickParticipant: (participantId: string) => void;
+  onKickParticipant: (participantId: number) => void;
   onChangeTeam: () => void;
 }
 
@@ -83,7 +83,7 @@ export function GameWaitingRoomLayout({
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground font-medium">
-              ⏱️ {room.timeLimit}분 · 📝 {room.problemCount}문제 · 👥 {room.maxPlayers}명
+              ⏱️ {Math.floor(room.timeLimit / 60)}분 · 📝 {room.problemCount}문제 · 👥 {room.maxPlayers}명
             </p>
           </div>
         </div>
@@ -135,20 +135,25 @@ export function GameWaitingRoomLayout({
             {isHost ? (
               <Button
                 size="lg"
-                className="min-w-[200px]"
+                className="min-w-[200px] bg-primary text-primary-foreground hover:scale-105 transition-all duration-200 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:scale-100"
                 disabled={!canStart}
                 onClick={onStartGame}
               >
                 시작하기
               </Button>
             ) : isReady ? (
-              <Button size="lg" variant="outline" className="min-w-[200px]" onClick={onCancelReady}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="min-w-[200px] border-2 border-primary/50 text-primary hover:bg-primary/5 hover:scale-105 transition-all duration-200"
+                onClick={onCancelReady}
+              >
                 준비 취소
               </Button>
             ) : (
               <Button
                 size="lg"
-                className="min-w-[200px] opacity-50 transition-opacity hover:opacity-100"
+                className="min-w-[200px] bg-primary text-primary-foreground hover:scale-105 transition-all duration-200 shadow-lg shadow-primary/20"
                 onClick={onReady}
               >
                 준비하기
@@ -159,7 +164,7 @@ export function GameWaitingRoomLayout({
 
         {/* 우측: 채팅 패널 */}
         <aside className="w-80 border-l">
-          <ChatPanel
+          <WaitingRoomChatPanel
             messages={messages}
             participants={room.participants}
             currentUserId={currentUserId}

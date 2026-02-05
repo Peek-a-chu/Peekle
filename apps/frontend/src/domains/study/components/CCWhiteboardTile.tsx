@@ -34,10 +34,10 @@ export function CCWhiteboardTile({ onClick, className }: CCWhiteboardTileProps) 
         }
       }}
       className={cn(
-        'relative flex h-40 w-52 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg transition-all hover:ring-2 hover:ring-rose-400',
+        'relative flex h-40 w-52 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg transition-all hover:ring-2 hover:ring-rose-400 border border-transparent shadow-md',
         isWhiteboardOverlayOpen
-          ? 'bg-gradient-to-br from-rose-300 to-rose-400 ring-2 ring-rose-500'
-          : 'bg-gradient-to-br from-rose-100 to-rose-200',
+          ? 'bg-gradient-to-br from-rose-400 to-rose-600 ring-2 ring-rose-500'
+          : 'bg-gradient-to-br from-rose-50 to-rose-200 border-rose-200',
         className,
       )}
     >
@@ -49,9 +49,8 @@ export function CCWhiteboardTile({ onClick, className }: CCWhiteboardTileProps) 
       </div>
 
       {/* Bottom Info Bar */}
-      <div className="flex items-center justify-center bg-white/80 px-2 py-1">
-        <span className="text-xs font-medium text-rose-600">
-          {/* {whiteboardOpenedBy ? `${whiteboardOpenedBy}님의 화이트보드` : '화이트보드'} */}
+      <div className="flex items-center justify-center bg-white/90 px-2 py-1.5 border-t border-rose-100 shadow-inner">
+        <span className="text-xs font-bold text-rose-600 uppercase tracking-tight">
           화이트보드
         </span>
       </div>
