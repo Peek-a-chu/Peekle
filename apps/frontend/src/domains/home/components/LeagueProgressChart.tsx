@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingUp, Calendar } from 'lucide-react';
+import Image from 'next/image';
 import { useLeagueProgress } from '../hooks/useDashboardData';
 import { LEAGUE_NAMES, LEAGUE_ORDER, LEAGUE_COLORS } from '@/components/LeagueIcon';
 import { LeagueProgressData } from '../mocks/dashboardMocks';
@@ -210,14 +211,16 @@ const LeagueProgressChart = ({ initialData }: LeagueProgressChartProps) => {
         <div className="flex flex-col justify-between h-[200px] pr-2">
           {yAxisIcons.map((league) => {
             const leagueKey = league.toLowerCase() as keyof typeof LEAGUE_ICONS;
-            const IconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
+            const iconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
             return (
               <div
                 key={league}
                 className="flex items-center justify-center"
                 style={{ height: `${100 / yAxisIcons.length}%` }}
               >
-                <IconAsset
+                <Image
+                  src={iconAsset}
+                  alt={LEAGUE_NAMES[league as keyof typeof LEAGUE_NAMES]}
                   width={18}
                   height={18}
                 />

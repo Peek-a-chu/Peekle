@@ -10,7 +10,7 @@ export function CCProfileStatsRow({ user }: Props) {
 
   // 리그 이름을 소문자로 변환하여 아이콘 매칭
   const leagueKey = (user.league?.toLowerCase() || 'stone') as keyof typeof LEAGUE_ICONS;
-  const IconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
+  const iconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
@@ -23,7 +23,9 @@ export function CCProfileStatsRow({ user }: Props) {
               UR
             </div>
           ) : (
-            <IconAsset
+            <Image
+              src={iconAsset}
+              alt={`${user.league} tier icon`}
               width={24}
               height={24}
               className="object-contain"
