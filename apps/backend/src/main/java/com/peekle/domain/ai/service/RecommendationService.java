@@ -126,7 +126,7 @@ public class RecommendationService {
         // 태그 파싱: "구현, 그리디" -> ["구현", "그리디"]
         List<String> tags = List.of();
         if (aiProblem.tags() != null && !aiProblem.tags().isEmpty()) {
-            tags = java.util.Arrays.stream(aiProblem.tags().split(","))
+            tags = java.util.Arrays.stream(aiProblem.tags().split("[,|]"))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .toList();
@@ -226,6 +226,7 @@ public class RecommendationService {
                 tagStatDtos,
                 currentTier
         );
+
     }
 
     private int calculateTierLevel(String tier) {
