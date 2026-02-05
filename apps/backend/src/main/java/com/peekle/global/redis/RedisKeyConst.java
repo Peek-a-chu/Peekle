@@ -116,4 +116,10 @@ public class RedisKeyConst {
     // 게임 내 문제 목록 (List) -> game:%d:problems
     public static final String GAME_PROBLEMS = "game:%d:problems";
 
+    // 게임 제출 예상 코드 길이 (Value) -> game:%d:problem:%d:user:%d:expected_length
+    public static final String GAME_EXPECTED_LENGTH = "game:%d:problem:%d:user:%d:expected_length";
+
+    // 게임 내 경고 알림 (Pub/Sub) -> topic/games/%d/alert/%d
+    public static final String TOPIC_GAME_ALERT = "topic/games/%d/alert/%d";
+
 }

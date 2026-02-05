@@ -654,9 +654,50 @@ public class RedisGameService {
 
     // 코드 저장
     public void updateCode(com.peekle.domain.game.dto.request.GameCodeRequest request, Long userId) {
-        String key = String.format(RedisKeyConst.GAME_CODE_KEY, request.getGameId(), request.getProblemId(), userId);
-        redisTemplate.opsForValue().set(key, request.getCode());
-        redisTemplate.expire(key, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
+        String codeKey = String.format(RedisKeyConst.GAME_CODE_KEY, request.getGameId(), request.getProblemId(),
+                userId);
+
+        // [Anti-Cheat] 이전 길이와 비교하여 급등(붙여넣기 의심) 체크
+        try {
+            String oldCode = (String) redisTemplate.opsForValue().get(codeKey);
+            int oldLen = normalizeCodeLength(oldCode);
+            int newLen = normalizeCodeLength(request.getCode());
+            int delta = newLen - oldLen;
+
+            if (delta > 100) {
+                log.warn("[Anti-Cheat] Suspicious code growth detected: Game {}, User {}, Delta {}",
+                        request.getGameId(), userId, delta);
+
+                String alertTopic = String.format(RedisKeyConst.TOPIC_GAME_ALERT, request.getGameId(), userId);
+                SocketResponse<String> alert = SocketResponse.of("CHEATING_DETECTED", "붙여넣기 또는 대량 코드 유입이 감지되었습니다!");
+                redisPublisher.publish(new ChannelTopic(alertTopic), alert);
+            }
+        } catch (Exception e) {
+            log.error("[Anti-Cheat] Error during delta check", e);
+        }
+
+        redisTemplate.opsForValue().set(codeKey, request.getCode());
+        redisTemplate.expire(codeKey, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
+    }
+
+    // [New] 코드 제출 요청 시 예상 길이 저장 (검증용)
+    public void submitCode(com.peekle.domain.game.dto.request.GameSubmitRequest request, Long userId) {
+        String key = String.format(RedisKeyConst.GAME_EXPECTED_LENGTH, request.getGameId(), request.getProblemId(),
+                userId);
+        int normalizedLength = normalizeCodeLength(request.getCode());
+
+        log.info("[RedisGameService] Storing expected length for game {}: user {}, problem {}, length {}",
+                request.getGameId(), userId, request.getProblemId(), normalizedLength);
+
+        redisTemplate.opsForValue().set(key, String.valueOf(normalizedLength));
+        redisTemplate.expire(key, 1, TimeUnit.HOURS); // 제출 검증용이므로 1시간이면 충분
+    }
+
+    // 코드 길이 정규화 (공백 제거, 개행 문자 통일)
+    private int normalizeCodeLength(String code) {
+        if (code == null)
+            return 0;
+        return code.replace("\r\n", "\n").trim().length();
     }
 
     // 코드 불러오기

@@ -135,20 +135,25 @@ export function GameWaitingRoomLayout({
             {isHost ? (
               <Button
                 size="lg"
-                className="min-w-[200px]"
+                className="min-w-[200px] bg-primary text-primary-foreground hover:scale-105 transition-all duration-200 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:scale-100"
                 disabled={!canStart}
                 onClick={onStartGame}
               >
                 시작하기
               </Button>
             ) : isReady ? (
-              <Button size="lg" variant="outline" className="min-w-[200px]" onClick={onCancelReady}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="min-w-[200px] border-2 border-primary/50 text-primary hover:bg-primary/5 hover:scale-105 transition-all duration-200"
+                onClick={onCancelReady}
+              >
                 준비 취소
               </Button>
             ) : (
               <Button
                 size="lg"
-                className="min-w-[200px] opacity-50 transition-opacity hover:opacity-100"
+                className="min-w-[200px] bg-primary text-primary-foreground hover:scale-105 transition-all duration-200 shadow-lg shadow-primary/20"
                 onClick={onReady}
               >
                 준비하기

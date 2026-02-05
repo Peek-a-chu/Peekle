@@ -188,6 +188,55 @@ async function handleSolvedSubmission(payload, sender) {
             return; // ✅ 백엔드 요청 차단
         }
 
+        // --- [Strict Game Validation] ---
+        if (targetSourceType === 'GAME' && pending) {
+            console.log('[Background] Performing STRICT validation for Game submission');
+
+            // 1. Language Check
+            let pendingLang = (pending.language || '').toLowerCase();
+            // Normalize pending language same as handleSolvedSubmission logic
+            if (pendingLang.includes('python') || pendingLang.includes('pypy')) pendingLang = 'python';
+            else if (pendingLang.includes('java')) pendingLang = 'java';
+            else if (pendingLang.includes('c++') || pendingLang.includes('cpp')) pendingLang = 'C++';
+
+            if (normalizedLang !== pendingLang) {
+                console.error(`[Validation Failed] Language mismatch: Submission(${normalizedLang}) vs IDE(${pendingLang})`);
+                if (sender?.tab) {
+                    chrome.tabs.sendMessage(sender.tab.id, {
+                        type: 'SHOW_FEEDBACK',
+                        payload: {
+                            success: false,
+                            message: `제출 언어가 다릅니다! IDE(${pendingLang})와 동일한 언어로 제출해주세요.`,
+                        }
+                    });
+                }
+                return; // Block submission
+            }
+
+            // 2. Length Check (Trim and normalize line endings for comparison)
+            const cleanCode = (c) => (c || '').replace(/\r\n/g, '\n').trim();
+            const submissionLen = cleanCode(code).length;
+            const pendingLen = cleanCode(pending.code).length;
+
+            console.log(`[Validation] Length Check - Submission: ${submissionLen}, IDE: ${pendingLen}`);
+
+            // Allow 0 tolerance for strict game mode
+            if (submissionLen !== pendingLen) {
+                console.error('[Validation Failed] Code length mismatch');
+                if (sender?.tab) {
+                    chrome.tabs.sendMessage(sender.tab.id, {
+                        type: 'SHOW_FEEDBACK',
+                        payload: {
+                            success: false,
+                            message: "IDE의 코드와 제출된 코드가 다릅니다! 복사한 코드를 그대로 제출해주세요.",
+                        }
+                    });
+                }
+                return; // Block submission
+            }
+            console.log('[Validation Success] Game submission validated.');
+        }
+
         const backendResponse = await sendToBackend({
             problemId: parseInt(problemId) || 0,
             problemTitle: problemInfo ? problemInfo.titleKo : "",

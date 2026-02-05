@@ -17,6 +17,7 @@ import com.peekle.domain.game.service.RedisGameService;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubmissionService {
@@ -86,6 +88,43 @@ public class SubmissionService {
             System.out.println("⚠️ Skip Validation: Failed submission (WA/RTE/TLE/etc)");
         } else {
             System.out.println("⚠️ Skip Validation: User has no BOJ ID linked.");
+        }
+
+        // --- [Strict Game Length Validation] ---
+        if (SourceType.GAME.name().equalsIgnoreCase(request.getSourceType()) && request.getIsSuccess()) {
+            try {
+                String expectedLenKey = String.format(RedisKeyConst.GAME_EXPECTED_LENGTH,
+                        request.getRoomId(), request.getProblemId(), user.getId());
+                String expectedLenStr = (String) redisTemplate.opsForValue().get(expectedLenKey);
+
+                if (expectedLenStr != null) {
+                    int expectedLen = Integer.parseInt(expectedLenStr);
+                    // Normalize submitted code length
+                    int submittedLen = (request.getCode() != null)
+                            ? request.getCode().replace("\r\n", "\n").trim().length()
+                            : 0;
+
+                    if (submittedLen != expectedLen) {
+                        log.error("[Strict Validation] Length Mismatch! User: {}, Expected: {}, Submitted: {}",
+                                user.getId(), expectedLen, submittedLen);
+                        return SubmissionResponse.builder()
+                                .success(false)
+                                .message("제출된 코드의 길이가 IDE와 다릅니다. 조작이 의심되어 채점이 취소되었습니다.")
+                                .build();
+                    }
+                    log.info("[Strict Validation] Length match success. User: {}, Len: {}", user.getId(),
+                            submittedLen);
+                    // 검증 완료 후 키 삭제
+                    redisTemplate.delete(expectedLenKey);
+                } else {
+                    log.warn("[Strict Validation] No expected length found in Redis for User: {}, Room: {}, Prob: {}",
+                            user.getId(), request.getRoomId(), request.getProblemId());
+                    // 1차 구현에서는 키가 없는 경우 경고만 하고 통과 (구형 버전 대응 등)
+                    // 향후 필수값으로 전환 가능
+                }
+            } catch (Exception e) {
+                log.error("[Strict Validation] Error during length validation", e);
+            }
         }
 
         // 2. 문제 조회

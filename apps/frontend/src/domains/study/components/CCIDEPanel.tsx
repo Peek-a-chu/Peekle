@@ -66,6 +66,7 @@ interface CCIDEPanelProps {
   editorId?: string;
   restoredCode?: string | null;
   restoreVersion?: number;
+  sourceType?: 'STUDY' | 'GAME';
 }
 
 export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
@@ -84,6 +85,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       editorId = 'default',
       restoredCode,
       restoreVersion,
+      sourceType = 'STUDY',
     },
     ref,
   ) => {
@@ -356,8 +358,25 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     // Editor Mount
     // ----------------------------------------------------------------------
 
-    const handleEditorDidMount: OnMount = (editor): void => {
+    const handleEditorDidMount: OnMount = (editor, monaco): void => {
       editorRef.current = editor;
+
+      // [Anti-Cheat] 게임 모드일 때 붙여넣기 금지 (Ctrl+V, Cmd+V)
+      if (sourceType === 'GAME') {
+        editor.onKeyDown((e) => {
+          const isPaste =
+            (e.ctrlKey || e.metaKey) && (e.keyCode === monaco.KeyCode.KeyV);
+
+          if (isPaste) {
+            e.preventDefault();
+            e.stopPropagation();
+            toast.error('게임 중에는 붙여넣기를 할 수 없습니다!', {
+              id: 'paste-blocked', // 중복 표시 방지
+            });
+          }
+        });
+      }
+
       if (onEditorMount) onEditorMount(editor);
 
       // [핵심 해결책 2] 마운트 시점에 state에 있는 값을 강제로 주입
@@ -468,6 +487,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
             height="100%"
             language={language}
             theme={theme}
+            onMount={handleEditorDidMount}
             // [중요] 경로 유니크화로 모델 캐싱 방지 + 에디터 구분
             path={`${editorId}_file_${modelId}.${getFileExtension(language)}`}
             // [중요] Controlled Component 방식 사용 (value에 전적으로 의존)
@@ -489,7 +509,6 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
                 isDirtyRef.current = normalizedNew !== normalizedOrigin;
               }
             }}
-            onMount={handleEditorDidMount}
             options={{
               readOnly: readOnly,
               fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
@@ -500,6 +519,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
               scrollBeyondLastLine: false,
             }}
           />
+          {/* 코드 길이 표시 (정규화 기준) */}
+          <div className="absolute bottom-4 right-8 z-10 rounded bg-black/50 px-2 py-1 text-[10px] text-zinc-400 backdrop-blur-sm pointer-events-none">
+            Length: {(code || '').replace(/\r\n/g, '\n').trim().length} chars
+          </div>
         </div>
 
         {/* 확인 모달 */}
