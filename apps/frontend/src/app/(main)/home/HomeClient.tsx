@@ -60,9 +60,9 @@ export default function HomeClient({
   return (
     <div className="min-h-screen bg-background text-foreground p-4 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6 pt-2">
           {/* 왼쪽 메인 영역 */}
-          <div className="space-y-6 order-1 xl:order-1 min-w-0 pt-2">
+          <div className="space-y-6 order-1 xl:order-1 min-w-0">
             {/* 리그 변화 추이 */}
             <LeagueProgressChart initialData={initialLeagueProgress} />
             <div className="border border-card-border rounded-2xl bg-card overflow-hidden">
