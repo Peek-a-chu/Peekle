@@ -26,7 +26,8 @@ describe('CCSubmissionViewerModal', () => {
   const defaultProps = {
     isOpen: true,
     onClose: vi.fn(),
-    problemTitle: '1753. 최단경로',
+    problemTitle: '최단경로',
+    problemExternalId: '1753',
     submissions: mockSubmissions,
     onViewCode: vi.fn(),
   };
