@@ -79,6 +79,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/workbooks/**").permitAll() // [TEST] 문제집 API
                                                 .requestMatchers("/api/dev/users/**").permitAll()
                                                 .requestMatchers("/api/ranks/**").permitAll()
+                                                .requestMatchers("/api/recommendations/**").permitAll()
 
                                                 // WebSocket
                                                 .requestMatchers("/ws-stomp/**").permitAll()

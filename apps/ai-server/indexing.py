@@ -1,7 +1,10 @@
 import pandas as pd
-from embedding_service import index_problems
+from embedding_service import index_problems, clear_collection
 
 def run():
+    print("기존 데이터를 초기화하고 인덱싱을 시작합니다...")
+    clear_collection()
+    
     print("태그 정보가 포함된 CSV 파일에서 데이터를 가져오는 중...")
     try:
         # 1. CSV 읽기
@@ -13,8 +16,7 @@ def run():
         # 결측치(NaN) 처리: tags가 비어있을 수 있으므로 빈 문자열로 채움
         df = df.fillna('')
 
-        # 2. [핵심] 제목 + 티어 + 태그를 합쳐서 풍부한 학습 데이터 생성
-        # AI가 "이 문제는 이런 제목이고, 이런 난이도이며, 이런 알고리즘이다"라고 이해하게 합니다.
+        # 2. 제목 + 티어 + 태그를 합쳐서 학습 데이터 생성
         df['combined_text'] = (
             "제목: " + df['title'] + 
             ", 난이도: " + df['tier'] + 
