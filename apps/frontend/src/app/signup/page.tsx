@@ -240,7 +240,7 @@ function SignupForm() {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder="2~12자 한글/영문/숫자"
-                className={`w-full h-11 px-4 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all ${getInputBorderColor()}`}
+                className={`w-full h-11 px-4 border rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 transition-all ${getInputBorderColor()}`}
                 maxLength={12}
               />
               {validation.message && (
@@ -262,7 +262,7 @@ function SignupForm() {
                 value={bojId}
                 onChange={(e) => setBojId(e.target.value)}
                 placeholder="백준 아이디를 입력하세요"
-                className={`w-full h-11 px-4 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all ${getBojInputBorderColor()}`}
+                className={`w-full h-11 px-4 border rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 transition-all ${getBojInputBorderColor()}`}
               />
               {bojValidation.message && (
                 <p className={`mt-1.5 text-sm ${getBojValidationColor()}`}>

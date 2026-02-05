@@ -63,8 +63,7 @@ public class WorkbookService {
         // 3. 응답 생성
         List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
         int solvedCount = (int) problemResponses.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
-        int failedCount = (int) problemResponses.stream().filter(p -> "FAIL".equals(p.getStatus())).count();
-        return WorkbookResponse.of(workbook, false, true, solvedCount, failedCount, problemResponses);
+        return WorkbookResponse.of(workbook, false, true, solvedCount, problemResponses);
     }
 
     // 문제집 목록 조회
@@ -103,25 +102,16 @@ public class WorkbookService {
                 ? new HashSet<>(submissionLogRepository.findSuccessProblemIds(userId, allProblemIds))
                 : Set.of();
 
-        // 유저가 시도한 문제 ID 목록 조회
-        Set<Long> attemptedProblemIds = (userId != null && !allProblemIds.isEmpty())
-                ? new HashSet<>(submissionLogRepository.findAttemptedProblemIds(userId, allProblemIds))
-                : Set.of();
-
         List<WorkbookListResponse> content = workbooks.getContent().stream()
                 .map(workbook -> {
                     int problemCount = workbook.getProblems().size();
                     int solvedCount = (int) workbook.getProblems().stream()
                             .filter(wp -> successProblemIds.contains(wp.getProblem().getId()))
                             .count();
-                    int failedCount = (int) workbook.getProblems().stream()
-                            .filter(wp -> !successProblemIds.contains(wp.getProblem().getId())
-                                    && attemptedProblemIds.contains(wp.getProblem().getId()))
-                            .count();
                     boolean isBookmarked = user != null
                             && workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
                     boolean isOwner = user != null && workbook.getCreator().getId().equals(userId);
-                    return WorkbookListResponse.of(workbook, problemCount, solvedCount, failedCount, isBookmarked,
+                    return WorkbookListResponse.of(workbook, problemCount, solvedCount, isBookmarked,
                             isOwner);
                 })
                 .toList();
@@ -152,9 +142,8 @@ public class WorkbookService {
 
         List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
         int solvedCount = (int) problemResponses.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
-        int failedCount = (int) problemResponses.stream().filter(p -> "FAIL".equals(p.getStatus())).count();
 
-        return WorkbookResponse.of(workbook, isBookmarked, isOwner, solvedCount, failedCount, problemResponses);
+        return WorkbookResponse.of(workbook, isBookmarked, isOwner, solvedCount, problemResponses);
     }
 
     // 문제집 수정
@@ -185,9 +174,8 @@ public class WorkbookService {
         boolean isBookmarked = workbookBookmarkRepository.existsByWorkbookAndUser(workbook, user);
         List<WorkbookProblemResponse> problemResponses = getWorkbookProblems(workbook, userId);
         int solvedCount = (int) problemResponses.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
-        int failedCount = (int) problemResponses.stream().filter(p -> "FAIL".equals(p.getStatus())).count();
 
-        return WorkbookResponse.of(workbook, isBookmarked, true, solvedCount, failedCount, problemResponses);
+        return WorkbookResponse.of(workbook, isBookmarked, true, solvedCount, problemResponses);
     }
 
     // 문제집 삭제

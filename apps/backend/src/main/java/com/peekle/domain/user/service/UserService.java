@@ -286,6 +286,7 @@ public class UserService {
                 .isSolvedToday(isSolvedToday)
                 .groupRank(statusDto.getGroupRank())
                 .leagueStatus(statusDto.getLeagueStatus())
+                .bojId(user.getBojId())
                 .build();
     }
 

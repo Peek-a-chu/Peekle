@@ -326,7 +326,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleSubmit = (): void => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
-        const { selectedProblemId } = useRoomStore.getState();
+        const { selectedProblemId, selectedProblemExternalId } = useRoomStore.getState();
 
         if (!selectedProblemId) {
           toast.error('선택된 문제가 없습니다.');
@@ -341,6 +341,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
             type: 'PEEKLE_SUBMIT_CODE',
             payload: {
               problemId,
+              externalId: selectedProblemExternalId,
               code: value,
               language: language, // 'python', 'java', 'cpp' 등
               studyId: studyId, // <--- Inject Study ID from params

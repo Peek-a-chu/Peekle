@@ -142,9 +142,6 @@ export function WorkbooksRightPanel({
             </span>
             <span className="font-bold flex items-center gap-1">
               <span className="text-green-500">{workbook.solvedCount}</span>
-              {workbook.failedCount > 0 && (
-                <span className="text-red-500">+{workbook.failedCount}</span>
-              )}
               <span className="text-muted-foreground">/ {workbook.problemCount}</span>
             </span>
           </div>
@@ -153,12 +150,6 @@ export function WorkbooksRightPanel({
               className="h-full bg-green-500 transition-all duration-500"
               style={{
                 width: `${workbook.problemCount > 0 ? (workbook.solvedCount / workbook.problemCount) * 100 : 0}%`,
-              }}
-            />
-            <div
-              className="h-full bg-red-500 transition-all duration-500"
-              style={{
-                width: `${workbook.problemCount > 0 ? (workbook.failedCount / workbook.problemCount) * 100 : 0}%`,
               }}
             />
           </div>

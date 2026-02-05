@@ -104,7 +104,7 @@ export function CCInlineCalendar({
           day: 'h-8 w-8 text-center text-sm p-0',
           day_button:
             'h-8 w-8 p-0 font-normal rounded-md inline-flex items-center justify-center transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
-          selected: 'bg-primary text-white hover:bg-primary/90 focus:bg-primary/90',
+          selected: 'bg-primary text-whit rounded-md hover:bg-primary/90 focus:bg-primary/90',
           today: 'bg-muted font-semibold',
           outside: 'text-muted-foreground/40',
           disabled: 'text-muted-foreground/30 cursor-not-allowed hover:bg-transparent',

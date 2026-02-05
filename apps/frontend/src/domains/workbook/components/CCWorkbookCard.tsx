@@ -24,10 +24,6 @@ export function CCWorkbookCard({
     workbook.problemCount > 0
       ? (workbook.solvedCount / workbook.problemCount) * 100
       : 0;
-  const failPercent =
-    workbook.problemCount > 0
-      ? (workbook.failedCount / workbook.problemCount) * 100
-      : 0;
 
   return (
     <div
@@ -71,9 +67,6 @@ export function CCWorkbookCard({
                 <span className="text-muted-foreground">진행률</span>
                 <span className="font-medium">
                   <span className="text-green-500">{workbook.solvedCount}</span>
-                  {workbook.failedCount > 0 && (
-                    <span className="text-red-500">+{workbook.failedCount}</span>
-                  )}
                   <span className="text-muted-foreground">/{workbook.problemCount}</span>
                 </span>
               </div>
@@ -81,10 +74,6 @@ export function CCWorkbookCard({
                 <div
                   className="h-full bg-green-500 transition-all"
                   style={{ width: `${successPercent}%` }}
-                />
-                <div
-                  className="h-full bg-red-500 transition-all"
-                  style={{ width: `${failPercent}%` }}
                 />
               </div>
             </div>
