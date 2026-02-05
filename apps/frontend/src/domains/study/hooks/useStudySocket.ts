@@ -118,6 +118,7 @@ export const useStudySocketSubscription = (studyId: number) => {
 
   // useRef는 컴포넌트 최상위 레벨에서만 호출 가능
   const currentUserIdRef = useRef(currentUserId);
+  const recentProblemEventRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!client || !connected || !studyId) return;
@@ -346,8 +347,19 @@ export const useStudySocketSubscription = (studyId: number) => {
               break;
             }
             const addedProblemId = data.problemId;
-            const problemTitle = data.title || data.externalId || `문제 ${addedProblemId}`;
             const externalId = data.externalId || String(addedProblemId);
+            const dedupeKey = `ADD:${studyId}:${addedProblemId}:${externalId}`;
+            const now = Date.now();
+            const lastTime = recentProblemEventRef.current.get(dedupeKey);
+            if (lastTime && now - lastTime < 1000) {
+              break;
+            }
+            recentProblemEventRef.current.set(dedupeKey, now);
+            // Cleanup old entries to avoid unbounded growth
+            for (const [key, ts] of recentProblemEventRef.current.entries()) {
+              if (now - ts > 5000) recentProblemEventRef.current.delete(key);
+            }
+            const problemTitle = data.title || data.externalId || `문제 ${addedProblemId}`;
             console.log('[StudySocket] Problem added:', addedProblemId, 'Full data:', data);
             window.dispatchEvent(
               new CustomEvent('study-problem-added', {
@@ -365,8 +377,18 @@ export const useStudySocketSubscription = (studyId: number) => {
               break;
             }
             const removedProblemId = data.problemId;
-            const problemTitle = data.title || data.externalId || `문제 ${removedProblemId}`;
             const externalId = data.externalId || String(removedProblemId);
+            const dedupeKey = `REMOVE:${studyId}:${removedProblemId}:${externalId}`;
+            const now = Date.now();
+            const lastTime = recentProblemEventRef.current.get(dedupeKey);
+            if (lastTime && now - lastTime < 1000) {
+              break;
+            }
+            recentProblemEventRef.current.set(dedupeKey, now);
+            for (const [key, ts] of recentProblemEventRef.current.entries()) {
+              if (now - ts > 5000) recentProblemEventRef.current.delete(key);
+            }
+            const problemTitle = data.title || data.externalId || `문제 ${removedProblemId}`;
             console.log('[StudySocket] Problem removed:', removedProblemId, 'Full data:', data);
             window.dispatchEvent(
               new CustomEvent('study-problem-removed', {
