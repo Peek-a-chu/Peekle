@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ActionModal } from '@/components/common/Modal';
 import { GamePlayHeader } from '@/domains/game/components/game-play-header';
 import { GameProblemListPanel } from '@/domains/game/components/game-problem-list-panel';
 import { GamePlayCenterPanel } from '@/domains/game/components/game-play-center-panel';
@@ -34,6 +35,7 @@ interface GamePlayLayoutProps {
   currentUserId: number;
   onSendMessage: (content: string) => void;
   onLeave: () => void;
+  onForfeit: () => void;
 }
 
 export function GamePlayLayout({
@@ -53,9 +55,11 @@ export function GamePlayLayout({
   currentUserId,
   onSendMessage,
   onLeave,
+  onForfeit,
 }: GamePlayLayoutProps) {
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
+  const [isForfeitModalOpen, setIsForfeitModalOpen] = useState(false);
 
   // 미디어 상태 관리 (Mock)
   const [micState, setMicState] = useState<Record<string, boolean>>({});
@@ -87,6 +91,15 @@ export function GamePlayLayout({
     }));
   };
 
+  const handleForfeitClick = () => {
+    setIsForfeitModalOpen(true);
+  };
+
+  const handleConfirmForfeit = () => {
+    setIsForfeitModalOpen(false);
+    onForfeit();
+  };
+
   return (
     <div className={cn('flex h-screen flex-col bg-background', className)}>
       {/* 헤더 */}
@@ -97,6 +110,7 @@ export function GamePlayLayout({
         formattedTime={formattedTime}
         scores={gameState.scores || { RED: 0, BLUE: 0 }}
         onLeave={onLeave}
+        onForfeit={handleForfeitClick}
       />
 
       {/* 메인 콘텐츠 */}
@@ -240,6 +254,18 @@ export function GamePlayLayout({
           teamType: gameState.teamType,
           playTime: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.clearTime || 0,
         }}
+      />
+
+      {/* 포기 확인 모달 */}
+      <ActionModal
+        isOpen={isForfeitModalOpen}
+        onClose={() => setIsForfeitModalOpen(false)}
+        onConfirm={handleConfirmForfeit}
+        title="게임 포기"
+        description="정말로 게임을 포기하시겠습니까? 포기하면 다시 돌아올 수 없으며 기록에 남습니다."
+        cancelText="취소"
+        confirmText="포기하기"
+        variant="destructive"
       />
     </div>
   );

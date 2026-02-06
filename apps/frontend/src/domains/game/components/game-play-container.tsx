@@ -27,6 +27,7 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
     sendMessage,
     submitCode,
     leaveRoom,
+    forfeitGame,
   } = useGamePlayRoom(roomId);
 
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
@@ -63,6 +64,7 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
           currentUserId={currentUserId}
           onSendMessage={sendMessage}
           onLeave={leaveRoom}
+          onForfeit={forfeitGame}
         />
       </GameLiveKitWrapper>
 

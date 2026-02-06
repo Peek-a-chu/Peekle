@@ -54,7 +54,11 @@ public enum ErrorCode {
     WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다."),
 
     // League
-    LEAGUE_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "LEAGUE_001", "리그 기록을 찾을 수 없습니다.");
+    LEAGUE_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "LEAGUE_001", "리그 기록을 찾을 수 없습니다."),
+
+    // Game
+    GAME_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "GAME_001", "게임 방을 찾을 수 없습니다."),
+    GAME_INVALID_ROOM_DATA(HttpStatus.INTERNAL_SERVER_ERROR, "GAME_002", "게임 방 데이터가 손상되었습니다.");
 
     private final HttpStatus status;
     private final String code;

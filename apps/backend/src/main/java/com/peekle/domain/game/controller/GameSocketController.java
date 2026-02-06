@@ -141,6 +141,15 @@ public class GameSocketController {
         gameService.kickParticipant(request.getGameId(), userId, request.getTargetUserId());
     }
 
+    // 게임 포기
+    @MessageMapping("/games/forfeit")
+    public void forfeit(@Payload GameCommonRequest request, SimpMessageHeaderAccessor headerAccessor) {
+        Long userId = getUserId(headerAccessor);
+        if (userId == null)
+            return;
+        gameService.forfeitGameRoom(request.getGameId(), userId);
+    }
+
     private Long getUserId(SimpMessageHeaderAccessor headerAccessor) {
         Object userIdObj = headerAccessor.getSessionAttributes().get("userId");
         if (userIdObj == null) {

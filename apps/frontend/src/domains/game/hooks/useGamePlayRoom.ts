@@ -57,6 +57,7 @@ interface UseGamePlayRoomReturn {
   // 액션
   submitCode: () => void;
   leaveRoom: () => void;
+  forfeitGame: () => void;
 }
 
 const DEFAULT_CODE: Record<string, string> = {
@@ -472,11 +473,30 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     }
   }, [selectedProblemId, gameState, currentCode, currentLanguage, client, connected, roomId]);
 
-  // 퇴장 처리
+  // 퇴장 처리 (잠시 나가기 - PLAYING/END 상태에서는 Redis 유지)
   const leaveRoom = useCallback(() => {
+    // WebSocket 메시지 전송
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/games/leave',
+        body: JSON.stringify({ gameId: roomId }),
+      });
+    }
     router.push('/game');
     toast.info('대기실로 이동합니다.');
-  }, [router]);
+  }, [client, connected, roomId, router]);
+
+  // 게임 포기 처리 (포기하기 - 모든 상태에서 Redis 삭제)
+  const forfeitGame = useCallback(() => {
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/games/forfeit',
+        body: JSON.stringify({ gameId: roomId }),
+      });
+      toast.warning('게임을 포기했습니다.');
+      router.push('/game');
+    }
+  }, [client, connected, roomId, router]);
 
   return {
     gameState,
@@ -496,5 +516,6 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     sendMessage,
     submitCode,
     leaveRoom,
+    forfeitGame,
   };
 }
