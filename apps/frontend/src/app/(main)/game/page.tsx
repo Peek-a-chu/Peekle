@@ -67,6 +67,9 @@ export default function GamesPage(): React.ReactNode {
             rooms={filteredRooms}
             onRoomClick={handleRoomClick}
             onResetFilters={resetFilters}
+            searchQuery={searchQuery}
+            selectedMode={selectedMode}
+            statusFilter={statusFilter}
           />
         </div>
       </div>
