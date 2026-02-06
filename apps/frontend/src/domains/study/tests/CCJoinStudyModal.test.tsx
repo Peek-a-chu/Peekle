@@ -43,7 +43,7 @@ describe('CCJoinStudyModal', () => {
 
     await waitFor(() => {
       expect(mockJoinStudy).toHaveBeenCalledWith('ABC123');
-      expect(defaultProps.onSuccess).toHaveBeenCalledWith(1);
+      expect(defaultProps.onSuccess).toHaveBeenCalledWith({ id: 1, title: 'Test', role: 'MEMBER', members: [] });
     });
   });
 
