@@ -262,7 +262,7 @@ export function GamePlayLayout({
         onClose={() => setIsForfeitModalOpen(false)}
         onConfirm={handleConfirmForfeit}
         title="게임 포기"
-        description="정말로 게임을 포기하시겠습니까? 포기하면 다시 돌아올 수 없으며 기록에 남습니다."
+        description="정말로 게임을 포기하시겠습니까? 포기하면 게임에 다시 참여할 수 없습니다."
         cancelText="취소"
         confirmText="포기하기"
         variant="destructive"

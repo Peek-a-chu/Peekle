@@ -270,9 +270,14 @@ public class RedisGameService {
             log.info("User {} assigned to Team {} in Room {}", userId, assignedTeam, roomId);
         }
 
-        // ENTER 이벤트 발행
+        // ENTER 이벤트 발행 (닉네임 포함)
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("ENTER", userId));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Map<String, Object> enterData = Map.of(
+                "userId", userId,
+                "nickname", user.getNickname());
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("ENTER", enterData));
 
         redisTemplate.opsForValue().set(
                 String.format(RedisKeyConst.USER_CURRENT_GAME, userId),
@@ -336,9 +341,14 @@ public class RedisGameService {
         // 2. PLAYING/END 상태: Redis 유지하고 LEAVE 이벤트만 발행 (재접속 가능)
         if ("PLAYING".equals(status) || "END".equals(status)) {
             log.info("User {} temporarily left game room {} ({}). Allowing reconnection.", userId, roomId, status);
-            // LEAVE 이벤트 발행 (UI 업데이트용)
+            // LEAVE 이벤트 발행 (닉네임 포함)
             String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", userId));
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            Map<String, Object> leaveData = Map.of(
+                    "userId", userId,
+                    "nickname", user.getNickname());
+            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", leaveData));
             // Redis 데이터는 유지 (재접속 가능)
             return;
         }
@@ -358,9 +368,14 @@ public class RedisGameService {
                 String.valueOf(userId));
         redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId), String.valueOf(userId));
 
-        // LEAVE 이벤트 발행
+        // LEAVE 이벤트 발행 (닉네임 포함)
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", userId));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Map<String, Object> leaveData = Map.of(
+                "userId", userId,
+                "nickname", user.getNickname());
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", leaveData));
 
         // 남은 인원 확인
         Long remainingCount = redisTemplate.opsForSet().size(playersKey);
@@ -384,9 +399,13 @@ public class RedisGameService {
 
                     // 방 정보에 새로운 방장 업데이트
                     redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
-
-                    // HOST_CHANGE 이벤트 발행 (아이콘 변경용)
-                    redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", newHostId));
+                    // HOST_CHANGE 이벤트 발행 (닉네임 포함)
+                    User newHost = userRepository.findById(Long.valueOf(newHostId))
+                            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                    Map<String, Object> hostChangeData = Map.of(
+                            "newHostId", newHostId,
+                            "newHostNickname", newHost.getNickname());
+                    redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", hostChangeData));
                     log.info("Game Room {} Host Changed: {} -> {}", roomId, userId, newHostId);
                 }
             }
@@ -411,9 +430,14 @@ public class RedisGameService {
                 String.valueOf(userId));
         redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId), String.valueOf(userId));
 
-        // 4. FORFEIT 이벤트 발행
+        // 4. FORFEIT 이벤트 발행 (닉네임 포함)
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("FORFEIT", Map.of("userId", userId)));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Map<String, Object> forfeitData = Map.of(
+                "userId", userId,
+                "nickname", user.getNickname());
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("FORFEIT", forfeitData));
 
         // 5. 남은 인원 확인 및 방장 위임 (exitGameRoom과 동일)
         Long remainingCount = redisTemplate.opsForSet().size(playersKey);
@@ -432,7 +456,13 @@ public class RedisGameService {
                     String newHostId = String.valueOf(newHostIdObj);
 
                     redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
-                    redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", newHostId));
+                    // HOST_CHANGE 이벤트 발행 (닉네임 포함)
+                    User newHost = userRepository.findById(Long.valueOf(newHostId))
+                            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                    Map<String, Object> hostChangeData = Map.of(
+                            "newHostId", newHostId,
+                            "newHostNickname", newHost.getNickname());
+                    redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", hostChangeData));
                     log.info("Game Room {} Host Changed after forfeit: {} -> {}", roomId, userId, newHostId);
                 }
             }
@@ -488,6 +518,69 @@ public class RedisGameService {
         data.put("userId", userId);
         data.put("isReady", next);
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("READY", data));
+    }
+
+    /**
+     * 유저 강퇴 (방장만 가능)
+     * 강퇴된 유저는 즉시 퇴장 처리되며, LEAVE 이벤트 대신 KICK 이벤트가 발행됨.
+     */
+    public void kickUser(Long roomId, Long userId, Long targetUserId) {
+        // 1. 방장 검증
+        String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+        String hostIdStr = (String) redisTemplate.opsForHash().get(infoKey, "hostId");
+        if (hostIdStr == null || !hostIdStr.equals(String.valueOf(userId))) {
+            throw new IllegalStateException("방장만 유저를 강퇴할 수 있습니다.");
+        }
+        if (userId.equals(targetUserId)) {
+            throw new IllegalStateException("자기 자신을 강퇴할 수 없습니다.");
+        }
+
+        log.info("User {} (Host) kicking user {} from game room {}", userId, targetUserId, roomId);
+
+        // 2. 강퇴 대상 유저의 Redis 데이터 삭제
+        // 참여자 목록(Set)에서 제거
+        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+        redisTemplate.opsForSet().remove(playersKey, String.valueOf(targetUserId));
+
+        // 유저의 현재 게임 정보 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, targetUserId));
+
+        // 부가 정보 제거 (Ready, Team)
+        redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId),
+                String.valueOf(targetUserId));
+        redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId),
+                String.valueOf(targetUserId));
+
+        // KICK 이벤트 발행 (닉네임 포함)
+        String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
+        User kickedUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Map<String, Object> kickData = Map.of(
+                "userId", targetUserId,
+                "nickname", kickedUser.getNickname(),
+                "message", "방장에 의해 강퇴되었습니다.");
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("KICK", kickData));
+
+        // 방장 위임 체크 (강퇴된 사람이 방장이었을 경우)
+        // infoKey와 hostIdStr은 이미 위에서 가져왔으므로 재사용
+        if (hostIdStr != null && hostIdStr.equals(String.valueOf(targetUserId))) {
+            // playersKey도 이미 위에서 가져왔으므로 재사용
+            Set<Object> members = redisTemplate.opsForSet().members(playersKey);
+            if (members != null && !members.isEmpty()) {
+                Object newHostIdObj = members.iterator().next();
+                String newHostId = String.valueOf(newHostIdObj);
+
+                redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+                // HOST_CHANGE 이벤트 발행 (닉네임 포함)
+                User newHost = userRepository.findById(Long.valueOf(newHostId))
+                        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                Map<String, Object> hostChangeData = Map.of(
+                        "newHostId", newHostId,
+                        "newHostNickname", newHost.getNickname());
+                redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", hostChangeData));
+                log.info("Game Room {} Host Changed after kick: {} -> {}", roomId, targetUserId, newHostId);
+            }
+        }
     }
 
     // 게임 시작
@@ -827,15 +920,55 @@ public class RedisGameService {
             throw new IllegalStateException("방장만 강퇴할 수 있습니다.");
         }
 
-        // 2. 강퇴 대상 퇴장 처리 (기존 exit 로직 재사용)
-        exitGameRoom(gameId, targetUserId);
+        log.info("User {} (Host) kicking user {} from game room {}", hostId, targetUserId, gameId);
 
-        // 3. KICK 이벤트 발행 (클라이언트가 이를 받고 목록 갱신 + 알림)
+        // 2. 강퇴 대상 유저의 Redis 데이터 삭제 (exitGameRoom 대신 직접 처리)
+        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, gameId);
+        redisTemplate.opsForSet().remove(playersKey, String.valueOf(targetUserId));
+
+        // 유저의 현재 게임 정보 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, targetUserId));
+
+        // 부가 정보 제거 (Ready, Team)
+        redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, gameId),
+                String.valueOf(targetUserId));
+        redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, gameId),
+                String.valueOf(targetUserId));
+
+        // 3. KICK 이벤트 발행 (닉네임 포함)
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, gameId);
-        Map<String, Object> kickData = new HashMap<>();
-        kickData.put("userId", targetUserId);
-        kickData.put("message", "방장에 의해 강퇴되었습니다.");
+        User kickedUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Map<String, Object> kickData = Map.of(
+                "userId", targetUserId,
+                "nickname", kickedUser.getNickname(),
+                "message", "방장에 의해 강퇴되었습니다.");
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("KICK", kickData));
+
+        // 4. 남은 인원 확인 및 방장 위임
+        Long remainingCount = redisTemplate.opsForSet().size(playersKey);
+
+        if (remainingCount != null && remainingCount == 0) {
+            log.info("🗑️ Game Room {} is empty after kick. Deleting immediately.", gameId);
+            deleteGameRoom(gameId);
+        } else if (realHostId != null && realHostId.equals(String.valueOf(targetUserId))) {
+            // 강퇴된 사람이 방장이었을 경우 방장 위임
+            Set<Object> members = redisTemplate.opsForSet().members(playersKey);
+            if (members != null && !members.isEmpty()) {
+                Object newHostIdObj = members.iterator().next();
+                String newHostId = String.valueOf(newHostIdObj);
+
+                redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+                // HOST_CHANGE 이벤트 발행 (닉네임 포함)
+                User newHost = userRepository.findById(Long.valueOf(newHostId))
+                        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                Map<String, Object> hostChangeData = Map.of(
+                        "newHostId", newHostId,
+                        "newHostNickname", newHost.getNickname());
+                redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", hostChangeData));
+                log.info("Game Room {} Host Changed after kick: {} -> {}", gameId, targetUserId, newHostId);
+            }
+        }
     }
 
     // 방 목록 조회

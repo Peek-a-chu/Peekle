@@ -84,6 +84,18 @@ export function WaitingRoomChatPanel({
                     <CardContent className="flex-1 overflow-y-auto p-3">
                         <div className="space-y-3">
                             {messages.map((message) => {
+                                // 시스템 메시지 렌더링
+                                if (message.type === 'SYSTEM') {
+                                    return (
+                                        <div key={message.id} className="flex justify-center py-1">
+                                            <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                                                {message.content}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                // 일반 메시지 렌더링
                                 const isMe = message.senderId === currentUserId;
                                 return (
                                     <div

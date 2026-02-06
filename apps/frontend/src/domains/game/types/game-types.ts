@@ -48,6 +48,7 @@ export interface ChatMessage {
     content: string;
     timestamp: number | string;
     senderTeam?: Team;
+    type?: 'USER' | 'SYSTEM'; // 일반 메시지 vs 시스템 메시지
 }
 
 export interface GameProblem {
