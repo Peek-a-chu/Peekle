@@ -4,6 +4,7 @@ import { Users, Clock, FileText, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { UserIcon } from '@/components/UserIcon';
 import type { GameRoom } from '@/domains/game/types/game-types';
 
 interface GameRoomCardProps {
@@ -72,9 +73,7 @@ export function GameRoomCard({ room, onClick }: GameRoomCardProps) {
 
         {/* 하단: 호스트 정보 */}
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-primary to-purple-500 text-xs font-medium text-white">
-            {room.host.nickname.charAt(0)}
-          </div>
+          <UserIcon src={room.host.profileImg} nickname={room.host.nickname} size={24} />
           <span className="text-sm text-muted-foreground">{room.host.nickname}</span>
         </div>
       </CardContent>
