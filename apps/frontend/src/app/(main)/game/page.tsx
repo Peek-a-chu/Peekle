@@ -2,7 +2,6 @@
 
 import { GameCreationModal } from '@/domains/game/components/game-creation-modal';
 import { PasswordModal } from '@/domains/game/components/password-modal';
-import { InviteCodeJoinModal } from '@/domains/game/components/invite-code-join-modal';
 import { GameReconnectModal } from '@/domains/game/components/game-reconnect-modal';
 import { useGamePageLogic } from '@/domains/game/hooks/useGamePageLogic';
 import { useCurrentGame } from '@/domains/game/hooks/useCurrentGame';
@@ -18,19 +17,16 @@ export default function GamesPage(): React.ReactNode {
     passwordModalOpen,
     selectedRoom,
     createModalOpen,
-    inviteJoinModalOpen,
     filteredRooms,
     isCreatingRoom,
     setCreateModalOpen,
     setPasswordModalOpen,
-    setInviteJoinModalOpen,
     // setSelectedRoom, // Not directly used in JSX
     setSearchQuery,
     setStatusFilter,
     handleModeSelect,
     handleRoomClick,
     handlePasswordSubmit,
-    handleInviteCodeJoin,
     handleCreateRoom,
     resetFilters,
   } = useGamePageLogic();
@@ -53,7 +49,6 @@ export default function GamesPage(): React.ReactNode {
           {/* 헤더 */}
           <GameLayoutHeader
             onCreateClick={() => setCreateModalOpen(true)}
-            onJoinWithCodeClick={() => setInviteJoinModalOpen(true)}
           />
 
           {/* 필터 섹션 (모드 선택, 검색, 상태 탭) */}
@@ -105,12 +100,7 @@ export default function GamesPage(): React.ReactNode {
         onSubmit={handlePasswordSubmit}
       />
 
-      {/* 참여 코드로 입장 모달 */}
-      <InviteCodeJoinModal
-        open={inviteJoinModalOpen}
-        onOpenChange={setInviteJoinModalOpen}
-        onSubmit={handleInviteCodeJoin}
-      />
+
     </>
   );
 }
