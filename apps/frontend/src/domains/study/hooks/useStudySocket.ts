@@ -153,6 +153,38 @@ export const useStudySocketSubscription = (studyId: number) => {
     let privateSubscription: any = null;
     let videoTokenSubscription: any = null;
 
+    const clearOnlineSyncTimer = () => {
+      if (onlineSyncTimerRef.current) {
+        window.clearInterval(onlineSyncTimerRef.current);
+        onlineSyncTimerRef.current = null;
+      }
+    };
+
+    const requestOnlineUsers = () => {
+      if (!client || !client.connected) return;
+      client.publish({
+        destination: '/pub/studies/online-users',
+        body: JSON.stringify({ studyId }),
+      });
+    };
+
+    const startOnlineSyncRetries = () => {
+      if (onlineSyncTimerRef.current || onlineSyncSeenRef.current) return;
+      onlineSyncAttemptsRef.current = 0;
+      onlineSyncTimerRef.current = window.setInterval(() => {
+        if (!client || !client.connected) return;
+        if (onlineSyncSeenRef.current) {
+          clearOnlineSyncTimer();
+          return;
+        }
+        onlineSyncAttemptsRef.current += 1;
+        requestOnlineUsers();
+        if (onlineSyncAttemptsRef.current >= 5) {
+          clearOnlineSyncTimer();
+        }
+      }, 1000);
+    };
+
     const subscribeToPrivateTopics = () => {
       // Use Ref to ensure we escape stale closures if called via interval
       const effectiveUserId = currentUserIdRef.current;
@@ -206,6 +238,15 @@ export const useStudySocketSubscription = (studyId: number) => {
     // 초기 구독 시도
     subscribeToPrivateTopics();
 
+    // 1. Enter Study (send once when connected; server reads userId from session)
+    if (!sentEnterRef.current) {
+      sentEnterRef.current = true;
+      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId });
+      client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
+    }
+
+    // NOTE: No long polling here. We only retry a few times until ONLINE_USERS arrives.
+
     // Helper to handle messages
     const handleSocketMessage = async (message: any) => {
       if (!message.body) {
@@ -224,22 +265,6 @@ export const useStudySocketSubscription = (studyId: number) => {
             const enteredUserId = data;
             // Optimistic update for immediate feedback
             updateParticipant(enteredUserId, { isOnline: true });
-
-            try {
-              const members = await fetchStudyParticipants(studyId);
-              // Ensure the entering user is marked online, in case API is slightly behind
-              const updatedMembers = members.map((p) =>
-                p.id === enteredUserId ? { ...p, isOnline: true } : p,
-              );
-              setParticipants(updatedMembers);
-
-              const enteredMember = updatedMembers.find((p) => p.id === enteredUserId);
-              if (enteredMember && enteredUserId !== useRoomStore.getState().currentUserId) {
-                toast.info(`${enteredMember.nickname}님이 입장하셨습니다.`);
-              }
-            } catch (e) {
-              console.error('Failed to refresh participants on ENTER', e);
-            }
             break;
           }
           case 'LEAVE': {
@@ -308,6 +333,46 @@ export const useStudySocketSubscription = (studyId: number) => {
             const { title, description } = data;
             setRoomInfo({ roomTitle: title, roomDescription: description });
             toast.info('스터디 정보가 변경되었습니다.');
+            break;
+          }
+          case 'ONLINE_USERS': {
+            onlineSyncSeenRef.current = true;
+            clearOnlineSyncTimer();
+            const onlineIds = Array.isArray(data)
+              ? data.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+              : [];
+            const onlineSet = new Set<number>(onlineIds);
+
+            const state = useRoomStore.getState();
+            const missingOnline =
+              onlineIds.length > 0 &&
+              state.participants &&
+              onlineIds.some((id) => !state.participants.find((p) => Number(p.id) === id));
+
+            if (!state.participants || state.participants.length === 0 || missingOnline) {
+              try {
+                const members = await fetchStudyParticipants(studyId);
+                setParticipants(
+                  members.map((member) => ({
+                    ...member,
+                    id: Number(member.id),
+                    isOnline: onlineSet.has(Number(member.id)),
+                    isOwner: member.isOwner ?? false,
+                    isMuted: member.isMuted ?? false,
+                    isVideoOff: member.isVideoOff ?? false,
+                  })),
+                );
+              } catch (e) {
+                console.error('Failed to sync participants from ONLINE_USERS', e);
+              }
+            } else {
+              setParticipants(
+                state.participants.map((p) => ({
+                  ...p,
+                  isOnline: onlineSet.has(Number(p.id)),
+                })),
+              );
+            }
             break;
           }
           case 'STATUS': {
@@ -481,6 +546,10 @@ export const useStudySocketSubscription = (studyId: number) => {
     return () => {
       console.log('[StudySocket] Hook cleanup triggered');
       clearInterval(resubscribeInterval);
+      if (onlineSyncTimerRef.current) {
+        window.clearInterval(onlineSyncTimerRef.current);
+        onlineSyncTimerRef.current = null;
+      }
       publicSubscription.unsubscribe();
       curriculumSubscription.unsubscribe();
       if (privateSubscription) privateSubscription.unsubscribe();

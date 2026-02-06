@@ -28,6 +28,7 @@ import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
+import { useStudyPresenceSync } from '@/domains/study/hooks/useStudyPresenceSync';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -53,7 +54,8 @@ function StudySocketInitiator({ studyId }: { studyId: number }) {
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { localParticipant } = useLocalParticipant();
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  useStudyPresenceSync();
 
   // Listen for participant events and Handle Enter/Leave
   // MOVED TO StudySocketInitiator
@@ -78,6 +80,9 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
   const setParticipants = useRoomStore((state) => state.setParticipants);
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
+  const participants = useRoomStore((state) => state.participants);
+  const currentUserId = useRoomStore((state) => state.currentUserId);
+  const updateParticipant = useRoomStore((state) => state.updateParticipant);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
   const openSettingsModal = useSettingsStore((state) => state.openModal);
@@ -127,6 +132,37 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     resetToOnlyMine();
   }, [setSelectedProblem, resetToOnlyMine]);
 
+  // [Fix] Sync Local Media State with Store (Address Entry Sync Issue)
+  useEffect(() => {
+    // Wait for user and participants to be loaded
+    if (!currentUserId || !localParticipant) return;
+
+    // Determine Real State
+    const realIsMuted = !isMicrophoneEnabled;
+    const realIsVideoOff = !isCameraEnabled;
+
+    const me = participants.find((p) => p.id === currentUserId);
+
+    // If Store State differs from Real State, update Store
+    if (me && (me.isMuted !== realIsMuted || me.isVideoOff !== realIsVideoOff)) {
+      console.log('[MediaSync] Syncing store to match local device', {
+        storeMuted: me.isMuted,
+        realMuted: realIsMuted,
+      });
+      updateParticipant(currentUserId, { isMuted: realIsMuted, isVideoOff: realIsVideoOff });
+      // Also notify server via socket
+      updateStatus(realIsMuted, realIsVideoOff);
+    }
+  }, [
+    currentUserId,
+    participants,
+    localParticipant,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    updateParticipant,
+    updateStatus,
+  ]);
+
   // API Hooks
   const { problems, addProblem, deleteProblem } = useProblems(
     studyId,
@@ -142,19 +178,24 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     setCurrentDate(formatDate(new Date()));
 
     fetchStudyParticipants(studyId)
-      .then((participants) =>
+      .then((participants) => {
+        const current = useRoomStore.getState().participants;
+        const currentMap = new Map(current.map((p) => [p.id, p]));
         setParticipants(
-          participants.map((p) => ({
-            id: Number(p.userId),
-            odUid: '', // Not available from static list
-            nickname: p.nickname,
-            isOwner: p.isOwner ?? false,
-            isMuted: p.isMuted ?? false,
-            isVideoOff: p.isVideoOff ?? false,
-            isOnline: p.isOnline ?? false,
-          })),
-        ),
-      )
+          participants.map((p) => {
+            const id = Number(p.id);
+            const existing = currentMap.get(id);
+            return {
+              ...p,
+              id,
+              isOwner: p.isOwner ?? existing?.isOwner ?? false,
+              isMuted: existing?.isMuted ?? p.isMuted ?? false,
+              isVideoOff: existing?.isVideoOff ?? p.isVideoOff ?? false,
+              isOnline: Boolean(existing?.isOnline) || Boolean(p.isOnline),
+            };
+          }),
+        );
+      })
       .catch((err) => console.error('Failed to fetch participants:', err));
   }, [studyId, setCurrentDate, setParticipants, user]);
 

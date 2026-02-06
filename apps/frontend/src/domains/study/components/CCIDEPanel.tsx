@@ -356,6 +356,17 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         );
 
         toast.info('자동 제출을 시작합니다...');
+
+        // Notify problem list to refresh solved counts after submission
+        window.dispatchEvent(
+          new CustomEvent('study-problem-submitted', {
+            detail: {
+              studyId,
+              problemId: selectedProblemId,
+              externalId: selectedProblemExternalId ?? null,
+            },
+          }),
+        );
       }
     };
 

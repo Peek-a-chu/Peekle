@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
 import { getProblemIdByExternalId } from '@/domains/study/api/problemApi';
@@ -21,6 +21,7 @@ export interface Problem {
 export function useProblems(studyId: number, dateString?: string) {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const refreshTimersRef = useRef<number[]>([]);
 
   const fetchProblems = useCallback(async () => {
     if (!studyId) return;
@@ -118,9 +119,28 @@ export function useProblems(studyId: number, dateString?: string) {
       }
     };
 
+    const handleProblemSubmitted = (event: CustomEvent) => {
+      const { studyId: eventStudyId } = event.detail;
+      if (eventStudyId !== studyId) return;
+
+      // Clear any pending refreshes to avoid piling up
+      refreshTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      refreshTimersRef.current = [];
+
+      // Submission results can be delayed on the backend; retry a few times.
+      const delays = [1200, 3500, 8000];
+      delays.forEach((delay) => {
+        const timerId = window.setTimeout(() => {
+          fetchProblems();
+        }, delay);
+        refreshTimersRef.current.push(timerId);
+      });
+    };
+
     window.addEventListener('study-problem-added', handleProblemAdded as EventListener);
     window.addEventListener('study-problem-removed', handleProblemRemoved as EventListener);
     window.addEventListener('study-curriculum-updated', handleCurriculumUpdated as EventListener);
+    window.addEventListener('study-problem-submitted', handleProblemSubmitted as EventListener);
 
     return () => {
       window.removeEventListener('study-problem-added', handleProblemAdded as EventListener);
@@ -129,6 +149,12 @@ export function useProblems(studyId: number, dateString?: string) {
         'study-curriculum-updated',
         handleCurriculumUpdated as EventListener,
       );
+      window.removeEventListener(
+        'study-problem-submitted',
+        handleProblemSubmitted as EventListener,
+      );
+      refreshTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      refreshTimersRef.current = [];
     };
   }, [studyId, fetchProblems]);
 
