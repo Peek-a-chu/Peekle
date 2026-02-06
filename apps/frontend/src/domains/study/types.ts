@@ -28,6 +28,7 @@ export interface DailyProblem {
   externalId?: string; // BOJ problem number (e.g. "1000")
   title: string;
   tier: string;
+  tags?: string[];
   solvedMemberCount: number;
   totalMemberCount: number;
 }

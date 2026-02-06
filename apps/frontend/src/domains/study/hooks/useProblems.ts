@@ -79,7 +79,7 @@ export function useProblems(studyId: number, dateString?: string) {
               title: problem.title || `문제 ${newProblemId}`,
               tier: problem.tier || 'Unrated',
               number: problem.externalId ? parseInt(problem.externalId, 10) : newProblemId,
-              tags: [],
+              tags: problem.tags || [],
               status: 'not_started' as const,
               participantCount: 0,
               totalParticipants: problem.totalMemberCount || 0,

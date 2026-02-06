@@ -110,8 +110,6 @@ export function CCProblemListPanel({
 
   const selectedProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
 
-  console.log('[CCProblemListPanel] Rendered with problems:', problems?.length, problems);
-
   return (
     <div className={cn('flex h-full flex-col relative bg-card', className)} data-tour="problem-list">
       {/* Top Row: Date, Add Button & Fold Button */}

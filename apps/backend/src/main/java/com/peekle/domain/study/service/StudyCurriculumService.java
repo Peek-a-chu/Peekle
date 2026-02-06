@@ -1,6 +1,7 @@
 package com.peekle.domain.study.service;
 
 import com.peekle.domain.problem.entity.Problem;
+import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.study.dto.curriculum.ProblemStatusResponse;
 import com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest;
@@ -86,6 +87,9 @@ public class StudyCurriculumService {
                 String title = (problem != null) ? problem.getTitle() : "Unknown";
                 String tier = (problem != null) ? problem.getTier() : "Unrated";
                 String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(actualProblemId);
+                List<String> tags = (problem != null)
+                                ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
+                                : List.of();
 
                 ProblemStatusResponse responseData = ProblemStatusResponse.builder()
                                 .studyProblemId(studyProblem.getId())
@@ -93,6 +97,7 @@ public class StudyCurriculumService {
                                 .externalId(externalId)
                                 .title(title)
                                 .tier(tier)
+                                .tags(tags)
                                 .assignedDate(targetDate)
                                 .solvedMemberCount(0)
                                 .totalMemberCount(studyMemberRepository.countByStudy_Id(studyId))
@@ -152,6 +157,9 @@ public class StudyCurriculumService {
                 String title = (problem != null) ? problem.getTitle() : "Unknown";
                 String tier = (problem != null) ? problem.getTier() : "Unrated";
                 String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(deletedProblemId);
+                List<String> tags = (problem != null)
+                                ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
+                                : List.of();
 
                 studyProblemRepository.delete(target);
 
@@ -162,6 +170,7 @@ public class StudyCurriculumService {
                                 .externalId(externalId)
                                 .title(title)
                                 .tier(tier)
+                                .tags(tags)
                                 .assignedDate(target.getProblemDate())
                                 .solvedMemberCount(0)
                                 .totalMemberCount(studyMemberRepository.countByStudy_Id(studyId))
@@ -214,6 +223,9 @@ public class StudyCurriculumService {
                         String tier = (problem != null) ? problem.getTier() : "Unrated";
                         String externalId = (problem != null) ? problem.getExternalId()
                                         : String.valueOf(sp.getProblemId());
+                        List<String> tags = (problem != null)
+                                        ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
+                                        : List.of();
 
                         List<Long> solvedUsers = solvedUserMap.getOrDefault(sp.getProblemId(), List.of());
                         boolean isSolvedByMe = solvedUsers.contains(userId);
@@ -225,6 +237,7 @@ public class StudyCurriculumService {
                                         .externalId(externalId)
                                         .title(title)
                                         .tier(tier)
+                                        .tags(tags)
                                         .assignedDate(sp.getProblemDate())
                                         .solvedMemberCount(solvedCount)
                                         .totalMemberCount(totalMembers)
