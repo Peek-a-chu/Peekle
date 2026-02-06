@@ -6,12 +6,16 @@ import { ConfirmModal, ActionModal } from '@/components/common/Modal';
 interface Props {
   user: UserProfile;
   isInstalled: boolean;
+  extensionVersion: string | null;
   extensionToken: string | null;
   checkInstallation: () => void;
   status: ExtensionStatus;
   isLoading: boolean;
   onRegisterBojId?: () => void;
 }
+
+const REQUIRED_VERSION = '0.0.7';
+const DOWNLOAD_URL = 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
 interface TokenResponse {
   success?: boolean;
@@ -22,6 +26,8 @@ interface TokenResponse {
 
 export function CCExtensionGuide({
   user,
+  isInstalled,
+  extensionVersion,
   checkInstallation,
   extensionToken,
   status,
@@ -30,7 +36,9 @@ export function CCExtensionGuide({
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
-  const [showManualGuide, setShowManualGuide] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
+
+  const isVersionMismatch = isInstalled && extensionVersion && extensionVersion !== REQUIRED_VERSION;
 
   // Modal State
   const [modal, setModal] = useState<{
@@ -149,7 +157,7 @@ export function CCExtensionGuide({
     {
       step: 1,
       title: '확장 프로그램 설치',
-      desc: 'Chrome 웹 스토어에서 설치',
+      desc: '수동 설치 가이드 또는 스토어 이용',
       isDone: status !== 'NOT_INSTALLED',
       isActive: status === 'NOT_INSTALLED',
     },
@@ -254,10 +262,29 @@ export function CCExtensionGuide({
                 ? '확장 프로그램에 저장된 계정과 현재 로그인된 계정이 다릅니다.'
                 : status === 'INSTALLED'
                   ? '아래 버튼을 클릭하여 계정을 연동해주세요.'
-                  : 'Chrome 웹 스토어에서 확장 프로그램을 설치해주세요.'}
+                  : '확장 프로그램 수동 설치 가이드에 따라 설치를 진행해주세요.'}
           </p>
         </div>
       </div>
+
+      {/* Version Mismatch Warning */}
+      {isVersionMismatch && (
+        <div className="rounded-lg p-4 mb-8 bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+          <div className="text-lg">🚨</div>
+          <div className="flex-1">
+            <h4 className="font-bold text-sm text-red-700 dark:text-red-300">업데이트가 필요합니다</h4>
+            <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">
+              현재 설치된 버전({extensionVersion})이 최신 버전({REQUIRED_VERSION})이 아닙니다. 최적의 기능을 위해 업데이트해주세요.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowManualModal(true)}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-bold hover:bg-red-700"
+          >
+            업데이트 가이드
+          </button>
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="space-y-8 pl-2">
@@ -349,6 +376,15 @@ export function CCExtensionGuide({
         {status === 'NOT_INSTALLED' && (
           <div className="flex flex-col gap-4 w-full items-center">
             <div className="flex gap-3">
+              {/* [Temp] Manual Installation Guide replacing directly store link */}
+              <button
+                onClick={() => setShowManualModal(true)}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 shadow-sm"
+              >
+                📥 확장 프로그램 수동 설치 가이드
+              </button>
+
+              {/* Original code preserved for future restoration
               <button
                 onClick={() => {
                   window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
@@ -358,6 +394,7 @@ export function CCExtensionGuide({
               >
                 {isPolling ? '⏳ 확인 중...' : '📥 스토어에서 다운로드'}
               </button>
+              */}
             </div>
             {isPolling && (
               <p className="text-xs text-muted-foreground animate-pulse">
@@ -474,6 +511,49 @@ export function CCExtensionGuide({
         cancelText="취소"
         variant="destructive"
         isLoading={isSubmitting}
+      />
+
+      {/* Manual Installation Modal */}
+      <ActionModal
+        isOpen={showManualModal}
+        onClose={() => setShowManualModal(false)}
+        onConfirm={() => {
+          window.open(DOWNLOAD_URL, '_blank');
+          handleInstallClick();
+        }}
+        title="확장 프로그램 수동 설치 가이드"
+        confirmText="Zip 다운로드"
+        cancelText="닫기"
+        description={
+          <div className="space-y-4 text-sm text-left">
+            <p className="text-muted-foreground">
+              스토어 심사 지연으로 인해 현재 수동 설치가 필요합니다. 아래 절차를 따라주세요.
+            </p>
+
+            <div className="space-y-3 bg-muted/50 p-4 rounded-lg border border-border">
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+                <span><strong>Zip 파일 다운로드:</strong> 아래 버튼을 눌러 압축 파일을 다운로드하고 압축을 해제합니다.</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+                <span><strong>확장 프로그램 설정 이동:</strong> 크롬 주소창에 <code className="bg-muted px-1 rounded">chrome://extensions</code>를 입력합니다.</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+                <span><strong>개발자 모드 활성화:</strong> 우측 상단의 <strong>개발자 모드(Developer mode)</strong> 스위치를 켭니다.</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">4</span>
+                <span><strong>압축해제된 확장 설치:</strong> 좌측 상단의 <strong>압축해제된 확장 프로그램을 로드합니다(Load unpacked)</strong> 버튼을 누르고, 압축을 푼 폴더를 선택합니다.</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-orange-500 font-medium">
+              ※ 주의: 설치 후 해당 폴더를 삭제하면 확장 프로그램이 작동하지 않습니다. 안전한 곳에 보관해주세요.
+            </p>
+          </div>
+        }
       />
     </div>
   );

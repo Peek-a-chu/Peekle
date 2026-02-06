@@ -86,8 +86,7 @@ function scanForSuccess() {
         // Time Check check as a fallback (for refresh case)
         const submitTimeText = row.querySelector('td:nth-child(9)')?.innerText?.trim() || '';
         const isRecent = submitTimeText.includes('초 전') ||
-            submitTimeText.includes('분 전') ||
-            submitTimeText.includes('시간 전');
+            submitTimeText.includes('분 전');
 
         // If it was watching, remove it from set (it's done now)
         if (wasPending) {
@@ -866,6 +865,29 @@ function showFailedToast(data) {
 
 
 // --- Extension Detection for Peekle Frontend ---
+// Auto-notify frontend on load (for detecting fresh installations without refresh)
+(async function autoNotifyFrontend() {
+    // Only notify if we're on the frontend domain
+    const isFrontend = window.location.hostname === 'localhost' || window.location.hostname.includes('i14a408.p.ssafy.io');
+    if (!isFrontend) return;
+
+    let token = null;
+    try {
+        const data = await chrome.storage.local.get(['peekle_token']);
+        token = data.peekle_token || null;
+    } catch (e) {
+        // Context might be invalidated or error
+    }
+
+    // Auto-broadcast installation status
+    window.postMessage({
+        type: 'PEEKLE_EXTENSION_INSTALLED',
+        version: chrome.runtime.getManifest().version,
+        token: token
+    }, '*');
+    console.log('[Peekle Content Script] Auto-notifying frontend of installation. Token:', token ? 'YES' : 'NO');
+})();
+
 window.addEventListener('message', async (event) => {
     // We only accept messages from ourselves
     if (event.source !== window) return;

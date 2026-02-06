@@ -11,24 +11,12 @@ interface ExtensionMessage {
 
 export function useExtensionCheck() {
   const [isInstalled, setIsInstalled] = useState(false);
+  const [extensionVersion, setExtensionVersion] = useState<string | null>(null);
   const [extensionToken, setExtensionToken] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
   const checkInstallation = useCallback(() => {
     setIsChecking(true);
-
-    // 응답 핸들러
-    const handleMessage = (event: MessageEvent<ExtensionMessage>) => {
-      if (event.data?.type === MSG_INSTALLED) {
-        setIsInstalled(true);
-        if (event.data.token) {
-          setExtensionToken(event.data.token);
-        }
-        setIsChecking(false); // 응답 받으면 즉시 확인 종료
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
 
     // 확인 요청 메시지 발송
     window.postMessage({ type: MSG_CHECK }, '*');
@@ -39,8 +27,29 @@ export function useExtensionCheck() {
     }, 2000);
 
     return () => {
-      window.removeEventListener('message', handleMessage);
       clearTimeout(timer);
+    };
+  }, []);
+
+  // Persistent message listener (always active to detect late installation)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent<ExtensionMessage & { version?: string }>) => {
+      if (event.data?.type === MSG_INSTALLED) {
+        setIsInstalled(true);
+        if (event.data.version) {
+          setExtensionVersion(event.data.version);
+        }
+        if (event.data.token) {
+          setExtensionToken(event.data.token);
+        }
+        setIsChecking(false); // 응답 받으면 즉시 확인 종료
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
     };
   }, []);
 
@@ -50,5 +59,5 @@ export function useExtensionCheck() {
     return cleanup;
   }, [checkInstallation]);
 
-  return { isInstalled, extensionToken, isChecking, checkInstallation };
+  return { isInstalled, extensionVersion, extensionToken, isChecking, checkInstallation };
 }

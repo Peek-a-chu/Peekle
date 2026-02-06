@@ -1,5 +1,5 @@
 // --- Configuration ---
-const IS_LOCAL = true; // false = 배포(Production), true = 로컬(Local)
+const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
 // 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
 // Local: 확장 프로그램은 Backend(8080)로 직접 연결
 // Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
@@ -20,6 +20,7 @@ const PEEKLE_TOKEN_KEY = 'peekle_token';
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'CHECK_ENV') {
         sendResponse({
+            version: chrome.runtime.getManifest().version,
             isLocal: IS_LOCAL,
             frontendUrl: FRONTEND_BASE_URL,
             apiUrl: API_BASE_URL
@@ -137,23 +138,22 @@ async function handleSolvedSubmission(payload, sender) {
         const problemInfo = await getProblemInfo(problemId);
 
         // --- Context Detection (Study vs. General) ---
-        // Use studyId and sourceType from payload (already sent by content.js)
-        let targetStudyId = studyId || null;
-        let targetSourceType = sourceType || 'EXTENSION';
+        // Verify if the solved problem actually matches the pending context
+        const pendingBojId = pending ? String(pending.externalId || pending.problemId) : null;
+        const currentPid = String(problemId);
+        const isMatch = pendingBojId === currentPid;
 
-        console.log(`[Debug] Context from payload - StudyId: ${targetStudyId}, SourceType: ${targetSourceType}`);
+        let targetStudyId = (isMatch && pending) ? (pending.studyId || null) : null;
+        let targetSourceType = (isMatch && pending) ? (pending.sourceType || 'EXTENSION') : 'EXTENSION';
+        let studyProblemId = (isMatch && pending) ? (pending.studyProblemId || null) : null;
 
-        // Clean up pending_submission if it exists and matches
-        if (pending && !pending.consumed) {
-            console.log('[Debug] Pending submission still active (not consumed). Skipping cleanup.');
-        } else if (pending) {
-            const pendingBojId = String(pending.externalId || pending.problemId);
-            const currentPid = String(problemId);
+        console.log(`[Debug] ID Match: ${isMatch} (Solved: ${currentPid}, Pending: ${pendingBojId})`);
+        console.log(`[Debug] Context - StudyId: ${targetStudyId}, SourceType: ${targetSourceType}`);
 
-            if (pendingBojId === currentPid) {
-                console.log(`[Debug] Cleaning up matching pending submission for problem ${problemId}`);
-                chrome.storage.local.remove('pending_submission');
-            }
+        // Clean up pending_submission if it matches the solved problem
+        if (isMatch) {
+            console.log(`[Debug] Clearing matching pending submission for problem ${problemId}`);
+            chrome.storage.local.remove('pending_submission');
         }
 
         // --- Send to Backend (Peekle) ---
@@ -252,7 +252,7 @@ async function handleSolvedSubmission(payload, sender) {
             extensionToken,
             roomId: targetStudyId ? parseInt(targetStudyId) : null,
             sourceType: targetSourceType
-        }, pending?.studyProblemId || null); // Pass studyProblemId if exists
+        }, studyProblemId); // Pass studyProblemId if exists
 
         // Save to storage
         processed[submitId] = {

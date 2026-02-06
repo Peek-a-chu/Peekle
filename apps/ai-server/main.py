@@ -24,12 +24,18 @@ async def lifespan(app: FastAPI):
         print(f"[INIT] ChromaDB 컬렉션에 {count}개의 문제가 저장되어 있습니다.")
         
         if count == 0:
-            print("[INIT] ChromaDB가 비어있습니다. problems.csv를 자동으로 로딩합니다...")
-            from indexing import run_auto_indexing
-            run_auto_indexing()
-            print("[INIT] ChromaDB 초기화 완료!")
+            print("[INIT] ChromaDB가 비어있습니다.")
         else:
-            print("[INIT] 기존 데이터 사용")
+            print(f"[INIT] 기존 데이터 {count}건 존재 (누락 데이터 확인 중...)")
+            
+        # 3. 백그라운드 스레드에서 이어하기 인덱싱 실행 (서버 시작 차단 방지)
+        import threading
+        from indexing import run_auto_indexing
+        
+        indexing_thread = threading.Thread(target=run_auto_indexing, daemon=True)
+        indexing_thread.start()
+        print("[INIT] 백그라운드 인덱싱 작업이 시작되었습니다.")
+        print("[INIT] ChromaDB 초기화 완료!")
     except Exception as e:
         print(f"[ERROR] ChromaDB 초기화 중 오류 발생: {e}")
         print("[WARN] 추천 기능이 제대로 작동하지 않을 수 있습니다.")
@@ -289,7 +295,7 @@ async def get_intelligent_recommendation(request: Request):
                 "tier": p_meta.get('tier', ''),
                 "tags": p_meta.get('tags', ''),
                 "reason": user_reason,
-                "keyword": rec['keyword'] # 디버깅용
+                "keyword": rec['keyword']
             })
 
         print("[DEBUG] 추천 로직 완료")
