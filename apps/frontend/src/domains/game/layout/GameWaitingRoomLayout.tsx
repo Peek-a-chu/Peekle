@@ -110,6 +110,8 @@ export function GameWaitingRoomLayout({
             tierMin={room.tierMin}
             tierMax={room.tierMax}
             tags={room.tags}
+            problems={room.problems}
+            workbookTitle={room.workbookTitle}
           />
 
           {/* 참여자 그리드 */}

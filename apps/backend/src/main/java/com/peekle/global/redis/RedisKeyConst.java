@@ -120,6 +120,9 @@ public class RedisKeyConst {
     // 게임 내 문제 목록 (List) -> game:%d:problems
     public static final String GAME_PROBLEMS = "game:%d:problems";
 
+    // 대기실용 문제 미리보기 (List) -> game:%d:problems:preview
+    public static final String GAME_PROBLEMS_PREVIEW = "game:%d:problems:preview";
+
     // 게임 제출 예상 코드 길이 (Value) -> game:%d:problem:%d:user:%d:expected_length
     public static final String GAME_EXPECTED_LENGTH = "game:%d:problem:%d:user:%d:expected_length";
 

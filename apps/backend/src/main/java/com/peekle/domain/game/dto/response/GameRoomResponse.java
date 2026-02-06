@@ -27,6 +27,7 @@ public class GameRoomResponse {
     private java.util.List<ParticipantInfo> participants;
     private String tierMin;
     private String tierMax;
+    private String workbookTitle; // 문제집 제목 (문제집인 경우)
     private java.util.List<ProblemInfo> problems;
 
     @Getter

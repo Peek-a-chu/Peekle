@@ -8,10 +8,12 @@ import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.service.RedisGameService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/games")
 @RequiredArgsConstructor
@@ -33,19 +35,24 @@ public class GameController {
 
     @GetMapping("/{roomId}")
     public ApiResponse<GameRoomResponse> getRoom(@PathVariable Long roomId) {
-        return ApiResponse.success(gameService.getGameRoom(roomId));
+        GameRoomResponse response = gameService.getGameRoom(roomId);
+        log.info("📤 [Get Room Response] workbookTitle: {}", response.getWorkbookTitle());
+        return ApiResponse.success(response);
     }
 
     /**
      * 방 입장 API
      */
     @PostMapping("/{roomId}/enter")
-    public ApiResponse<Void> enterRoom(@PathVariable Long roomId,
+    public ApiResponse<GameRoomResponse> enterRoom(@PathVariable Long roomId,
             @RequestBody(required = false) GameEnterRequest request,
             @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
         String password = request != null ? request.getPassword() : null;
         gameService.enterGameRoom(roomId, userId, password);
-        return ApiResponse.success(null);
+        // 입장 후 방 정보 반환
+        GameRoomResponse roomInfo = gameService.getGameRoom(roomId);
+        log.info("📥 [Enter Room] Returning room info with workbookTitle: {}", roomInfo.getWorkbookTitle());
+        return ApiResponse.success(roomInfo);
     }
 
     /**

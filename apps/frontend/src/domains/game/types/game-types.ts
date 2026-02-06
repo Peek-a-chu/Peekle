@@ -33,6 +33,7 @@ export interface GameRoom {
     tags: string[];
     tierMin: string;
     tierMax: string;
+    workbookTitle?: string; // 문제집 제목 (문제집인 경우)
 }
 
 export interface GameRoomDetail extends GameRoom {

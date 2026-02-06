@@ -1,14 +1,20 @@
 package com.peekle.domain.problem.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 // import Tag removed (same package)
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Getter
+@Setter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "problems")
 public class Problem {
@@ -32,12 +38,8 @@ public class Problem {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String url;
 
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-            name = "problem_tags",
-            joinColumns = @JoinColumn(name = "problem_id"),
-            inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
+    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JoinTable(name = "problem_tags", joinColumns = @JoinColumn(name = "problem_id"), inverseJoinColumns = @JoinColumn(name = "tag_id"))
     private Set<Tag> tags = new HashSet<>();
 
     public Problem(String source, String externalId, String title, String tier, String url) {

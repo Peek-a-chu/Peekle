@@ -90,10 +90,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     const init = async () => {
       setIsLoading(true);
       try {
-        // [추가] 방 입장 처리 (멱등성 보장)
-        await enterGameRoom(roomIdString);
-
-        const room = await getGameRoom(roomIdString);
+        // enterGameRoom이 방 정보를 반환하므로 중복 조회 불필요
+        const room = await enterGameRoom(roomIdString);
         if (room) {
           // GameRoomDetail -> GamePlayState 변환
           const playState: GamePlayState = {

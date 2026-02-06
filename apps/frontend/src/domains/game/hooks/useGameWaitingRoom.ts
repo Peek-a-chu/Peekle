@@ -53,6 +53,9 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     try {
       const data = await getGameRoom(roomId);
       if (data) {
+        console.log('🎮 [Game Room Data]', data);
+        console.log('📚 workbookTitle:', data.workbookTitle);
+        console.log('📝 problems:', data.problems);
         setRoom(data);
         return data;
       } else {
@@ -75,13 +78,18 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
 
     const enter = async () => {
       try {
-        // [수정] 멱등성 보장: 백엔드에서 이미 참여중이면 성공 처리하므로 안심하고 호출
-        await enterGameRoom(roomId);
+        // enterGameRoom이 방 정보를 반환하므로 중복 조회 불필요
+        const data = await enterGameRoom(roomId);
         hasEnteredRef.current = true;
 
-        // 방 정보 갱신 후 입장 메시지 추가
-        const data = await fetchRoom();
         if (data) {
+          console.log('🎮 [Game Room Data]', data);
+          console.log('📚 workbookTitle:', data.workbookTitle);
+          console.log('📝 problems:', data.problems);
+          setRoom(data);
+          setIsLoading(false);
+
+          // 입장 메시지 추가
           const currentUser = data.participants.find(p => p.id === userId);
           if (currentUser) {
             setMessages((prev) => [
@@ -97,6 +105,9 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
               },
             ]);
           }
+        } else {
+          toast.error('방 정보를 불러올 수 없습니다.');
+          router.push('/game');
         }
       } catch (error) {
         console.error('Failed to enter room:', error);
@@ -106,7 +117,7 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     };
 
     enter();
-  }, [roomId, fetchRoom, router, userId]);
+  }, [roomId, router, userId]);
 
   // 소켓 이벤트 처리
   useEffect(() => {

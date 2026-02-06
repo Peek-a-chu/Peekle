@@ -35,6 +35,7 @@ interface GameRoomResponse {
     tags: string[];
     tierMin?: string;
     tierMax?: string;
+    workbookTitle?: string;
 }
 
 interface GameRoomDetailResponse extends GameRoomResponse {
@@ -85,8 +86,9 @@ export async function getGameRooms(): Promise<GameRoom[]> {
                 profileImg: room.host.profileImg
             },
             tags: room.tags || [],
-            tierMin: room.tierMin || '브론즈', // [New]
-            tierMax: room.tierMax || '다이아', // [New]
+            tierMin: room.tierMin || '브론즈',
+            tierMax: room.tierMax || '다이아',
+            workbookTitle: room.workbookTitle,
         }));
     } catch (error) {
         console.error('Error fetching game rooms:', error);
@@ -118,8 +120,9 @@ export async function getGameRoom(roomId: string | number): Promise<GameRoomDeta
             host: data.host,
             isPrivate: data.isSecret,
             tags: data.tags,
-            tierMin: data.tierMin || '브론즈', // [New]
-            tierMax: data.tierMax || '다이아', // [New]
+            tierMin: data.tierMin || '브론즈',
+            tierMax: data.tierMax || '다이아',
+            workbookTitle: data.workbookTitle,
             participants: (data.participants || []).map(p => ({
                 id: p.id,
                 nickname: p.nickname,
@@ -134,7 +137,7 @@ export async function getGameRoom(roomId: string | number): Promise<GameRoomDeta
                 title: p.title,
                 tier: p.tier,
                 url: p.url,
-                status: 'UNSOLVED', // 초기값
+                status: 'UNSOLVED',
             })),
         };
     } catch (error) {
@@ -167,20 +170,55 @@ export async function createGameRoom(data: GameCreateRequest): Promise<number | 
 
 /**
  * 게임 방 입장
+ * @returns 입장한 방의 상세 정보 (GameRoomDetail)
  */
-export async function enterGameRoom(roomId: string | number, password?: string): Promise<boolean> {
+export async function enterGameRoom(roomId: string | number, password?: string): Promise<GameRoomDetail | null> {
     try {
-        const response = await apiFetch<void>(`/api/games/${roomId}/enter`, {
+        const response = await apiFetch<GameRoomDetailResponse>(`/api/games/${roomId}/enter`, {
             method: 'POST',
             body: JSON.stringify({ password }),
         });
 
-        if (!response.success) {
+        if (!response.success || !response.data) {
             console.error('Failed to enter game room:', response.error);
             throw new Error(response.error?.message || '방 입장에 실패했습니다.');
         }
 
-        return true;
+        // GameRoomDetailResponse를 GameRoomDetail로 변환
+        const data = response.data;
+        return {
+            id: data.roomId,
+            title: data.title,
+            mode: data.mode as GameMode,
+            teamType: data.teamType as TeamType,
+            status: data.status as GameStatus,
+            currentPlayers: data.currentPlayers,
+            maxPlayers: data.maxPlayers,
+            timeLimit: data.timeLimit,
+            problemCount: data.problemCount,
+            host: data.host,
+            isPrivate: data.isSecret,
+            tags: data.tags,
+            tierMin: data.tierMin || '브론즈',
+            tierMax: data.tierMax || '다이아',
+            workbookTitle: data.workbookTitle,
+            participants: (data.participants || []).map(p => ({
+                id: p.id,
+                nickname: p.nickname,
+                profileImg: p.profileImg,
+                isHost: p.host,
+                status: p.ready ? 'READY' : 'NOT_READY',
+                team: p.team as Team,
+            })),
+            problems: (data.problems || []).map(p => ({
+                id: p.id,
+                externalId: p.externalId,
+                title: p.title,
+                tier: p.tier,
+                url: p.url,
+                status: 'UNSOLVED',
+            })),
+        };
     } catch (error) {
         console.error('Error entering game room:', error);
         throw error;
@@ -256,6 +294,7 @@ export async function getGameRoomByCode(code: string): Promise<GameRoom | null> 
             tags: room.tags || [],
             tierMin: room.tierMin || '브론즈',
             tierMax: room.tierMax || '다이아',
+            workbookTitle: room.workbookTitle,
         };
     } catch (error) {
         console.error('Error fetching game room by code:', error);
