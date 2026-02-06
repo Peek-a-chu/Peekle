@@ -31,12 +31,12 @@ export interface GameRoom {
     };
     isPrivate: boolean;
     tags: string[];
+    tierMin: string;
+    tierMax: string;
 }
 
 export interface GameRoomDetail extends GameRoom {
     participants: Participant[];
-    tierMin: string;
-    tierMax: string;
     problems?: GameProblem[];
 }
 

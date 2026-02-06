@@ -1,7 +1,8 @@
 'use client';
 
-import { Clock } from 'lucide-react';
+import { Clock, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface GamePlayHeaderProps {
   title: string;
@@ -9,6 +10,7 @@ interface GamePlayHeaderProps {
   teamType: 'INDIVIDUAL' | 'TEAM';
   formattedTime: string;
   scores?: { RED: number; BLUE: number };
+  onLeave?: () => void;
   className?: string;
 }
 
@@ -18,6 +20,7 @@ export function GamePlayHeader({
   teamType,
   formattedTime,
   scores,
+  onLeave,
   className,
 }: GamePlayHeaderProps) {
   const modeLabel = mode === 'SPEED_RACE' ? '스피드 레이스' : '시간제한';
@@ -30,8 +33,17 @@ export function GamePlayHeader({
         className,
       )}
     >
-      {/* 좌측: 방 제목 및 모드 */}
+      {/* 좌측: 퇴장 버튼, 방 제목 및 모드 */}
       <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onLeave}
+          className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+          title="나가기"
+        >
+          <LogOut className="h-5 w-5" />
+        </Button>
         <h1 className="text-lg font-semibold text-foreground">{title}</h1>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">

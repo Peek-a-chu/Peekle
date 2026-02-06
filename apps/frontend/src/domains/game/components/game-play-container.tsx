@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
 import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout';
+import { GameLiveKitWrapper } from '@/domains/game/components/GameLiveKitWrapper';
 // import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
 
 interface GamePlayContainerProps {
@@ -25,6 +26,7 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
     currentUserId,
     sendMessage,
     submitCode,
+    leaveRoom,
   } = useGamePlayRoom(roomId);
 
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
@@ -44,22 +46,25 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
   // 게임 화면 렌더링
   return (
     <>
-      <GamePlayLayout
-        gameState={gameState}
-        problems={gameState.problems}
-        selectedProblemId={selectedProblemId}
-        onSelectProblem={selectProblem}
-        formattedTime={formattedTime}
-        code={currentCode}
-        language={currentLanguage}
-        onCodeChange={setCode}
-        onLanguageChange={setLanguage}
-        onSubmit={submitCode}
-        messages={messages}
-        participants={participants}
-        currentUserId={currentUserId}
-        onSendMessage={sendMessage}
-      />
+      <GameLiveKitWrapper roomId={gameState.roomId}>
+        <GamePlayLayout
+          gameState={gameState}
+          problems={gameState.problems}
+          selectedProblemId={selectedProblemId}
+          onSelectProblem={selectProblem}
+          formattedTime={formattedTime}
+          code={currentCode}
+          language={currentLanguage}
+          onCodeChange={setCode}
+          onLanguageChange={setLanguage}
+          onSubmit={submitCode}
+          messages={messages}
+          participants={participants}
+          currentUserId={currentUserId}
+          onSendMessage={sendMessage}
+          onLeave={leaveRoom}
+        />
+      </GameLiveKitWrapper>
 
       {/* [임시] 결과 모달 테스트 버튼 - mockGameResult가 정의되지 않아 주석 처리 */}
       {/* 

@@ -12,6 +12,8 @@ import { getGameRoom, enterGameRoom } from '@/domains/game/api/game-api';
 import { useGameTimer } from './useGameTimer';
 import { useGameSocketConnection } from './useGameSocketConnection';
 import { useAuthStore } from '@/store/auth-store';
+import { useGameLiveKitStore } from './useGameLiveKitStore';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 // 문제별 코드 상태 (언어별로 저장)
@@ -54,6 +56,7 @@ interface UseGamePlayRoomReturn {
 
   // 액션
   submitCode: () => void;
+  leaveRoom: () => void;
 }
 
 const DEFAULT_CODE: Record<string, string> = {
@@ -64,8 +67,10 @@ const DEFAULT_CODE: Record<string, string> = {
 
 export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
   const roomId = Number(roomIdString);
+  const router = useRouter();
   const { user } = useAuthStore();
   const currentUserId = user?.id || 0;
+  const { setVideoToken, clearVideoToken } = useGameLiveKitStore();
 
   const [gameState, setGameState] = useState<GamePlayState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,6 +78,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
   const [problemCodes, setProblemCodes] = useState<ProblemCodeState>({});
   const [currentLanguage, setCurrentLanguage] = useState('python');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isGracePeriod, setIsGracePeriod] = useState(false);
+  const [graceTime, setGraceTime] = useState(60);
 
   // 소켓 연결
   const { client, connected } = useGameSocketConnection(roomId, currentUserId);
@@ -173,6 +180,14 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
           case 'SCORE_UPDATE':
             // 팀 점수 및 개인 변동 업데이트 처리
             break;
+          case 'FINISH_TIMER_START':
+            console.log('⏱️ FINISH_TIMER_START event received:', data);
+            toast.info(`${data.nickname}님이 모든 문제를 풀었습니다! 1분 후 게임이 종료됩니다.`, {
+              duration: 5000,
+            });
+            setIsGracePeriod(true);
+            setGraceTime(data.remainSeconds || 60);
+            break;
           case 'GAME_END':
             console.log('🏆 GAME_END event received:', data);
             setGameState((prev) => {
@@ -263,12 +278,38 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
       }
     });
 
+    // 4. VIDEO_TOKEN Subscription (LiveKit)
+    const videoTokenSub = client.subscribe(`/topic/games/${roomId}/video-token/${currentUserId}`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type === 'VIDEO_TOKEN') {
+          console.log('[GamePlayRoom] VIDEO_TOKEN received');
+          setVideoToken(response.data);
+        } else if (response.type === 'ERROR') {
+          console.error('[GamePlayRoom] VIDEO_TOKEN error:', response.data);
+          toast.error('화상 연결에 실패했습니다.');
+        }
+      } catch (e) {
+        console.error('Failed to parse video token message:', e);
+      }
+    });
+
+    // 5. Send WebSocket ENTER message to trigger VIDEO_TOKEN generation
+    // This must happen AFTER subscriptions are set up to receive the token
+    console.log('[GamePlayRoom] Sending WebSocket ENTER to trigger VIDEO_TOKEN');
+    client.publish({
+      destination: '/pub/games/enter',
+      body: JSON.stringify({ gameId: roomId })
+    });
+
     return () => {
       roomSub.unsubscribe();
       chatSub.unsubscribe();
       rankingSub.unsubscribe();
+      videoTokenSub.unsubscribe();
+      clearVideoToken();
     };
-  }, [client, connected, roomId, roomIdString]);
+  }, [client, connected, roomId, roomIdString, currentUserId, setVideoToken, clearVideoToken]);
 
   const updateProblemStatus = (
     problemId: number,
@@ -295,17 +336,20 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
   // 타이머
   const isSpeedRace = gameState?.mode === 'SPEED_RACE';
-  const timerInitialTime = isSpeedRace ? 0 : (gameState?.remainingTime ?? 1800);
+  const timerInitialTime = isGracePeriod
+    ? graceTime
+    : (isSpeedRace ? 0 : (gameState?.remainingTime ?? 1800));
   const timeUpToastShownRef = useRef(false);
 
-  // Room ID가 변경되면 토스트 플래그 초기화
+  // Room ID가 변경되면 토스트/유예상태 초기화
   useEffect(() => {
     timeUpToastShownRef.current = false;
+    setIsGracePeriod(false);
   }, [roomIdString]);
 
-  const { formattedTime, time } = useGameTimer({
+  const { formattedTime, time, reset } = useGameTimer({
     initialTime: timerInitialTime,
-    mode: isSpeedRace ? 'countup' : 'countdown',
+    mode: (isSpeedRace && !isGracePeriod) ? 'countup' : 'countdown',
     autoStart: gameState !== null,
     onTimeUp: useCallback(() => {
       if (!isSpeedRace && !timeUpToastShownRef.current) {
@@ -428,6 +472,12 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     }
   }, [selectedProblemId, gameState, currentCode, currentLanguage, client, connected, roomId]);
 
+  // 퇴장 처리
+  const leaveRoom = useCallback(() => {
+    router.push('/game');
+    toast.info('대기실로 이동합니다.');
+  }, [router]);
+
   return {
     gameState,
     isLoading,
@@ -445,5 +495,6 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     messages,
     sendMessage,
     submitCode,
+    leaveRoom,
   };
 }

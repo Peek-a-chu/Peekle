@@ -1,7 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { getGameRooms, createGameRoom, enterGameRoom, type GameCreateRequest } from '@/domains/game/api/game-api';
+import {
+  getGameRooms,
+  createGameRoom,
+  enterGameRoom,
+  getGameRoomByCode,
+  type GameCreateRequest,
+} from '@/domains/game/api/game-api';
 import {
   type GameRoom,
   type GameMode,
@@ -26,6 +32,7 @@ export function useGamePageLogic() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<GameRoom | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [inviteJoinModalOpen, setInviteJoinModalOpen] = useState(false);
   const [rooms, setRooms] = useState<GameRoom[]>([]);
 
   // 방 목록 조회
@@ -104,6 +111,37 @@ export function useGamePageLogic() {
     }
   };
 
+  const handleInviteCodeJoin = async (code: string) => {
+    try {
+      const room = await getGameRoomByCode(code);
+      if (!room) {
+        toast.error('유효하지 않은 초대 코드입니다.');
+        return;
+      }
+
+      if (room.status === 'PLAYING') {
+        toast.error('진행 중인 방에는 입장할 수 없습니다');
+        return;
+      }
+
+      if (room.isPrivate) {
+        setInviteJoinModalOpen(false);
+        setSelectedRoom(room);
+        setPasswordModalOpen(true);
+      } else {
+        const success = await enterGameRoom(room.id);
+        if (success) {
+          setInviteJoinModalOpen(false);
+          router.push(`/game/${room.id}`);
+        } else {
+          toast.error('방 입장에 실패했습니다.');
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.message || '방 입장에 실패했습니다.');
+    }
+  };
+
   const handleCreateRoom = async (formData: GameCreationFormData) => {
     // GameCreationFormData -> GameCreateRequest 변환
     const requestData: GameCreateRequest = {
@@ -147,17 +185,20 @@ export function useGamePageLogic() {
     passwordModalOpen,
     selectedRoom,
     createModalOpen,
+    inviteJoinModalOpen,
     filteredRooms,
     setCreateModalOpen,
     setPasswordModalOpen,
+    setInviteJoinModalOpen,
     setSelectedRoom,
     setSearchQuery,
     setStatusFilter,
     handleModeSelect,
     handleRoomClick,
     handlePasswordSubmit,
+    handleInviteCodeJoin,
     handleCreateRoom,
-    refreshRooms,
     resetFilters,
   };
 }
+

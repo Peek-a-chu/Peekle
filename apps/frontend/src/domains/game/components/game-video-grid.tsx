@@ -3,15 +3,16 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { GamePlayParticipant } from '@/domains/game/types/game-types';
-import { MicOff, VideoOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useParticipants } from '@livekit/components-react';
+import { GameVideoTile } from './GameVideoTile';
+import { Participant } from 'livekit-client';
 
 interface GameVideoGridProps {
   participants: GamePlayParticipant[];
   currentUserId: number;
   className?: string;
-  micState?: Record<string, boolean>;
-  camState?: Record<string, boolean>;
 }
 
 const PAGE_SIZE = 5;
@@ -20,10 +21,11 @@ export function GameVideoGrid({
   participants,
   currentUserId,
   className,
-  micState = {},
-  camState = {},
 }: GameVideoGridProps) {
   const [page, setPage] = useState(0);
+
+  // LiveKit participants (only available when inside LiveKitRoom context)
+  const liveKitParticipants = useParticipants();
 
   // 현재 사용자를 앞에 배치
   const sortedParticipants = [...participants].sort((a, b) => {
@@ -41,6 +43,18 @@ export function GameVideoGrid({
 
   const handleNext = () => {
     setPage((prev) => Math.min(totalPages - 1, prev + 1));
+  };
+
+  // Helper to find LiveKit participant by user ID (stored in metadata)
+  const findLiveKitParticipant = (userId: number): Participant | undefined => {
+    return liveKitParticipants.find((p) => {
+      try {
+        const metadata = JSON.parse(p.metadata || '{}');
+        return metadata.userId === userId;
+      } catch {
+        return false;
+      }
+    });
   };
 
   return (
@@ -62,8 +76,7 @@ export function GameVideoGrid({
       {/* 비디오 그리드 */}
       <div className="flex flex-1 justify-center gap-2 overflow-hidden px-4">
         {displayedParticipants.map((participant) => {
-          const isMicOff = micState[participant.id];
-          const isCamOff = camState[participant.id];
+          const lkParticipant = findLiveKitParticipant(participant.id);
           const isMe = participant.id === currentUserId;
           const isParticipantHost = participant.isHost;
 
@@ -71,56 +84,44 @@ export function GameVideoGrid({
             <div
               key={participant.id}
               className={cn(
-                'relative flex h-24 w-32 shrink-0 flex-col items-center justify-center rounded-lg border transition-colors',
-                isMe ? 'border-2 border-primary' : 'border', // 내 테두리는 액센트 컬러
-                // 팀 배경색 및 테두리 (내 테두리가 우선이므로 배경색만 주로 적용됨, !isMe 제거)
-                participant.team === 'RED' && !isMe && 'border-red-300',
-                participant.team === 'BLUE' && !isMe && 'border-blue-300',
-                participant.team === 'RED' && 'bg-red-50/30',
-                participant.team === 'BLUE' && 'bg-blue-50/30',
-                !participant.team && 'bg-muted/50', // 개인전일 때
+                'relative',
+                // 팀 배경색 및 테두리
+                participant.team === 'RED' && !isMe && 'ring-1 ring-red-300',
+                participant.team === 'BLUE' && !isMe && 'ring-1 ring-blue-300',
               )}
             >
-              {/* 아바타 또는 카메라 화면 */}
-              <div className="relative h-12 w-12">
+              {lkParticipant ? (
+                <GameVideoTile
+                  participant={lkParticipant}
+                  isCurrentUser={isMe}
+                  className={cn(
+                    participant.team === 'RED' && 'bg-red-50/30',
+                    participant.team === 'BLUE' && 'bg-blue-50/30',
+                  )}
+                />
+              ) : (
+                // Fallback when LiveKit participant is not yet connected
                 <div
                   className={cn(
-                    'flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-white text-lg font-medium shadow-sm transition-opacity',
-                    isCamOff && 'opacity-50 grayscale',
+                    'relative flex h-24 w-32 shrink-0 flex-col items-center justify-center rounded-lg border transition-colors',
+                    isMe ? 'border-2 border-primary' : 'border',
+                    participant.team === 'RED' && 'bg-red-50/30',
+                    participant.team === 'BLUE' && 'bg-blue-50/30',
+                    !participant.team && 'bg-muted/50',
                   )}
                 >
-                  {participant.nickname.charAt(0)}
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-white text-lg font-medium shadow-sm opacity-50">
+                    {participant.nickname.charAt(0)}
+                  </div>
+                  <span className="mt-2 text-xs font-medium text-muted-foreground truncate max-w-[100px]">
+                    {participant.nickname}
+                  </span>
                 </div>
-
-                {/* 상태 아이콘 오버레이 (모든 참여자에게 표시) */}
-                <div className="absolute -bottom-1 -right-1 flex gap-0.5">
-                  {isMicOff && (
-                    <div
-                      className="rounded-full bg-destructive p-0.5 text-white shadow-sm"
-                      title="음소거됨"
-                    >
-                      <MicOff className="h-2.5 w-2.5" />
-                    </div>
-                  )}
-                  {isCamOff && (
-                    <div
-                      className="rounded-full bg-gray-600 p-0.5 text-white shadow-sm"
-                      title="카메라 꺼짐"
-                    >
-                      <VideoOff className="h-2.5 w-2.5" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 닉네임 */}
-              <span className="mt-2 text-xs font-medium text-muted-foreground truncate max-w-[100px]">
-                {participant.nickname}
-              </span>
+              )}
 
               {/* 호스트 표시 (왕관만 표시) */}
               {isParticipantHost && (
-                <div className="absolute top-1 right-1">
+                <div className="absolute top-1 right-1 z-10">
                   <div className="text-yellow-500 drop-shadow-sm" title="방장">
                     <div className="text-[10px]">👑</div>
                   </div>

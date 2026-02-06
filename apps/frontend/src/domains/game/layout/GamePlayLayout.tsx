@@ -33,6 +33,7 @@ interface GamePlayLayoutProps {
   participants: GamePlayParticipant[];
   currentUserId: number;
   onSendMessage: (content: string) => void;
+  onLeave: () => void;
 }
 
 export function GamePlayLayout({
@@ -51,6 +52,7 @@ export function GamePlayLayout({
   participants,
   currentUserId,
   onSendMessage,
+  onLeave,
 }: GamePlayLayoutProps) {
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
@@ -94,6 +96,7 @@ export function GamePlayLayout({
         teamType={gameState.teamType}
         formattedTime={formattedTime}
         scores={gameState.scores || { RED: 0, BLUE: 0 }}
+        onLeave={onLeave}
       />
 
       {/* 메인 콘텐츠 */}
@@ -218,6 +221,7 @@ export function GamePlayLayout({
             solvedCount: r.solvedCount,
             teamId: r.teamColor,
             profileImg: (r as any).profileImg,
+            clearTime: (r as any).clearTime,
           })),
           personalStats: {
             pointsGained: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.gainedExp || 0,
