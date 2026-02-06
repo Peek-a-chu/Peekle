@@ -13,11 +13,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { joinStudy } from '@/domains/study/api/studyApi';
 import { toast } from 'sonner';
+import { StudyRoomDetail } from '@/domains/study/types';
 
 interface CCJoinStudyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (studyId: number) => void;
+  onSuccess: (study: StudyRoomDetail) => void;
 }
 
 export function CCJoinStudyModal({ open, onOpenChange, onSuccess }: CCJoinStudyModalProps) {
@@ -37,7 +38,7 @@ export function CCJoinStudyModal({ open, onOpenChange, onSuccess }: CCJoinStudyM
     try {
       const result = await joinStudy(inviteCode.trim());
       toast.success('스터디에 참여했습니다!');
-      onSuccess(result.id);
+      onSuccess(result);
       setInviteCode('');
     } catch (err) {
       const message = err instanceof Error ? err.message : '참여에 실패했습니다';
