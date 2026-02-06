@@ -33,18 +33,31 @@ def run_auto_indexing():
             print("[AUTO-INDEX] 인덱싱할 데이터가 CSV에 없습니다.")
             return
 
-        print(f"[AUTO-INDEX] 총 {total}개의 문제를 ChromaDB에 인덱싱합니다.")
+        print(f"[AUTO-INDEX] 총 {total}개의 문제를 확인합니다. (이어하기 모드)")
         
-        # 3. 100개씩 나눠서 처리 (Batch Processing)
+        # 3. 100개씩 나눠서 델타 인덱싱 (Delta Indexing)
         batch_size = 100
+        from embedding_service import check_existing_ids, index_problems
+
         for i in range(0, total, batch_size):
             batch = problems[i : i + batch_size]
-            index_problems(batch)
+            batch_ids = [str(p['id']) for p in batch]
             
-            current_pos = min(i + batch_size, total)
-            print(f"[AUTO-INDEX] 진행 중... ({current_pos}/{total})")
+            # DB에 이미 있는지 확인
+            existing_ids = check_existing_ids(batch_ids)
+            
+            # 없는 것만 골라내기
+            to_index = [p for p in batch if str(p['id']) not in existing_ids]
+            
+            if to_index:
+                index_problems(to_index)
+                print(f"[INDEX] {len(to_index)}개 추가 저장 ({i + len(batch)}/{total})")
+            else:
+                # 100개 단위로 체크 (1000개 단위로 로그)
+                if (i + batch_size) % 1000 == 0:
+                    print(f"[SKIP] 이미 저장됨 ({i + batch_size}/{total})")
 
-        print("[AUTO-INDEX] 인덱싱 완료!")
+        print("[AUTO-INDEX] 모든 데이터 동기화 완료!")
         
     except FileNotFoundError:
         print("[ERROR] problems.csv 파일을 찾을 수 없습니다.")
