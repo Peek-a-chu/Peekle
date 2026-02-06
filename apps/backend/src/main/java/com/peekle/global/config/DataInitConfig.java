@@ -2,6 +2,7 @@ package com.peekle.global.config;
 
 import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.problem.entity.Problem;
+import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.study.entity.StudyMember;
 import com.peekle.domain.study.entity.StudyRoom;
@@ -154,14 +155,31 @@ public class DataInitConfig {
 
                         // 2. Problem Mock Data
                         if (problemRepository.count() == 0) {
+                                Tag tMath = new Tag("math", "수학");
+                                Tag tImpl = new Tag("implementation", "구현");
+                                Tag tArith = new Tag("arithmetic", "사칙연산");
+                                Tag tBinSearch = new Tag("binary_search", "이분 탐색");
+                                Tag tSort = new Tag("sorting", "정렬");
+                                Tag tDP = new Tag("dp", "다이나믹 프로그래밍");
+
                                 Problem p1 = new Problem("BOJ", "1000", "A+B", "Bronze V",
                                                 "https://www.acmicpc.net/problem/1000");
+                                p1.getTags().add(tMath);
+                                p1.getTags().add(tImpl);
+                                p1.getTags().add(tArith);
+
                                 Problem p2 = new Problem("BOJ", "2557", "Hello World", "Bronze V",
                                                 "https://www.acmicpc.net/problem/2557");
+                                p2.getTags().add(tImpl);
+
                                 Problem p3 = new Problem("BOJ", "1920", "수 찾기", "Silver IV",
                                                 "https://www.acmicpc.net/problem/1920");
+                                p3.getTags().add(tBinSearch);
+                                p3.getTags().add(tSort);
+
                                 Problem p4 = new Problem("BOJ", "1149", "RGB거리", "Silver I",
                                                 "https://www.acmicpc.net/problem/1149");
+                                p4.getTags().add(tDP);
 
                                 problemRepository.saveAll(List.of(p1, p2, p3, p4));
                         }
