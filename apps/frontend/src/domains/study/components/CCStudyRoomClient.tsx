@@ -28,6 +28,7 @@ import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
+import { useStudyPresenceSync } from '@/domains/study/hooks/useStudyPresenceSync';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -53,7 +54,8 @@ function StudySocketInitiator({ studyId }: { studyId: number }) {
 function StudyRoomContent({ studyId }: { studyId: number }) {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { localParticipant } = useLocalParticipant();
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  useStudyPresenceSync();
 
   // Listen for participant events and Handle Enter/Leave
   // MOVED TO StudySocketInitiator
@@ -72,19 +74,20 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   // We can also initialize store with props?
   useEffect(() => {
-    if (studyId) setRoomInfo({ roomId: studyId, roomTitle: '' });
+    if (studyId) setRoomInfo({ roomId: studyId });
   }, [studyId, setRoomInfo]);
 
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
   const setParticipants = useRoomStore((state) => state.setParticipants);
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
+  const currentUserId = useRoomStore((state) => state.currentUserId);
+  const updateParticipant = useRoomStore((state) => state.updateParticipant);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
   const openSettingsModal = useSettingsStore((state) => state.openModal);
 
   // [Fix] Move device settings modal open logic to after successful join or remove auto-open if causing issues on redirect.
   const [isJoined, setIsJoined] = useState(false);
-
 
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
@@ -128,6 +131,40 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     resetToOnlyMine();
   }, [setSelectedProblem, resetToOnlyMine]);
 
+  // [Fix] Sync Local Media State with Store (Address Entry Sync Issue)
+  useEffect(() => {
+    // Wait for user and participants to be loaded
+    if (!currentUserId || !localParticipant) return;
+
+    // Determine Real State
+    const realIsMuted = !isMicrophoneEnabled;
+    const realIsVideoOff = !isCameraEnabled;
+
+    // If Store State differs from Real State, update Store
+    const currentParticipants = useRoomStore.getState().participants;
+    const me = currentParticipants.find((p) => p.id === currentUserId);
+
+    if (me && (me.isMuted !== realIsMuted || me.isVideoOff !== realIsVideoOff)) {
+      console.log('[MediaSync] Syncing store to match local device', {
+        storeMuted: me.isMuted,
+        realMuted: realIsMuted,
+        storeVideo: me.isVideoOff,
+        realVideo: realIsVideoOff
+      });
+      updateParticipant(currentUserId, { isMuted: realIsMuted, isVideoOff: realIsVideoOff });
+      // Also notify server via socket
+      updateStatus(realIsMuted, realIsVideoOff);
+    }
+  }, [
+    currentUserId,
+    // Removed participants dependency to prevent infinite loop
+    localParticipant,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    updateParticipant,
+    updateStatus,
+  ]);
+
   // API Hooks
   const { problems, addProblem, deleteProblem } = useProblems(
     studyId,
@@ -143,19 +180,24 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     setCurrentDate(formatDate(new Date()));
 
     fetchStudyParticipants(studyId)
-      .then((participants) =>
+      .then((participants) => {
+        const current = useRoomStore.getState().participants;
+        const currentMap = new Map(current.map((p) => [p.id, p]));
         setParticipants(
-          participants.map((p) => ({
-            id: Number(p.userId),
-            odUid: '', // Not available from static list
-            nickname: p.nickname,
-            isOwner: p.isOwner ?? false,
-            isMuted: p.isMuted ?? false,
-            isVideoOff: p.isVideoOff ?? false,
-            isOnline: p.isOnline ?? false,
-          })),
-        ),
-      )
+          participants.map((p) => {
+            const id = Number(p.id);
+            const existing = currentMap.get(id);
+            return {
+              ...p,
+              id,
+              isOwner: p.isOwner ?? existing?.isOwner ?? false,
+              isMuted: existing?.isMuted ?? p.isMuted ?? false,
+              isVideoOff: existing?.isVideoOff ?? p.isVideoOff ?? false,
+              isOnline: Boolean(existing?.isOnline) || Boolean(p.isOnline),
+            };
+          }),
+        );
+      })
       .catch((err) => console.error('Failed to fetch participants:', err));
   }, [studyId, setCurrentDate, setParticipants, user]);
 
@@ -355,10 +397,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   );
 }
 
-
-
-
-
 // Wrapper to provide SocketContext and handle Auth Check
 export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
@@ -408,7 +446,7 @@ export function CCStudyRoomClient(): React.ReactNode {
   // If prejoined, use params. Else default (mic off, cam on).
   const [initialMediaState, setInitialMediaState] = useState({
     mic: preJoined ? paramMic : false,
-    cam: preJoined ? paramCam : true
+    cam: preJoined ? paramCam : true,
   });
 
   const handleJoin = (mic: boolean, cam: boolean) => {
@@ -431,9 +469,9 @@ export function CCStudyRoomClient(): React.ReactNode {
     return null;
   }
 
-  if (!isJoined) {
-    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
-  }
+  // if (!isJoined) {
+  //   return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
+  // }
 
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>

@@ -33,7 +33,7 @@ export const TIER_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export const getTierStyle = (tierStr?: string) => {
-    if (!tierStr) return { bg: 'bg-gray-100', text: 'text-gray-600' };
+    if (!tierStr) return { bg: 'bg-muted', text: 'text-muted-foreground' };
 
     let tierKey = tierStr.toUpperCase();
     if (tierKey.includes(' ')) {
@@ -42,7 +42,7 @@ export const getTierStyle = (tierStr?: string) => {
         tierKey = tierKey.split('_')[0];
     }
 
-    return TIER_COLORS[tierKey] || { bg: 'bg-gray-100', text: 'text-gray-600' };
+    return TIER_COLORS[tierKey] || { bg: 'bg-muted', text: 'text-muted-foreground' };
 };
 
 export const highlightMatch = (text: string, searchQuery: string): React.JSX.Element => {

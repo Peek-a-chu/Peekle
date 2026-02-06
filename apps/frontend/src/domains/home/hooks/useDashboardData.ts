@@ -152,7 +152,10 @@ export const useTimeline = (
 };
 
 // AI 추천 문제 데이터 (토큰 인증 & 데이터 매핑 적용)
-export const useAIRecommendations = (options?: { skip?: boolean }): { data: AIRecommendationData[]; isLoading: boolean } => {
+export const useAIRecommendations = (options?: {
+  skip?: boolean;
+  refreshKey?: number;
+}): { data: AIRecommendationData[]; isLoading: boolean } => {
   const [data, setData] = useState<AIRecommendationData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -195,7 +198,7 @@ export const useAIRecommendations = (options?: { skip?: boolean }): { data: AIRe
     };
 
     fetchData();
-  }, [options?.skip]);
+  }, [options?.skip, options?.refreshKey]);
 
   return { data, isLoading };
 };

@@ -9,7 +9,7 @@ import { VolumeX, Search } from 'lucide-react';
 import { ParticipantCard } from './ParticipantCard';
 import { KickConfirmModal } from './KickConfirmModal';
 import { CCDelegateConfirmModal } from './CCDelegateConfirmModal';
-import { CCUserProfileModal } from '@/domains/profile/components/CCUserProfileModal';
+import { CCUserProfileModal } from '@/components/common/CCUserProfileModal';
 import { toast } from 'sonner';
 import { useSocketContext } from '../context/SocketContext';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
@@ -106,7 +106,7 @@ export function StudyParticipantPanel() {
         {isOwner && (
           <Button
             variant="outline"
-            className="w-full text-foreground hover:bg-secondary border-dashed border-border h-9 text-xs"
+            className="w-full text-foreground hover:bg-secondary/80 dark:hover:bg-muted/60 border-dashed border-border h-9 text-xs"
             onClick={handleMuteAll}
           >
             <VolumeX className="mr-2 h-3.5 w-3.5" />

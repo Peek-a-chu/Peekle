@@ -24,6 +24,9 @@ function normalizeChatType(
 export function useStudyChat(roomId: number) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const { currentUserId, participants, replyingTo, selectedProblemId } = useRoomStore();
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Connect to socket if not already connected
   const socket = useSocket(roomId, currentUserId || 0);
@@ -31,41 +34,74 @@ export function useStudyChat(roomId: number) {
   const currentUser = participants.find((p) => p.id === currentUserId);
   const senderName = currentUser?.nickname || `User ${currentUserId}`;
 
-  // Fetch History
+  // Helper for mapping
+  const mapHistoryToMessage = useCallback(
+    (msg: ChatMessageResponse) => {
+      const metadata = msg.metadata;
+      const type = normalizeChatType(msg.type, metadata);
+
+      return {
+        id: msg.id || `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        roomId: roomId,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        content: msg.content,
+        type,
+        createdAt: msg.createdAt,
+        parentMessage: undefined,
+        metadata,
+      } as ChatMessage;
+    },
+    [roomId],
+  );
+
+  // Fetch Initial History
   useEffect(() => {
     if (roomId) {
-      fetchStudyChats(roomId)
+      setIsLoadingHistory(true);
+      setPage(0);
+      setHasMore(true);
+
+      fetchStudyChats(roomId, 0)
         .then((history) => {
           // Backend returns latest first (Page 0), but UI renders top-to-bottom (oldest first)
-          // So we need to reverse the array.
           const sortedHistory = [...history].reverse();
-
-          setMessages(
-            sortedHistory.map((msg) => {
-              const metadata = msg.metadata;
-              const type = normalizeChatType(msg.type, metadata);
-
-              return {
-                id: msg.id || `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                roomId: roomId,
-                senderId: msg.senderId,
-                senderName: msg.senderName,
-                content: msg.content,
-                type,
-                createdAt: msg.createdAt,
-                parentMessage: undefined, // API might not return parent details fully yet
-                metadata,
-              } as ChatMessage;
-            }),
-          );
+          setMessages(sortedHistory.map(mapHistoryToMessage));
+          if (history.length < 50) {
+            setHasMore(false);
+          }
         })
         .catch((err) => {
           console.error('Failed to load chat history', err);
-          // 에러가 발생해도 채팅 기능은 계속 사용 가능하도록 함
-          // (실시간 메시지는 WebSocket을 통해 받을 수 있음)
+        })
+        .finally(() => {
+          setIsLoadingHistory(false);
         });
     }
-  }, [roomId]);
+  }, [roomId, mapHistoryToMessage]);
+
+  const loadMore = useCallback(async () => {
+    if (!roomId || !hasMore || isLoadingHistory) return;
+
+    setIsLoadingHistory(true);
+    const nextPage = page + 1;
+
+    try {
+      const history = await fetchStudyChats(roomId, nextPage);
+      if (history.length > 0) {
+        const sortedHistory = [...history].reverse();
+        setMessages((prev) => [...sortedHistory.map(mapHistoryToMessage), ...prev]);
+        setPage(nextPage);
+      }
+      if (history.length < 50) {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Failed to load more chats', err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [roomId, page, hasMore, isLoadingHistory, mapHistoryToMessage]);
 
   // STOMP Subscription
   useEffect(() => {
@@ -165,5 +201,8 @@ export function useStudyChat(roomId: number) {
     sendMessage,
     sendCodeShare,
     currentUserId,
+    loadMore,
+    hasMore,
+    isLoadingHistory,
   };
 }

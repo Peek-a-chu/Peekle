@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Sparkles, ExternalLink, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkles, ExternalLink, Plus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAIRecommendations } from '../hooks/useDashboardData';
 import { BOJ_TIER_NAMES, BOJ_TIER_COLORS } from '../mocks/dashboardMocks';
@@ -15,14 +15,37 @@ interface AIRecommendationProps {
 }
 
 const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
-  const { data: fetchedData, isLoading } = useAIRecommendations({ skip: !!initialData });
-  const data = initialData || fetchedData;
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { data: fetchedData, isLoading } = useAIRecommendations({
+    skip: !!initialData,
+    refreshKey,
+  });
+  const data = initialData || fetchedData || [];
 
   // 로딩 중이거나 초기 데이터가 없는 경우의 처리
   const showLoading = !initialData && isLoading;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState<{ id: string; title: string } | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+
+  useEffect(() => {
+    if (!showLoading) {
+      setCanRetry(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCanRetry(true);
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [showLoading]);
+
+  const handleRetry = () => {
+    setCanRetry(false);
+    setRefreshKey(Date.now());
+  };
 
   const handleOpenModal = (id: string, title: string) => {
     setSelectedProblem({ id, title });
@@ -43,10 +66,31 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
       {/* 추천 문제 목록 */}
       <div className="space-y-4">
         {showLoading ? (
-          // 로딩 스켈레톤
-          [1, 2, 3].map((i) => (
-            <div key={i} className="p-4 bg-muted/10 rounded-xl border border-border/30 animate-pulse h-[140px]" />
-          ))
+          // 로딩 스피너 + 스켈레톤
+          <div className="space-y-4">
+            <div className="flex flex-col items-center justify-center gap-2 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">AI가 문제를 생성 중이에요...</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 text-xs"
+                onClick={handleRetry}
+                disabled={!canRetry}
+              >
+                재요청
+              </Button>
+              {!canRetry && (
+                <span className="text-[11px] text-muted-foreground">30초 후 활성화됩니다.</span>
+              )}
+            </div>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="p-4 bg-muted/10 rounded-xl border border-border/30 animate-pulse h-[140px]"
+              />
+            ))}
+          </div>
         ) : data.length > 0 ? (
           data.map((item) => (
             <div
@@ -87,19 +131,20 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
               <p className="text-[15px] text-muted-foreground mb-4">💡 {item.reason}</p>
 
               {/* 버튼들 */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col items-stretch gap-2">
                 <Link
                   href={`https://www.acmicpc.net/problem/${item.problemId.replace('#', '')}`}
                   target="_blank"
+                  className="w-full"
                 >
-                  <Button className="h-8 px-2.5 text-xs gap-1 bg-primary hover:bg-primary">
+                  <Button className="h-8 w-full px-2.5 text-xs gap-1 bg-primary hover:bg-primary">
                     <ExternalLink className="w-3 h-3" />
                     풀러가기
                   </Button>
                 </Link>
                 <Button
                   variant="outline"
-                  className="h-8 px-2.5 text-xs gap-1 border-border"
+                  className="h-8 w-full px-2.5 text-xs gap-1 border-border"
                   onClick={() => handleOpenModal(item.problemId, item.title)}
                 >
                   <Plus className="w-3 h-3" />

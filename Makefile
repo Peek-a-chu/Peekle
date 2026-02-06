@@ -38,6 +38,9 @@ redis-down:
 # ===========================================
 
 prod-up:
+	# 최신 캐시 이미지를 가져오고, 없더라도 무시하여 빌드 오류 방지
+	-docker pull $${CI_REGISTRY_IMAGE:-peekle}/backend:latest
+	-docker pull $${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
 	@echo "🚀 Starting production services (includes LiveKit)..."
 	@echo ""
 	@# Step 1: Sync existing certificates from host (if any)

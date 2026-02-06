@@ -30,8 +30,8 @@ export function UserGridItem({ result, query, onClick }: UserGridItemProps) {
                     <span
                         className={cn(
                             'text-[10px] px-1.5 py-0.5 rounded font-bold',
-                            TIER_COLORS[result.tier]?.bg || 'bg-gray-100',
-                            TIER_COLORS[result.tier]?.text || 'text-gray-500',
+                            TIER_COLORS[result.tier]?.bg || 'bg-muted',
+                            TIER_COLORS[result.tier]?.text || 'text-muted-foreground',
                         )}
                     ></span>
                 </div>

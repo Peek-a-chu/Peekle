@@ -14,7 +14,7 @@ import { SearchResultSection } from './components/SearchResultSection';
 import { SearchResultItem } from './components/SearchResultItem';
 import { UserGridItem } from './components/UserGridItem';
 import { WorkbookGridItem } from './components/WorkbookGridItem';
-import { TABS, TIER_COLORS } from './components/search.constants';
+import { TABS, TIER_COLORS, SUGGESTED_KEYWORDS } from './components/search.constants';
 import { isProblem, isUser, isWorkbook, type SearchType } from './components/search.types';
 
 function SearchPageContent() {
@@ -124,7 +124,10 @@ function SearchPageContent() {
 
   const handleItemClick = (result: SearchResultItemType) => {
     if (isProblem(result)) {
-      window.open(`https://www.acmicpc.net/problem/${result.problemId}`, '_blank');
+      window.open(
+        `https://www.acmicpc.net/problem/${result.externalId || result.problemId}`,
+        '_blank',
+      );
     } else if (isWorkbook(result)) {
       router.push(`/workbooks?id=${result.workbookId}`);
     } else if (isUser(result)) {
@@ -210,6 +213,7 @@ function SearchPageContent() {
           {isFilterOpen && (
             <div className="bg-card p-6 rounded-2xl border border-border mb-8 shadow-sm animate-in fade-in slide-in-from-top-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Tier Filter */}
                 <div>
                   <h3 className="text-sm font-bold text-foreground mb-3">백준 티어</h3>
                   <div className="flex flex-wrap gap-2">
@@ -225,6 +229,27 @@ function SearchPageContent() {
                         )}
                       >
                         {tier}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Problem Tag Filter */}
+                <div>
+                  <h3 className="text-sm font-bold text-foreground mb-3">문제 태그</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {SUGGESTED_KEYWORDS.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTempTag(tag)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg border text-xs font-bold transition-all',
+                          tempTags.includes(tag)
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:border-primary hover:text-primary bg-card',
+                        )}
+                      >
+                        {tag}
                       </button>
                     ))}
                   </div>
@@ -259,19 +284,21 @@ function SearchPageContent() {
 
           {showLoading && (
             <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="h-10 w-10 animate-spin text-[#E24EA0]" />
-              <p className="mt-4 text-sm font-medium text-[#59656E]">열심히 검색하고 있어요...</p>
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="mt-4 text-sm font-medium text-muted-foreground">
+                열심히 검색하고 있어요...
+              </p>
             </div>
           )}
 
           {error && (
             <div className="flex flex-col items-center justify-center py-20">
               <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-              <p className="text-lg font-bold text-[#040C13]">검색 중 오류가 발생했습니다</p>
-              <p className="mt-2 text-sm text-[#59656E]">{error.message}</p>
+              <p className="text-lg font-bold text-foreground">검색 중 오류가 발생했습니다</p>
+              <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="mt-6 rounded-lg bg-[#E24EA0] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#E24EA0]/90 transition-colors shadow-sm"
+                className="mt-6 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
               >
                 다시 시도
               </button>
@@ -280,11 +307,11 @@ function SearchPageContent() {
 
           {showEmptyState && (
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="h-20 w-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-                <Search className="h-10 w-10 text-gray-400" />
+              <div className="h-20 w-20 bg-secondary rounded-full flex items-center justify-center mb-6">
+                <Search className="h-10 w-10 text-muted-foreground" />
               </div>
-              <p className="text-xl font-bold text-[#040C13]">검색 결과가 없어요</p>
-              <p className="mt-2 text-[#59656E]">다른 키워드로 검색해보시겠어요?</p>
+              <p className="text-xl font-bold text-foreground">검색 결과가 없어요</p>
+              <p className="mt-2 text-muted-foreground">다른 키워드로 검색해보시겠어요?</p>
               <div className="mt-8 w-full max-w-md"></div>
             </div>
           )}
@@ -348,7 +375,7 @@ function SearchPageContent() {
                     })}
                   </div>
                 ) : (
-                  <div className="bg-white rounded-[24px] border border-[#D8DFE4] divide-y divide-[#D8DFE4] overflow-hidden">
+                  <div className="bg-card rounded-[24px] border border-border divide-y divide-border overflow-hidden">
                     {singleResults.map((result) => (
                       <SearchResultItem
                         key={
@@ -371,7 +398,7 @@ function SearchPageContent() {
                 {hasNextPage && (
                   <div ref={observerTarget} className="flex justify-center py-8">
                     {isFetchingNextPage ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-[#E24EA0]" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     ) : (
                       <div className="h-8" />
                     )}
@@ -383,10 +410,10 @@ function SearchPageContent() {
           {!query && (
             <div className="flex flex-col items-center justify-center py-32">
               <div className="mb-6">
-                <h2 className="text-3xl font-bold text-[#040C13] mb-2 text-center">
+                <h2 className="text-3xl font-bold text-foreground mb-2 text-center">
                   어떤 문제를 찾고 계신가요?
                 </h2>
-                <p className="text-[#59656E] text-center">
+                <p className="text-muted-foreground text-center">
                   문제, 사용자, 문제집을 검색하여 학습을 시작해보세요.
                 </p>
               </div>
@@ -402,9 +429,9 @@ export default function SearchResultsPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#F7F8FC] py-8">
+        <div className="min-h-screen bg-background py-8">
           <div className="mx-auto max-w-5xl px-6 flex items-center justify-center py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-[#E24EA0]" />
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
         </div>
       }

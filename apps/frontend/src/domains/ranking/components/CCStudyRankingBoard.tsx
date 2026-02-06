@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getRankings, type RankResponse } from '@/api/rankingApi';
+import { useDebounce } from '@/hooks/useDebounce';
 import { TopThreePodium } from './TopThreePodium';
 import { StudyRankingList } from './StudyRankingList';
 import { RankingPagination } from './RankingPagination';
@@ -17,8 +18,14 @@ export function CCStudyRankingBoard(): React.ReactNode {
   const [scope, setScope] = useState<'ALL' | 'MINE'>('ALL');
   const [topThreeRankings, setTopThreeRankings] = useState<RankResponse[]>([]);
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [debouncedSearchTerm]);
 
   useEffect(() => {
     const fetchRankings = async (): Promise<void> => {
@@ -27,10 +34,10 @@ export function CCStudyRankingBoard(): React.ReactNode {
       try {
         // If we are on Page 0 and ALL scope, we can get top 3 from the main list.
         // Otherwise, we need to ensure top 3 exists (fetch if missing).
-        const isPageZeroAndAll = currentPage === 0 && scope === 'ALL';
+        const isPageZeroAndAll = currentPage === 0 && scope === 'ALL' && !debouncedSearchTerm;
         const needTopThree = topThreeRankings.length === 0 && !isPageZeroAndAll;
 
-        const mainQueryPromise = getRankings(currentPage, pageSize, undefined, scope);
+        const mainQueryPromise = getRankings(currentPage, pageSize, debouncedSearchTerm, scope);
         const topThreeQueryPromise = needTopThree
           ? getRankings(0, 3, undefined, 'ALL')
           : Promise.resolve(null);
@@ -59,7 +66,7 @@ export function CCStudyRankingBoard(): React.ReactNode {
 
     void fetchRankings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, scope]); // topThreeRankings is excluded to prevent loop
+  }, [currentPage, scope, debouncedSearchTerm]); // topThreeRankings is excluded to prevent loop
 
   const handlePageChange = (page: number): void => {
     setCurrentPage(page);
@@ -108,6 +115,8 @@ export function CCStudyRankingBoard(): React.ReactNode {
         scope={scope}
         onScopeChange={handleScopeChange}
         isLoading={isLoading}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
       >
         {topThreeRankings.length > 0 && (
           <TopThreePodium rankings={topThreeRankings} onStudyClick={handleStudyClick} />

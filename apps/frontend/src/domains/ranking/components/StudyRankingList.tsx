@@ -9,6 +9,7 @@ import PeopleIcon from '@/assets/icons/people.svg';
 import TrophyIcon from '@/assets/icons/trophy.svg';
 import ZoomIcon from '@/assets/icons/zoom.svg';
 import { UserIcon } from '@/components/UserIcon';
+import { CCUserProfileModal } from '@/components/common/CCUserProfileModal';
 
 interface StudyRankingListProps {
   rankings: RankResponse[];
@@ -19,6 +20,8 @@ interface StudyRankingListProps {
   onScopeChange: (scope: 'ALL' | 'MINE') => void;
   children?: React.ReactNode;
   isLoading?: boolean;
+  searchTerm?: string;
+  onSearchChange?: (term: string) => void;
 }
 
 const MemberAvatars = ({
@@ -66,37 +69,56 @@ export function StudyRankingList({
   onScopeChange,
   children,
   isLoading = false,
+  searchTerm = '',
+  onSearchChange,
 }: StudyRankingListProps): React.ReactNode {
+  const [selectedUserNickname, setSelectedUserNickname] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleUserClick = (nickname: string) => {
+    setSelectedUserNickname(nickname);
+    setIsProfileModalOpen(true);
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto space-y-4">
+      <CCUserProfileModal
+        nickname={selectedUserNickname}
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
       {children}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Search Bar matching Container.svg */}
-        <div className="relative group flex-1 max-w-lg">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <ZoomIcon className="h-5 w-5 text-gray-400" />
+        {/* Search Bar matching GlobalSearchBar */}
+        <div className="relative flex-1 max-w-lg">
+          <div className="relative">
+            <button className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors">
+              <Search className="h-full w-full" />
+            </button>
+            <input
+              type="text"
+              placeholder="스터디를 검색해보세요."
+              className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-4 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground h-10"
+              value={searchTerm}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+            />
           </div>
-          <Input
-            type="text"
-            placeholder="스터디를 검색해보세요."
-            className="pl-10 h-12 rounded-xl border-none bg-white shadow-sm ring-1 ring-slate-200 focus:ring-primary text-base placeholder:text-gray-400"
-          />
         </div>
 
         {/* Scope Toggle matching Container.svg style */}
-        <div className="flex bg-[#F7F8FC] p-1 rounded-lg border border-[#D8DFE4]">
+        <div className="flex bg-[#F7F8FC] p-1 rounded-lg border border-[#D8DFE4] dark:bg-muted dark:border-border">
           <button
             onClick={() => onScopeChange('ALL')}
             className={cn(
               'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all',
               scope === 'ALL'
-                ? 'bg-white text-[#040C13] shadow-sm ring-1 ring-black/5'
-                : 'text-[#59656E] hover:text-[#040C13]',
+                ? 'bg-white text-[#040C13] shadow-sm ring-1 ring-black/5 dark:bg-background dark:text-foreground dark:ring-white/10'
+                : 'text-[#798d9c] hover:text-[#040C13] dark:text-muted-foreground dark:hover:text-foreground',
             )}
           >
             <TrophyIcon
-              className={cn('w-4 h-4', scope === 'ALL' ? 'text-[#E24EA0]' : 'text-[#59656E]')}
+              className={cn('w-4 h-4', scope === 'ALL' ? 'text-primary' : 'text-[#59656E] dark:text-muted-foreground')}
             />
             <span>전체 팀</span>
           </button>
@@ -105,12 +127,12 @@ export function StudyRankingList({
             className={cn(
               'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all',
               scope === 'MINE'
-                ? 'bg-white text-[#040C13] shadow-sm ring-1 ring-black/5'
-                : 'text-[#59656E] hover:text-[#040C13]',
+                ? 'bg-white text-[#040C13] shadow-sm ring-1 ring-black/5 dark:bg-background dark:text-foreground dark:ring-white/10'
+                : 'text-[#798d9c] hover:text-[#040C13] dark:text-muted-foreground dark:hover:text-foreground',
             )}
           >
             <PeopleIcon
-              className={cn('w-4 h-4', scope === 'MINE' ? 'text-[#E24EA0]' : 'text-[#59656E]')}
+              className={cn('w-4 h-4', scope === 'MINE' ? 'text-primary' : 'text-[#59656E] dark:text-muted-foreground')}
             />
             <span>내 팀</span>
           </button>
@@ -118,7 +140,7 @@ export function StudyRankingList({
       </div>
 
       {/* Table Header Row */}
-      <div className="hidden md:grid grid-cols-[4rem_1fr_5rem_6rem_3rem] gap-4 px-6 py-2 text-sm font-medium text-slate-400">
+      <div className="hidden md:grid grid-cols-[4rem_1fr_5rem_6rem_3rem] gap-4 px-6 py-2 text-sm font-medium text-slate-400 dark:text-muted-foreground">
         <div className="text-center">순위</div>
         <div>팀 이름</div>
         <div className="text-center">인원</div>
@@ -136,11 +158,11 @@ export function StudyRankingList({
       ) : (
         <div className={cn('space-y-3', scope === 'MINE' && 'space-y-6')}>
           {rankings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-slate-400 mb-2">
+            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 shadow-sm dark:bg-card dark:border-border">
+              <div className="text-slate-400 mb-2 dark:text-muted-foreground">
                 <Search className="h-8 w-8 opacity-50" />
               </div>
-              <p className="text-slate-500 font-medium">
+              <p className="text-slate-500 font-medium dark:text-muted-foreground">
                 {scope === 'MINE' ? '속한 스터디가 없습니다.' : '랭킹 정보가 없습니다.'}
               </p>
             </div>
@@ -154,13 +176,13 @@ export function StudyRankingList({
                   key={ranking.studyId}
                   className={cn(
                     'group relative flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm transition-all duration-200 overflow-hidden',
-                    'hover:shadow-md hover:border-slate-300',
+                    'hover:shadow-md hover:border-slate-300 dark:bg-card dark:border-border dark:hover:border-primary/50',
                   )}
                 >
                   <div
                     className={cn(
                       'grid grid-cols-[4rem_1fr_5rem_6rem_3rem] gap-4 items-center p-3 cursor-pointer select-none',
-                      isExpanded ? 'bg-slate-50/50' : '',
+                      isExpanded ? 'bg-slate-50/50 dark:bg-muted/50' : '',
                     )}
                     onClick={() => onToggleExpand(ranking.studyId)}
                   >
@@ -168,26 +190,26 @@ export function StudyRankingList({
                       <span
                         className={cn(
                           'text-lg font-black italic',
-                          ranking.rank <= 3 ? 'text-slate-800' : 'text-slate-400',
+                          ranking.rank <= 3 ? 'text-slate-800 dark:text-foreground' : 'text-slate-400 dark:text-muted-foreground',
                         )}
                       >
                         {ranking.rank}
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-bold text-slate-700 truncate text-base group-hover:text-primary transition-colors">
+                      <h3 className="font-bold text-slate-700 truncate text-base group-hover:text-primary transition-colors dark:text-card-foreground">
                         {ranking.name}
                       </h3>
                     </div>
                     <div className="flex justify-center">
-                      <div className="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-full">
-                        <span className="text-xs font-bold text-slate-600 tabular-nums">
+                      <div className="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-full dark:bg-muted">
+                        <span className="text-xs font-bold text-slate-600 tabular-nums dark:text-muted-foreground">
                           {ranking.memberCount}명
                         </span>
                       </div>
                     </div>
                     <div className="flex justify-end pr-2">
-                      <div className="text-sm font-bold text-slate-800 tabular-nums">
+                      <div className="text-sm font-bold text-slate-800 tabular-nums dark:text-foreground">
                         {ranking.totalPoint.toLocaleString()}점
                       </div>
                     </div>
@@ -197,8 +219,8 @@ export function StudyRankingList({
                   </div>
 
                   {isExpanded && (
-                    <div className="bg-slate-50 border-t border-slate-200 p-4 animate-in slide-in-from-top-2 duration-200">
-                      <h4 className="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b border-slate-200">
+                    <div className="bg-slate-50 border-t border-slate-200 p-4 animate-in slide-in-from-top-2 duration-200 dark:bg-muted/20 dark:border-border">
+                      <h4 className="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b border-slate-200 dark:text-muted-foreground dark:border-border">
                         스터디 멤버
                       </h4>
                       <div className="grid gap-3">
@@ -207,7 +229,8 @@ export function StudyRankingList({
                           return (
                             <div
                               key={member.userId}
-                              className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm"
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md cursor-pointer transition-all hover:bg-slate-50 dark:bg-card dark:border-border dark:hover:bg-muted/50"
+                              onClick={() => handleUserClick(member.nickname)}
                             >
                               <div className="flex items-center gap-3">
                                 {displayImg ? (
@@ -222,7 +245,7 @@ export function StudyRankingList({
                                   </div>
                                 )}
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-slate-700 text-sm">
+                                  <span className="font-bold text-slate-700 text-sm dark:text-card-foreground">
                                     {member.nickname}
                                   </span>
                                   <span
@@ -230,7 +253,7 @@ export function StudyRankingList({
                                       'text-[10px] font-bold px-1.5 py-0.5 rounded w-fit',
                                       member.role === 'OWNER'
                                         ? 'bg-primary/10 text-primary'
-                                        : 'bg-slate-100 text-slate-500',
+                                        : 'bg-slate-100 text-slate-500 dark:bg-muted dark:text-muted-foreground',
                                     )}
                                   >
                                     {member.role === 'OWNER' ? 'OWNER' : 'MEMBER'}
