@@ -122,4 +122,12 @@ public class RedisKeyConst {
     // 게임 내 경고 알림 (Pub/Sub) -> topic/games/%d/alert/%d
     public static final String TOPIC_GAME_ALERT = "topic/games/%d/alert/%d";
 
+    // 게임 초대 코드 (String: Code -> roomId)
+    public static final String GAME_INVITE_CODE = "game:invite:code:%s";
+    // 게임 방 초대 코드 (String: roomId -> Code)
+    public static final String GAME_ROOM_INVITE_CODE = "game:room:invite:%d";
+
+    // 개인전 스피드 레이스 1등 종료 타이머 시작 여부 (Value)
+    public static final String GAME_FINISH_TIMER = "game:room:%d:finish_timer";
+
 }

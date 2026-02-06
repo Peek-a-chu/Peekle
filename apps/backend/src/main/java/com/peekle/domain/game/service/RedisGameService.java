@@ -19,6 +19,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -230,6 +231,12 @@ public class RedisGameService {
             throw new IllegalArgumentException("존재하지 않는 방입니다.");
         }
 
+        // 0-3. 방 상태 확인 (대기 중일 때만 입장 가능)
+        String status = (String) redisTemplate.opsForValue().get(String.format(RedisKeyConst.GAME_STATUS, roomId));
+        if (status != null && !"WAITING".equals(status)) {
+            throw new IllegalStateException("이미 시작되었거나 종료된 방에는 입장할 수 없습니다.");
+        }
+
         // 비밀번호 체크
         if (roomInfo.containsKey("password")) {
             String roomPassword = (String) roomInfo.get("password");
@@ -366,6 +373,18 @@ public class RedisGameService {
         redisTemplate.delete(String.format(RedisKeyConst.GAME_START_TIME, roomId));
         redisTemplate.delete(String.format(RedisKeyConst.GAME_RANKING, roomId));
         redisTemplate.delete(String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS, roomId));
+
+        // 초대 코드 삭제
+        String inviteCode = (String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+        if (inviteCode != null) {
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_INVITE_CODE, inviteCode));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+        }
+
+        // 종료 타이머 키 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_TIMER, roomId));
 
         log.info("🗑️ Game Room {} Deleted and Resources Cleaned up.", roomId);
     }
@@ -1055,6 +1074,7 @@ public class RedisGameService {
                 return;
 
             boolean allCompleted = true;
+            boolean anyCompleted = false;
             for (Object playerObj : players) {
                 Long playerId = Long.parseLong(String.valueOf(playerObj));
                 String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, playerId);
@@ -1062,14 +1082,67 @@ public class RedisGameService {
                 int playerSolvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 0;
                 if (playerSolvedCount < problemCount) {
                     allCompleted = false;
-                    break;
+                } else {
+                    anyCompleted = true;
                 }
             }
 
             if (allCompleted) {
                 log.info("🏆 All players completed all {} problems! Finishing game...", problemCount);
                 finishGame(gameId);
+            } else if (anyCompleted) {
+                // 한 명이라도 다 풀었으면 그 사람의 닉네임을 찾아서 1분 유예 시간 시작 알림
+                String finisherNickname = "누군가";
+                for (Object playerObj : players) {
+                    Long playerId = Long.parseLong(String.valueOf(playerObj));
+                    String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, playerId);
+                    Object solvedCountObj = redisTemplate.opsForHash().get(scoreKey, "solvedCount");
+                    int playerSolvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj))
+                            : 0;
+                    if (playerSolvedCount >= problemCount) {
+                        User user = userRepository.findById(playerId).orElse(null);
+                        if (user != null) {
+                            finisherNickname = user.getNickname();
+                            break;
+                        }
+                    }
+                }
+                startIndividualSpeedRaceFinishTimer(gameId, finisherNickname);
             }
+        }
+    }
+
+    /**
+     * 개인전 스피드 레이스 1등 발생 시 1분 유예 타이머 시작
+     */
+    private void startIndividualSpeedRaceFinishTimer(Long gameId, String finisherNickname) {
+        String timerKey = String.format(RedisKeyConst.GAME_FINISH_TIMER, gameId);
+        Boolean alreadyStarted = redisTemplate.hasKey(timerKey);
+
+        if (Boolean.FALSE.equals(alreadyStarted)) {
+            // Redis에 플래그 설정 (동시 실행 방지 및 상태 추적)
+            redisTemplate.opsForValue().set(timerKey, "started", 10, TimeUnit.MINUTES);
+
+            log.info("⏱️ First finisher in Speed Race Game {}. Starting 1-minute grace period...", gameId);
+
+            // 참여자들에게 타이머 시작 알림
+            String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, gameId);
+            Map<String, Object> timerData = new HashMap<>();
+            timerData.put("remainSeconds", 60);
+            timerData.put("nickname", finisherNickname);
+            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("FINISH_TIMER_START", timerData));
+
+            // 60초 뒤 게임 종료 예약
+            CompletableFuture.delayedExecutor(60, TimeUnit.SECONDS).execute(() -> {
+                String statusKey = String.format(RedisKeyConst.GAME_STATUS, gameId);
+                String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
+
+                // 아직 플레이 중이라면 종료 처리
+                if ("PLAYING".equals(currentStatus)) {
+                    log.info("⏰ Grace period ended for Game {}. Auto finishing...", gameId);
+                    finishGame(gameId);
+                }
+            });
         }
     }
 
@@ -1220,6 +1293,20 @@ public class RedisGameService {
             }
         }
 
+        // 7. 활성 방 목록에서 제거 (로비에서 숨김)
+        redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
+
+        // 8. 초대 코드 만료 처리
+        String inviteCode = (String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+        if (inviteCode != null) {
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_INVITE_CODE, inviteCode));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+        }
+
+        // 9. 종료 타이머 키 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_TIMER, roomId));
+
         log.info("✅ Game {} finished successfully. Winner: {}", roomId, winner);
     }
 
@@ -1235,4 +1322,59 @@ public class RedisGameService {
         }
         return null;
     }
+
+    /**
+     * 초대 코드 생성 및 저장 (TTL 10분)
+     */
+    public String generateInviteCode(Long roomId) {
+        // 1. 기존 코드가 있는지 확인
+        String oldCode = (String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+        if (oldCode != null) {
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_INVITE_CODE, oldCode));
+        }
+
+        // 2. 새 코드 생성
+        String newCode = createRandomCode();
+
+        // 3. 코드 -> RoomId 저장
+        redisTemplate.opsForValue().set(
+                String.format(RedisKeyConst.GAME_INVITE_CODE, newCode),
+                String.valueOf(roomId),
+                10, TimeUnit.MINUTES);
+
+        // 4. RoomId -> 코드 저장
+        redisTemplate.opsForValue().set(
+                String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId),
+                newCode,
+                10, TimeUnit.MINUTES);
+
+        return newCode;
+    }
+
+    /**
+     * 초대 코드로 방 ID 조회
+     */
+    public Long getRoomIdByInviteCode(String code) {
+        String roomIdStr = (String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_INVITE_CODE, code));
+        if (roomIdStr == null) {
+            return null;
+        }
+        return Long.parseLong(roomIdStr);
+    }
+
+    /**
+     * 8자리 랜덤 대문자+숫자 코드 생성
+     */
+    private String createRandomCode() {
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder(8);
+        SecureRandom random = new SecureRandom();
+        for (int i = 0; i < 8; i++) {
+            sb.append(characters.charAt(random.nextInt(characters.length())));
+        }
+        return sb.toString();
+    }
+
 }

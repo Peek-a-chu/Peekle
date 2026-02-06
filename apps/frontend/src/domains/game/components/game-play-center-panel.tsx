@@ -61,13 +61,15 @@ export function GamePlayCenterPanel({
     // 2. 게임 서버에 제출 알림
     onSubmit();
 
-    // 3. 확장 프로그램 자동 제출 요청
-    if (externalId) {
+    // 3. 확장 프로그램 자동 제출 요청 및 제출 페이지 이동
+    const targetExternalId = externalId || selectedProblemUrl?.split('/').pop();
+
+    if (targetExternalId) {
       window.postMessage(
         {
           type: 'PEEKLE_SUBMIT_CODE',
           payload: {
-            externalId: externalId,
+            externalId: targetExternalId,
             code: code,
             language: language,
             sourceType: 'GAME',
@@ -75,13 +77,6 @@ export function GamePlayCenterPanel({
         },
         '*',
       );
-    } else if (selectedProblemUrl) {
-      // Fallback: URL에서 추출 시도 (구형 로직 대응용)
-      let submitUrl = selectedProblemUrl;
-      if (submitUrl.includes('/problem/')) {
-        submitUrl = submitUrl.replace('/problem/', '/submit/');
-      }
-      window.open(submitUrl, '_blank');
     }
   };
 
@@ -110,8 +105,6 @@ export function GamePlayCenterPanel({
         <GameVideoGrid
           participants={participants}
           currentUserId={currentUserId}
-          micState={micState}
-          camState={camState}
         />
       )}
 

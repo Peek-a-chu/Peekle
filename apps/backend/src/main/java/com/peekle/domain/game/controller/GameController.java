@@ -3,6 +3,7 @@ package com.peekle.domain.game.controller;
 import com.peekle.domain.game.dto.request.GameCreateRequest;
 import com.peekle.domain.game.dto.request.GameEnterRequest;
 import com.peekle.domain.game.dto.request.GameKickRequest;
+import com.peekle.domain.game.dto.response.GameInviteCodeResponse;
 import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.service.RedisGameService;
 import com.peekle.global.dto.ApiResponse;
@@ -66,6 +67,27 @@ public class GameController {
     public ApiResponse<String> endGame(@PathVariable Long roomId) {
         gameService.finishGame(roomId);
         return ApiResponse.success("Game ended successfully");
+    }
+
+    /**
+     * 초대 코드 생성 API
+     */
+    @PostMapping("/{roomId}/invite-code")
+    public ApiResponse<GameInviteCodeResponse> createInviteCode(@PathVariable Long roomId) {
+        String code = gameService.generateInviteCode(roomId);
+        return ApiResponse.success(GameInviteCodeResponse.of(code));
+    }
+
+    /**
+     * 초대 코드로 방 정보 조회 API
+     */
+    @GetMapping("/invite/{code}")
+    public ApiResponse<GameRoomResponse> getRoomByCode(@PathVariable String code) {
+        Long roomId = gameService.getRoomIdByInviteCode(code);
+        if (roomId == null) {
+            return ApiResponse.success(null);
+        }
+        return ApiResponse.success(gameService.getGameRoom(roomId));
     }
 
 }

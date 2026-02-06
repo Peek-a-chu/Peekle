@@ -203,3 +203,62 @@ export async function kickUser(roomId: string | number, targetUserId: string | n
         return false;
     }
 }
+
+/**
+ * 게임 초대 코드 생성
+ */
+export async function getGameInviteCode(roomId: string | number): Promise<string | null> {
+    try {
+        const response = await apiFetch<{ inviteCode: string }>(`/api/games/${roomId}/invite-code`, {
+            method: 'POST',
+        });
+
+        if (!response.success || !response.data) {
+            console.error('Failed to get invite code:', response.error);
+            return null;
+        }
+
+        return response.data.inviteCode;
+    } catch (error) {
+        console.error('Error getting invite code:', error);
+        return null;
+    }
+}
+
+/**
+ * 초대 코드로 방 정보 조회
+ */
+export async function getGameRoomByCode(code: string): Promise<GameRoom | null> {
+    try {
+        const response = await apiFetch<GameRoomResponse>(`/api/games/invite/${code}`);
+
+        if (!response.success || !response.data) {
+            return null;
+        }
+
+        const room = response.data;
+        return {
+            id: room.roomId,
+            title: room.title,
+            mode: room.mode as GameMode,
+            teamType: room.teamType as TeamType,
+            status: room.status as GameStatus,
+            currentPlayers: room.currentPlayers || 0,
+            maxPlayers: room.maxPlayers,
+            timeLimit: room.timeLimit,
+            problemCount: room.problemCount,
+            isPrivate: room.isSecret,
+            host: {
+                id: room.host.id,
+                nickname: room.host.nickname,
+                profileImg: room.host.profileImg
+            },
+            tags: room.tags || [],
+            tierMin: room.tierMin || '브론즈',
+            tierMax: room.tierMax || '다이아',
+        };
+    } catch (error) {
+        console.error('Error fetching game room by code:', error);
+        return null;
+    }
+}

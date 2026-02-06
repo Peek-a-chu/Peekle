@@ -3,11 +3,15 @@ package com.peekle.domain.game.controller;
 import com.peekle.domain.game.dto.request.GameChatRequest;
 import com.peekle.domain.game.dto.request.GameCommonRequest;
 import com.peekle.domain.game.service.RedisGameService;
+import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.global.media.service.MediaService;
+import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Slf4j
@@ -16,6 +20,9 @@ import org.springframework.stereotype.Controller;
 public class GameSocketController {
 
     private final RedisGameService gameService;
+    private final MediaService mediaService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
 
     // 방 입장
     @MessageMapping("/games/enter")
@@ -28,6 +35,24 @@ public class GameSocketController {
         headerAccessor.getSessionAttributes().put("gameId", request.getGameId());
 
         gameService.enterGameRoom(request.getGameId(), userId, request.getPassword());
+
+        // LiveKit 토큰 발급 및 전송
+        try {
+            String nickname = userRepository.findById(userId)
+                    .map(com.peekle.domain.user.entity.User::getNickname)
+                    .orElse("Player " + userId);
+            String token = mediaService.createGameAccessToken(request.getGameId(), userId, nickname);
+            log.info("Generated LiveKit token for user {}, game {}", userId, request.getGameId());
+
+            messagingTemplate.convertAndSend(
+                    "/topic/games/" + request.getGameId() + "/video-token/" + userId,
+                    SocketResponse.of("VIDEO_TOKEN", token));
+        } catch (Exception e) {
+            log.error("LiveKit token generation failed for game {}: {}", request.getGameId(), e.getMessage());
+            messagingTemplate.convertAndSend(
+                    "/topic/games/" + request.getGameId() + "/video-token/" + userId,
+                    SocketResponse.of("ERROR", "Video connection failed"));
+        }
     }
 
     // 팀 변경
