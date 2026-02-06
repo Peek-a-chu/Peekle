@@ -156,21 +156,22 @@ export function ParticipantCard({
         )}
 
         {/* Menu Trigger */}
-        {hasAnyAction && (
-          <div className="relative flex items-center" ref={menuRef}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100"
-              data-state={isMenuOpen ? 'open' : 'closed'}
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="메뉴"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
+        <div className="relative flex items-center h-8 w-8 justify-center" ref={menuRef}>
+          {hasAnyAction && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100"
+                data-state={isMenuOpen ? 'open' : 'closed'}
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                aria-label="메뉴"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
 
-            {isMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95">
+              {isMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95">
                 <div className="flex flex-col py-1">
                   {/* 1. Owner Actions */}
                   {canOwnerActions && (
@@ -236,8 +237,9 @@ export function ParticipantCard({
                 </div>
               </div>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
