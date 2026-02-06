@@ -20,6 +20,7 @@ export default function GamesPage(): React.ReactNode {
     createModalOpen,
     inviteJoinModalOpen,
     filteredRooms,
+    isCreatingRoom,
     setCreateModalOpen,
     setPasswordModalOpen,
     setInviteJoinModalOpen,
@@ -93,6 +94,7 @@ export default function GamesPage(): React.ReactNode {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSubmit={handleCreateRoom}
+        isLoading={isCreatingRoom}
       />
 
       {/* 비밀번호 입력 모달 */}

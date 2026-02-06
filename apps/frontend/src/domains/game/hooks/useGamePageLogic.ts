@@ -35,6 +35,8 @@ export function useGamePageLogic() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [inviteJoinModalOpen, setInviteJoinModalOpen] = useState(false);
   const [rooms, setRooms] = useState<GameRoom[]>([]);
+  // 로딩 상태
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   // 방 목록 조회
   const refreshRooms = useCallback(async () => {
@@ -196,30 +198,40 @@ export function useGamePageLogic() {
   };
 
   const handleCreateRoom = async (formData: GameCreationFormData) => {
-    // GameCreationFormData -> GameCreateRequest 변환
-    const requestData: GameCreateRequest = {
-      title: formData.title,
-      mode: formData.mode,
-      teamType: formData.teamType,
-      maxPlayers: formData.maxPlayers,
-      timeLimit: formData.timeLimit,
-      problemCount: formData.problemCount,
-      password: formData.password || undefined, // 빈 문자열이면 undefined 처리
-      problemSource: formData.problemSource,
-      tierMin: formData.tierMin,
-      tierMax: formData.tierMax,
-      selectedWorkbookId: formData.selectedWorkbookId || undefined, // null -> undefined 변환
-      selectedTags: formData.selectedTags,
-    };
+    if (isCreatingRoom) return;
+    setIsCreatingRoom(true);
 
-    const roomId = await createGameRoom(requestData);
-    if (roomId) {
-      toast.success('방이 생성되었습니다.');
-      setCreateModalOpen(false);
-      await refreshRooms();
-      router.push(`/game/${roomId}`);
-    } else {
-      toast.error('방 생성에 실패했습니다.');
+    try {
+      // GameCreationFormData -> GameCreateRequest 변환
+      const requestData: GameCreateRequest = {
+        title: formData.title,
+        mode: formData.mode,
+        teamType: formData.teamType,
+        maxPlayers: formData.maxPlayers,
+        timeLimit: formData.timeLimit,
+        problemCount: formData.problemCount,
+        password: formData.password || undefined, // 빈 문자열이면 undefined 처리
+        problemSource: formData.problemSource,
+        tierMin: formData.tierMin,
+        tierMax: formData.tierMax,
+        selectedWorkbookId: formData.selectedWorkbookId || undefined, // null -> undefined 변환
+        selectedTags: formData.selectedTags,
+      };
+
+      const roomId = await createGameRoom(requestData);
+      if (roomId) {
+        toast.success('방이 생성되었습니다.');
+        setCreateModalOpen(false);
+        // await refreshRooms(); // 방 목록 새로고침 대기 제거 -> 즉시 입장
+        router.push(`/game/${roomId}`);
+      } else {
+        toast.error('방 생성에 실패했습니다.');
+        setIsCreatingRoom(false);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('방 생성 중 오류가 발생했습니다.');
+      setIsCreatingRoom(false);
     }
   };
 
@@ -240,6 +252,7 @@ export function useGamePageLogic() {
     createModalOpen,
     inviteJoinModalOpen,
     filteredRooms,
+    isCreatingRoom,
     setCreateModalOpen,
     setPasswordModalOpen,
     setInviteJoinModalOpen,

@@ -19,6 +19,7 @@ interface GameCreationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit?: (formData: GameCreationFormData) => void;
+  isLoading?: boolean;
 }
 
 const STEPS = [
@@ -28,7 +29,7 @@ const STEPS = [
   { id: 3, label: '확인', icon: CheckCircle },
 ];
 
-export function GameCreationModal({ open, onOpenChange, onSubmit }: GameCreationModalProps) {
+export function GameCreationModal({ open, onOpenChange, onSubmit, isLoading = false }: GameCreationModalProps) {
   const {
     currentStep,
     formData,
@@ -162,7 +163,16 @@ export function GameCreationModal({ open, onOpenChange, onSubmit }: GameCreation
                   </Button>
                 )}
                 {currentStep === 3 ? (
-                  <Button onClick={handleSubmit}>생성하기</Button>
+                  <Button onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        생성 중...
+                      </>
+                    ) : (
+                      '생성하기'
+                    )}
+                  </Button>
                 ) : (
                   <Button onClick={() => setCurrentStep(currentStep + 1)}>다음</Button>
                 )}
