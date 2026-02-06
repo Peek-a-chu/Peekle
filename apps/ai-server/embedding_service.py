@@ -21,33 +21,32 @@ chroma_client = chromadb.HttpClient(
     host=CHROMA_HOST,
     port=int(CHROMA_PORT)
 )
-collection = chroma_client.get_or_create_collection(
-    name="problems",
-    embedding_function=openai_ef
-)
+
+def get_collection():
+    """컬렉션 객체를 동적으로 가져옴 (연결 끊김 방지)"""
+    return chroma_client.get_or_create_collection(
+        name="problems",
+        embedding_function=openai_ef
+    )
 
 def get_collection_count():
     """현재 컬렉션에 저장된 문서 수 반환"""
     try:
-        return collection.count()
+        return get_collection().count()
     except Exception as e:
         print(f"[WARN] 컬렉션 카운트 조회 실패: {e}")
         return 0
 
 def clear_collection():
     """기존 컬렉션을 완전히 삭제하고 초기화"""
-    global collection
     try:
         chroma_client.delete_collection(name="problems")
         print("기존 ChromaDB 컬렉션을 삭제했습니다.")
     except Exception as e:
         print(f"컬렉션 삭제 중 오류(이미 없을 수 있음): {e}")
     
-    # 다시 생성
-    collection = chroma_client.create_collection(
-        name="problems",
-        embedding_function=openai_ef
-    )
+    # 다시 생성 (get_collection 호출 시 자동 생성됨)
+    get_collection()
     print("새로운 컬렉션('problems')을 생성했습니다.")
 
 def index_problems(problems):
@@ -70,7 +69,7 @@ def index_problems(problems):
         for p in problems
     ]
     
-    collection.upsert(
+    get_collection().upsert(
         ids=ids,
         documents=documents,
         metadatas=metadatas
@@ -78,8 +77,18 @@ def index_problems(problems):
 
 def search_similar_problems(query_text, n_results=5):
     """유사 문제 검색"""
-    results = collection.query(
+    results = get_collection().query(
         query_texts=[query_text],
         n_results=n_results
     )
     return results
+
+def check_existing_ids(ids):
+    """주어진 ID 리스트 중 이미 DB에 존재하는 ID만 반환"""
+    try:
+        # get() 메서드로 ID 존재 여부 확인 (메타데이터만 가볍게 조회)
+        existing = get_collection().get(ids=ids, include=[])
+        return set(existing['ids'])
+    except Exception as e:
+        print(f"[WARN] ID 조회 중 오류: {e}")
+        return set()

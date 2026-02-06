@@ -170,12 +170,26 @@ async function retryOriginalRequest<T>(url: string, fetchOptions: RequestInit): 
     } as ApiResponse<T>;
   }
 
+  if (retryResponse.status === 401) {
+    return handleAuthFailure();
+  }
+
   try {
     const json = JSON.parse(retryText);
     if (json && typeof json === 'object' && 'success' in json) {
       return json as ApiResponse<T>;
     }
-    return { success: true, data: json, error: undefined } as ApiResponse<T>;
+    if (retryResponse.ok) {
+      return { success: true, data: json, error: undefined } as ApiResponse<T>;
+    }
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: json.code || json.status?.toString() || 'API_ERROR',
+        message: json.message || json.error || `Request failed with status ${retryResponse.status}`,
+      },
+    } as ApiResponse<T>;
   } catch (e: any) {
     return {
       success: false,

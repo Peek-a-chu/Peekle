@@ -328,20 +328,25 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const handleSubmit = (): void => {
       if (editorRef.current) {
         const value = editorRef.current.getValue();
-        const { selectedStudyProblemId, selectedProblemExternalId } = useRoomStore.getState();
+        const { selectedProblemId, selectedStudyProblemId, selectedProblemExternalId } =
+          useRoomStore.getState();
 
         if (!selectedStudyProblemId) {
           toast.error('선택된 문제가 없습니다.');
           return;
         }
 
+        const problemId = selectedProblemExternalId
+          ? String(selectedProblemExternalId)
+          : String(selectedProblemId);
+
         // 확장 프로그램에 메시지 전송 (확장 프로그램이 수신 후 스토리지 저장 -> 페이지 이동 처리)
         window.postMessage(
           {
             type: 'PEEKLE_SUBMIT_CODE',
             payload: {
-              studyProblemId: selectedStudyProblemId,  // StudyProblem PK
-              externalId: selectedProblemExternalId,   // BOJ 문제 번호
+              studyProblemId: selectedStudyProblemId, // StudyProblem PK
+              externalId: selectedProblemExternalId, // BOJ 문제 번호
               code: value,
               language: language,
               sourceType: 'STUDY',
@@ -351,6 +356,17 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         );
 
         toast.info('자동 제출을 시작합니다...');
+
+        // Notify problem list to refresh solved counts after submission
+        window.dispatchEvent(
+          new CustomEvent('study-problem-submitted', {
+            detail: {
+              studyId,
+              problemId: selectedProblemId,
+              externalId: selectedProblemExternalId ?? null,
+            },
+          }),
+        );
       }
     };
 
@@ -364,8 +380,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       // [Anti-Cheat] 게임 모드일 때 붙여넣기 금지 (Ctrl+V, Cmd+V)
       if (sourceType === 'GAME') {
         editor.onKeyDown((e) => {
-          const isPaste =
-            (e.ctrlKey || e.metaKey) && (e.keyCode === monaco.KeyCode.KeyV);
+          const isPaste = (e.ctrlKey || e.metaKey) && e.keyCode === monaco.KeyCode.KeyV;
 
           if (isPaste) {
             e.preventDefault();
@@ -460,7 +475,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     return (
       <div
         className={cn(
-          'flex h-full flex-col bg-background min-w-0',
+          'flex h-full flex-col bg-background min-w-0 relative',
           borderColorClass
             ? `border-2 ${borderColorClass} rounded-lg`
             : readOnly
@@ -480,6 +495,28 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           />
         )}
 
+        {/* Desktop Only Overlay (Inline) */}
+        <div className="ide-desktop-overlay absolute inset-0 z-50 items-center justify-center bg-black/90 text-white p-6 text-center">
+            <div className="flex flex-col items-center">
+                <div className="text-xl font-bold">데스크탑 전용 서비스</div>
+                <div className="mt-3 text-sm text-white/70 leading-relaxed">
+                화면 크기가 작아 콘텐츠를 표시할 수 없습니다.
+                <br />
+                더 큰 화면에서 다시 접속해주세요.
+                </div>
+            </div>
+        </div>
+        <style jsx>{`
+            .ide-desktop-overlay {
+                display: flex;
+            }
+            @media (min-width: 900px) and (min-height: 576px) {
+                .ide-desktop-overlay {
+                    display: none;
+                }
+            }
+        `}</style>
+        
         <div className="flex-1 overflow-hidden" onMouseEnter={() => editorRef.current?.focus()}>
           <Editor
             // [중요] 키 변경으로 컴포넌트 완전 재생성
@@ -519,10 +556,6 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
               scrollBeyondLastLine: false,
             }}
           />
-          {/* 코드 길이 표시 (정규화 기준) */}
-          <div className="absolute bottom-4 right-8 z-10 rounded bg-black/50 px-2 py-1 text-[10px] text-zinc-400 backdrop-blur-sm pointer-events-none">
-            Length: {(code || '').replace(/\r\n/g, '\n').trim().length} chars
-          </div>
         </div>
 
         {/* 확인 모달 */}

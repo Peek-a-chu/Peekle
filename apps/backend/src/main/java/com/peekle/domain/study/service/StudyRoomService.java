@@ -13,16 +13,22 @@ import com.peekle.domain.study.repository.StudyProblemRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
 import com.peekle.domain.submission.dto.SubmissionRequest;
 import com.peekle.domain.submission.dto.SubmissionResponse;
+import com.peekle.domain.submission.entity.SubmissionLog;
+import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.submission.service.SubmissionService;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.redis.RedisPublisher;
+import com.peekle.global.socket.SocketResponse;
+import org.springframework.data.redis.listener.ChannelTopic;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +50,8 @@ public class StudyRoomService {
         private final StringRedisTemplate redisTemplate;
         private final UserRepository userRepository;
         private final SubmissionService submissionService;
+        private final SubmissionLogRepository submissionLogRepository; // Added
+        private final RedisPublisher redisPublisher; // Added
 
         // 스터디 방 생성 (초대코드 반환)
         @Transactional
@@ -331,7 +339,28 @@ public class StudyRoomService {
                         }
 
                         // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
-                        // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
+
+                        // [Added] Real-time SOLVED Broadcast
+                        try {
+                                Long submissionId = response.getSubmissionId();
+                                SubmissionLog log = submissionLogRepository.findById(submissionId).orElse(null);
+
+                                if (log != null) {
+                                        User user = log.getUser();
+                                        System.out.println(
+                                                        "[StudyRoomService] Broadcasting SOLVED event for Study "
+                                                                        + studyId);
+                                        redisPublisher.publish(
+                                                        new ChannelTopic("topic/studies/rooms/" + studyId),
+                                                        SocketResponse.of("SOLVED", Map.of(
+                                                                        "problemId", problemId,
+                                                                        "userId", user.getId(),
+                                                                        "nickname", user.getNickname(),
+                                                                        "earnedPoints", response.getEarnedPoints())));
+                                }
+                        } catch (Exception e) {
+                                System.err.println("Failed to broadcast SOLVED event: " + e.getMessage());
+                        }
                 } else {
                         System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
                 }

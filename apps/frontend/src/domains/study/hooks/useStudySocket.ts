@@ -118,36 +118,24 @@ export const useStudySocketSubscription = (studyId: number) => {
 
   // useRef는 컴포넌트 최상위 레벨에서만 호출 가능
   const currentUserIdRef = useRef(currentUserId);
+  const recentProblemEventRef = useRef<Map<string, number>>(new Map());
+  const onlineSyncTimerRef = useRef<number | null>(null);
+  const onlineSyncSeenRef = useRef<boolean>(false);
+  const onlineSyncAttemptsRef = useRef<number>(0);
+  const sentEnterRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!client || !connected || !studyId) return;
 
-    // 1. Enter Study (currentUserId가 있으면 즉시, 없으면 나중에 재시도)
+
+    // 1. Enter Study Helper
     const sendEnter = () => {
-      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId });
+      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId: currentUserIdRef.current });
       client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
     };
 
-    // currentUserId가 있으면 즉시 ENTER 전송, 없으면 나중에 재시도
-    if (currentUserId) {
-      sendEnter();
-    } else {
-      // currentUserId가 설정될 때까지 기다렸다가 ENTER 전송
-      const checkAndEnter = () => {
-        const userId = useRoomStore.getState().currentUserId;
-        if (userId) {
-          console.log('[StudySocket] currentUserId available, sending ENTER');
-          sendEnter();
-          clearInterval(enterInterval);
-        }
-      };
-      const enterInterval = setInterval(checkAndEnter, 500);
-
-      // 5초 후 타임아웃
-      setTimeout(() => {
-        clearInterval(enterInterval);
-      }, 5000);
-    }
+    // Note: We do NOT send ENTER here immediately.
+    // We wait for `subscribeToPrivateTopics` to succeed first.
 
     // 2. Subscribe Public Room Topic
     const publicTopic = `/topic/studies/rooms/${studyId}`;
@@ -169,27 +157,62 @@ export const useStudySocketSubscription = (studyId: number) => {
     let privateSubscription: any = null;
     let videoTokenSubscription: any = null;
 
+    const clearOnlineSyncTimer = () => {
+      if (onlineSyncTimerRef.current) {
+        window.clearInterval(onlineSyncTimerRef.current);
+        onlineSyncTimerRef.current = null;
+      }
+    };
+
+    const requestOnlineUsers = () => {
+      if (!client || !client.connected) return;
+      client.publish({
+        destination: '/pub/studies/online-users',
+        body: JSON.stringify({ studyId }),
+      });
+    };
+
+    const startOnlineSyncRetries = () => {
+      if (onlineSyncTimerRef.current || onlineSyncSeenRef.current) return;
+      onlineSyncAttemptsRef.current = 0;
+      onlineSyncTimerRef.current = window.setInterval(() => {
+        if (!client || !client.connected) return;
+        if (onlineSyncSeenRef.current) {
+          clearOnlineSyncTimer();
+          return;
+        }
+        onlineSyncAttemptsRef.current += 1;
+        requestOnlineUsers();
+        if (onlineSyncAttemptsRef.current >= 5) {
+          clearOnlineSyncTimer();
+        }
+      }, 1000);
+    };
+
     const subscribeToPrivateTopics = () => {
-      // 기존 구독 해제
-      if (privateSubscription) {
-        privateSubscription.unsubscribe();
-        privateSubscription = null;
-      }
-      if (videoTokenSubscription) {
-        videoTokenSubscription.unsubscribe();
-        videoTokenSubscription = null;
-      }
+      // Use Ref to ensure we escape stale closures if called via interval
+      const effectiveUserId = currentUserIdRef.current;
 
       // currentUserId가 있으면 구독 생성
-      if (currentUserId) {
-        const privateTopic = `/topic/studies/${studyId}/info/${currentUserId}`;
+      if (effectiveUserId) {
+        // 중복 구독 방지: 이미 구독 중이고, ID가 같다면 패스
+        if (privateSubscription) {
+          // 하지만 ID가 바뀌었을 수도 있으므로 (거의 없지만) 확인할 수도 있음.
+          // 여기선 단순화를 위해 기존 구독 해제 후 재구독 (아래 로직)
+          privateSubscription.unsubscribe();
+        }
+        if (videoTokenSubscription) {
+          videoTokenSubscription.unsubscribe();
+        }
+
+        const privateTopic = `/topic/studies/${studyId}/info/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Private:', privateTopic);
         privateSubscription = client.subscribe(privateTopic, (message) => {
           handleSocketMessage(message);
         });
 
         // 3-1. Subscribe Private Error Topic
-        const errorTopic = `/topic/studies/${studyId}/error/${currentUserId}`;
+        const errorTopic = `/topic/studies/${studyId}/error/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Error:', errorTopic);
         const errorSub = client.subscribe(errorTopic, (message) => {
           handleSocketMessage(message);
@@ -202,16 +225,31 @@ export const useStudySocketSubscription = (studyId: number) => {
         };
 
         // 4. Subscribe Video Token Topic
-        const videoTokenTopic = `/topic/studies/${studyId}/video-token/${currentUserId}`;
+        const videoTokenTopic = `/topic/studies/${studyId}/video-token/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Video Token:', videoTokenTopic);
         videoTokenSubscription = client.subscribe(videoTokenTopic, (message) => {
           handleSocketMessage(message);
         });
+
+        // [Fix] Subscription Complete -> Send ENTER
+        // 구독이 *완료된 후*에 입장 메시지를 보내야 응답(VIDEO_TOKEN)을 받을 수 있음
+        // STOMP subscribe는 클라이언트 측에서 즉시 처리되므로 바로 보내도 됨.
+        console.log('[StudySocket] Subscription ready, sending ENTER');
+        sendEnter();
       }
     };
 
     // 초기 구독 시도
     subscribeToPrivateTopics();
+
+    // 1. Enter Study (send once when connected; server reads userId from session)
+    if (!sentEnterRef.current) {
+      sentEnterRef.current = true;
+      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId });
+      client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
+    }
+
+    // NOTE: No long polling here. We only retry a few times until ONLINE_USERS arrives.
 
     // Helper to handle messages
     const handleSocketMessage = async (message: any) => {
@@ -231,22 +269,6 @@ export const useStudySocketSubscription = (studyId: number) => {
             const enteredUserId = data;
             // Optimistic update for immediate feedback
             updateParticipant(enteredUserId, { isOnline: true });
-
-            try {
-              const members = await fetchStudyParticipants(studyId);
-              // Ensure the entering user is marked online, in case API is slightly behind
-              const updatedMembers = members.map((p) =>
-                p.id === enteredUserId ? { ...p, isOnline: true } : p,
-              );
-              setParticipants(updatedMembers);
-
-              const enteredMember = updatedMembers.find((p) => p.id === enteredUserId);
-              if (enteredMember && enteredUserId !== useRoomStore.getState().currentUserId) {
-                toast.info(`${enteredMember.nickname}님이 입장하셨습니다.`);
-              }
-            } catch (e) {
-              console.error('Failed to refresh participants on ENTER', e);
-            }
             break;
           }
           case 'LEAVE': {
@@ -317,6 +339,46 @@ export const useStudySocketSubscription = (studyId: number) => {
             toast.info('스터디 정보가 변경되었습니다.');
             break;
           }
+          case 'ONLINE_USERS': {
+            onlineSyncSeenRef.current = true;
+            clearOnlineSyncTimer();
+            const onlineIds = Array.isArray(data)
+              ? data.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+              : [];
+            const onlineSet = new Set<number>(onlineIds);
+
+            const state = useRoomStore.getState();
+            const missingOnline =
+              onlineIds.length > 0 &&
+              state.participants &&
+              onlineIds.some((id) => !state.participants.find((p) => Number(p.id) === id));
+
+            if (!state.participants || state.participants.length === 0 || missingOnline) {
+              try {
+                const members = await fetchStudyParticipants(studyId);
+                setParticipants(
+                  members.map((member) => ({
+                    ...member,
+                    id: Number(member.id),
+                    isOnline: onlineSet.has(Number(member.id)),
+                    isOwner: member.isOwner ?? false,
+                    isMuted: member.isMuted ?? false,
+                    isVideoOff: member.isVideoOff ?? false,
+                  })),
+                );
+              } catch (e) {
+                console.error('Failed to sync participants from ONLINE_USERS', e);
+              }
+            } else {
+              setParticipants(
+                state.participants.map((p) => ({
+                  ...p,
+                  isOnline: onlineSet.has(Number(p.id)),
+                })),
+              );
+            }
+            break;
+          }
           case 'STATUS': {
             const { userId, isMuted, isVideoOff } = data;
             updateParticipant(userId, { isMuted, isVideoOff });
@@ -363,8 +425,19 @@ export const useStudySocketSubscription = (studyId: number) => {
               break;
             }
             const addedProblemId = data.problemId;
-            const problemTitle = data.title || data.externalId || `문제 ${addedProblemId}`;
             const externalId = data.externalId || String(addedProblemId);
+            const dedupeKey = `ADD:${studyId}:${addedProblemId}:${externalId}`;
+            const now = Date.now();
+            const lastTime = recentProblemEventRef.current.get(dedupeKey);
+            if (lastTime && now - lastTime < 1000) {
+              break;
+            }
+            recentProblemEventRef.current.set(dedupeKey, now);
+            // Cleanup old entries to avoid unbounded growth
+            for (const [key, ts] of recentProblemEventRef.current.entries()) {
+              if (now - ts > 5000) recentProblemEventRef.current.delete(key);
+            }
+            const problemTitle = data.title || data.externalId || `문제 ${addedProblemId}`;
             console.log('[StudySocket] Problem added:', addedProblemId, 'Full data:', data);
             window.dispatchEvent(
               new CustomEvent('study-problem-added', {
@@ -382,8 +455,18 @@ export const useStudySocketSubscription = (studyId: number) => {
               break;
             }
             const removedProblemId = data.problemId;
-            const problemTitle = data.title || data.externalId || `문제 ${removedProblemId}`;
             const externalId = data.externalId || String(removedProblemId);
+            const dedupeKey = `REMOVE:${studyId}:${removedProblemId}:${externalId}`;
+            const now = Date.now();
+            const lastTime = recentProblemEventRef.current.get(dedupeKey);
+            if (lastTime && now - lastTime < 1000) {
+              break;
+            }
+            recentProblemEventRef.current.set(dedupeKey, now);
+            for (const [key, ts] of recentProblemEventRef.current.entries()) {
+              if (now - ts > 5000) recentProblemEventRef.current.delete(key);
+            }
+            const problemTitle = data.title || data.externalId || `문제 ${removedProblemId}`;
             console.log('[StudySocket] Problem removed:', removedProblemId, 'Full data:', data);
             window.dispatchEvent(
               new CustomEvent('study-problem-removed', {
@@ -408,6 +491,33 @@ export const useStudySocketSubscription = (studyId: number) => {
             const token = data;
             console.log('[StudySocket] Received VIDEO_TOKEN');
             setVideoToken(token);
+            break;
+          }
+          case 'SOLVED': {
+            // Problem Solved - trigger refetch & toast
+            const { problemId, userId: solverId, nickname, earnedPoints } = data;
+            console.log('[StudySocket] SOLVED event:', data);
+
+            // Refetch curriculum to update status (green check, user count)
+            window.dispatchEvent(
+              new CustomEvent('study-curriculum-updated', {
+                detail: { studyId },
+              }),
+            );
+
+            // Toast notification
+            // If I am the solver, message might be different or handled by API response.
+            // But API response covers the submitter. This broadcast covers EVERYONE.
+            // Avoid duplicate toast for submitter if API response already toasted?
+            // Usually API response handles success toast.
+            // But here we can just show generic info.
+            if (solverId !== useRoomStore.getState().currentUserId) {
+              toast.success(`${nickname}님이 문제를 해결했습니다!`);
+            } else {
+              // For me, maybe redundant if UI already showed it, but socket is faster/surer.
+              // Let's show it or rely on existing success feedback.
+              // Existing submit logic shows toast probably.
+            }
             break;
           }
           case 'ERROR': {
@@ -440,6 +550,10 @@ export const useStudySocketSubscription = (studyId: number) => {
     return () => {
       console.log('[StudySocket] Hook cleanup triggered');
       clearInterval(resubscribeInterval);
+      if (onlineSyncTimerRef.current) {
+        window.clearInterval(onlineSyncTimerRef.current);
+        onlineSyncTimerRef.current = null;
+      }
       publicSubscription.unsubscribe();
       curriculumSubscription.unsubscribe();
       if (privateSubscription) privateSubscription.unsubscribe();

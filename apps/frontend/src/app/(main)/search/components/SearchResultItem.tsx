@@ -12,7 +12,7 @@ interface SearchResultItemProps {
 }
 
 export function SearchResultItem({ result, query, onClick }: SearchResultItemProps) {
-    let tierStyle = { bg: 'bg-gray-100', text: 'text-gray-600' };
+    let tierStyle = { bg: 'bg-muted', text: 'text-muted-foreground' };
     let title = '';
     let description = '';
     let tags: string[] = [];
@@ -58,7 +58,7 @@ export function SearchResultItem({ result, query, onClick }: SearchResultItemPro
                         className="border-border"
                     />
                 ) : (
-                    <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                    <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
                         <BookIcon className="h-5 w-5" />
                     </div>
                 )}

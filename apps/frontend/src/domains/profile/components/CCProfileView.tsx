@@ -90,7 +90,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
   });
 
   // Extension State
-  const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
+  const { isInstalled, extensionVersion, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
   const [status, setStatus] = useState<ExtensionStatus>('NOT_INSTALLED');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -452,7 +452,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
         const res = await fetch(`/api/users/me/validate-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ token, bojId: user.bojId }),
         });
         const json = (await res.json()) as ValidateResponse;
 
@@ -598,6 +598,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
           <CCExtensionGuide
             user={optimisticUser}
             isInstalled={isInstalled}
+            extensionVersion={extensionVersion}
             extensionToken={extensionToken}
             checkInstallation={checkInstallation}
             status={status}

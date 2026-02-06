@@ -3,12 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   type ViewMode,
   type Participant,
@@ -102,11 +97,12 @@ export function CCIDEToolbar({
               <span>
                 {isRealtime
                   ? `${viewingUser?.nickname}의 코드 실시간 열람 중`
-                  : `${targetSubmission?.username}${targetSubmission?.username === 'PS러버' ||
-                    targetSubmission?.username === 'CodeNinja'
-                    ? ' (Bot)'
-                    : ''
-                  }의 저장된 코드 열람 중`}
+                  : `${targetSubmission?.username}${
+                      targetSubmission?.username === 'PS러버' ||
+                      targetSubmission?.username === 'CodeNinja'
+                        ? ' (Bot)'
+                        : ''
+                    }의 저장된 코드 열람 중`}
               </span>
               {isSaved && targetSubmission && (
                 <span className="text-xs opacity-75 font-normal">

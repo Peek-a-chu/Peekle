@@ -113,7 +113,7 @@ export function CCProblemListPanel({
   console.log('[CCProblemListPanel] Rendered with problems:', problems?.length, problems);
 
   return (
-    <div className={cn('flex h-full flex-col relative bg-card', className)}>
+    <div className={cn('flex h-full flex-col relative bg-card', className)} data-tour="problem-list">
       {/* Top Row: Date, Add Button & Fold Button */}
       <div className="flex items-center justify-between px-3 h-14 shrink-0 border-b border-border">
         <CCCalendarWidget
@@ -189,7 +189,7 @@ export function CCProblemListPanel({
         isOpen={submissionModalOpen}
         onClose={() => setSubmissionModalOpen(false)}
         problemTitle={selectedProblem ? selectedProblem.title : ''}
-        problemNumber={selectedProblem ? selectedProblem.problemId : undefined}
+        problemExternalId={selectedProblem ? selectedProblem.externalId : undefined}
         submissions={submissions}
         onViewCode={handleViewCode}
       />

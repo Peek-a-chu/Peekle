@@ -10,6 +10,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8443:443" # Optional: keep for legacy/conflict avoidance
+      - "7880:7880" # LiveKit WSS
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/dev.conf:ro
@@ -28,12 +30,16 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=https://localhost
         - NEXT_PUBLIC_SOCKET_URL=https://localhost
+        - NEXT_PUBLIC_BACKEND_URL=https://localhost
+        - NEXT_PUBLIC_LIVEKIT_URL=wss://localhost/livekit/
     container_name: peekle-frontend-dev
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=https://localhost
       - NEXT_PUBLIC_SOCKET_URL=https://localhost
-      - NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880
+      - NEXT_PUBLIC_BACKEND_URL=https://localhost
+      - NEXT_PUBLIC_LIVEKIT_URL=wss://localhost/livekit/
+      - BACKEND_API_URL=http://backend:8080
     expose:
       - "3000"
     networks:
@@ -46,6 +52,8 @@ services:
       dockerfile: Dockerfile
     container_name: peekle-backend-dev
     user: root
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     entrypoint:
       [
         "sh",
@@ -60,7 +68,7 @@ services:
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
       - AI_SERVER_URL=http://ai-server:8000
-      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_URL=http://livekit:7880
       - LIVEKIT_API_KEY=devkey
       - LIVEKIT_API_SECRET=secret
       - FRONTEND_URL=https://localhost
@@ -70,7 +78,7 @@ services:
       - "8080"
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
       ai-server:
         condition: service_started
       livekit:
@@ -85,6 +93,11 @@ services:
     command: redis-server --requirepass peekle-redis-password
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "peekle-redis-password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - peekle-network-dev
 
@@ -94,8 +107,7 @@ services:
     container_name: peekle-livekit-dev
     command: --dev --bind 0.0.0.0
     ports:
-      - "7880:7880"
-      - "7881:7881"
+      - "7881:7881" # Keep 7881 exposed if needed for TCP/HTTP direct access, but remove 7880 host binding
       - "7882:7882/udp"
     environment:
       - "LIVEKIT_KEYS=devkey: secret"

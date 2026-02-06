@@ -47,21 +47,24 @@ public class DataInitConfig {
                         // Reset Sequence for H2 dynamically based on existing data
                         try {
                                 Long maxUserId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM users", Long.class);
-                                if (maxUserId == null) maxUserId = 0L;
-                                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN id RESTART WITH " + (maxUserId + 1));
+                                if (maxUserId == null)
+                                        maxUserId = 0L;
+                                jdbcTemplate.execute(
+                                                "ALTER TABLE users ALTER COLUMN id RESTART WITH " + (maxUserId + 1));
 
-                                Long maxRoomId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM study_rooms", Long.class);
-                                if (maxRoomId == null) maxRoomId = 0L;
-                                jdbcTemplate.execute("ALTER TABLE study_rooms ALTER COLUMN id RESTART WITH " + (maxRoomId + 1));
+                                Long maxRoomId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM study_rooms",
+                                                Long.class);
+                                if (maxRoomId == null)
+                                        maxRoomId = 0L;
+                                jdbcTemplate.execute("ALTER TABLE study_rooms ALTER COLUMN id RESTART WITH "
+                                                + (maxRoomId + 1));
                         } catch (Exception e) {
                                 // Ignore if table doesn't exist yet or other issues
                                 System.out.println("Failed to reset H2 sequence: " + e.getMessage());
                         }
 
                         // 1. User Mock Data (20 members)
-                        // Using findBySocialIdAndProvider check instead of count() to be more robust
-                        // and removing the risky sequence reset which might cause collisions
-                        if (userRepository.findBySocialIdAndProvider("kakao_1", "KAKAO").isEmpty()) {
+                        if (userRepository.count() == 0) {
                                 User user1 = User.builder().nickname("AlgorithmKing").provider("KAKAO")
                                                 .socialId("kakao_1").bojId("boj_king")
                                                 .profileImg("https://api.dicebear.com/9.x/pixel-art/svg?seed=King")

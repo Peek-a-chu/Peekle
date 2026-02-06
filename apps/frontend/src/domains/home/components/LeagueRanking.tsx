@@ -38,24 +38,11 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
 
       {/* 내 순위 요약 카드 - Borderless, uses surface elevation only */}
       <div className="mb-4">
-        <div className="flex items-center justify-between p-3 bg-surface-2 rounded-xl shadow-sm">
-          {/* 우측 상단 리그 정보 (태그 형식) */}
-          <div className="absolute top-2.5 right-2.5">
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-              style={{
-                color: 'hsl(var(--primary))',
-                backgroundColor: 'hsl(var(--primary) / 0.08)',
-              }}
-            >
-              {LEAGUE_NAMES[data.myLeague]} 리그
-            </span>
-          </div>
-
+        <div className="flex flex-wrap items-start gap-2 p-3 bg-surface-2 rounded-xl shadow-sm">
           {/* 왼쪽 내용: 아이콘 + 순위 */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <LeagueIcon league={data.myLeague} size={40} />
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="text-[10px] font-semibold text-primary block mb-0">
                 나의 현재 순위
               </span>
@@ -68,6 +55,19 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* 리그 정보 (태그 형식) */}
+          <div className="ml-auto shrink-0 self-start">
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+              style={{
+                color: 'hsl(var(--primary))',
+                backgroundColor: 'hsl(var(--primary) / 0.08)',
+              }}
+            >
+              {LEAGUE_NAMES[data.myLeague]} 리그
+            </span>
           </div>
         </div>
       </div>

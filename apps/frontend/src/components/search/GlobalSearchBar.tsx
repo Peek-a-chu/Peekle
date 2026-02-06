@@ -105,7 +105,8 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
 
     // Navigate based on suggestion type
     if (suggestion.type === 'problem') {
-      window.open(`https://www.acmicpc.net/problem/${suggestion.id}`, '_blank');
+      const problemId = suggestion.externalId || suggestion.id;
+      window.open(`https://www.acmicpc.net/problem/${problemId}`, '_blank');
     } else if (suggestion.type === 'user') {
       router.push(`/profile/${encodeURIComponent(suggestion.title)}`);
     } else if (suggestion.type === 'workbook') {
@@ -126,7 +127,7 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
       <div className="relative">
         <button
           onClick={handleSearch}
-          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 hover:text-[#E24EA0] transition-colors"
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
           aria-label="Search"
         >
           <Search className="h-full w-full" />
@@ -141,13 +142,13 @@ export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: Glob
             if (suggestions.length > 0) setIsOpen(true);
           }}
           placeholder="문제, 사용자, 문제집 검색..."
-          className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-10 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-[#E24EA0]/20"
+          className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-10 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
         />
         {query && (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             aria-label="Clear search"
           >
             <X className="h-4 w-4" />

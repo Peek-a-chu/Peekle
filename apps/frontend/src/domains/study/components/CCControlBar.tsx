@@ -1,17 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Mic, MicOff, Video, VideoOff, Pencil, Settings } from 'lucide-react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useLocalParticipant } from '@livekit/components-react';
 
 interface CCControlBarProps {
   onMicToggle?: () => void;
@@ -33,10 +28,11 @@ export function CCControlBar({
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const openSettingsModal = useSettingsStore((state) => state.openModal);
 
-  // Derive state from Store
-  const me = participants.find((p) => p.id === currentUserId);
-  const isMuted = me?.isMuted ?? false;
-  const isVideoOff = me?.isVideoOff ?? false;
+  // Use LiveKit local participant state for immediate feedback
+  const { isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+
+  const isMuted = !isMicrophoneEnabled;
+  const isVideoOff = !isCameraEnabled;
 
   const handleMicToggle = () => {
     onMicToggle?.();
@@ -55,7 +51,7 @@ export function CCControlBar({
     <TooltipProvider>
       <div
         className={cn(
-          'relative flex items-center justify-center border-t border-border bg-card px-4 py-3',
+          'relative flex h-14 items-center justify-center border-t border-border bg-card px-4',
           className,
         )}
       >
@@ -64,12 +60,13 @@ export function CCControlBar({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={isMuted ? 'destructive' : 'ghost'}
+                variant="ghost"
                 size="icon"
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
-                  !isMuted && 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-                  isMuted && 'bg-red-500 hover:bg-red-600 text-white',
+                  isMuted
+                    ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 )}
                 onClick={handleMicToggle}
               >
@@ -88,12 +85,13 @@ export function CCControlBar({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={isVideoOff ? 'destructive' : 'ghost'}
+                variant="ghost"
                 size="icon"
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
-                  !isVideoOff && 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-                  isVideoOff && 'bg-red-500 hover:bg-red-600 text-white',
+                  isVideoOff
+                    ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 )}
                 onClick={handleVideoToggle}
               >
@@ -117,8 +115,8 @@ export function CCControlBar({
                 className={cn(
                   'h-12 w-12 rounded-full border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95',
                   isWhiteboardActive
-                    ? 'bg-rose-500 hover:bg-rose-600 text-white'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
                 )}
                 onClick={onWhiteboardToggle}
               >
@@ -135,7 +133,7 @@ export function CCControlBar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-12 w-12 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95"
+                className="h-12 w-12 rounded-full bg-muted text-muted-foreground hover:bg-muted/90 border border-white/10 shadow-sm transition-all hover:scale-105 active:scale-95"
                 onClick={handleSettingsClick}
               >
                 <Settings className="h-5 w-5" strokeWidth={2.25} />

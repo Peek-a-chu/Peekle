@@ -157,7 +157,7 @@ export function WorkbooksRightPanel({
       </div>
 
       {/* 문제 목록 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {problems.map((problem) => (
           <div
             key={problem.id}

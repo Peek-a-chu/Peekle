@@ -26,6 +26,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -112,19 +114,11 @@ public class StudySocketController {
                 // Mark as Active
                 stringRedisTemplate.opsForValue().set(activeStudyKey, String.valueOf(studyId));
                 stringRedisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
+                Set<String> onlineUsers = stringRedisTemplate.opsForSet().members("study:" + studyId + ":online_users");
+                List<Long> onlineUserIds = onlineUsers == null
+                                ? List.of()
+                                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
 
-                // [Fix] Session Tracking for Online Status
-                String sessionId = headerAccessor.getSessionId();
-                if (sessionId != null) {
-                        String sessionKey = String.format(com.peekle.global.redis.RedisKeyConst.USER_SESSION, userId);
-                        stringRedisTemplate.opsForValue().set(sessionKey, sessionId);
-
-                        log.info("[Study] User Entered. Saved Session ID. User: {}, Session: {}", userId, sessionId);
-                } else {
-                        log.warn("[Study] User Entered but Session ID is NULL! User: {}", userId);
-                }
-
-                log.info("[Study] Enter Flow - Step 1: Media Evict Start");
                 // 2. LiveKit 및 초기화 (Bundled)
                 try {
                         // 화상 연결 중복 방지 (기존 연결 종료)
@@ -157,6 +151,9 @@ public class StudySocketController {
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/info/" + userId,
                                         SocketResponse.of("ROOM_INFO", roomInfo));
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/info/" + userId,
+                                        SocketResponse.of("ONLINE_USERS", onlineUserIds));
 
                         // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
@@ -217,8 +214,33 @@ public class StudySocketController {
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + studyId),
                                 SocketResponse.of("ENTER", userId));
+                publishOnlineUsers(studyId);
+        }
 
-                log.info("[Study] Enter Flow - Finished");
+        @MessageMapping("/studies/online-users")
+        public void onlineUsers(@Payload StudyOnlineUsersRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                Long studyId = request.getStudyId();
+
+                if (userId == null || studyId == null) {
+                        return;
+                }
+
+                boolean isUserMember = studyMemberRepository.existsByStudyAndUser_Id(
+                                StudyRoom.builder().id(studyId).build(), userId);
+                if (!isUserMember) {
+                        return;
+                }
+
+                Set<String> onlineUsers = stringRedisTemplate.opsForSet()
+                                .members("study:" + studyId + ":online_users");
+                List<Long> onlineUserIds = onlineUsers == null
+                                ? List.of()
+                                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
+
+                messagingTemplate.convertAndSend(
+                                "/topic/studies/" + studyId + "/info/" + userId,
+                                SocketResponse.of("ONLINE_USERS", onlineUserIds));
         }
 
         // 스터디 정보 수정
@@ -258,6 +280,7 @@ public class StudySocketController {
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("LEAVE", userId));
+                publishOnlineUsers(request.getStudyId());
 
                 String nickname = getUserNickname(userId);
 
@@ -314,6 +337,7 @@ public class StudySocketController {
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("QUIT", userId));
+                publishOnlineUsers(request.getStudyId());
 
                 // 5. LiveKit Force Disconnect
                 mediaService.evictUser(request.getStudyId(), userId);
@@ -344,6 +368,7 @@ public class StudySocketController {
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("KICK", request.getTargetUserId()));
+                publishOnlineUsers(request.getStudyId());
 
                 // LiveKit Force Disconnect (Kick target)
                 mediaService.evictUser(request.getStudyId(), request.getTargetUserId());
@@ -489,5 +514,16 @@ public class StudySocketController {
                 return userRepository.findById(userId)
                                 .map(com.peekle.domain.user.entity.User::getNickname)
                                 .orElse("알 수 없는 사용자");
+        }
+
+        private void publishOnlineUsers(Long studyId) {
+                Set<String> onlineUsers = stringRedisTemplate.opsForSet()
+                                .members("study:" + studyId + ":online_users");
+                List<Long> onlineUserIds = onlineUsers == null
+                                ? List.of()
+                                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + studyId),
+                                SocketResponse.of("ONLINE_USERS", onlineUserIds));
         }
 }

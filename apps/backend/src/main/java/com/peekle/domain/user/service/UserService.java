@@ -59,7 +59,7 @@ public class UserService {
         return token;
     }
 
-    public boolean validateExtensionToken(Long userId, String token) {
+    public boolean validateExtensionToken(Long userId, String token, String bojId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -67,7 +67,16 @@ public class UserService {
             return false;
         }
 
-        return user.getExtensionToken().equals(token);
+        // Check token match
+        boolean tokenMatches = user.getExtensionToken().equals(token);
+
+        // Check bojId match (if provided)
+        boolean bojIdMatches = true;
+        if (bojId != null && !bojId.isEmpty()) {
+            bojIdMatches = bojId.equalsIgnoreCase(user.getBojId());
+        }
+
+        return tokenMatches && bojIdMatches;
     }
 
     @Transactional(readOnly = true)

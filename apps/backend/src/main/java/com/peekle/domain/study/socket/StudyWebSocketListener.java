@@ -1,5 +1,7 @@
 package com.peekle.domain.study.socket;
 
+import com.peekle.domain.study.entity.StudyRoom;
+import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.service.WhiteboardService;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisKeyConst;
@@ -13,11 +15,17 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -159,5 +167,15 @@ public class StudyWebSocketListener {
             }
             redisTemplate.delete(viewerKey);
         }
+    }
+
+    private void publishOnlineUsers(Long studyId) {
+        Set<String> onlineUsers = stringRedisTemplate.opsForSet().members("study:" + studyId + ":online_users");
+        List<Long> onlineUserIds = onlineUsers == null
+                ? List.of()
+                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
+        redisPublisher.publish(
+                new ChannelTopic("topic/studies/rooms/" + studyId),
+                SocketResponse.of("ONLINE_USERS", onlineUserIds));
     }
 }

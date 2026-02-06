@@ -124,7 +124,10 @@ export function CCCenterPanel({
       {!isVideoGridFolded && <VideoGrid onWhiteboardClick={onWhiteboardClick} />}
 
       {/* IDE Area */}
-      <div className="relative flex min-h-0 flex-1 flex-col min-w-0 bg-background">
+      <div
+        className="relative flex min-h-0 flex-1 flex-col min-w-0 bg-background"
+        data-tour="ide-panel"
+      >
         {/* Header Row: Always show toolbar for Left IDE.  
             If isViewingOther, the toolbar layout adapts to show View Mode Banner on left and Tools on right. */}
         <div className="flex h-14 shrink-0 border-b border-border bg-card">
