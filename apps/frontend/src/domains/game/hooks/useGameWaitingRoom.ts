@@ -48,19 +48,22 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
   const isReady = currentParticipant?.status === 'READY';
 
   // 방 정보 조회
-  const fetchRoom = useCallback(async () => {
-    if (!roomId) return;
+  const fetchRoom = useCallback(async (): Promise<GameRoomDetail | null> => {
+    if (!roomId) return null;
     try {
       const data = await getGameRoom(roomId);
       if (data) {
         setRoom(data);
+        return data;
       } else {
         toast.error('방 정보를 불러올 수 없습니다.');
         router.push('/game');
+        return null;
       }
     } catch (error) {
       console.error('Failed to fetch room:', error);
       toast.error('방 정보를 불러오는 중 오류가 발생했습니다.');
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +78,26 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
         // [수정] 멱등성 보장: 백엔드에서 이미 참여중이면 성공 처리하므로 안심하고 호출
         await enterGameRoom(roomId);
         hasEnteredRef.current = true;
-        fetchRoom(); // 입장 후 정보 갱신
+
+        // 방 정보 갱신 후 입장 메시지 추가
+        const data = await fetchRoom();
+        if (data) {
+          const currentUser = data.participants.find(p => p.id === userId);
+          if (currentUser) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `system-enter-self-${Date.now()}`,
+                senderId: -1,
+                senderNickname: 'System',
+                profileImg: '',
+                content: `${currentUser.nickname}님이 입장했습니다.`,
+                timestamp: Date.now(),
+                type: 'SYSTEM' as const,
+              },
+            ]);
+          }
+        }
       } catch (error) {
         console.error('Failed to enter room:', error);
         toast.error('방 입장에 실패했습니다.');
@@ -84,7 +106,7 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     };
 
     enter();
-  }, [roomId, fetchRoom, router]);
+  }, [roomId, fetchRoom, router, userId]);
 
   // 소켓 이벤트 처리
   useEffect(() => {
@@ -139,7 +161,35 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
   const handleRoomEvent = (event: any) => {
     switch (event.type) {
       case 'ENTER':
+        // 시스템 메시지 추가
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-enter-${Date.now()}`,
+            senderId: -1,
+            senderNickname: 'System',
+            profileImg: '',
+            content: `${event.data.nickname || '사용자'}님이 입장했습니다.`,
+            timestamp: Date.now(),
+            type: 'SYSTEM' as const,
+          },
+        ]);
+        fetchRoom();
+        break;
       case 'LEAVE': // [수정] EXIT -> LEAVE (백엔드와 맞춤)
+        // 시스템 메시지 추가
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-leave-${Date.now()}`,
+            senderId: -1,
+            senderNickname: 'System',
+            profileImg: '',
+            content: `${event.data.nickname || '사용자'}님이 나갔습니다.`,
+            timestamp: Date.now(),
+            type: 'SYSTEM' as const,
+          },
+        ]);
         fetchRoom();
         break;
       case 'KICK':
@@ -147,8 +197,20 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
           toast.error(event.data.message || '강퇴되었습니다.');
           router.push('/game');
         } else {
+          // 시스템 메시지 추가
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `system-kick-${Date.now()}`,
+              senderId: -1,
+              senderNickname: 'System',
+              profileImg: '',
+              content: `${event.data.nickname || '사용자'}님이 강퇴되었습니다.`,
+              timestamp: Date.now(),
+              type: 'SYSTEM' as const,
+            },
+          ]);
           fetchRoom();
-          toast.info('참여자가 강퇴되었습니다.');
         }
         break;
       case 'READY':
@@ -180,6 +242,22 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
             };
           });
         }
+        break;
+      case 'HOST_CHANGE':
+        // 시스템 메시지 추가
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-host-${Date.now()}`,
+            senderId: -1,
+            senderNickname: 'System',
+            profileImg: '',
+            content: `${event.data.newHostNickname || '사용자'}님이 방장이 되었습니다.`,
+            timestamp: Date.now(),
+            type: 'SYSTEM' as const,
+          },
+        ]);
+        fetchRoom();
         break;
       case 'START':
         setIsCountingDown(true);
