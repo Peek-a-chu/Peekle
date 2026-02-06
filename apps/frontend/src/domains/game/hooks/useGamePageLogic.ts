@@ -135,17 +135,8 @@ export function useGamePageLogic() {
       setSelectedRoom(room);
       setPasswordModalOpen(true);
     } else {
-      // 공개 방일 경우 입장 API 호출 후 성공 시 이동
-      try {
-        const success = await enterGameRoom(room.id);
-        if (success) {
-          router.push(`/game/${room.id}`);
-        } else {
-          toast.error('방 입장에 실패했습니다.');
-        }
-      } catch (error: any) {
-        toast.error(error.message || '방 입장에 실패했습니다.');
-      }
+      // 공개 방일 경우 바로 이동 (페이지에서 프리조인/입장 처리)
+      router.push(`/game/${room.id}`);
     }
   };
 

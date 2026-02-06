@@ -53,7 +53,7 @@ export const CCPreJoinModal = ({
   onCancel,
 }: CCPreJoinModalProps) => {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, isLoading: isAuthLoading } = useAuthStore();
   const isBojLinked = !!user?.bojId;
 
   // Extension Check State
@@ -119,7 +119,9 @@ export const CCPreJoinModal = ({
 
   // Check Extension Logic
   useEffect(() => {
+    if (isAuthLoading) return;
     if (!user) return;
+
     if (isChecking) {
       setExtensionStatus('LOADING');
       return;
@@ -132,6 +134,11 @@ export const CCPreJoinModal = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, bojId: user.bojId }),
         });
+
+        if (!res.ok) {
+          throw new Error('API Error');
+        }
+
         const json = await res.json();
 
         if (json.data?.valid) {
@@ -162,7 +169,7 @@ export const CCPreJoinModal = ({
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isInstalled, extensionToken, extensionVersion, isChecking]);
+  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, REQUIRED_VERSION]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
@@ -788,7 +795,7 @@ export const CCPreJoinModal = ({
               {extensionStatus === 'LOADING' ? (
                 <Button
                   disabled
-                  className="bg-zinc-800 text-zinc-500 h-11 px-8 rounded-lg border border-zinc-700"
+                  className="bg-zinc-800 text-zinc-500 h-11 px-8 rounded-lg border border-zinc-700 w-[160px]"
                 >
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   확인 중...
