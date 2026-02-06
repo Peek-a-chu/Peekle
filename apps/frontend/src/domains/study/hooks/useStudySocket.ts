@@ -119,6 +119,10 @@ export const useStudySocketSubscription = (studyId: number) => {
   // useRef는 컴포넌트 최상위 레벨에서만 호출 가능
   const currentUserIdRef = useRef(currentUserId);
   const recentProblemEventRef = useRef<Map<string, number>>(new Map());
+  const onlineSyncTimerRef = useRef<number | null>(null);
+  const onlineSyncSeenRef = useRef<boolean>(false);
+  const onlineSyncAttemptsRef = useRef<number>(0);
+  const sentEnterRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!client || !connected || !studyId) return;
