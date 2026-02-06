@@ -54,6 +54,10 @@ public class RedisKeyConst {
     // /topic/games/{gameId}/room
     public static final String TOPIC_GAME_ROOM = "topic/games/%d/room";
 
+    // Game Lobby Topic (Pub/Sub) - Global lobby broadcast
+    // /topic/games/lobby
+    public static final String TOPIC_GAME_LOBBY = "topic/games/lobby";
+
     // /sub/games/{gameId}/chat/global
     public static final String TOPIC_GAME_CHAT_GLOBAL = "topic/games/%d/chat/global";
 

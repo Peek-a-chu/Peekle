@@ -16,6 +16,7 @@ import {
   type GameCreationFormData,
 } from '@/domains/game/types/game-types';
 import { filterGameRooms } from '@/domains/game/utils/game-utils';
+import { useGameLobbySocket } from '@/domains/game/hooks/useGameLobbySocket';
 
 
 export type StatusFilter = GameStatus | 'ALL';
@@ -40,6 +41,58 @@ export function useGamePageLogic() {
     const data = await getGameRooms();
     setRooms(data);
   }, []);
+
+  // 실시간 로비 이벤트 핸들러
+  useGameLobbySocket({
+    onRoomCreated: (data: any) => {
+      console.log('[Lobby] New room created:', data);
+      // 새 방 추가
+      const newRoom: GameRoom = {
+        id: data.roomId,
+        title: data.title,
+        mode: data.mode as GameMode,
+        teamType: data.teamType as TeamType,
+        status: data.status as GameStatus,
+        isPrivate: data.isPrivate,
+        maxPlayers: data.maxPlayers,
+        currentPlayers: data.currentPlayers,
+        timeLimit: 0, // Backend doesn't send this in lobby broadcast
+        problemCount: 0, // Backend doesn't send this in lobby broadcast
+        host: {
+          id: 0, // Backend doesn't send host ID in lobby broadcast
+          nickname: data.hostNickname,
+          profileImg: '',
+        },
+        tags: [],
+        tierMin: '',
+        tierMax: '',
+      };
+      setRooms((prev) => [newRoom, ...prev]);
+    },
+    onRoomUpdated: (data: any) => {
+      console.log('[Lobby] Room status updated:', data);
+      // 방 상태 업데이트
+      setRooms((prev) =>
+        prev.map((room) =>
+          room.id === data.roomId ? { ...room, status: data.status as GameStatus } : room,
+        ),
+      );
+    },
+    onRoomDeleted: (data: any) => {
+      console.log('[Lobby] Room deleted:', data);
+      // 방 목록에서 제거
+      setRooms((prev) => prev.filter((room) => room.id !== data.roomId));
+    },
+    onPlayerUpdate: (data: any) => {
+      console.log('[Lobby] Player count updated:', data);
+      // 방 인원수 업데이트
+      setRooms((prev) =>
+        prev.map((room) =>
+          room.id === data.roomId ? { ...room, currentPlayers: data.currentPlayers } : room,
+        ),
+      );
+    },
+  });
 
   // 초기 데이터 로딩
   useEffect(() => {

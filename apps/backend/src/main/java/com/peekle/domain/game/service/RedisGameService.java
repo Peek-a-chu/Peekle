@@ -92,11 +92,20 @@ public class RedisGameService {
             String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
             redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("STATUS_CHANGE", nextStatus));
 
+            // 7. 로비 브로드캐스트: 방 상태 변경 알림
+            Map<String, Object> lobbyUpdateData = new HashMap<>();
+            lobbyUpdateData.put("roomId", roomId);
+            lobbyUpdateData.put("status", nextStatus.name());
+            redisPublisher.publish(
+                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                    SocketResponse.of("LOBBY_ROOM_UPDATED", lobbyUpdateData));
+            log.info("📢 [Lobby] Game Room {} Status Updated to {} - Broadcasting to lobby", roomId, nextStatus);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Lock interrupted", e);
         } finally {
-            // 7. 락 해제
+            // 8. 락 해제
             // 반드시 finally 블록에서 해제해야 예외가 발생해도 락이 풀립니다.
             // isHeldByCurrentThread: 내가 건 락인지 확인하고 해제합니다.
             if (lock.isHeldByCurrentThread()) {
@@ -187,6 +196,22 @@ public class RedisGameService {
             // 4. 방정 참여 처리 & Ready (Host는 자동 Ready)
             enterGameRoom(roomId, hostId, request.getPassword());
             toggleReady(roomId, hostId); // true
+
+            // 5. 로비 브로드캐스트: 새 방 생성 알림
+            Map<String, Object> lobbyCreateData = new HashMap<>();
+            lobbyCreateData.put("roomId", roomId);
+            lobbyCreateData.put("title", request.getTitle());
+            lobbyCreateData.put("mode", request.getMode().name());
+            lobbyCreateData.put("teamType", request.getTeamType().name());
+            lobbyCreateData.put("maxPlayers", request.getMaxPlayers());
+            lobbyCreateData.put("currentPlayers", 1); // Host
+            lobbyCreateData.put("status", GameStatus.WAITING.name());
+            lobbyCreateData.put("isPrivate", request.getPassword() != null && !request.getPassword().isEmpty());
+            lobbyCreateData.put("hostNickname", host.getNickname());
+            redisPublisher.publish(
+                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                    SocketResponse.of("LOBBY_ROOM_CREATED", lobbyCreateData));
+            log.info("📢 [Lobby] Game Room {} Created - Broadcasting to lobby", roomId);
 
             return roomId;
 
@@ -282,6 +307,17 @@ public class RedisGameService {
         redisTemplate.opsForValue().set(
                 String.format(RedisKeyConst.USER_CURRENT_GAME, userId),
                 String.valueOf(roomId));
+
+        // 로비 브로드캐스트: 플레이어 입장 알림
+        Long currentPlayers = redisTemplate.opsForSet().size(playersKey);
+
+        Map<String, Object> lobbyPlayerData = new HashMap<>();
+        lobbyPlayerData.put("roomId", roomId);
+        lobbyPlayerData.put("currentPlayers", currentPlayers != null ? currentPlayers.intValue() : 0);
+        redisPublisher.publish(
+                new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
+        log.info("📢 [Lobby] Player joined Room {} - Current players: {}", roomId, currentPlayers);
     }
 
     // 팀 변경
@@ -409,6 +445,15 @@ public class RedisGameService {
                     log.info("Game Room {} Host Changed: {} -> {}", roomId, userId, newHostId);
                 }
             }
+
+            // 로비 브로드캐스트: 플레이어 퇴장 알림 (방이 삭제되지 않은 경우에만)
+            Map<String, Object> lobbyPlayerData = new HashMap<>();
+            lobbyPlayerData.put("roomId", roomId);
+            lobbyPlayerData.put("currentPlayers", remainingCount != null ? remainingCount.intValue() : 0);
+            redisPublisher.publish(
+                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                    SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
+            log.info("📢 [Lobby] Player left Room {} - Current players: {}", roomId, remainingCount);
         }
     }
 
@@ -466,6 +511,15 @@ public class RedisGameService {
                     log.info("Game Room {} Host Changed after forfeit: {} -> {}", roomId, userId, newHostId);
                 }
             }
+
+            // 로비 브로드캐스트: 플레이어 포기 알림 (방이 삭제되지 않은 경우에만)
+            Map<String, Object> lobbyPlayerData = new HashMap<>();
+            lobbyPlayerData.put("roomId", roomId);
+            lobbyPlayerData.put("currentPlayers", remainingCount != null ? remainingCount.intValue() : 0);
+            redisPublisher.publish(
+                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                    SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
+            log.info("📢 [Lobby] Player forfeited Room {} - Current players: {}", roomId, remainingCount);
         }
     }
 
@@ -474,6 +528,15 @@ public class RedisGameService {
      * 참여자가 없으면 호출
      */
     public void deleteGameRoom(Long roomId) {
+        // 0. 로비 브로드캐스트: 방 삭제 알림 (삭제 전에 전송)
+        Map<String, Object> lobbyDeleteData = new HashMap<>();
+        lobbyDeleteData.put("roomId", roomId);
+        redisPublisher.publish(
+                new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                SocketResponse.of("LOBBY_ROOM_DELETED", lobbyDeleteData));
+        log.info("📢 [Lobby] Game Room {} Deleted - Broadcasting to lobby", roomId);
+
+        // 1. Redis 데이터 삭제
         String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
 
         redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
