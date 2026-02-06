@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Puzzle } from 'lucide-react';
 import { ExtensionStatus, UserProfile } from '../types';
 import { ConfirmModal, ActionModal } from '@/components/common/Modal';
+import { useExtensionVersionCheck } from '@/hooks/useExtensionVersionCheck';
 
 interface Props {
   user: UserProfile;
@@ -13,9 +14,6 @@ interface Props {
   isLoading: boolean;
   onRegisterBojId?: () => void;
 }
-
-const REQUIRED_VERSION = '0.0.7';
-const DOWNLOAD_URL = 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
 interface TokenResponse {
   success?: boolean;
@@ -34,6 +32,11 @@ export function CCExtensionGuide({
   isLoading,
   onRegisterBojId,
 }: Props) {
+  // Version Check from R2
+  const { versionInfo } = useExtensionVersionCheck();
+  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.8';
+  const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
@@ -405,20 +408,27 @@ export function CCExtensionGuide({
         )}
 
         {(status === 'INSTALLED' || status === 'MISMATCH') && (
-          <button
-            onClick={() => void handleLinkAccount(false)}
-            disabled={isSubmitting}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                처리 중...
-              </>
-            ) : (
-              '🔗 계정 연동하기 (기존 토큰 불러오기)'
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => void handleLinkAccount(false)}
+              disabled={isSubmitting || !!isVersionMismatch}
+              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  처리 중...
+                </>
+              ) : (
+                '🔗 계정 연동하기 (기존 토큰 불러오기)'
+              )}
+            </button>
+            {isVersionMismatch && (
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                ⚠️ 연동하려면 먼저 확장 프로그램을 업데이트해주세요.
+              </p>
             )}
-          </button>
+          </div>
         )}
 
         {status === 'LINKED' && (
