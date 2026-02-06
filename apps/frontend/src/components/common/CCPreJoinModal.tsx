@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ConfirmModal, ActionModal } from '@/components/common/Modal';
 
 interface CCPreJoinModalProps {
   roomTitle: string;
@@ -55,10 +56,14 @@ export const CCPreJoinModal = ({
   const isBojLinked = !!user?.bojId;
 
   // Extension Check State
-  const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
-  type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING';
+  const { isInstalled, extensionVersion, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
+  type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING' | 'VERSION_MISMATCH';
   const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>('LOADING');
   const [isLinking, setIsLinking] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
+
+  const REQUIRED_VERSION = '0.0.7';
+  const DOWNLOAD_URL = 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
   // Polling State for Installation Check
   const [isPolling, setIsPolling] = useState(false);
@@ -82,10 +87,15 @@ export const CCPreJoinModal = ({
     // Actually, if I click "Install", it opens window. If I come back and it's not detected, I click again.
     // Maybe I should separate "Check" from "Install"?
     // For now, simplicity: Clicking button opens window AND starts polling.
+    // [Temp] Manual installation guide instead of direct store link
+    setShowManualModal(true);
+
+    /* Original store link preserved
     window.open(
       'https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb',
       '_blank',
     );
+    */
 
     setIsPolling(true);
     checkInstallation(); // Immediate
@@ -116,11 +126,17 @@ export const CCPreJoinModal = ({
         const res = await fetch(`/api/users/me/validate-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ token, bojId: user.bojId }),
         });
         const json = await res.json();
+
         if (json.data?.valid) {
-          setExtensionStatus('LINKED');
+          // Check version if linked
+          if (extensionVersion && extensionVersion !== REQUIRED_VERSION) {
+            setExtensionStatus('VERSION_MISMATCH');
+          } else {
+            setExtensionStatus('LINKED');
+          }
         } else {
           setExtensionStatus('MISMATCH');
         }
@@ -133,11 +149,16 @@ export const CCPreJoinModal = ({
     if (extensionToken) {
       void checkTokenValidity(extensionToken);
     } else if (isInstalled) {
-      setExtensionStatus('INSTALLED'); // Installed but not linked
+      // Even if not linked, check version if installed
+      if (extensionVersion && extensionVersion !== REQUIRED_VERSION) {
+        setExtensionStatus('VERSION_MISMATCH');
+      } else {
+        setExtensionStatus('INSTALLED'); // Installed but not linked
+      }
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isInstalled, extensionToken, isChecking]);
+  }, [user, isInstalled, extensionToken, extensionVersion, isChecking]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
@@ -291,7 +312,7 @@ export const CCPreJoinModal = ({
     if (inputGainNodeRef.current) {
       try {
         inputGainNodeRef.current.disconnect();
-      } catch {}
+      } catch { }
       inputGainNodeRef.current = null;
     }
   }, []);
@@ -710,33 +731,45 @@ export const CCPreJoinModal = ({
 
             {/* Right: Actions */}
             <div className="flex items-center gap-3 relative">
-              {/* Speech Bubble (말풍선) 안내 */}
-              {extensionStatus === 'NOT_INSTALLED' ? (
-                <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
-                  <div className="bg-blue-600 text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
-                    <Puzzle size={14} />
-                    확장 프로그램을 먼저 설치해 주세요!
-                  </div>
-                  <div className="w-3 h-3 bg-blue-600 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
-                </div>
-              ) : !isBojLinked ? (
-                <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
-                  <div className="bg-primary text-primary-foreground text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
-                    <AlertCircle size={14} />
-                    프로필에서 백준 아이디를 먼저 등록해 주세요.
-                  </div>
-                  <div className="w-3 h-3 bg-primary rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
-                </div>
-              ) : (
-                (extensionStatus === 'INSTALLED' || extensionStatus === 'MISMATCH') && (
-                  <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
-                    <div className="bg-primary text-primary-foreground text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
-                      <LinkIcon size={14} />
-                      확장 프로그램과 계정을 연동해 주세요.
+              {/* Speech Bubble (말풍선) 안내 - Priority Fixed */}
+              {extensionStatus === 'LOADING' ? null : (
+                <>
+                  {extensionStatus === 'NOT_INSTALLED' ? (
+                    <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                      <div className="bg-blue-600 text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                        <Puzzle size={14} />
+                        확장 프로그램을 먼저 설치해 주세요!
+                      </div>
+                      <div className="w-3 h-3 bg-blue-600 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
                     </div>
-                    <div className="w-3 h-3 bg-primary rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
-                  </div>
-                )
+                  ) : extensionStatus === 'VERSION_MISMATCH' ? (
+                    <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                      <div className="bg-red-600 text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                        <AlertCircle size={14} />
+                        확장 프로그램 업데이트가 필요합니다! ({extensionVersion} → {REQUIRED_VERSION})
+                      </div>
+                      <div className="w-3 h-3 bg-red-600 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
+                    </div>
+                  ) : !isBojLinked ? (
+                    <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                      <div className="bg-primary text-primary-foreground text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                        <AlertCircle size={14} />
+                        프로필에서 백준 아이디를 먼저 등록해 주세요.
+                      </div>
+                      <div className="w-3 h-3 bg-primary rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
+                    </div>
+                  ) : (
+                    (extensionStatus === 'INSTALLED' || extensionStatus === 'MISMATCH') && (
+                      <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
+                        <div className="bg-primary text-primary-foreground text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
+                          <LinkIcon size={14} />
+                          확장 프로그램과 계정을 연동해 주세요.
+                        </div>
+                        <div className="w-3 h-3 bg-primary rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
+                      </div>
+                    )
+                  )}
+                </>
               )}
 
               <Button
@@ -777,6 +810,14 @@ export const CCPreJoinModal = ({
                     확장 프로그램 설치
                   </Button>
                 </div>
+              ) : extensionStatus === 'VERSION_MISMATCH' ? (
+                <Button
+                  onClick={() => setShowManualModal(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold h-11 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <AlertCircle size={18} className="mr-2" />
+                  업데이트 가이드 확인하기
+                </Button>
               ) : !isBojLinked ? (
                 <Button
                   onClick={() => router.push(`/profile/${user?.nickname}`)}
@@ -810,6 +851,48 @@ export const CCPreJoinModal = ({
           </div>
         </div>
       </div>
+      {/* Manual Installation Modal */}
+      <ActionModal
+        isOpen={showManualModal}
+        onClose={() => setShowManualModal(false)}
+        onConfirm={() => {
+          window.open(DOWNLOAD_URL, '_blank');
+          checkInstallation();
+        }}
+        title="확장 프로그램 수동 설치 가이드"
+        confirmText="Zip 다운로드"
+        cancelText="닫기"
+        description={
+          <div className="space-y-4 text-sm text-left">
+            <p className="text-zinc-400">
+              스토어 심사 지연으로 인해 현재 수동 설치가 필요합니다. 아래 절차를 따라주세요.
+            </p>
+
+            <div className="space-y-3 bg-zinc-800/50 p-4 rounded-lg border border-zinc-700">
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+                <span className="text-zinc-300"><strong>Zip 파일 다운로드:</strong> 아래 버튼을 눌러 압축 파일을 다운로드하고 압축을 해제합니다.</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+                <span className="text-zinc-300"><strong>확장 프로그램 설정 이동:</strong> 크롬 주소창에 <code className="bg-zinc-800 px-1 rounded text-primary">chrome://extensions</code>를 입력합니다.</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+                <span className="text-zinc-300"><strong>개발자 모드 활성화:</strong> 우측 상단의 <strong>개발자 모드(Developer mode)</strong> 스위치를 켭니다.</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] shrink-0 mt-0.5">4</span>
+                <span className="text-zinc-300"><strong>압축해제된 확장 설치:</strong> 좌측 상단의 <strong>압축해제된 확장 프로그램을 로드합니다(Load unpacked)</strong> 버튼을 누르고, 압축을 푼 폴더를 선택합니다.</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-orange-500 font-medium">
+              ※ 주의: 설치 후 해당 폴더를 삭제하면 확장 프로그램이 작동하지 않습니다. 안전한 곳에 보관해주세요.
+            </p>
+          </div>
+        }
+      />
     </TooltipProvider>
   );
 };
