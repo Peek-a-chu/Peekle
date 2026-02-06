@@ -35,7 +35,7 @@ export function ChatInput({ onSend, pendingCodeShare, onCancelShare }: ChatInput
   };
 
   return (
-    <div className="h-14 px-3 border-t bg-background flex items-center">
+    <div className="min-h-[3.5rem] px-3 py-2 border-t bg-background flex flex-col justify-center">
       {pendingCodeShare && (
         <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-md border text-xs animate-in slide-in-from-bottom-2">
           <FileCode size={14} className="text-primary" />
@@ -60,7 +60,7 @@ export function ChatInput({ onSend, pendingCodeShare, onCancelShare }: ChatInput
           </Button>
         </div>
       )}
-      <div className="relative">
+      <div className="relative w-full">
         <textarea
           id="chat-input"
           className="flex min-h-[40px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none pr-10"

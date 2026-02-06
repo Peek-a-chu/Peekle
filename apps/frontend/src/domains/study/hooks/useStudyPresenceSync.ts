@@ -20,6 +20,7 @@ function parseIdentity(identity: string): number | null {
 export function useStudyPresenceSync() {
   const liveKitParticipants = useParticipants();
   const roomId = useRoomStore((state) => state.roomId);
+  const currentUserId = useRoomStore((state) => state.currentUserId);
   const roomParticipants = useRoomStore((state) => state.participants);
   const updateParticipant = useRoomStore((state) => state.updateParticipant);
   const setParticipants = useRoomStore((state) => state.setParticipants);
@@ -56,6 +57,9 @@ export function useStudyPresenceSync() {
     );
 
     liveKitPresence.forEach((presence) => {
+      // Skip local user - handled by MediaSync in CCStudyRoomClient
+      if (currentUserId && presence.id === currentUserId) return;
+
       const existing = roomById.get(presence.id);
       if (!existing) {
         shouldSync = true;
@@ -106,5 +110,5 @@ export function useStudyPresenceSync() {
         })
         .catch((err) => console.error('Failed to sync participants from LiveKit:', err));
     }
-  }, [liveKitPresence, roomById, updateParticipant, roomId, setParticipants]);
+  }, [liveKitPresence, roomById, updateParticipant, roomId, setParticipants, currentUserId]);
 }

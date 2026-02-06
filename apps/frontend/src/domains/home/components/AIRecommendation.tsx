@@ -64,32 +64,25 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
       </div>
 
       {/* 추천 문제 목록 */}
-      <div className="space-y-4">
+      <div className="space-y-4 h-full flex flex-col justify-center">
         {showLoading ? (
-          // 로딩 스피너 + 스켈레톤
-          <div className="space-y-4">
-            <div className="flex flex-col items-center justify-center gap-2 py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground">AI가 문제를 생성 중이에요...</p>
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground font-medium">AI가 문제를 생성 중이에요...</p>
+            <div className="flex flex-col items-center gap-1">
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-2 text-xs"
+                className="text-xs h-8"
                 onClick={handleRetry}
                 disabled={!canRetry}
               >
                 재요청
               </Button>
               {!canRetry && (
-                <span className="text-[11px] text-muted-foreground">30초 후 활성화됩니다.</span>
+                <span className="text-[10px] text-muted-foreground">30초 후 활성화됩니다.</span>
               )}
             </div>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="p-4 bg-muted/10 rounded-xl border border-border/30 animate-pulse h-[140px]"
-              />
-            ))}
           </div>
         ) : data.length > 0 ? (
           data.map((item) => (

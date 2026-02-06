@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -30,13 +31,15 @@ public class ProblemStatusResponse {
 
     private boolean isSolvedByMe;
 
+    private List<String> tags;
+
     // Optional: List of solved members (nicknames)
     // private List<String> solvedMembers;
 
     @Builder
     public ProblemStatusResponse(Long studyProblemId, Long problemId, String externalId, String title, String tier,
             LocalDate assignedDate,
-            int solvedMemberCount, int totalMemberCount, boolean isSolvedByMe) {
+            int solvedMemberCount, int totalMemberCount, boolean isSolvedByMe, List<String> tags) {
         this.studyProblemId = studyProblemId;
         this.problemId = problemId;
         this.externalId = externalId;
@@ -46,5 +49,6 @@ public class ProblemStatusResponse {
         this.solvedMemberCount = solvedMemberCount;
         this.totalMemberCount = totalMemberCount;
         this.isSolvedByMe = isSolvedByMe;
+        this.tags = tags;
     }
 }

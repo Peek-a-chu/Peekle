@@ -7,7 +7,7 @@ import { useStudyListPageLogic } from '@/domains/study/hooks/useStudyListPageLog
 import { CCStudyCard } from '@/domains/study/components/CCStudyCard';
 import { CCJoinStudyModal } from '@/domains/study/components/CCJoinStudyModal';
 import { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
-import type { StudyListContent } from '@/domains/study/types';
+import type { StudyListContent, StudyRoomDetail } from '@/domains/study/types';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -28,8 +28,26 @@ export function CCStudyListPage() {
     setCreateModalOpen,
     // handleStudyClick, // We handle click locally now
     handleCreateSuccess,
-    handleJoinSuccess,
+    // handleJoinSuccess, // We handle this locally now
+    refetch,
   } = useStudyListPageLogic();
+
+  const handleInviteSuccess = (study: StudyRoomDetail) => {
+    setJoinModalOpen(false);
+    void refetch();
+    // Simulate StudyListContent for the modal
+    setSelectedStudyForJoin({
+      id: study.id,
+      title: study.title,
+      description: '', // Not available in detail
+      isActive: true,
+      createdAt: '',
+      memberCount: study.members.length,
+      profileImages: [],
+      rankingPoint: 0,
+      owner: { id: 0, nickname: '' }, // Dummy owner
+    });
+  };
 
   const handleCardClick = (studyId: number) => {
     const study = studies.find((s) => s.id === studyId);
@@ -122,7 +140,7 @@ export function CCStudyListPage() {
       <CCJoinStudyModal
         open={joinModalOpen}
         onOpenChange={setJoinModalOpen}
-        onSuccess={handleJoinSuccess}
+        onSuccess={handleInviteSuccess}
       />
       <CCCreateStudyModal
         open={createModalOpen}

@@ -8,19 +8,24 @@ import { useRouter } from 'next/navigation';
 import { fetchStudyRoom, fetchStudyParticipants } from '../api/studyApi';
 
 export const useStudySocketActions = () => {
-  const { client, connected } = useSocketContext();
+  const { client, connected, reconnect } = useSocketContext();
   const roomId = useRoomStore((state) => state.roomId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
 
   const publish = useCallback(
     (destination: string, body: any) => {
       if (!client || !connected) {
-        toast.error('서버와 연결되지 않았습니다.');
+        toast.error('서버와 연결되지 않았습니다.', {
+          action: {
+            label: '재연결',
+            onClick: () => reconnect(),
+          },
+        });
         return;
       }
       client.publish({ destination, body: JSON.stringify(body) });
     },
-    [client, connected],
+    [client, connected, reconnect],
   );
 
   const enterStudy = useCallback(() => {
@@ -127,6 +132,8 @@ export const useStudySocketSubscription = (studyId: number) => {
   useEffect(() => {
     if (!client || !connected || !studyId) return;
 
+    // Ensure ref is up to date immediately so closures use the fresh value
+    currentUserIdRef.current = currentUserId;
 
     // 1. Enter Study Helper
     const sendEnter = () => {
@@ -241,13 +248,6 @@ export const useStudySocketSubscription = (studyId: number) => {
 
     // 초기 구독 시도
     subscribeToPrivateTopics();
-
-    // 1. Enter Study (send once when connected; server reads userId from session)
-    if (!sentEnterRef.current) {
-      sentEnterRef.current = true;
-      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId });
-      client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
-    }
 
     // NOTE: No long polling here. We only retry a few times until ONLINE_USERS arrives.
 
@@ -532,9 +532,6 @@ export const useStudySocketSubscription = (studyId: number) => {
         console.error('[StudySocket] Error parsing message', e);
       }
     };
-
-    // currentUserId가 변경될 때마다 private topics 재구독
-    currentUserIdRef.current = currentUserId;
 
     // currentUserId 변경 감지 및 재구독
     const checkAndResubscribe = () => {

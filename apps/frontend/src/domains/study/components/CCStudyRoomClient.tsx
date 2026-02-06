@@ -125,7 +125,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   useEffect(() => {
     // Reset selected problem and view mode when mounting study room
-    console.log('[StudyRoomClient] Mounting/Effect trigger');
     // DISABLED AUTO-RESET: Suspected cause of "No Problem Selected" bug
     // setSelectedProblem(null, null);
     resetToOnlyMine();
@@ -469,9 +468,9 @@ export function CCStudyRoomClient(): React.ReactNode {
     return null;
   }
 
-  // if (!isJoined) {
-  //   return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
-  // }
+  if (!isJoined) {
+    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
+  }
 
   return (
     <SocketProvider roomId={studyId} userId={currentUserId ?? 0}>

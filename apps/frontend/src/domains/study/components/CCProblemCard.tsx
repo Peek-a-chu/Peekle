@@ -95,6 +95,19 @@ export function CCProblemCard({
                 {problem.tier}
               </span>
             </div>
+            {/* Tags */}
+            {problem.tags && problem.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {problem.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
