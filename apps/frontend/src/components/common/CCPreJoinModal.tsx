@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useExtensionCheck } from '@/hooks/useExtensionCheck';
+import { useExtensionVersionCheck } from '@/hooks/useExtensionVersionCheck';
 import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { cn } from '@/lib/utils';
@@ -57,13 +58,16 @@ export const CCPreJoinModal = ({
 
   // Extension Check State
   const { isInstalled, extensionVersion, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
+
+  // Version Check from R2
+  const { versionInfo, isLoading: isVersionLoading } = useExtensionVersionCheck();
+  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.8';
+  const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
+
   type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING' | 'VERSION_MISMATCH';
   const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>('LOADING');
   const [isLinking, setIsLinking] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
-
-  const REQUIRED_VERSION = '0.0.7';
-  const DOWNLOAD_URL = 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
   // Polling State for Installation Check
   const [isPolling, setIsPolling] = useState(false);

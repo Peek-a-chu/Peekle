@@ -80,21 +80,14 @@ function scanForSuccess() {
             return; // It's still pending, nothing to do yet
         }
 
-        // 2. It's not pending anymore. Check if it WAS pending or is RECENT.
+        // 2. It's not pending anymore. Check if it WAS pending.
         const wasPending = pendingSubmissions.has(submitId);
-
-        // Time Check check as a fallback (for refresh case)
-        const submitTimeText = row.querySelector('td:nth-child(9)')?.innerText?.trim() || '';
-        const isRecent = submitTimeText.includes('초 전') ||
-            submitTimeText.includes('분 전');
 
         // If it was watching, remove it from set (it's done now)
         if (wasPending) {
             pendingSubmissions.delete(submitId);
         }
 
-        // 3. Filter: Only process finished states (exclude 'ce' - compile error)
-        // Send: ac, wa, rte, tle, mle, ole (맞았습니다, 틀렸습니다, 런타임 에러, 시간 초과, 메모리 초과, 출력 초과)
         // 3. Filter: Only process finished states (exclude 'ce' - compile error)
         // Send: ac, wa, rte, tle, mle, ole (맞았습니다, 틀렸습니다, 런타임 에러, 시간 초과, 메모리 초과, 출력 초과)
         const finishedStates = ['ac', 'wa', 'rte', 'tle', 'mle', 'ole'];
@@ -113,7 +106,8 @@ function scanForSuccess() {
         // 4. Determine success
         const isSuccess = resultColor === 'ac';
 
-        if (wasPending || isRecent) {
+        // Only process submissions that we were actively monitoring
+        if (wasPending) {
 
             // Mark as sent IMMEDIATELY to prevent dupes
             sentSubmissions.add(submitId);
