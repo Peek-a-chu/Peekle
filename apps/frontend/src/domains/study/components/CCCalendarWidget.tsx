@@ -103,8 +103,8 @@ export function CCInlineCalendar({
           week: 'flex w-full justify-between',
           day: 'h-8 w-8 text-center text-sm p-0',
           day_button:
-            'h-8 w-8 p-0 font-normal rounded-md inline-flex items-center justify-center transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-1',
-          selected: 'bg-pink-500 text-white hover:bg-pink-600 focus:bg-pink-600',
+            'h-8 w-8 p-0 font-normal rounded-md inline-flex items-center justify-center transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
+          selected: 'bg-primary text-whit rounded-md hover:bg-primary/90 focus:bg-primary/90',
           today: 'bg-muted font-semibold',
           outside: 'text-muted-foreground/40',
           disabled: 'text-muted-foreground/30 cursor-not-allowed hover:bg-transparent',
@@ -112,7 +112,7 @@ export function CCInlineCalendar({
         }}
         modifiersClassNames={{
           hasHistory:
-            'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:bg-pink-500 after:rounded-full',
+            'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:bg-primary after:rounded-full',
         }}
         components={{
           Chevron: ({ orientation }) =>

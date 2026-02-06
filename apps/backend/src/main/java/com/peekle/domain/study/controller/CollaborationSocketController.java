@@ -2,6 +2,7 @@ package com.peekle.domain.study.controller;
 
 import com.peekle.domain.study.dto.ide.IdeRequest;
 import com.peekle.domain.study.dto.ide.IdeResponse;
+import com.peekle.domain.study.dto.ide.IdeWatchRequest;
 import com.peekle.domain.study.service.RedisIdeService;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
@@ -14,6 +15,9 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
+import java.util.Map;
+import java.util.Set;
+
 @Slf4j
 @Controller
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class CollaborationSocketController {
 
     @MessageMapping("/ide/update")
     public void updateIde(@Payload IdeRequest request, SimpMessageHeaderAccessor headerAccessor) {
+        // ... (Existing code) ...
         Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
         Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
 
@@ -32,34 +37,20 @@ public class CollaborationSocketController {
             return;
         }
 
-        // 1. Save to Redis (For persistence/refresh)
+        // 1. Redis에 저장 (영속성/새로고침 시 복원용)
         redisIdeService.saveCode(studyId, userId, request);
 
-        // 2. Publish to Redis Topic (Broadcasting to subscribers)
-        // Topic: topic/studies/rooms/{studyId}/ide/{userId}
+        // 2. Redis 토픽에 발행 (구독자들에게 브로드캐스팅)
+        // 토픽: topic/studies/rooms/{studyId}/ide/{userId}
         String topic = String.format(RedisKeyConst.TOPIC_IDE, studyId, userId);
 
-        // Create Payload
-        // Note: SenderName isn't in Request, but clients usually know who they are
-        // watching or we can fetch it.
-        // For performance, we might skip fetching User entity if nickname isn't
-        // strictly needed for the editor sync itself.
-        // But to be complete, let's just send what we have.
-        // If needed, we can fetch nickname from Redis session or DB.
-
-        // Construct partial response or fetch full if needed.
-        // Let's rely on the service to get full response OR just forward the update
-        // content with ID.
-        // For efficiency, just forwarding might be enough, but let's stick to
-        // consistent IdeResponse structure.
-        // We will fetch senderName efficiently?
-        // RedisIdeService.getCode() fetches User from DB. Calling it every keystroke is
-        // heavy.
-        // Optimization: Just send the data. Client knows who they subbed to.
+        // Safe check for problemId
+        Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L;
 
         IdeResponse response = IdeResponse.builder()
                 .senderId(userId)
-                .senderName("Unknown") // Optimization: Skip DB lookup for high-frequency updates
+                .senderName("Unknown")
+                .problemId(problemId)
                 .filename(request.getFilename())
                 .code(request.getCode())
                 .lang(request.getLang())
@@ -68,9 +59,9 @@ public class CollaborationSocketController {
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("IDE", response));
     }
 
-    // Watch Event (Start/Stop watching someone)
+    // 관찰 시작/종료 이벤트 (Watch Event)
     @MessageMapping("/ide/watch")
-    public void handleWatch(@Payload com.peekle.domain.study.dto.ide.IdeWatchRequest request,
+    public void handleWatch(@Payload IdeWatchRequest request,
             SimpMessageHeaderAccessor headerAccessor) {
         Long viewerId = (Long) headerAccessor.getSessionAttributes().get("userId");
         Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
@@ -81,29 +72,49 @@ public class CollaborationSocketController {
 
         Long targetId = request.getTargetUserId();
 
-        // 1. Update Redis State
+        // 1. Redis 상태 업데이트
         if ("START".equalsIgnoreCase(request.getAction())) {
             redisIdeService.addWatcher(studyId, targetId, viewerId);
         } else if ("STOP".equalsIgnoreCase(request.getAction())) {
             redisIdeService.removeWatcher(studyId, targetId, viewerId);
         }
 
-        // 2. Notify the Target User ("Someone is watching you!")
-        // Topic: topic/studies/rooms/{studyId}/ide/{targetId}/status
-        // Or simply reuse the personal topic if the client listens to it?
-        // Let's use a specific status topic or the existing ide ONE.
-        // Usually, the target user wants to know who is watching ME.
-        // So target subscribes to: /topic/.../ide/{myId}/watchers
-
+        // 2. 대상 유저에게 알림 ("누군가 당신을 보고 있습니다!")
         String topic = String.format("topic/studies/rooms/%d/ide/%d/watchers", studyId, targetId);
+        Set<String> watchers = redisIdeService.getWatchers(studyId, targetId);
 
-        java.util.Set<String> watchers = redisIdeService.getWatchers(studyId, targetId);
-
-        // Payload: { type: "WATCH_UPDATE", data: { count: 3, viewers: [1, 5, ...] } }
-        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        Map<String, Object> data = new java.util.HashMap<>();
         data.put("count", watchers.size());
         data.put("viewers", watchers);
 
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("WATCH_UPDATE", data));
+    }
+
+    // [New] Snapshot Request over WebSocket
+    @MessageMapping("/ide/request-snapshot")
+    public void requestSnapshot(@Payload Map<String, Object> payload,
+            SimpMessageHeaderAccessor headerAccessor) {
+        Long requesterId = (Long) headerAccessor.getSessionAttributes().get("userId");
+        Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
+
+        if (requesterId == null || studyId == null || !payload.containsKey("targetUserId")) {
+            return;
+        }
+
+        try {
+            Long targetUserId = Long.valueOf(payload.get("targetUserId").toString());
+            Long problemId = payload.containsKey("problemId") ? Long.valueOf(payload.get("problemId").toString()) : 0L;
+
+            // Redis Fetch
+            IdeResponse snapshot = redisIdeService.getCode(studyId, problemId, targetUserId);
+
+            if (snapshot != null) {
+                // Topic: topic/studies/rooms/{studyId}/ide/{requesterId}/snapshot
+                String responseTopic = String.format("topic/studies/rooms/%d/ide/%d/snapshot", studyId, requesterId);
+                redisPublisher.publish(new ChannelTopic(responseTopic), SocketResponse.of("IDE_SNAPSHOT", snapshot));
+            }
+        } catch (Exception e) {
+            log.error("Snapshot Request Error", e);
+        }
     }
 }

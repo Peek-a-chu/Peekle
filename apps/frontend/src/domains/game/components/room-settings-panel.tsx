@@ -32,7 +32,7 @@ export function RoomSettingsPanel({
           {/* 제한 시간 */}
           <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-background p-3">
             <Clock className="mb-1 h-4 w-4 text-muted-foreground" />
-            <span className="text-xl font-bold text-foreground">{timeLimit}분</span>
+            <span className="text-xl font-bold text-foreground">{Math.floor(timeLimit / 60)}분</span>
             <span className="text-xs text-muted-foreground">제한 시간</span>
           </div>
 
@@ -53,7 +53,7 @@ export function RoomSettingsPanel({
           {/* 난이도 범위 */}
           <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-background p-3">
             <span className="mb-1 text-sm">🎯</span>
-            <span className="text-base font-bold text-foreground">
+            <span className="text-base font-bold text-primary">
               {tierMin} ~ {tierMax}
             </span>
             <span className="text-xs text-muted-foreground">난이도 범위</span>
@@ -63,7 +63,7 @@ export function RoomSettingsPanel({
         {/* 태그 */}
         <div className="flex gap-2">
           {tags.map((tag) => (
-            <Badge key={tag} variant="secondary">
+            <Badge key={tag} variant="secondary" className="dark:text-zinc-900">
               {tag}
             </Badge>
           ))}

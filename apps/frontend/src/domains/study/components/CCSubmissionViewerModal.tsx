@@ -1,16 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Search, CheckCircle2, User, Clock, HardDrive, FileCode2 } from 'lucide-react';
+import { X, Search, CheckCircle2, User, Clock, HardDrive, FileCode2, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Submission } from '@/domains/study/types';
-import { BoxSearchIcon } from '@/assets/icons/BoxSearchIcon';
 
 interface CCSubmissionViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
   problemTitle: string;
-  problemNumber?: number;
+  problemExternalId?: string;
   submissions: Submission[];
   onViewCode: (submissionId: number) => void;
 }
@@ -19,7 +18,7 @@ export function CCSubmissionViewerModal({
   isOpen,
   onClose,
   problemTitle,
-  problemNumber,
+  problemExternalId,
   submissions,
   onViewCode,
 }: CCSubmissionViewerModalProps) {
@@ -27,9 +26,11 @@ export function CCSubmissionViewerModal({
 
   if (!isOpen) return null;
 
-  const filteredSubmissions = submissions.filter((sub) =>
-    sub.username.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredSubmissions = (submissions || []).filter((sub) => {
+    // Check if nickname exists before filtering
+    const nameToCheck = sub.nickname || '';
+    return nameToCheck.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
@@ -38,12 +39,12 @@ export function CCSubmissionViewerModal({
         <div className="flex items-start justify-between p-6 pb-2">
           <div className="flex items-start gap-4">
             <div className="h-12 w-12 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
-              <BoxSearchIcon className="h-6 w-6 text-green-600" />
+              <Box className="h-6 w-6 text-green-600" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-foreground">풀이 보관함</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {problemNumber ? `${problemNumber}. ` : ''}
+                {problemExternalId ? `${problemExternalId}. ` : ''}
                 {problemTitle} - 맞은 사람 목록
               </p>
             </div>
@@ -61,7 +62,7 @@ export function CCSubmissionViewerModal({
         {/* Content Container */}
         <div className="p-6 pt-2 flex flex-col gap-6 flex-1 overflow-hidden">
           {/* Info Box */}
-          <div className="bg-background rounded-xl border border-border p-5 shadow-sm space-y-4">
+          <div className="bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border p-5 shadow-sm space-y-4">
             {/* Top Info */}
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
@@ -75,18 +76,18 @@ export function CCSubmissionViewerModal({
               <p className="text-sm font-bold text-foreground">실시간 코드를 보고 싶다면?</p>
 
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold text-[11px] dark:bg-primary/30">
                   방법 1
                 </span>
                 <span>상단 캠 영역의 참여자 타일을 선택하세요.</span>
               </div>
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="shrink-0 px-1.5 py-0.5 rounded bg-pink-100 text-pink-600 font-bold text-[11px]">
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold text-[11px] dark:bg-primary/30">
                   방법 2
                 </span>
                 <span className="leading-snug">
                   참여자 타일을 찾기 어렵다면, 참여자 목록에서 온라인 참가자 프로필 우측 클릭 메뉴의{' '}
-                  <span className="font-semibold text-pink-600">&apos;실시간 코드 확인&apos;</span>{' '}
+                  <span className="font-semibold text-primary">&apos;실시간 코드 확인&apos;</span>{' '}
                   버튼을 클릭해주세요.
                 </span>
               </div>
@@ -115,41 +116,44 @@ export function CCSubmissionViewerModal({
             {filteredSubmissions.length > 0 ? (
               filteredSubmissions.map((sub) => (
                 <div
-                  key={sub.id}
-                  className="flex items-center justify-between p-4 rounded-2xl border border-border bg-white shadow-sm hover:shadow-md transition-all group"
+                  key={sub.submissionId}
+                  className="flex items-center justify-between p-4 rounded-2xl border border-border bg-background/80 dark:bg-slate-900/60 shadow-sm hover:shadow-md transition-all group"
                 >
                   <div className="flex items-center gap-4">
-                    {/* Avatar Placeholder */}
-                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                      {/* Can use nice avatar images if available, using icon for now */}
-                      <User className="h-5 w-5 text-slate-400" />
+                    {/* Profile Image Placeholder */}
+                    <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700">
+                      {/* Can use nice profile images if available, using icon for now */}
+                      <User className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                     </div>
 
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-base text-foreground">{sub.username}</span>
+                        <span className="font-bold text-base text-foreground">
+                          {sub.nickname || 'Unknown'}
+                        </span>
                         <CheckCircle2 className="h-4 w-4 text-green-500 fill-green-100" />
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
                           {sub.language}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
+                        <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300">
                           <HardDrive className="h-3 w-3" />
-                          <span>{(sub.memory / 1024).toFixed(1)}MB</span>
+                          <span>{sub.memory ? (sub.memory / 1024).toFixed(1) : '0.0'}MB</span>
                         </div>
-                        <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
+                        <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300">
                           <Clock className="h-3 w-3" />
-                          <span>{sub.time}ms</span>
+                          <span>{sub.executionTime || 0}ms</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <Button
-                    className="h-9 px-4 rounded-full border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 hover:border-pink-300 shadow-sm transition-all text-sm font-medium group-hover:bg-pink-500 group-hover:text-white group-hover:border-pink-500"
-                    onClick={() => onViewCode(sub.id)}
+                    className="h-9 px-4 rounded-full border border-primary bg-white dark:bg-slate-900/60 text-primary hover:bg-primary/10 hover:border-primary/20 shadow-sm transition-all text-sm font-medium group-hover:bg-primary group-hover:text-white group-hover:border-primary disabled:opacity-50 dark:group-hover:bg-primary"
+                    disabled={!sub.submissionId}
+                    onClick={() => sub.submissionId && onViewCode(sub.submissionId)}
                   >
                     <FileCode2 className="h-4 w-4 mr-1.5" />
                     코드 확인하기
@@ -168,7 +172,7 @@ export function CCSubmissionViewerModal({
         {/* Footer */}
         <div className="p-6 pt-2 flex justify-end">
           <Button
-            className="rounded-full px-6 bg-slate-800 hover:bg-slate-900 text-white font-medium"
+            className="rounded-full px-6 bg-slate-800 hover:bg-slate-900 text-white font-medium dark:bg-slate-700 dark:hover:bg-slate-600"
             onClick={onClose}
           >
             닫기

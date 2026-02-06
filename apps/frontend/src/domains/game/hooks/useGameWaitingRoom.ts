@@ -1,157 +1,272 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import {
-  getMockGameRoomDetail,
-  getMockChatMessages,
-  type ChatMessage,
-  type GameRoomDetail,
-} from '@/domains/game/mocks/mock-data';
-
-// 현재 사용자 ID (Mock - 실제로는 인증에서 가져옴)
-// room 3에서 테스트하려면 user3 (레드팀 방장)
-// room 2에서 개인전 준비 버튼 테스트하려면 user2 (일반 참여자)
-const CURRENT_USER_ID = 'user2';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuthStore } from '@/store/auth-store';
+import { useGameSocketConnection } from './useGameSocketConnection';
+import { getGameRoom, kickUser, enterGameRoom } from '@/domains/game/api/game-api';
+import { GameRoomDetail, ChatMessage, Team } from '@/domains/game/types/game-types';
+import { toast } from 'sonner';
 
 interface UseGameWaitingRoomReturn {
   room: GameRoomDetail | null;
   messages: ChatMessage[];
-  currentUserId: string;
+  currentUserId: number;
   isHost: boolean;
   isReady: boolean;
+  isCountingDown: boolean;
   inviteModalOpen: boolean;
   isLoading: boolean;
   setInviteModalOpen: (open: boolean) => void;
   sendMessage: (content: string) => void;
   toggleReady: () => void;
   startGame: () => void;
+  onCountdownComplete: () => void;
   leaveRoom: () => void;
-  kickParticipant: (participantId: string) => void;
+  kickParticipant: (participantId: number) => void;
   changeTeam: () => void;
 }
 
 export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
-  // 방 정보 (Mock 데이터 사용)
-  const [room, setRoom] = useState<GameRoomDetail | null>(() => getMockGameRoomDetail(roomId));
-  const [messages, setMessages] = useState<ChatMessage[]>(() => getMockChatMessages(roomId));
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user } = useAuthStore();
+  const userId = user ? user.id : 0;
+
+  const { client, connected } = useGameSocketConnection(roomId, userId);
+
+  const [room, setRoom] = useState<GameRoomDetail | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCountingDown, setIsCountingDown] = useState(false);
+  const hasEnteredRef = useRef(false);
 
-  const currentUserId = CURRENT_USER_ID;
-
-  // 현재 사용자가 방장인지 확인
-  const currentParticipant = room?.participants.find((p) => p.id === currentUserId);
+  // 현재 사용자 상태 계산
+  const currentParticipant = room?.participants.find((p) => p.id === userId);
   const isHost = currentParticipant?.isHost ?? false;
   const isReady = currentParticipant?.status === 'READY';
 
-  // 메시지 전송 (팀 정보 포함)
-  const sendMessage = useCallback(
-    (content: string) => {
-      const newMessage: ChatMessage = {
-        id: `msg-${Date.now()}`,
-        senderId: currentUserId,
-        senderNickname: currentParticipant?.nickname ?? '나',
-        senderProfileImg: currentParticipant?.profileImg ?? '',
-        content,
-        timestamp: new Date().toISOString(),
-        senderTeam: currentParticipant?.team, // 팀 정보 추가
-      };
-      setMessages((prev) => [...prev, newMessage]);
-    },
-    [currentUserId, currentParticipant],
-  );
+  // 방 정보 조회
+  const fetchRoom = useCallback(async () => {
+    if (!roomId) return;
+    try {
+      const data = await getGameRoom(roomId);
+      if (data) {
+        setRoom(data);
+      } else {
+        toast.error('방 정보를 불러올 수 없습니다.');
+        router.push('/game');
+      }
+    } catch (error) {
+      console.error('Failed to fetch room:', error);
+      toast.error('방 정보를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [roomId, router]);
 
-  // 준비 토글
-  const toggleReady = useCallback(() => {
-    if (!room || isHost) return;
+  // 방 입장 (초기 진입 시 1회)
+  useEffect(() => {
+    if (!roomId || hasEnteredRef.current) return;
 
-    setRoom((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        participants: prev.participants.map((p) =>
-          p.id === currentUserId
-            ? { ...p, status: p.status === 'READY' ? 'NOT_READY' : 'READY' }
-            : p,
-        ),
-      };
+    const enter = async () => {
+      try {
+        // [수정] 멱등성 보장: 백엔드에서 이미 참여중이면 성공 처리하므로 안심하고 호출
+        await enterGameRoom(roomId);
+        hasEnteredRef.current = true;
+        fetchRoom(); // 입장 후 정보 갱신
+      } catch (error) {
+        console.error('Failed to enter room:', error);
+        toast.error('방 입장에 실패했습니다.');
+        router.push('/game');
+      }
+    };
+
+    enter();
+  }, [roomId, fetchRoom, router]);
+
+  // 소켓 이벤트 처리
+  useEffect(() => {
+    if (!connected || !client) return;
+
+    // 1. Room Status Subscription
+    const roomSub = client.subscribe(`/topic/games/${roomId}/room`, (msg) => {
+      try {
+        const event = JSON.parse(msg.body);
+        handleRoomEvent(event);
+      } catch (e) {
+        console.error('Failed to parse room event:', e);
+      }
     });
-  }, [room, isHost, currentUserId]);
 
-  // 게임 시작 (방장 전용)
-  const startGame = useCallback(() => {
-    if (!isHost) return;
-    // TODO: 실제 게임 시작 API 호출
-    console.log('게임 시작!');
-    // router.push(`/game/${roomId}/play`)
-  }, [isHost]);
+    // 2. Chat Subscription (Global)
+    const chatSub = client.subscribe(`/topic/games/${roomId}/chat/global`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type !== 'CHAT') return;
 
-  // 방 나가기
-  const leaveRoom = useCallback(() => {
-    // TODO: 실제 방 나가기 API 호출
-    console.log('방 나가기');
-    // router.push('/game')
-  }, []);
-
-  // 참여자 강퇴 (방장 전용)
-  const kickParticipant = useCallback(
-    (participantId: string) => {
-      if (!isHost || !room) return;
-
-      // TODO: 실제 강퇴 API 호출
-      console.log('참여자 강퇴:', participantId);
-
-      // Mock: 참여자 목록에서 제거
-      setRoom((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          currentPlayers: prev.currentPlayers - 1,
-          participants: prev.participants.filter((p) => p.id !== participantId),
+        const chatData = response.data;
+        const newMsg: ChatMessage = {
+          id: `msg-${Date.now()}`,
+          senderId: Number(chatData.senderId),
+          senderNickname: chatData.senderNickname || 'Unknown',
+          profileImg: chatData.profileImg,
+          content: chatData.message,
+          timestamp: chatData.timestamp,
+          senderTeam: chatData.teamColor
         };
-      });
-    },
-    [isHost, room],
-  );
+        setMessages((prev) => [...prev, newMsg]);
+      } catch (e) {
+        console.error('Failed to parse chat message:', e);
+      }
+    });
 
-  // 팀 변경
+    // 3. Error Subscription (User Specific)
+    const errorSub = client.subscribe('/user/queue/errors', (msg) => {
+      if (msg.body) {
+        toast.error(msg.body);
+      }
+    });
+
+    return () => {
+      roomSub.unsubscribe();
+      chatSub.unsubscribe();
+      errorSub.unsubscribe();
+    };
+  }, [connected, client, roomId]);
+
+  const handleRoomEvent = (event: any) => {
+    switch (event.type) {
+      case 'ENTER':
+      case 'LEAVE': // [수정] EXIT -> LEAVE (백엔드와 맞춤)
+        fetchRoom();
+        break;
+      case 'KICK':
+        if (Number(event.data.userId) === userId) {
+          toast.error(event.data.message || '강퇴되었습니다.');
+          router.push('/game');
+        } else {
+          fetchRoom();
+          toast.info('참여자가 강퇴되었습니다.');
+        }
+        break;
+      case 'READY':
+        if (event.data) {
+          setRoom(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              participants: prev.participants.map(p =>
+                p.id === Number(event.data.userId)
+                  ? { ...p, status: event.data.isReady ? 'READY' : 'NOT_READY' }
+                  : p
+              )
+            };
+          });
+        }
+        break;
+      case 'TEAM': // [수정] TEAM_CHANGE -> TEAM
+        if (event.data) {
+          setRoom(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              participants: prev.participants.map(p =>
+                p.id === Number(event.data.userId)
+                  ? { ...p, team: event.data.team as Team }
+                  : p
+              )
+            };
+          });
+        }
+        break;
+      case 'START':
+        setIsCountingDown(true);
+        break;
+    }
+  };
+
+  const sendMessage = useCallback((content: string) => {
+    if (!client || !connected) return;
+    client.publish({
+      destination: '/pub/games/chat',
+      body: JSON.stringify({
+        gameId: Number(roomId),
+        message: content,
+        scope: 'GLOBAL',
+        teamColor: null // 대기실은 전체 채팅이므로 팀 정보 제외
+      })
+    });
+  }, [client, connected, roomId]);
+
+  const toggleReady = useCallback(() => {
+    if (!client || !connected) return;
+    client.publish({
+      destination: '/pub/games/ready',
+      body: JSON.stringify({ gameId: Number(roomId) })
+    });
+  }, [client, connected, roomId]);
+
+  const startGame = useCallback(() => {
+    if (!client || !connected || !isHost) return;
+    client.publish({
+      destination: '/pub/games/start',
+      body: JSON.stringify({ gameId: Number(roomId) })
+    });
+  }, [client, connected, roomId, isHost]);
+
   const changeTeam = useCallback(() => {
-    if (!room || room.teamType !== 'TEAM' || !currentParticipant?.team) return;
-
+    if (!client || !connected || !currentParticipant?.team) return;
     const currentTeam = currentParticipant.team;
     const targetTeam = currentTeam === 'RED' ? 'BLUE' : 'RED';
-    const maxTeamPlayers = room.maxPlayers / 2;
 
-    const targetTeamCount = room.participants.filter((p) => p.team === targetTeam).length;
-
-    // 빈 슬롯이 없으면 아무 동작 안 함
-    if (targetTeamCount >= maxTeamPlayers) return;
-
-    setRoom((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        participants: prev.participants.map((p) =>
-          p.id === currentUserId
-            ? { ...p, team: targetTeam, status: 'NOT_READY' } // 팀 변경 시 준비 해제
-            : p,
-        ),
-      };
+    client.publish({
+      destination: '/pub/games/team',
+      body: JSON.stringify({ gameId: Number(roomId), team: targetTeam })
     });
-  }, [room, currentParticipant, currentUserId]);
+  }, [client, connected, roomId, currentParticipant]);
+
+  const leaveRoom = useCallback(() => {
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/games/leave',
+        body: JSON.stringify({ gameId: Number(roomId) })
+      });
+    }
+    // "나가기" 버튼 클릭 시에는 명시적으로 이동
+    router.replace('/game');
+  }, [client, connected, roomId, router]);
+
+  const kickParticipant = useCallback(async (targetUserId: number) => {
+    const success = await kickUser(roomId, String(targetUserId));
+    if (success) {
+      toast.success('참여자를 강퇴했습니다.');
+    } else {
+      toast.error('강퇴에 실패했습니다.');
+    }
+  }, [roomId]);
+
+  const onCountdownComplete = useCallback(() => {
+    router.push(`/game/${roomId}/play`);
+  }, [router, roomId]);
+
+
 
   return {
     room,
     messages,
-    currentUserId,
+    currentUserId: userId,
     isHost,
     isReady,
+    isCountingDown,
     inviteModalOpen,
     isLoading,
     setInviteModalOpen,
     sendMessage,
     toggleReady,
     startGame,
+    onCountdownComplete,
     leaveRoom,
     kickParticipant,
     changeTeam,

@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { type GameCreationFormData } from '@/domains/game/mocks/mock-data';
+import { type GameCreationFormData } from '@/domains/game/types/game-types';
 
 interface GameCreationStepSettingsProps {
   formData: GameCreationFormData;
@@ -54,7 +54,7 @@ export function GameCreationStepSettings({
           <Label>
             인원 수{' '}
             <span className="text-xs text-muted-foreground">
-              ({isTeamMode ? '4 ~ 12' : '2 ~ 8'})
+              ({isTeamMode ? '4 ~ 8' : '2 ~ 8'})
             </span>
           </Label>
           <span className="text-sm font-medium">{formData.maxPlayers}명</span>
@@ -62,9 +62,9 @@ export function GameCreationStepSettings({
         <div className="flex items-center gap-4">
           <Slider
             value={[formData.maxPlayers]}
-            onValueChange={([value]) => onMaxPlayersChange(value)}
+            onValueChange={([value]: number[]) => onMaxPlayersChange(value)}
             min={isTeamMode ? 4 : 2}
-            max={isTeamMode ? 12 : 8}
+            max={8}
             step={isTeamMode ? 2 : 1}
             className="flex-1"
           />
@@ -74,14 +74,14 @@ export function GameCreationStepSettings({
             onChange={(e) => {
               setMaxPlayersInput(e.target.value);
               const num = Number(e.target.value);
-              if (!isNaN(num) && num >= (isTeamMode ? 4 : 2) && num <= (isTeamMode ? 12 : 8)) {
+              if (!isNaN(num) && num >= (isTeamMode ? 4 : 2) && num <= 8) {
                 onUpdateForm('maxPlayers', num);
               }
             }}
             onBlur={onMaxPlayersBlur}
             className="w-20"
             min={isTeamMode ? 4 : 2}
-            max={isTeamMode ? 12 : 8}
+            max={8}
             step={isTeamMode ? 2 : 1}
           />
         </div>
@@ -95,14 +95,14 @@ export function GameCreationStepSettings({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>
-              제한 시간 <span className="text-xs text-muted-foreground">(10 ~ 240)</span>
+              제한 시간 <span className="text-xs text-muted-foreground">(10 ~ 240분)</span>
             </Label>
             <span className="text-sm font-medium">{formData.timeLimit}분</span>
           </div>
           <div className="flex items-center gap-4">
             <Slider
               value={[formData.timeLimit]}
-              onValueChange={([value]) => onTimeLimitChange(value)}
+              onValueChange={([value]: number[]) => onTimeLimitChange(value)}
               min={10}
               max={240}
               step={10}
@@ -143,7 +143,7 @@ export function GameCreationStepSettings({
           <div className="flex items-center gap-4">
             <Slider
               value={[formData.problemCount]}
-              onValueChange={([value]) => onProblemCountChange(value)}
+              onValueChange={([value]: number[]) => onProblemCountChange(value)}
               min={1}
               max={10}
               step={1}

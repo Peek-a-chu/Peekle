@@ -32,6 +32,7 @@ erDiagram
         bigint id PK
         string nickname
         string profile_img
+        string profile_img_thumb
         string boj_id "백준 ID (확장프로그램 연동용)"
         string tier "CURRENT_TIER (Enum)"
         int league_point "이번 주 획득 점수"
@@ -47,13 +48,6 @@ erDiagram
         string tier "티어 등급"
         int season_week "2024-W10 (시즌 주차)"
         datetime created_at
-    }
-
-    LEAGUE_GROUPS {
-        BIGINT id PK
-        VARCHAR(20) tier %% 티어 등급
-        INT season_week %% YYYYWW (ex: 202410)
-        DATETIME created_at
     }
     
     %% 스트릭 용 테이블
@@ -165,15 +159,22 @@ erDiagram
 | 컬럼 (Column) | 타입 (Type) | 제약조건 (Constraints) | 설명 (Description) |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK | 사용자 ID |
-| `nickname` | VARCHAR(50) | NIX | 표시용 닉네임 |
+| `social_id` | VARCHAR(255) | UQ, NOT NULL | 소셜 로그인 ID |
+| `provider` | VARCHAR(255) | NOT NULL | 소셜 로그인 제공자 |
+| `nickname` | VARCHAR(255) | UQ | 표시용 닉네임 |
+| `profile_img` | VARCHAR(255) | | 프로필 이미지 URL |
+| `profile_img_thumb` | VARCHAR(255) | | 프로필 이미지 썸네일 URL |
 | `boj_id` | VARCHAR(50) | NULL | 확장프로그램 연동용 외부 ID |
 | `extension_token` | VARCHAR(100) | UQ | 확장프로그램 연동용 토큰 (UUID) |
 | `extension_token_updated_at` | DATETIME | | 토큰 발급/갱신 일시 |
-| `league` | VARCHAR(20) | | 현재 리그 (예: SILVER) |
+| `league` | VARCHAR(20) | Default 'BRONZE' | 현재 리그 |
 | `league_point` | INT | Default 0 | 이번 주 획득 리그 포인트 |
 | `league_group_id` | BIGINT | FK -> league_groups.id | 이번 주 배정된 리그 그룹 ID |
 | `streak_current` | INT | Default 0 | 현재 연속 스트릭 |
 | `streak_max` | INT | Default 0 | 최대 연속 스트릭 |
+| `max_league` | VARCHAR(255) | | 달성한 최고 리그 |
+| `is_deleted` | BOOLEAN | Default FALSE | 탈퇴 여부 |
+| `created_at` | DATETIME(6) | NOT NULL | 가입 일시 |
 
 **`league_groups`**
 | 컬럼 (Column) | 타입 (Type) | 제약조건 (Constraints) | 설명 (Description) |
@@ -192,6 +193,7 @@ erDiagram
 | `result` | VARCHAR(20) | | 승급(PROMOTED)/강등(DEMOTED) 여부 |
 | `season_week` | INT | | 시즌 주차 (YYYYWW) |
 | `closed_at` | DATETIME | | 시즌 종료일 |
+| `is_viewed` | BOOLEAN | Default FALSE | 결과 확인 여부 (모달 노출용) |
 
 **`daily_solved_counts`** (스트릭)
 | 컬럼 | 타입 | 설명 |
@@ -249,17 +251,32 @@ erDiagram
 | `problem_date` | DATE | 캘린더 표시 날짜 |
 | `created_by` | BIGINT | 추가한 사람 |
 
-**`submission_logs`**
+**`problem`**
 | 컬럼 (Column) | 타입 (Type) | 제약조건 (Constraints) | 설명 (Description) |
 | :--- | :--- | :--- | :--- |
-| `id` | BIGINT | PK | |
-| `user_id` | BIGINT | FK | |
-| `source_type` | VARCHAR(20) | | STUDY, GAME, EXTENSION |
+| `id` | BIGINT | PK | 문제 ID |
+| `source` | VARCHAR(255) | NOT NULL | 출처 (BOJ, SWEA 등) |
+| `external_id` | VARCHAR(255) | UQ, NOT NULL | 외부 문제 번호 |
+| `title` | VARCHAR(255) | NOT NULL | 문제 제목 |
+| `tier` | VARCHAR(255) | NOT NULL | 문제 난이도/티어 |
+| `url` | TEXT | NOT NULL | 문제 링크 URL |
+
+**`submission_log`**
+| 컬럼 (Column) | 타입 (Type) | 제약조건 (Constraints) | 설명 (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK | 로그 ID |
+| `user_id` | BIGINT | FK -> users.id | 제출한 사용자 |
+| `problem_id` | BIGINT | FK -> problem.id | 푼 문제 |
+| `source_type` | VARCHAR(255) | | STUDY, GAME, EXTENSION |
+| `room_id` | BIGINT | | 스터디/게임 방 ID (Nullable) |
 | `problem_title` | VARCHAR(255) | | 문제 제목 (역정규화) |
-| `problem_tier` | VARCHAR(20) | | 문제 티어 (역정규화) |
+| `problem_tier` | VARCHAR(255) | | 문제 티어 (역정규화) |
+| `result` | VARCHAR(50) | | 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등) |
 | `code` | TEXT | | 제출한 코드 |
-| `result` | VARCHAR(20) | | SUCCESS/FAIL |
+| `memory` | INT | | 메모리 사용량 (KB) |
 | `execution_time` | INT | | 실행 시간 (ms) |
+| `language` | VARCHAR(255) | | 사용 언어 |
+| `submitted_at` | DATETIME(6) | | 제출 일시 |
 
 
 **`workbook_problems`**

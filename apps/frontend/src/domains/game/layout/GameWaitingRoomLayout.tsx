@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RoomSettingsPanel } from '../components/room-settings-panel';
 import { ParticipantGrid } from '../components/participant-grid';
-import { ChatPanel } from '../components/chat-panel';
+import { WaitingRoomChatPanel } from '../components/WaitingRoomChatPanel';
 import { InviteModal } from '../components/invite-modal';
-import type { GameRoomDetail, ChatMessage } from '@/domains/game/mocks/mock-data';
+import { GameCountdownOverlay } from '../components/game-countdown-overlay';
+import type { GameRoomDetail, ChatMessage } from '@/domains/game/types/game-types';
 
 const modeLabels = {
   TIME_ATTACK: '타임어택',
@@ -23,16 +24,18 @@ const teamLabels = {
 interface GameWaitingRoomLayoutProps {
   room: GameRoomDetail;
   messages: ChatMessage[];
-  currentUserId: string;
+  currentUserId: number;
   isHost: boolean;
   isReady: boolean;
+  isCountingDown: boolean;
   inviteModalOpen: boolean;
   onInviteModalChange: (open: boolean) => void;
   onSendMessage: (content: string) => void;
   onReady: () => void;
   onCancelReady: () => void;
   onStartGame: () => void;
-  onKickParticipant: (participantId: string) => void;
+  onCountdownComplete: () => void;
+  onKickParticipant: (participantId: number) => void;
   onChangeTeam: () => void;
 }
 
@@ -42,12 +45,14 @@ export function GameWaitingRoomLayout({
   currentUserId,
   isHost,
   isReady,
+  isCountingDown,
   inviteModalOpen,
   onInviteModalChange,
   onSendMessage,
   onReady,
   onCancelReady,
   onStartGame,
+  onCountdownComplete,
   onKickParticipant,
   onChangeTeam,
 }: GameWaitingRoomLayoutProps) {
@@ -70,15 +75,15 @@ export function GameWaitingRoomLayout({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-foreground">{room.title}</h1>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs dark:text-zinc-900">
                 {teamLabels[room.teamType]}
               </Badge>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs text-primary border-primary/30">
                 {modeLabels[room.mode]}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              ⏱️ {room.timeLimit}분 · 📝 {room.problemCount}문제 · 👥 {room.maxPlayers}명
+            <p className="text-xs text-muted-foreground font-medium">
+              ⏱️ {Math.floor(room.timeLimit / 60)}분 · 📝 {room.problemCount}문제 · 👥 {room.maxPlayers}명
             </p>
           </div>
         </div>
@@ -130,20 +135,25 @@ export function GameWaitingRoomLayout({
             {isHost ? (
               <Button
                 size="lg"
-                className="min-w-[200px]"
+                className="min-w-[200px] bg-primary text-primary-foreground hover:scale-105 transition-all duration-200 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:scale-100"
                 disabled={!canStart}
                 onClick={onStartGame}
               >
                 시작하기
               </Button>
             ) : isReady ? (
-              <Button size="lg" variant="outline" className="min-w-[200px]" onClick={onCancelReady}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="min-w-[200px] border-2 border-primary/50 text-primary hover:bg-primary/5 hover:scale-105 transition-all duration-200"
+                onClick={onCancelReady}
+              >
                 준비 취소
               </Button>
             ) : (
               <Button
                 size="lg"
-                className="min-w-[200px] opacity-50 transition-opacity hover:opacity-100"
+                className="min-w-[200px] bg-primary text-primary-foreground hover:scale-105 transition-all duration-200 shadow-lg shadow-primary/20"
                 onClick={onReady}
               >
                 준비하기
@@ -154,7 +164,7 @@ export function GameWaitingRoomLayout({
 
         {/* 우측: 채팅 패널 */}
         <aside className="w-80 border-l">
-          <ChatPanel
+          <WaitingRoomChatPanel
             messages={messages}
             participants={room.participants}
             currentUserId={currentUserId}
@@ -167,6 +177,9 @@ export function GameWaitingRoomLayout({
 
       {/* 초대 모달 */}
       <InviteModal open={inviteModalOpen} onOpenChange={onInviteModalChange} roomId={room.id} />
+
+      {/* 카운트다운 오버레이 */}
+      <GameCountdownOverlay isActive={isCountingDown} onComplete={onCountdownComplete} />
     </div>
   );
 }

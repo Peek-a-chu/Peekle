@@ -4,20 +4,35 @@ import com.peekle.domain.study.entity.StudyMember;
 import lombok.Builder;
 import lombok.Getter;
 
+import static com.peekle.domain.study.entity.StudyMember.StudyRole;
+
 @Getter
 @Builder
 public class StudyMemberResponse {
     private Long userId;
     private String nickname;
-    private StudyMember.StudyRole role;
+    private String profileImg;
+    private StudyRole role;
     private boolean isOnline;
+    private String odUid;
 
     public static StudyMemberResponse of(StudyMember member, boolean isOnline) {
+        return of(member, isOnline, null);
+    }
+
+    public static StudyMemberResponse of(StudyMember member, boolean isOnline, String odUid) {
+        String profileImg = member.getUser().getProfileImgThumb();
+        if (profileImg == null) {
+            profileImg = member.getUser().getProfileImg();
+        }
+
         return StudyMemberResponse.builder()
                 .userId(member.getUser().getId())
                 .nickname(member.getUser().getNickname())
+                .profileImg(profileImg)
                 .role(member.getRole())
                 .isOnline(isOnline)
+                .odUid(odUid)
                 .build();
     }
 }

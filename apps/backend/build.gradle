@@ -8,7 +8,9 @@ group = 'com.peekle'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    sourceCompatibility = '21'
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 configurations {
@@ -40,11 +42,17 @@ dependencies {
     implementation 'io.github.springwolf:springwolf-core:1.6.0'
     implementation 'io.github.springwolf:springwolf-stomp:1.6.0'
 
-    // OpenVidu
-    implementation 'io.openvidu:openvidu-java-client:2.31.0'
+    // LiveKit
+    implementation 'io.livekit:livekit-server:0.6.0'
+    implementation 'com.google.protobuf:protobuf-java:3.25.1'
+
     // Database
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+    
+    // Flyway (Database Migration)
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
 
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
@@ -52,8 +60,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
 
     // Lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
@@ -77,6 +85,12 @@ dependencies {
 
     // Jsoup
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    // Redisson
+    implementation 'org.redisson:redisson-spring-boot-starter:3.31.0'
+
+    // AWS SDK (for Cloudflare R2)
+    implementation 'software.amazon.awssdk:s3:2.29.23'
 }
 
 tasks.named('test') {

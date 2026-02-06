@@ -3,6 +3,8 @@ package com.peekle.domain.user.entity;
 import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -10,7 +12,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Entity
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@Builder
 @Table(name = "users")
 public class User extends BaseTimeEntity {
 
@@ -29,47 +33,70 @@ public class User extends BaseTimeEntity {
 
     // ... fields ...
 
-    @Column(unique = true)
+    @Column
     private String bojId; // 백준 아이디
 
-    @Column(unique = true)
-    private String extensionToken;
+    @Column(unique = true, length = 100)
+    @Builder.Default
+    private String extensionToken = java.util.UUID.randomUUID().toString();
 
-    private java.time.LocalDateTime extensionTokenUpdatedAt;
-
+    @Builder.Default
+    private java.time.LocalDateTime extensionTokenUpdatedAt = java.time.LocalDateTime.now();
 
     public User(String socialId, String provider, String nickname) {
         this.socialId = socialId;
         this.provider = provider;
         this.nickname = nickname;
-        // this.bojId = null; // 기본값 null
-        this.extensionToken = java.util.UUID.randomUUID().toString(); // 회원가입 시 토큰 자동 발급
-        this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
-        this.league = LeagueTier.BRONZE;
+        this.league = LeagueTier.STONE;
         this.leaguePoint = 0;
         this.isDeleted = false;
+        this.extensionToken = java.util.UUID.randomUUID().toString();
+        this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
+        this.streakCurrent = 0;
+        this.streakMax = 0;
     }
-
 
     private String profileImg;
     private String profileImgThumb;
 
+    @Builder.Default
     @Column(name = "league")
     @Enumerated(EnumType.STRING)
-    private LeagueTier league = LeagueTier.BRONZE;
+    private LeagueTier league = LeagueTier.STONE;
 
+    @Builder.Default
     @Column(name = "league_point")
     private Integer leaguePoint = 0;
 
     private Long leagueGroupId; // FK (Nullable)
 
+    @Builder.Default
     private Integer streakCurrent = 0;
+    @Builder.Default
     private Integer streakMax = 0;
 
-    private String maxLeague;
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    private LeagueTier maxLeague = LeagueTier.STONE;
 
+    @Builder.Default
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
+
+    @Column(name = "last_solved_date")
+    private java.time.LocalDate lastSolvedDate;
+
+    public void updateStreak(boolean increment, java.time.LocalDate streakDate) {
+        if (increment) {
+            this.streakCurrent++;
+        } else {
+            this.streakCurrent = 1;
+        }
+        if (this.streakCurrent > this.streakMax) {
+            this.streakMax = this.streakCurrent;
+        }
+        this.lastSolvedDate = streakDate;
+    }
 
     public void addLeaguePoint(int amount) {
         this.leaguePoint += amount;
@@ -82,5 +109,57 @@ public class User extends BaseTimeEntity {
     public void updateExtensionToken(String extensionToken) {
         this.extensionToken = extensionToken;
         this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
+    }
+
+    public void updateLeagueGroup(Long leagueGroupId) {
+        this.leagueGroupId = leagueGroupId;
+    }
+
+    public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
+        if (nickname != null)
+            this.nickname = nickname;
+        if (bojId != null)
+            this.bojId = bojId;
+        if (profileImg != null)
+            this.profileImg = profileImg;
+        if (profileImgThumb != null)
+            this.profileImgThumb = profileImgThumb;
+    }
+
+    public void deleteProfileImage() {
+        this.profileImg = null;
+        this.profileImgThumb = null;
+    }
+
+    /**
+     * 승급 - 다음 티어로 이동
+     */
+    public void promoteLeague() {
+        this.league = this.league.next();
+        if (this.maxLeague == null || this.league.ordinal() > this.maxLeague.ordinal()) {
+            this.maxLeague = this.league;
+        }
+    }
+
+    /**
+     * 강등 - 이전 티어로 이동
+     */
+    public void demoteLeague() {
+        this.league = this.league.previous();
+    }
+
+    /**
+     * 새로운 시즌 시작 시 초기화
+     */
+    public void resetForNewSeason() {
+        this.leaguePoint = 0;
+        this.leagueGroupId = null;
+    }
+
+    /**
+     * 리그 그룹 배정
+     */
+    public void assignToLeagueGroup(Long leagueGroupId) {
+        this.leagueGroupId = leagueGroupId;
     }
 }

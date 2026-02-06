@@ -13,8 +13,11 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,9 +31,12 @@ public class RedisIdeService {
      * 사용자 코드를 Redis Hash에 저장
      */
     public void saveCode(Long studyId, Long userId, IdeRequest request) {
-        String key = String.format(RedisKeyConst.IDE_KEY, studyId, userId);
+        // Safe check for problemId
+        Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L; // 0L for default or unknown
+        String key = String.format(RedisKeyConst.IDE_KEY, studyId, problemId, userId);
 
         Map<String, String> data = new HashMap<>();
+        data.put("problemId", problemId.toString());
         data.put("filename", request.getFilename());
         data.put("code", request.getCode());
         data.put("lang", request.getLang());
@@ -44,8 +50,8 @@ public class RedisIdeService {
     /**
      * Redis에서 사용자 코드 스냅샷 조회
      */
-    public IdeResponse getCode(Long studyId, Long userId) {
-        String key = String.format(RedisKeyConst.IDE_KEY, studyId, userId);
+    public IdeResponse getCode(Long studyId, Long problemId, Long userId) {
+        String key = String.format(RedisKeyConst.IDE_KEY, studyId, problemId, userId);
         Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
 
         if (entries.isEmpty()) {
@@ -59,6 +65,7 @@ public class RedisIdeService {
         return IdeResponse.builder()
                 .senderId(userId)
                 .senderName(user.getNickname())
+                .problemId(problemId)
                 .filename((String) entries.getOrDefault("filename", "Untitled"))
                 .code((String) entries.getOrDefault("code", ""))
                 .lang((String) entries.getOrDefault("lang", "text"))
@@ -93,30 +100,30 @@ public class RedisIdeService {
     /**
      * 대상 사용자의 모든 감시자 조회
      */
-    public java.util.Set<String> getWatchers(Long studyId, Long targetUserId) {
+    public Set<String> getWatchers(Long studyId, Long targetUserId) {
         String key = String.format(RedisKeyConst.IDE_WATCHERS, studyId, targetUserId);
-        java.util.Set<Object> members = redisTemplate.opsForSet().members(key);
+        Set<Object> members = redisTemplate.opsForSet().members(key);
 
         if (members == null || members.isEmpty()) {
-            return java.util.Collections.emptySet();
+            return Collections.emptySet();
         }
 
         // Set<Object> (Redis 기본) -> Set<String> 변환
         return members.stream()
                 .map(Object::toString)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     /**
      * 사용자가 현재 감시 중인 모든 대상 조회 (정리용)
      */
-    public java.util.Set<String> getWatchingTargets(Long studyId, Long viewerId) {
+    public Set<String> getWatchingTargets(Long studyId, Long viewerId) {
         String viewerKey = "user:" + viewerId + ":watching:" + studyId;
-        java.util.Set<Object> targets = redisTemplate.opsForSet().members(viewerKey);
+        Set<Object> targets = redisTemplate.opsForSet().members(viewerKey);
         if (targets == null)
-            return java.util.Collections.emptySet();
+            return Collections.emptySet();
 
         // Convert Object -> String
-        return targets.stream().map(Object::toString).collect(java.util.stream.Collectors.toSet());
+        return targets.stream().map(Object::toString).collect(Collectors.toSet());
     }
 }

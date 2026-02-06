@@ -10,10 +10,12 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8443:443" # Optional: keep for legacy/conflict avoidance
+      - "7880:7880" # LiveKit WSS
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/default.conf:ro
-      - h2-data:/etc/letsencrypt # Reusing a volume for dev certs if needed, or just let it generate in container
+      - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/dev.conf:ro
+      - nginx-certs:/etc/letsencrypt
     depends_on:
       - frontend
       - backend
@@ -23,16 +25,21 @@ services:
   # Frontend - Next.js (Dev mode)
   frontend:
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://localhost/api
+        - NEXT_PUBLIC_API_URL=https://localhost
         - NEXT_PUBLIC_SOCKET_URL=https://localhost
+        - NEXT_PUBLIC_BACKEND_URL=https://localhost
+        - NEXT_PUBLIC_LIVEKIT_URL=wss://localhost/livekit/
     container_name: peekle-frontend-dev
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=https://localhost/api
+      - NEXT_PUBLIC_API_URL=https://localhost
       - NEXT_PUBLIC_SOCKET_URL=https://localhost
+      - NEXT_PUBLIC_BACKEND_URL=https://localhost
+      - NEXT_PUBLIC_LIVEKIT_URL=wss://localhost/livekit/
+      - BACKEND_API_URL=http://backend:8080
     expose:
       - "3000"
     networks:
@@ -45,18 +52,37 @@ services:
       dockerfile: Dockerfile
     container_name: peekle-backend-dev
     user: root
-    entrypoint: ["sh", "-c", "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $JAVA_OPTS -jar app.jar"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "chown -R spring:spring /app/data && chmod -R 777 /app/data && su-exec spring java $$JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher",
+      ]
     env_file:
       - ../apps/backend/.env
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - SERVER_PORT=8080
+      - REDIS_HOST=redis
+      - SPRING_DATA_REDIS_HOST=redis
+      - AI_SERVER_URL=http://ai-server:8000
+      - LIVEKIT_URL=http://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      - FRONTEND_URL=https://localhost
     volumes:
       - h2-data:/app/data
     expose:
       - "8080"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      ai-server:
+        condition: service_started
+      livekit:
+        condition: service_started
     networks:
       - peekle-network-dev
 
@@ -64,18 +90,60 @@ services:
   redis:
     image: redis:7-alpine
     container_name: peekle-redis-dev
-    expose:
-      - "6379"
+    command: redis-server --requirepass peekle-redis-password
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "peekle-redis-password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - peekle-network-dev
 
-  # OpenVidu Server (WebRTC) - Local Dev Mode
-  openvidu:
-    image: openvidu/openvidu-dev:2.29.0
-    container_name: peekle-openvidu-dev
+  # LiveKit Server (WebRTC) - Dev Mode
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: peekle-livekit-dev
+    command: --dev --bind 0.0.0.0
+    ports:
+      - "7881:7881" # Keep 7881 exposed if needed for TCP/HTTP direct access, but remove 7880 host binding
+      - "7882:7882/udp"
     environment:
-      - OPENVIDU_SECRET=MY_SECRET
-      - DOMAIN_OR_PUBLIC_IP=localhost
+      - "LIVEKIT_KEYS=devkey: secret"
+    networks:
+      - peekle-network-dev
+
+  # ChromaDB - Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma-dev
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - peekle-network-dev
+
+  # AI Server - FastAPI (Python)
+  ai-server:
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+    container_name: peekle-ai-server-dev
+    env_file:
+      - ../apps/ai-server/.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../apps/ai-server:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - redis
+      - chroma
     networks:
       - peekle-network-dev
 
@@ -85,4 +153,8 @@ networks:
 
 volumes:
   h2-data:
+    driver: local
+  nginx-certs:
+    driver: local
+  chroma-data:
     driver: local

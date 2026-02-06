@@ -5,7 +5,7 @@ import { PasswordModal } from '@/domains/game/components/password-modal';
 import { useGamePageLogic } from '@/domains/game/hooks/useGamePageLogic';
 import { GameLayoutHeader, GameLayoutFilter, GameLayoutContent } from '@/domains/game/layout';
 
-export default function GamesPage() {
+export default function GamesPage(): React.ReactNode {
   const {
     selectedMode,
     selectedTeamType,
@@ -23,11 +23,12 @@ export default function GamesPage() {
     handleModeSelect,
     handleRoomClick,
     handlePasswordSubmit,
+    handleCreateRoom,
     resetFilters,
   } = useGamePageLogic();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* 헤더 */}
         <GameLayoutHeader onCreateClick={() => setCreateModalOpen(true)} />
@@ -55,10 +56,7 @@ export default function GamesPage() {
       <GameCreationModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
-        onSubmit={(formData) => {
-          console.log('게임 생성 완료:', formData);
-          // TODO: 실제로는 생성된 방으로 이동
-        }}
+        onSubmit={handleCreateRoom}
       />
 
       {/* 비밀번호 입력 모달 */}

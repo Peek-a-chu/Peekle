@@ -4,27 +4,31 @@ import com.peekle.domain.study.aop.CheckStudyOwner;
 import com.peekle.domain.study.dto.http.request.StudyRoomCreateRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomJoinRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
-import com.peekle.domain.study.dto.http.response.StudyInviteCodeResponse;
-import com.peekle.domain.study.dto.http.response.StudyMemberResponse;
-import com.peekle.domain.study.dto.http.response.StudyRoomCreateResponse;
-import com.peekle.domain.study.dto.http.response.StudyRoomListResponse;
-import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
+import com.peekle.domain.study.dto.http.response.*;
 import com.peekle.domain.study.entity.StudyMember;
+import com.peekle.domain.study.entity.StudyProblem;
 import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.study.repository.StudyMemberRepository;
+import com.peekle.domain.study.repository.StudyProblemRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
 import com.peekle.domain.submission.dto.SubmissionRequest;
 import com.peekle.domain.submission.dto.SubmissionResponse;
+import com.peekle.domain.submission.entity.SubmissionLog;
+import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.submission.service.SubmissionService;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.redis.RedisPublisher;
+import com.peekle.global.socket.SocketResponse;
+import org.springframework.data.redis.listener.ChannelTopic;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,10 +45,13 @@ public class StudyRoomService {
 
         private final StudyRoomRepository studyRoomRepository;
         private final StudyMemberRepository studyMemberRepository;
+        private final StudyProblemRepository studyProblemRepository;
         private final InviteCodeService inviteCodeService;
-        private final RedisTemplate<String, String> redisTemplate;
+        private final StringRedisTemplate redisTemplate;
         private final UserRepository userRepository;
         private final SubmissionService submissionService;
+        private final SubmissionLogRepository submissionLogRepository; // Added
+        private final RedisPublisher redisPublisher; // Added
 
         // 스터디 방 생성 (초대코드 반환)
         @Transactional
@@ -107,11 +114,16 @@ public class StudyRoomService {
                                                         Collections.emptyList());
                                         int memberCount = studyMembers.size();
 
-                                        // 프로필 이미지 (Mock Data) - 최대 3개
+                                        // 프로필 이미지 (실제 데이터 사용) - 최대 3개
                                         List<String> profileImages = studyMembers.stream()
                                                         .limit(3)
-                                                        .map(m -> "https://api.dicebear.com/7.x/avataaars/svg?seed="
-                                                                        + m.getUser().getId()) // 예시용 더미 이미지
+                                                        .map(m -> {
+                                                                String img = m.getUser().getProfileImgThumb();
+                                                                if (img == null) {
+                                                                        img = m.getUser().getProfileImg();
+                                                                }
+                                                                return img;
+                                                        })
                                                         .toList();
 
                                         return StudyRoomListResponse.of(studyRoom, memberCount, profileImages);
@@ -128,7 +140,7 @@ public class StudyRoomService {
 
                 // 이미 멤버라면 스터디 상세 정보 반환 (멤버 목록 포함)
                 if (studyMemberRepository.existsByStudyAndUser_Id(studyRoom, userId)) {
-                        return buildStudyRoomResponse(studyRoom);
+                        return buildStudyRoomResponse(studyRoom, userId);
                 }
 
                 // 멤버가 아니라면 접근 거부
@@ -151,11 +163,6 @@ public class StudyRoomService {
                         throw new BusinessException(ErrorCode.ALREADY_JOINED_STUDY);
                 }
 
-                // 4. (New) 다른 스터디 참여 중인지 확인
-                if (studyMemberRepository.existsByUser_Id(userId)) {
-                        throw new BusinessException(ErrorCode.ALREADY_PARTICIPATING_IN_OTHER_STUDY);
-                }
-
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -168,7 +175,7 @@ public class StudyRoomService {
 
                 studyMemberRepository.save(member);
 
-                return buildStudyRoomResponse(studyRoom);
+                return buildStudyRoomResponse(studyRoom, userId);
         }
 
         // 스터디 방 초대코드 생성 (방에 참여한 사람만 가능)
@@ -267,9 +274,12 @@ public class StudyRoomService {
 
                 currentOwner.updateRole(StudyMember.StudyRole.MEMBER);
                 targetMember.updateRole(StudyMember.StudyRole.OWNER);
+
+                // 3. 스터디 방 Owner 필드 업데이트 (Response DTO용)
+                studyRoom.delegateOwner(targetMember.getUser());
         }
 
-        private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom) {
+        private StudyRoomResponse buildStudyRoomResponse(StudyRoom studyRoom, Long currentUserId) {
                 // 1. 전체 멤버 조회
                 List<StudyMember> members = studyMemberRepository.findAllByStudy(studyRoom);
 
@@ -280,32 +290,81 @@ public class StudyRoomService {
                         onlineUserIds = java.util.Collections.emptySet();
                 }
 
+                // 2-2. Connection IDs 조회
+                String connectionIdsKey = "study:" + studyRoom.getId() + ":connection_ids";
+                Map<Object, Object> connectionIds = redisTemplate.opsForHash().entries(connectionIdsKey);
+
                 final java.util.Set<String> finalOnlineUserIds = onlineUserIds;
 
                 // 3. Response 매핑
                 List<StudyMemberResponse> memberResponses = members.stream()
                                 .map(member -> StudyMemberResponse.of(member,
-                                                finalOnlineUserIds.contains(String.valueOf(member.getUser().getId()))))
+                                                finalOnlineUserIds.contains(String.valueOf(member.getUser().getId())),
+                                                (String) connectionIds.get(String.valueOf(member.getUser().getId()))))
                                 .collect(Collectors.toList());
 
-                return StudyRoomResponse.from(studyRoom, memberResponses);
+                return StudyRoomResponse.from(studyRoom, memberResponses, currentUserId);
         }
 
-    @Transactional
-    public SubmissionResponse submitStudyProblem(Long studyId, SubmissionRequest request) {
-        System.out.println("[StudyRoomService] Processing study submission for studyId: " + studyId);
+        @Transactional
+        public SubmissionResponse submitStudyProblem(Long studyProblemId, SubmissionRequest request) {
+                System.out.println(
+                                "[StudyRoomService] Processing study submission for studyProblemId: " + studyProblemId);
 
-        // 1. 일반 제출 처리 (검증 및 저장)
-        SubmissionResponse response = submissionService.saveGeneralSubmission(request);
+                // 1. StudyProblem 조회 (studyId와 problemId 추출)
+                StudyProblem studyProblem = studyProblemRepository.findById(studyProblemId)
+                                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
 
-        if (response.isSuccess()) {
-            System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
-            // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
-            // 현재는 실시간 반영(WebSocket)은 제외하고 제출 연동까지만 완료
-        } else {
-            System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
+                Long studyId = studyProblem.getStudy().getId();
+                Long problemId = studyProblem.getProblemId();
+
+                System.out.println("[StudyRoomService] Extracted - StudyId: " + studyId + ", ProblemId: " + problemId);
+
+                // 2. Request에 스터디 컨텍스트 설정
+                request.setRoomId(studyId);
+                request.setSourceType("STUDY");
+
+                // 3. 일반 제출 처리 (검증 및 저장)
+                SubmissionResponse response = submissionService.saveGeneralSubmission(request);
+
+                if (response.isSuccess()) {
+                        System.out.println("[StudyRoomService] Submission logic successful. Now marking study status.");
+
+                        // 스터디 점수 업데이트 (Transactional)
+                        if (response.getEarnedPoints() > 0) {
+                                StudyRoom studyRoom = studyProblem.getStudy(); // 이미 조회한 StudyProblem에서 가져옴
+                                studyRoom.addRankingPoint(response.getEarnedPoints());
+                                System.out.println("[StudyRoomService] Updated ranking point for study " + studyId
+                                                + ": +" + response.getEarnedPoints());
+                        }
+
+                        // TODO: 3단계 - 스터디 현황 반영 로직 (StudyMemberProblemStatus 저장 등)
+
+                        // [Added] Real-time SOLVED Broadcast
+                        try {
+                                Long submissionId = response.getSubmissionId();
+                                SubmissionLog log = submissionLogRepository.findById(submissionId).orElse(null);
+
+                                if (log != null) {
+                                        User user = log.getUser();
+                                        System.out.println(
+                                                        "[StudyRoomService] Broadcasting SOLVED event for Study "
+                                                                        + studyId);
+                                        redisPublisher.publish(
+                                                        new ChannelTopic("topic/studies/rooms/" + studyId),
+                                                        SocketResponse.of("SOLVED", Map.of(
+                                                                        "problemId", problemId,
+                                                                        "userId", user.getId(),
+                                                                        "nickname", user.getNickname(),
+                                                                        "earnedPoints", response.getEarnedPoints())));
+                                }
+                        } catch (Exception e) {
+                                System.err.println("Failed to broadcast SOLVED event: " + e.getMessage());
+                        }
+                } else {
+                        System.out.println("[StudyRoomService] Submission logic failed: " + response.getMessage());
+                }
+
+                return response;
         }
-
-        return response;
-    }
 }

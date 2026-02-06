@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ParticipantCard } from './participant-card';
-import type { Participant, TeamType } from '@/domains/game/mocks/mock-data';
+import type { Participant, TeamType } from '@/domains/game/types/game-types';
 
 interface ParticipantGridProps {
   participants: Participant[];
@@ -38,9 +38,9 @@ export function ParticipantGrid({
     const blueEmptySlots = Math.max(0, halfMax - blueTeam.length);
 
     return (
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card dark:border-white/10 dark:bg-[#0F1624]">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-sm font-medium">
+          <CardTitle className="text-sm font-medium text-foreground dark:text-[#E8EEF9]">
             참여자 ({currentPlayers}/{maxPlayers})
           </CardTitle>
         </CardHeader>
@@ -49,7 +49,7 @@ export function ParticipantGrid({
           <div>
             <div className="mb-2 flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-red-500" />
-              <span className="text-xs font-medium text-red-600">레드팀</span>
+              <span className="text-xs font-medium text-red-600 dark:text-red-500/90">레드팀</span>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {redTeam.map((participant) => (
@@ -65,7 +65,7 @@ export function ParticipantGrid({
           <div>
             <div className="mb-2 flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-blue-500" />
-              <span className="text-xs font-medium text-blue-600">블루팀</span>
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-500/90">블루팀</span>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {blueTeam.map((participant) => (
@@ -86,9 +86,9 @@ export function ParticipantGrid({
   const gridCols = maxPlayers <= 8 ? 'grid-cols-4' : 'grid-cols-4 lg:grid-cols-6';
 
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card dark:border-white/10 dark:bg-[#0F1624]">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-sm font-medium">
+        <CardTitle className="text-sm font-medium text-foreground dark:text-[#E8EEF9]">
           참여자 ({currentPlayers}/{maxPlayers})
         </CardTitle>
       </CardHeader>

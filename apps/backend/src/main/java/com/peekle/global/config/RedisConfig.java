@@ -1,5 +1,8 @@
 package com.peekle.global.config;
 
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,6 +10,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -29,6 +33,20 @@ public class RedisConfig {
         config.setPort(port);
         config.setPassword(password);
         return new LettuceConnectionFactory(config);
+    }
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        // redis:// 접두사 필수
+        org.redisson.config.SingleServerConfig serverConfig = config.useSingleServer()
+                .setAddress("redis://" + host + ":" + port);
+
+        if (password != null && !password.isBlank()) {
+            serverConfig.setPassword(password);
+        }
+
+        return Redisson.create(config);
     }
 
     @Bean
@@ -61,6 +79,10 @@ public class RedisConfig {
         // Subscribe to all study room chat topics
         container.addMessageListener(redisSubscriber,
                 new org.springframework.data.redis.listener.PatternTopic("topic/studies/rooms/**"));
+
+        // 게임 관련 토픽 구독 추가
+        container.addMessageListener(redisSubscriber,
+                new PatternTopic("topic/games/**"));
         return container;
     }
 }

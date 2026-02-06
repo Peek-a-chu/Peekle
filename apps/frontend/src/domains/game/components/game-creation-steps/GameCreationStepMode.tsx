@@ -3,11 +3,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { GameModeCard } from '../game-mode-card';
 import {
-  gameModes,
   type GameMode,
   type TeamType,
   type GameCreationFormData,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { gameModes } from '@/domains/game/constants/game-constants';
 import type { RefObject } from 'react';
 
 interface GameCreationStepModeProps {
@@ -57,7 +57,7 @@ export function GameCreationStepMode({
           <Switch
             id="private"
             checked={formData.isPrivate}
-            onCheckedChange={(checked) => onUpdateForm('isPrivate', checked)}
+            onCheckedChange={(checked: boolean) => onUpdateForm('isPrivate', checked)}
           />
         </div>
         {formData.isPrivate && (

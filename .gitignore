@@ -1,4 +1,5 @@
 # Backend Data (H2 Database)
+data/
 apps/backend/data/*.db
 apps/backend/data/*.lock
 apps/backend/data/*.trace
@@ -19,9 +20,13 @@ _bmad-output
 .vscode
 
 # Dependency Directories
-
 .turbo
 node_modules
+
+# Build Outputs
+dist/
+.next/
+*.tsbuildinfo
 peekle.sqlite
 .idea
 apps/frontend/build.log
@@ -30,3 +35,11 @@ apps/frontend/build.log
 
 test-chat
 test-ide
+
+test-results
+
+# AI Server (Python)
+apps/ai-server/venv/
+apps/ai-server/__pycache__/
+apps/ai-server/*.pyc
+apps/ai-server/chroma_db/

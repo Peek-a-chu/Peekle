@@ -2,9 +2,11 @@ package com.peekle.domain.submission.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 @Getter
+@Setter
 @NoArgsConstructor
 @ToString
 public class SubmissionRequest {
@@ -16,6 +18,7 @@ public class SubmissionRequest {
     private Integer memory;
     private Integer executionTime;
     private String result;
+    private Boolean isSuccess; // AC(맞았습니다) 여부
     private String submittedAt;
 
     // 확장 프로그램에서는 submitId도 보내지만,

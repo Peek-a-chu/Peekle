@@ -4,20 +4,15 @@ services:
     container_name: peekle-coturn
     restart: unless-stopped
     ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "5349:5349/tcp"
-      - "5349:5349/udp"
-      - "50000-50050:50000-50050/tcp"
-      - "50000-50050:50000-50050/udp"
+      # STUN/TURN Listener - DISABLED (Handled by LiveKit Built-in)
+      # - "3478:3478"
+      # - "3478:3478/udp"
+      # - "5349:5349"
+      # - "5349:5349/udp"
+      # Relay Ports (Min-Max) - Adjusted for Dev
+      # You might need to expand this range for production
+      - "49152-49162:49152-49162/udp" 
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - coturn-logs:/var/log
-    command: ["-c", "/etc/coturn/turnserver.conf"]
-    environment:
-      - DETECT_EXTERNAL_IP=yes
-      - DETECT_RELAY_IP=yes
-
-volumes:
-  coturn-logs:
-    driver: local
+    command: 
+      - -c /etc/coturn/turnserver.conf --min-port 49152 --max-port 49162

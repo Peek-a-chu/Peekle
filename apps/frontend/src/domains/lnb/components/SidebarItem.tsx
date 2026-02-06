@@ -7,29 +7,54 @@ import { cn } from '@/lib/utils';
 interface SidebarItemProps {
   icon: LucideIcon;
   label: string;
-  href: string;
+  href?: string;
   isActive?: boolean;
+  onClick?: () => void;
 }
 
-const SidebarItem = ({ icon: Icon, label, href, isActive }: SidebarItemProps) => {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-all duration-200 group text-sm font-medium',
-        isActive
-          ? 'bg-pink-500 text-white shadow-md shadow-pink-200'
-          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
-      )}
-    >
+const SidebarItem = ({ icon: Icon, label, href, isActive, onClick }: SidebarItemProps) => {
+  const content = (
+    <>
       <Icon
         size={20}
         className={cn(
           'transition-colors',
-          isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600',
+          isActive
+            ? 'text-primary-foreground'
+            : 'text-muted-foreground group-hover:text-foreground',
         )}
       />
-      <span>{label}</span>
+      <span
+        className={cn(
+          'transition-colors',
+          isActive
+            ? 'text-primary-foreground'
+            : 'text-muted-foreground group-hover:text-foreground',
+        )}
+      >
+        {label}
+      </span>
+    </>
+  );
+
+  const className = cn(
+    'flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-all duration-200 group text-sm font-medium w-[calc(100%-1rem)]',
+    isActive
+      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/10'
+      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+  );
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={className}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={href || '#'} className={className}>
+      {content}
     </Link>
   );
 };

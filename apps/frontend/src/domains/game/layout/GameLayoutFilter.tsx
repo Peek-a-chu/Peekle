@@ -3,11 +3,11 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GameModeCard } from '@/domains/game/components/game-mode-card';
 import {
-  gameModes,
   type GameMode,
   type TeamType,
   type GameStatus,
-} from '@/domains/game/mocks/mock-data';
+} from '@/domains/game/types/game-types';
+import { gameModes } from '@/domains/game/constants/game-constants';
 
 type StatusFilter = GameStatus | 'ALL';
 
@@ -64,23 +64,23 @@ export function GameLayoutFilter({
 
       {/* 필터 탭 */}
       <section className="mb-6">
-        <Tabs value={statusFilter} onValueChange={(v) => onStatusChange(v as StatusFilter)}>
+        <Tabs value={statusFilter} onValueChange={(v: string) => onStatusChange(v as StatusFilter)}>
           <TabsList className="bg-muted/50 p-1 border border-border">
             <TabsTrigger
               value="ALL"
-              className="data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
             >
               전체
             </TabsTrigger>
             <TabsTrigger
               value="WAITING"
-              className="data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
             >
               대기 중
             </TabsTrigger>
             <TabsTrigger
               value="PLAYING"
-              className="data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
             >
               진행 중
             </TabsTrigger>

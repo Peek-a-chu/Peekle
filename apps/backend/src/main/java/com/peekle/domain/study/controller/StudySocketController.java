@@ -1,17 +1,23 @@
 package com.peekle.domain.study.controller;
 
+import com.peekle.domain.study.dto.chat.ChatMessageRequest;
 import com.peekle.domain.study.dto.curriculum.ProblemStatusResponse;
+import com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest;
 import com.peekle.domain.study.dto.http.request.StudyRoomUpdateRequest;
 import com.peekle.domain.study.dto.http.response.StudyRoomResponse;
+import com.peekle.domain.study.dto.ide.IdeResponse;
 import com.peekle.domain.study.dto.socket.request.*;
+import com.peekle.domain.study.entity.StudyChatLog;
 import com.peekle.domain.study.entity.StudyRoom;
-import com.peekle.domain.study.service.StudyRoomService;
+import com.peekle.domain.study.repository.StudyMemberRepository;
+import com.peekle.domain.study.service.*;
+import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -19,9 +25,9 @@ import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -29,34 +35,36 @@ import java.util.Map;
 public class StudySocketController {
 
         private final RedisPublisher redisPublisher;
-        private final RedisTemplate<String, Object> redisTemplate;
+        private final StringRedisTemplate stringRedisTemplate;
         private final StudyRoomService studyRoomService;
-        private final com.peekle.domain.study.repository.StudyMemberRepository studyMemberRepository;
-        private final com.peekle.domain.study.service.StudyCurriculumService studyCurriculumService;
+        private final StudyMemberRepository studyMemberRepository;
+        private final StudyCurriculumService studyCurriculumService;
+        private final RedisIdeService redisIdeService;
         private final MediaService mediaService;
         private final SimpMessagingTemplate messagingTemplate;
+        private final StudyChatService studyChatService; // Injected
+        private final WhiteboardService whiteboardService; // Injected
+        private final UserRepository userRepository; // Custom injection
 
         // 스터디 입장 알림
         @MessageMapping("/studies/enter")
         public void enter(@Payload StudyEnterRequest request,
                         SimpMessageHeaderAccessor headerAccessor) {
-                // Session Attributes에서 userId 추출 (WebSocketEventListener에서 저장됨)
+                // Session Attributes에서 userId 추출
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
                 if (userId == null) {
-                        // 세션에 userId가 없으면 비정상 접근 (혹은 재연결 필요)
                         log.warn("Study Enter Failed: userId not found in session attributes.");
                         return;
                 }
 
                 Long studyId = request.getStudyId();
 
-                // 0. 검증: 해당 유저가 실제로 이 스터디의 멤버인지 확인
-                boolean isMember = studyMemberRepository.existsByStudyAndUser_Id(
+                // 0. 검증
+                boolean isUserMember = studyMemberRepository.existsByStudyAndUser_Id(
                                 StudyRoom.builder().id(studyId).build(), userId);
 
-                if (!isMember) {
-                        log.warn("Unauthorized OpenVidu access attempt: User {} is not a member of Study {}", userId,
-                                        studyId);
+                if (!isUserMember) {
+                        // ... (Error handling)
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("ERROR",
@@ -64,44 +72,115 @@ public class StudySocketController {
                         return;
                 }
 
-                // Session Attributes에 studyId, userId 저장 (Disconnect 핸들링 용)
+                // Session Attributes 저장
                 headerAccessor.getSessionAttributes().put("studyId", studyId);
                 headerAccessor.getSessionAttributes().put("userId", userId);
 
-                // 1. Redis Presence: Online User 추가
-                redisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
+                // 1. Redis Presence
+                // [Access Control] Check if user is already in another study
+                // [Access Control] Check if user is already in another study
+                String activeStudyKey = "user:" + userId + ":active_study";
+                String currentActiveStudy = stringRedisTemplate.opsForValue().get(activeStudyKey);
 
-                // 2. OpenVidu 토큰 발급 및 전송 (Private)
+                if (currentActiveStudy != null && !String.valueOf(studyId).equals(currentActiveStudy)) {
+                        log.info("Switching study: User {} moved from {} to {}", userId, currentActiveStudy, studyId);
+
+                        try {
+                                Long oldStudyId = Long.valueOf(currentActiveStudy);
+                                String oldOnlineKey = "study:" + oldStudyId + ":online_users";
+
+                                // 1. Remove from old study presence
+                                stringRedisTemplate.opsForSet().remove(oldOnlineKey, userId.toString());
+
+                                // 2. Notify old study members
+                                redisPublisher.publish(
+                                                new ChannelTopic("topic/studies/rooms/" + oldStudyId),
+                                                SocketResponse.of("LEAVE", userId));
+
+                                // 3. Clean up if empty
+                                Long remainingUsers = stringRedisTemplate.opsForSet().size(oldOnlineKey);
+                                if (remainingUsers != null && remainingUsers == 0) {
+                                        log.info("Study Room {} is empty (Switch). Scheduling whiteboard cleanup...",
+                                                        oldStudyId);
+                                        whiteboardService.scheduleCleanup(oldStudyId);
+                                }
+                        } catch (NumberFormatException e) {
+                                log.warn("Invalid format for old study ID: {}", currentActiveStudy);
+                                // Delete invalid key and proceed
+                                stringRedisTemplate.delete(activeStudyKey);
+                        }
+                }
+
+                // Mark as Active
+                stringRedisTemplate.opsForValue().set(activeStudyKey, String.valueOf(studyId));
+                stringRedisTemplate.opsForSet().add("study:" + studyId + ":online_users", userId.toString());
+                Set<String> onlineUsers = stringRedisTemplate.opsForSet().members("study:" + studyId + ":online_users");
+                List<Long> onlineUserIds = onlineUsers == null
+                                ? List.of()
+                                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
+
+                // 2. LiveKit 및 초기화 (Bundled)
                 try {
-                        log.info("Try OpenVidu: study_{}, user_{}", studyId, userId);
-                        String sessionId = "study_" + studyId;
-                        mediaService.getOrCreateSession(sessionId);
+                        // 화상 연결 중복 방지 (기존 연결 종료)
+                        mediaService.evictUser(studyId, userId);
+                        log.info("[Study] Enter Flow - Step 1: Media Evict Success");
+                } catch (Exception e) {
+                        log.warn("Pre-evict failed: {}", e.getMessage());
+                }
 
-                        Map<String, Object> userData = new HashMap<>();
-                        userData.put("userId", userId);
+                try {
+                        log.info("[Study] Enter Flow - Step 2: Token Gen Start");
+                        String token = mediaService.createAccessToken(studyId, userId, getUserNickname(userId));
+                        log.info("Generated LiveKit token for user {}, study {}", userId, studyId);
 
-                        String token = mediaService.createConnection(sessionId, userData);
-                        log.info("Token Success: {}", token);
-
-                        // 1. OpenVidu Token 전송
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/video-token/" + userId,
                                         SocketResponse.of("VIDEO_TOKEN", token));
+                } catch (Exception e) {
+                        log.error("LiveKit token generation failed: {}", e.getMessage());
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "Video connection failed"));
+                }
 
-                        // 2. 스터디 방 정보 전송 (ROOM_INFO) - 초기 로딩
+                try {
+                        log.info("[Study] Enter Flow - Step 3: Room/Curriculum Info");
+                        // 2. Room Info
                         StudyRoomResponse roomInfo = studyRoomService
                                         .getStudyRoom(userId, studyId);
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/info/" + userId,
                                         SocketResponse.of("ROOM_INFO", roomInfo));
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/info/" + userId,
+                                        SocketResponse.of("ONLINE_USERS", onlineUserIds));
 
-                        // 3. 오늘의 커리큘럼 전송 (CURRICULUM) - 초기 로딩
+                        // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
-                                        .getDailyProblems(userId, studyId, java.time.LocalDate.now());
+                                        .getDailyProblems(userId, studyId,
+                                                        java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/curriculum/" + userId,
                                         SocketResponse.of("CURRICULUM", curriculum));
 
+                        // 4. IDE Restore
+                        for (ProblemStatusResponse problem : curriculum) {
+                                IdeResponse savedCode = redisIdeService.getCode(studyId,
+                                                problem.getProblemId(), userId);
+                                if (savedCode != null) {
+                                        messagingTemplate.convertAndSend(
+                                                        "/topic/studies/" + studyId + "/ide/" + userId,
+                                                        SocketResponse.of("IDE", savedCode));
+                                }
+                        }
+
+                        // 5. Whiteboard Restore (화이트보드 상태 동기화)
+                        try {
+                                whiteboardService.getWhiteboardState(studyId, userId);
+                        } catch (Exception e) {
+                                log.error("Whiteboard Restore Failed", e);
+                        }
+                        log.info("[Study] Enter Flow - Step 3: Info Success");
                 } catch (Exception e) {
                         log.error("Enter Init Fail", e);
                         messagingTemplate.convertAndSend(
@@ -109,10 +188,59 @@ public class StudySocketController {
                                         SocketResponse.of("ERROR", "Init Error: " + e.getMessage()));
                 }
 
-                // 3. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Online 처리)
+                // 5. [SYSTEM CHAT] 입장 메시지 전송 (초기화 여부 무관)
+                try {
+                        log.info("[Study] Enter Flow - Step 4: Chat");
+                        String nickname = "알 수 없는 사용자";
+                        try {
+                                nickname = userRepository.findById(userId)
+                                                .map(com.peekle.domain.user.entity.User::getNickname)
+                                                .orElse("알 수 없는 사용자");
+                        } catch (Exception e) {
+                                log.error("User Fetch Failed", e);
+                        }
+
+                        studyChatService.sendChat(studyId, userId,
+                                        ChatMessageRequest.builder()
+                                                        .content(nickname + "님이 스터디에 입장하셨습니다.")
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+                } catch (Exception e) {
+                        log.error("System Chat Error", e);
+                }
+
+                // 3. Pub/Sub (ENTER event)
+                log.info("[Study] Enter Flow - Step 5: Publishing ENTER");
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + studyId),
                                 SocketResponse.of("ENTER", userId));
+                publishOnlineUsers(studyId);
+        }
+
+        @MessageMapping("/studies/online-users")
+        public void onlineUsers(@Payload StudyOnlineUsersRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                Long studyId = request.getStudyId();
+
+                if (userId == null || studyId == null) {
+                        return;
+                }
+
+                boolean isUserMember = studyMemberRepository.existsByStudyAndUser_Id(
+                                StudyRoom.builder().id(studyId).build(), userId);
+                if (!isUserMember) {
+                        return;
+                }
+
+                Set<String> onlineUsers = stringRedisTemplate.opsForSet()
+                                .members("study:" + studyId + ":online_users");
+                List<Long> onlineUserIds = onlineUsers == null
+                                ? List.of()
+                                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
+
+                messagingTemplate.convertAndSend(
+                                "/topic/studies/" + studyId + "/info/" + userId,
+                                SocketResponse.of("ONLINE_USERS", onlineUserIds));
         }
 
         // 스터디 정보 수정
@@ -136,13 +264,35 @@ public class StudySocketController {
         public void leave(@Payload StudyLeaveRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
-                // 1. Redis Presence: Online User 제거
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+                // 1. Redis Presence
+                String onlineKey = "study:" + request.getStudyId() + ":online_users";
+                stringRedisTemplate.opsForSet().remove(onlineKey, userId.toString());
+                stringRedisTemplate.delete("user:" + userId + ":active_study");
 
-                // 2. Pub/Sub: 메시지 발행 (UserId 전송 -> 클라이언트가 해당 유저 Offline 처리)
+                // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+                Long remainingUsers = stringRedisTemplate.opsForSet().size(onlineKey);
+                if (remainingUsers != null && remainingUsers == 0) {
+                        log.info("Study Room {} is empty. Scheduling whiteboard cleanup...", request.getStudyId());
+                        whiteboardService.scheduleCleanup(request.getStudyId());
+                }
+
+                // 2. Pub/Sub (LEAVE)
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("LEAVE", userId));
+                publishOnlineUsers(request.getStudyId());
+
+                String nickname = getUserNickname(userId);
+
+                // 3. [SYSTEM CHAT] 퇴장 메시지
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                ChatMessageRequest.builder()
+                                                .content(nickname + "님이 퇴장하셨습니다.")
+                                                .type(StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
+                // 4. LiveKit Force Disconnect
+                mediaService.evictUser(request.getStudyId(), userId);
         }
 
         // 스터디 영구 탈퇴 (Quit)
@@ -150,37 +300,78 @@ public class StudySocketController {
         public void quit(@Payload StudyQuitRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
-                // 1. DB에서 멤버 삭제
+                String nickname = getUserNickname(userId);
+
+                // [SYSTEM CHAT] 탈퇴 메시지 (멤버 삭제 전에 보내야 User 조회 가능)
+                try {
+                        studyChatService.sendChat(request.getStudyId(), userId,
+                                        ChatMessageRequest.builder()
+                                                        .content(nickname + "님이 스터디를 탈퇴하셨습니다.")
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+                } catch (Exception e) {
+                        /* 이미 삭제 등 에러 무시 */ }
+
+                // 1. DB 삭제
                 studyRoomService.leaveStudyRoom(userId, request.getStudyId());
 
-                // 2. Redis Presence: Online User 제거
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users", userId.toString());
+                // 2. Redis Presence
+                String onlineKey = "study:" + request.getStudyId() + ":online_users";
+                stringRedisTemplate.opsForSet().remove(onlineKey, userId.toString());
+                stringRedisTemplate.delete("user:" + userId + ":active_study");
 
-                // 3. 세션에서 studyId 제거 (Disconnect 시 중복 처리 방지)
+                // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
+                Long remainingUsers = stringRedisTemplate.opsForSet().size(onlineKey);
+                if (remainingUsers != null && remainingUsers == 0) {
+                        log.info("Study Room {} is empty (Quit). Scheduling whiteboard cleanup...",
+                                        request.getStudyId());
+                        whiteboardService.scheduleCleanup(request.getStudyId());
+                }
+
+                // 3. 세션 정리
                 if (headerAccessor.getSessionAttributes() != null) {
                         headerAccessor.getSessionAttributes().remove("studyId");
                 }
 
-                // 4. Pub/Sub: 메시지 발행 (QUIT 타입 전송 -> 클라이언트가 해당 유저 목록에서 영구 제거)
+                // 4. Pub/Sub (QUIT)
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("QUIT", userId));
+                publishOnlineUsers(request.getStudyId());
+
+                // 5. LiveKit Force Disconnect
+                mediaService.evictUser(request.getStudyId(), userId);
         }
 
         // 강퇴 알림
         @MessageMapping("/studies/kick")
         public void kickUser(@Payload StudyKickRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // [SYSTEM CHAT] 강퇴 메시지 (관리자가 보냄)
+                // "관리자님이 {target}님을 강퇴했습니다"
+                // -> Service에서 target 이름을 조회하기 복잡하므로 단순 알림
+                String nickname = getUserNickname(userId);
+                String targetNickname = getUserNickname(request.getTargetUserId());
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                ChatMessageRequest.builder()
+                                                .content(nickname + "님이 " + targetNickname + "님을 강퇴했습니다.")
+                                                .type(StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
                 studyRoomService.kickMemberByUserId(userId, request.getStudyId(), request.getTargetUserId());
 
-                // 강퇴된 유저는 Online Users에서 바로 제거보다는 Disconnect 시점에 제거될 것임.
-                // 혹은 여기서 강제 제거
-                redisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
+                stringRedisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
                                 request.getTargetUserId().toString());
+                stringRedisTemplate.delete("user:" + request.getTargetUserId() + ":active_study");
 
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("KICK", request.getTargetUserId()));
+                publishOnlineUsers(request.getStudyId());
+
+                // LiveKit Force Disconnect (Kick target)
+                mediaService.evictUser(request.getStudyId(), request.getTargetUserId());
         }
 
         // 스터디 삭제 (방 폭파)
@@ -188,50 +379,151 @@ public class StudySocketController {
         public void deleteRoom(@Payload StudyDeleteRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
 
-                // 1. Service 호출 (DB Soft Delete & AOP Check)
+                // [SYSTEM CHAT] 방 삭제 메시지
+                String nickname = getUserNickname(userId);
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                ChatMessageRequest.builder()
+                                                .content(nickname + "님이 스터디를 삭제했습니다.")
+                                                .type(StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
+                // 1. Service
                 studyRoomService.deleteStudyRoom(userId, request.getStudyId());
 
-                // 2. Broadcast (DELETE event)
-                // 클라이언트에서 이 이벤트를 받으면 메인 화면으로 이동
+                // 2. Broadcast
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
                                 SocketResponse.of("DELETE", "Room Deleted"));
 
-                // 3. (Optional) Redis Presence 전체 제거
-                redisTemplate.delete("study:" + request.getStudyId() + ":online_users");
+                stringRedisTemplate.delete("study:" + request.getStudyId() + ":online_users");
         }
 
-        // 스터디 문제 관리 (WebSocket)
+        // 스터디 문제 관리
         @MessageMapping("/studies/problems")
         public void handleProblem(@Payload CurriculumSocketRequest request, SimpMessageHeaderAccessor headerAccessor) {
                 Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
                 Long studyId = (Long) headerAccessor.getSessionAttributes().get("studyId");
 
-                if (userId == null || studyId == null) {
-                        log.warn("Curriculum/handleProblem: userId or studyId is null in session. userId={}, studyId={}",
-                                        userId, studyId);
+                if (userId == null || studyId == null)
                         return;
-                }
 
                 try {
                         if ("ADD".equalsIgnoreCase(request.getAction())) {
-                                com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest addRequest = com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest
+                                StudyProblemAddRequest addRequest = StudyProblemAddRequest
                                                 .builder()
                                                 .problemId(request.getProblemId())
                                                 .problemDate(request.getProblemDate())
                                                 .build();
 
-                                studyCurriculumService.addProblem(userId, studyId, addRequest);
+                                ProblemStatusResponse addedProblem = studyCurriculumService.addProblem(userId, studyId,
+                                                addRequest);
+
+                                String nickname = getUserNickname(userId);
+                                // [SYSTEM] 문제 추가 알림
+                                studyChatService.sendChat(studyId, userId,
+                                                ChatMessageRequest.builder()
+                                                                .content(nickname + "님이 커리큘럼을 추가했습니다: "
+                                                                                + addedProblem.getExternalId() + ". "
+                                                                                + addedProblem.getTitle())
+                                                                .type(StudyChatLog.ChatType.SYSTEM)
+                                                                .build());
+
+                                // Broadcast ADD event
+                                redisPublisher.publish(
+                                                new ChannelTopic("topic/studies/rooms/" + studyId + "/problems"),
+                                                SocketResponse.of("ADD", addedProblem));
 
                         } else if ("REMOVE".equalsIgnoreCase(request.getAction())) {
-                                studyCurriculumService.removeProblem(userId, studyId, request.getProblemId());
+                                ProblemStatusResponse removedProblem = studyCurriculumService.removeProblem(userId,
+                                                studyId, request.getProblemId());
+
+                                String nickname = getUserNickname(userId);
+                                // [SYSTEM] 문제 삭제 알림
+                                studyChatService.sendChat(studyId, userId,
+                                                ChatMessageRequest.builder()
+                                                                .content(nickname + "님이 커리큘럼을 삭제했습니다: "
+                                                                                + removedProblem.getExternalId() + ". "
+                                                                                + removedProblem.getTitle())
+                                                                .type(StudyChatLog.ChatType.SYSTEM)
+                                                                .build());
+
+                                // Broadcast REMOVE event
+                                redisPublisher.publish(
+                                                new ChannelTopic("topic/studies/rooms/" + studyId + "/problems"),
+                                                SocketResponse.of("REMOVE", removedProblem));
                         }
                 } catch (Exception e) {
                         log.error("Curriculum Socket Error: {}", e.getMessage());
-                        // Optional: Send error message to user via private topic
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/error/" + userId,
                                         SocketResponse.of("ERROR", e.getMessage()));
                 }
+        }
+
+        // 방장 권한 위임
+        @MessageMapping("/studies/delegate")
+        public void delegateLeader(@Payload StudyDelegateRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                studyRoomService.delegateLeader(userId, request.getStudyId(), request.getTargetUserId());
+
+                // [SYSTEM] 위임 알림
+                String nickname = getUserNickname(userId);
+                studyChatService.sendChat(request.getStudyId(), userId,
+                                ChatMessageRequest.builder()
+                                                .content(nickname + "님이 방장 권한을 위임했습니다.")
+                                                .type(StudyChatLog.ChatType.SYSTEM)
+                                                .build());
+
+                // Broadcast DELEGATE event
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                SocketResponse.of("DELEGATE", request.getTargetUserId()));
+
+                // Room Info Update
+                StudyRoomResponse roomInfo = studyRoomService.getStudyRoom(userId, request.getStudyId());
+                messagingTemplate.convertAndSend(
+                                "/topic/studies/" + request.getStudyId() + "/info/" + userId,
+                                SocketResponse.of("ROOM_INFO", roomInfo));
+        }
+
+        // 전체 음소거 (방장 전용)
+        @MessageMapping("/studies/mute-all")
+        public void muteAll(@Payload StudyMuteAllRequest request, SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+
+                // 권한 검증 (Service에 위임하거나 직접 확인)
+                // 여기서는 간단히 Room 정보를 가져와서 Owner 비교
+                StudyRoomResponse roomInfo = studyRoomService.getStudyRoom(userId, request.getStudyId());
+                if (roomInfo.getOwner().getId().equals(userId)) {
+                        // [SYSTEM] 전체 음소거 알림
+                        String nickname = getUserNickname(userId);
+                        studyChatService.sendChat(request.getStudyId(), userId,
+                                        ChatMessageRequest.builder()
+                                                        .content(nickname + "님이 전체 음소거를 실행했습니다.")
+                                                        .type(StudyChatLog.ChatType.SYSTEM)
+                                                        .build());
+
+                        // Broadcast MUTE_ALL
+                        redisPublisher.publish(
+                                        new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),
+                                        SocketResponse.of("MUTE_ALL", userId)); // senderId
+                }
+        }
+
+        private String getUserNickname(Long userId) {
+                return userRepository.findById(userId)
+                                .map(com.peekle.domain.user.entity.User::getNickname)
+                                .orElse("알 수 없는 사용자");
+        }
+
+        private void publishOnlineUsers(Long studyId) {
+                Set<String> onlineUsers = stringRedisTemplate.opsForSet()
+                                .members("study:" + studyId + ":online_users");
+                List<Long> onlineUserIds = onlineUsers == null
+                                ? List.of()
+                                : onlineUsers.stream().map(Long::valueOf).collect(Collectors.toList());
+                redisPublisher.publish(
+                                new ChannelTopic("topic/studies/rooms/" + studyId),
+                                SocketResponse.of("ONLINE_USERS", onlineUserIds));
         }
 }

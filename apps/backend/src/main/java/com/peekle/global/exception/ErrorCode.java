@@ -16,6 +16,7 @@ public enum ErrorCode {
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_001", "사용자를 찾을 수 없습니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "USER_002", "이미 사용 중인 닉네임입니다."),
+    DUPLICATE_BOJ_ID(HttpStatus.CONFLICT, "USER_003", "이미 사용 중인 백준 아이디입니다."),
 
     // Auth
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_001", "인증이 필요합니다."),
@@ -39,7 +40,21 @@ public enum ErrorCode {
     PROBLEM_ALREADY_ADDED(HttpStatus.CONFLICT, "CURRICULUM_001", "이미 커리큘럼에 등록된 문제입니다."),
     PROBLEM_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "CURRICULUM_002", "문제는 오늘 날짜로만 추가할 수 있습니다."),
     STUDY_PROBLEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CURRICULUM_003", "등록된 문제를 찾을 수 없습니다."),
-    SUBMISSION_EXISTS(HttpStatus.CONFLICT, "CURRICULUM_004", "이미 제출된 기록이 있어 문제를 삭제할 수 없습니다.");
+    SUBMISSION_EXISTS(HttpStatus.CONFLICT, "CURRICULUM_004", "이미 제출된 기록이 있어 문제를 삭제할 수 없습니다."),
+    PROBLEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CURRICULUM_005", "문제를 찾을 수 없습니다."),
+
+    SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBMISSION_006", "제출 기록을 찾을 수 없습니다."),
+
+    // Whiteboard
+    WHITEBOARD_ALREADY_ACTIVE(HttpStatus.CONFLICT, "WHITEBOARD_001", "이미 활성화된 화이트보드가 있습니다."),
+    WHITEBOARD_NOT_FOUND(HttpStatus.NOT_FOUND, "WHITEBOARD_002", "활성화된 화이트보드를 찾을 수 없습니다."),
+    WHITEBOARD_PERMISSION_DENIED(HttpStatus.FORBIDDEN, "WHITEBOARD_003", "화이트보드 제어 권한이 없습니다."),
+
+    // Workbook
+    WORKBOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "WORKBOOK_001", "문제집을 찾을 수 없습니다."),
+
+    // League
+    LEAGUE_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "LEAGUE_001", "리그 기록을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

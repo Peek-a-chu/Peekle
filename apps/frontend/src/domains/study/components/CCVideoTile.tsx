@@ -1,96 +1,78 @@
 'use client';
 
-import { useRoomStore, type Participant } from '@/domains/study/hooks/useRoomStore';
+import { Track } from 'livekit-client';
+import { VideoTrack, useParticipantTracks } from '@livekit/components-react';
 import { cn } from '@/lib/utils';
-import { Crown, Mic, MicOff, VideoOff, User } from 'lucide-react';
+import { User, MicOff } from 'lucide-react';
+import { Participant } from 'livekit-client';
 
 interface CCVideoTileProps {
   participant: Participant;
-  isCurrentUser?: boolean;
-  onClick?: () => void;
   className?: string;
+  onClick?: () => void;
+  isCurrentUser?: boolean;
+  displayName?: string;
 }
 
 export function CCVideoTile({
   participant,
-  isCurrentUser = false,
-  onClick,
   className,
+  onClick,
+  isCurrentUser,
+  displayName,
 }: CCVideoTileProps) {
-  const viewingUser = useRoomStore((state) => state.viewingUser);
-  const isBeingViewed = viewingUser?.id === participant.id;
+  // Use hook to track camera state reactively
+  const videoTracks = useParticipantTracks([Track.Source.Camera], participant.identity);
+  const videoTrackRef = videoTracks[0]; // Requesting only Camera, so first one is it
+
+  const isVideoEnabled =
+    !!videoTrackRef &&
+    videoTrackRef.participant.isCameraEnabled &&
+    !videoTrackRef.publication.isMuted;
+  const isAudioEnabled = participant.isMicrophoneEnabled;
+
+  // Additional check for local participant: sometimes isCameraEnabled is true but track is not yet published in the list?
+  // But useParticipantTracks should handle that.
+  // Note: participant.isCameraEnabled might update faster?
+  // Let's rely on track existence for rendering VideoTrack.
+  // Also check publication directly for logic if needed, but hook drives re-render.
+
+  // Re-deriving enabled state for consistent rendering
+  const shouldShowVideo = !!videoTrackRef && !videoTrackRef.publication.isMuted;
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          onClick?.();
-        }
-      }}
       className={cn(
-        'relative flex h-24 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg bg-muted transition-all hover:ring-2 hover:ring-primary/50',
-        isBeingViewed && 'ring-2 ring-yellow-400',
-        !participant.isOnline && 'opacity-60',
+        'relative h-40 w-52 shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+        'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all',
+        isCurrentUser && 'ring-2 ring-primary',
         className,
       )}
+      onClick={onClick}
     >
-      {/* Video Area */}
-      <div className="flex flex-1 items-center justify-center bg-muted-foreground/10">
-        {participant.isVideoOff ? (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted-foreground/20">
-            {participant.profileImage ? (
-              <img
-                src={participant.profileImage}
-                alt={participant.nickname}
-                className="h-full w-full rounded-full object-cover"
-              />
-            ) : (
-              <User className="h-6 w-6 text-muted-foreground" />
-            )}
-          </div>
-        ) : (
-          // Video stream placeholder - will be replaced with actual video
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/20">
-            <User className="h-8 w-8 text-muted-foreground/50" />
-          </div>
-        )}
+      {shouldShowVideo ? (
+        <VideoTrack
+          trackRef={videoTrackRef}
+          className={cn('h-full w-full object-cover scale-x-[-1]')}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gray-900 text-muted-foreground">
+          <User className="h-10 w-10" />
+        </div>
+      )}
 
-        {/* Video Off Indicator */}
-        {participant.isVideoOff && (
-          <div className="absolute right-1 top-1">
-            <VideoOff className="h-4 w-4 text-muted-foreground" />
-          </div>
-        )}
+      {/* Overlays */}
+      <div className="absolute bottom-1 left-2 max-w-[80%]">
+        <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
+          {displayName || participant.name || participant.identity} {isCurrentUser && '(나)'}
+        </span>
       </div>
 
-      {/* Bottom Info Bar */}
-      <div className="flex items-center justify-between bg-card/90 px-2 py-1">
-        <div className="flex items-center gap-1 truncate">
-          <span className="truncate text-xs font-medium">{participant.nickname}</span>
-          {isCurrentUser && <span className="text-xs text-muted-foreground">(나)</span>}
+      {!isAudioEnabled && (
+        <div className="absolute top-2 right-2 rounded-full bg-red-500 p-1.5 shadow-lg border border-red-600 animate-in fade-in zoom-in duration-300">
+          <MicOff className="h-4 w-4 text-white stroke-[2.5px]" />
         </div>
-
-        <div className="flex items-center gap-1">
-          {participant.isOwner && <Crown className="h-3 w-3 text-yellow-500" aria-label="방장" />}
-          {participant.isMuted ? (
-            <MicOff className="h-3 w-3 text-destructive" aria-label="음소거" />
-          ) : (
-            <Mic className="h-3 w-3 text-muted-foreground" aria-label="마이크 켜짐" />
-          )}
-        </div>
-      </div>
-
-      {/* Online Status Indicator */}
-      <div
-        className={cn(
-          'absolute left-1 top-1 h-2 w-2 rounded-full',
-          participant.isOnline ? 'bg-green-500' : 'bg-gray-400',
-        )}
-        aria-label={participant.isOnline ? '온라인' : '오프라인'}
-      />
+      )}
     </div>
   );
 }

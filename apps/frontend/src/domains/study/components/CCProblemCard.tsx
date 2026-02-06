@@ -3,15 +3,16 @@
 import { useState } from 'react';
 import { cn, getBojTierName, getBojTierColorClass } from '@/lib/utils';
 import { ExternalLink, Users, Lightbulb, CheckCircle2 } from 'lucide-react';
-import { Problem } from '@/domains/study/types';
+import { DailyProblem as Problem } from '@/domains/study/types';
 import { Button } from '@/components/ui/button';
-import { BoxSearchIcon } from '@/assets/icons/BoxSearchIcon';
+import { Box } from 'lucide-react';
 
 interface CCProblemCardProps {
   problem: Problem;
   isSelected?: boolean;
   onSelect?: () => void;
   onOpenSubmission?: (problemId: number) => void;
+  onRemove?: () => void;
   className?: string; // Added className prop
 }
 
@@ -20,9 +21,14 @@ export function CCProblemCard({
   isSelected,
   onSelect,
   onOpenSubmission,
+  onRemove,
   className,
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
+
+  // Use externalId (BOJ problem number) for display and URL, fallback to problemId
+  const problemNumber = problem.externalId || String(problem.problemId);
+  const problemUrl = `https://www.acmicpc.net/problem/${problemNumber}`;
 
   return (
     <div
@@ -37,8 +43,8 @@ export function CCProblemCard({
       className={cn(
         'relative rounded-xl border bg-card p-3 shadow-sm transition-all hover:shadow-md cursor-pointer group',
         isSelected
-          ? 'border-pink-500 ring-1 ring-pink-500 bg-pink-50/10'
-          : 'border-border hover:border-pink-200',
+          ? 'border-primary ring-1 ring-primary bg-primary/10'
+          : 'border-border hover:border-primary/20',
         className,
       )}
     >
@@ -65,11 +71,11 @@ export function CCProblemCard({
         <div className="flex items-start justify-between w-full">
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground text-sm line-clamp-1">
-              {problem.number}. {problem.title}
+              {problemNumber}. {problem.title}
             </span>
-            {problem.url && (
+            {problemUrl && (
               <a
-                href={problem.url}
+                href={problemUrl}
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -81,24 +87,23 @@ export function CCProblemCard({
           </div>
         </div>
 
-        {/* Tier & Tags Row - Shown only when showHint is true */}
+        {/* Tier Row */}
         {showHint && (
           <div className="flex flex-col gap-1.5 mt-0.5">
-            {problem.tier !== undefined && (
-              <div className="flex items-center gap-1">
-                <span className={cn('text-[10px] font-bold', getBojTierColorClass(problem.tier))}>
-                  {getBojTierName(problem.tier)}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              <span className={cn('text-[10px] font-bold text-muted-foreground')}>
+                {problem.tier}
+              </span>
+            </div>
+            {/* Tags */}
             {problem.tags && problem.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 {problem.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
                   >
-                    {tag}
+                    #{tag}
                   </span>
                 ))}
               </div>
@@ -109,35 +114,24 @@ export function CCProblemCard({
 
       {/* Action Row */}
       <div className="flex items-center justify-between mt-2">
-        {/* View Submission Button */}
         <Button
           variant="ghost"
           size="sm"
           className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenSubmission?.(problem.id);
+            onOpenSubmission?.(problem.problemId);
           }}
           aria-label="view submissions"
         >
-          <BoxSearchIcon className="h-4 w-4" />
+          <Box className="h-4 w-4" />
         </Button>
 
         <div className="flex items-center gap-3">
-          {problem.status === 'completed' ? (
-            <div className="flex items-center gap-1 text-xs font-medium text-green-600">
-              <CheckCircle2 className="h-3 w-3" />
-              <span>풀이 완료</span>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground hidden group-hover:block">진행 중</div>
-          )}
-
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
-            {/* AC implies removing total count if I follow 'remove denominator' strictly, but visual shows 2/4. I'll stick to 2/4 for now as per wireframe text. */}
             <span>
-              {problem.participantCount}/{problem.totalParticipants || 4}
+              {problem.solvedMemberCount ?? 0}명 / 전체 {problem.totalMemberCount ?? 0}명 해결
             </span>
           </div>
         </div>

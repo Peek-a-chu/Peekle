@@ -5,6 +5,7 @@ import com.peekle.domain.study.dto.chat.ChatMessageRequest;
 import com.peekle.domain.study.dto.chat.ChatMessageResponse;
 import com.peekle.domain.study.entity.StudyChatLog;
 import com.peekle.domain.study.repository.StudyChatRepository;
+import com.peekle.domain.study.repository.StudyRoomRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
@@ -21,9 +22,9 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,11 +36,9 @@ public class StudyChatService {
     private final UserRepository userRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
-    // private final ChatPersistenceService chatPersistenceService; // Replaced by
-    // Buffer
     private final RedisChatBufferService redisChatBufferService;
     private final StudyChatRepository studyChatRepository;
-    private final com.peekle.domain.study.repository.StudyRoomRepository studyRoomRepository;
+    private final StudyRoomRepository studyRoomRepository;
     private final ObjectMapper objectMapper; // For Redis serialization
 
     // Redis 캐시 크기 (최신 N개의 메시지)
@@ -72,24 +71,28 @@ public class StudyChatService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // 3. Redis 리스트에 저장 (Right Push)
-        String key = String.format(RedisKeyConst.CHAT_ROOM_LOGS, studyId);
-        try {
-            // 일관된 저장을 위해 JSON으로 직렬화
-            String json = objectMapper.writeValueAsString(response);
-            redisTemplate.opsForList().rightPush(key, json);
-            // 최신 N개만 유지하도록 리스트 정리
-            redisTemplate.opsForList().trim(key, -REDIS_CHAT_CACHE_SIZE, -1);
-        } catch (Exception e) {
-            log.error("Redis Push Failed", e);
+        // 3. Redis 리스트에 저장 (Right Push) - SYSTEM 메시지는 저장 제외
+        if (request.getType() != StudyChatLog.ChatType.SYSTEM) {
+            String key = String.format(RedisKeyConst.CHAT_ROOM_LOGS, studyId);
+            try {
+                // 일관된 저장을 위해 JSON으로 직렬화
+                String json = objectMapper.writeValueAsString(response);
+                redisTemplate.opsForList().rightPush(key, json);
+                // 최신 N개만 유지하도록 리스트 정리
+                redisTemplate.opsForList().trim(key, -REDIS_CHAT_CACHE_SIZE, -1);
+            } catch (Exception e) {
+                log.error("Redis Push Failed", e);
+            }
         }
 
         // 4. Redis 발행 (실시간)
         String topic = String.format(RedisKeyConst.TOPIC_STUDY_CHAT, studyId);
         redisPublisher.publish(new ChannelTopic(topic), com.peekle.global.socket.SocketResponse.of("CHAT", response));
 
-        // 5. 비동기 일괄 저장을 위해 Redis에 버퍼링
-        redisChatBufferService.bufferChat(response);
+        // 5. 비동기 일괄 저장을 위해 Redis에 버퍼링 - SYSTEM 메시지는 저장 제외
+        if (request.getType() != StudyChatLog.ChatType.SYSTEM) {
+            redisChatBufferService.bufferChat(response);
+        }
         // chatPersistenceService.saveChatToDB(studyId, userId, request); // Deprecated
     }
 
@@ -123,10 +126,10 @@ public class StudyChatService {
                                     return null;
                                 }
                             })
-                            .filter(java.util.Objects::nonNull)
+                            .filter(Objects::nonNull)
                             .collect(Collectors.toList());
 
-                    // 0페이지를 위해 최신순으로 뒤집기
+                    // 0페이지를 위해 최신순으로 뒤집기 (DESC)
                     Collections.reverse(fastList);
 
                     if (fastList.size() >= pageSize) {
@@ -138,6 +141,11 @@ public class StudyChatService {
 
         // 폴백 또는 이전 페이지: DB 조회
         Page<StudyChatLog> dbPage = studyChatRepository.findAllByStudyIdOrderByCreatedAtDesc(studyId, pageable);
-        return dbPage.map(ChatMessageResponse::from);
+        // DB는 이미 DESC 정렬
+        List<ChatMessageResponse> dbList = dbPage.getContent().stream()
+                .map(ChatMessageResponse::from)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(dbList, pageable, dbPage.getTotalElements());
     }
 }

@@ -1,74 +1,110 @@
+# x-logging: 공통 로그 설정 (Disk Full 방지)
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
-  # Nginx Reverse Proxy with SSL (Let's Encrypt / Self-signed)
+  # Nginx Reverse Proxy
   nginx:
     build:
       context: ./nginx
       dockerfile: Dockerfile
     container_name: peekle-nginx
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-i14a408.p.ssafy.io}
     ports:
       - "80:80"
       - "443:443"
+      - "8880:8880" # LiveKit WSS Direct Port
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      # - "livekit:host-gateway"
     depends_on:
       - frontend
       - backend
     restart: unless-stopped
     networks:
       - peekle-network
+    logging: *default-logging
 
-  # Certbot for SSL certificate renewal
+  # Certbot (SSL Renewal)
   certbot:
     image: certbot/certbot
     container_name: peekle-certbot
     volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - nginx-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     networks:
       - peekle-network
+    logging: *default-logging
 
-  # Frontend - Next.js
+  # Frontend (Next.js)
   frontend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/frontend:${CI_COMMIT_SHORT_SHA:-latest}
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: apps/frontend/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io/api
+        - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
         - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_LIVEKIT_URL=wss://i14a408.p.ssafy.io
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
     container_name: peekle-frontend
     env_file:
       - ../apps/frontend/.env
     environment:
       - NODE_ENV=production
+      - BACKEND_API_URL=http://backend:8080
     expose:
       - "3000"
     restart: unless-stopped
     networks:
       - peekle-network
+    logging: *default-logging
 
-  # Backend - Spring Boot
+  # Backend (Spring Boot)
   backend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/backend:${CI_COMMIT_SHORT_SHA:-latest}
     build:
       context: ../apps/backend
       dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/backend:latest
     container_name: peekle-backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - ../apps/backend/.env
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SERVER_PORT=8080
+      - REDIS_HOST=redis
+      - SPRING_DATA_REDIS_HOST=redis
+      - LIVEKIT_URL=http://localhost:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - AI_SERVER_URL=http://ai-server:8000
     expose:
-      - "8080"
+      - "8080" # 외부 직접 접근 차단, 내부망 전용
     depends_on:
       redis:
         condition: service_healthy
+      ai-server:
+        condition: service_started
     restart: unless-stopped
     networks:
       - peekle-network
+    logging: *default-logging
 
   # Redis
   redis:
@@ -77,8 +113,8 @@ services:
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-peekle-redis-password}
     volumes:
       - redis-data:/data
-    expose:
-      - "6379"
+    ports:
+      - "127.0.0.1:6379:6379" # localhost에서만 접근 가능 (Host Network인 LiveKit 연동용)
     restart: unless-stopped
     healthcheck:
       test:
@@ -94,46 +130,66 @@ services:
       retries: 5
     networks:
       - peekle-network
+    logging: *default-logging
 
-  # OpenVidu Server (WebRTC)
-  openvidu:
-    image: openvidu/openvidu-dev:2.29.0
-    container_name: peekle-openvidu
-    ports:
-      - "40000-40050:40000-40050/udp"
-      - "40000-40050:40000-40050/tcp"
+  # AI Server (FastAPI)
+  ai-server:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/ai-server:${CI_COMMIT_SHORT_SHA:-latest}
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/ai-server:latest
+    container_name: peekle-ai-server
+    env_file:
+      - ../apps/ai-server/.env
     environment:
-      - OPENVIDU_SECRET=${OPENVIDU_SECRET:-MY_SECRET}
-      - DOMAIN_OR_PUBLIC_IP=${DOMAIN_NAME:-localhost}
-      - OPENVIDU_PUBLICURL=https://${DOMAIN_NAME:-localhost}:4443
-      - HTTPS_PORT=4443
-      - KMS_MIN_PORT=40000
-      - KMS_MAX_PORT=40050
-      - COTURN_IP=${COTURN_IP:-auto}
-      - COTURN_PORT=3478
-    volumes:
-      - openvidu-recordings:/opt/openvidu/recordings
-      - openvidu-log:/var/log/openvidu
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+      - chroma
     restart: unless-stopped
     networks:
       - peekle-network
+    logging: *default-logging
 
-  # Coturn TURN/STUN Server
-  coturn:
-    image: coturn/coturn:latest
-    container_name: peekle-coturn
-    ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "5349:5349/tcp"
-      - "5349:5349/udp"
-      - "51000-51050:51000-51050/udp"
+  # ChromaDB
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma
     volumes:
-      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-    command: ["-c", "/etc/coturn/turnserver.conf"]
+      - chroma-data:/chroma/chroma
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - peekle-network
+    logging: *default-logging
+
+  # ============================================
+  # LiveKit Server (SFU - WebRTC Media Server)
+  # ============================================
+  # IMPORTANT: Uses host network mode for optimal performance
+  # - Eliminates Docker NAT layer for WebRTC
+  # - Auto-discovers public IP via STUN
+  # - Connects to Redis on localhost:6379
+  # ============================================
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: peekle-livekit
+    command: --config /livekit.yaml
+    restart: unless-stopped
+    network_mode: "host" # Required for WebRTC performance
+    volumes:
+      - ./livekit/livekit.yaml:/livekit.yaml
+      - nginx-certs:/etc/letsencrypt:ro
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    user: root # Required to read SSL certificates
+    logging: *default-logging
 
 networks:
   peekle-network:
@@ -142,7 +198,9 @@ networks:
 volumes:
   redis-data:
     driver: local
-  openvidu-recordings:
+  nginx-certs:
     driver: local
-  openvidu-log:
+  certbot-www:
+    driver: local
+  chroma-data:
     driver: local

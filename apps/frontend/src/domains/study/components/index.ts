@@ -16,3 +16,7 @@ export {
   type StudyLayoutContentProps,
 } from '@/domains/study/components/StudyLayoutContent';
 export { StudyLayout } from '@/domains/study/layout';
+export { CCStudyCard } from '@/domains/study/components/CCStudyCard';
+export { CCJoinStudyModal } from '@/domains/study/components/CCJoinStudyModal';
+export { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
+export { CCStudyListPage } from '@/domains/study/components/CCStudyListPage';

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { GameRoomCard } from '@/domains/game/components/game-room-card';
-import type { GameRoom } from '@/domains/game/mocks/mock-data';
+import type { GameRoom } from '@/domains/game/types/game-types';
 
 interface GameLayoutContentProps {
   rooms: GameRoom[];

@@ -6,31 +6,28 @@ import { Submission } from '@/domains/study/types';
 describe('CCSubmissionViewerModal', () => {
   const mockSubmissions: Submission[] = [
     {
-      id: 1,
+      submissionId: 1,
       userId: 101,
-      username: 'CodeNinja',
+      nickname: 'CodeNinja',
       language: 'PYTHON 3',
       memory: 34200,
-      time: 142,
-      status: 'success',
-      submittedAt: '2023-01-01T00:00:00Z',
+      executionTime: 142,
     },
     {
-      id: 2,
+      submissionId: 2,
       userId: 102,
-      username: 'JavaKing',
+      nickname: 'JavaKing',
       language: 'JAVA',
       memory: 68500,
-      time: 256,
-      status: 'success',
-      submittedAt: '2023-01-01T00:00:00Z',
+      executionTime: 256,
     },
   ];
 
   const defaultProps = {
     isOpen: true,
     onClose: vi.fn(),
-    problemTitle: '1753. 최단경로',
+    problemTitle: '최단경로',
+    problemExternalId: '1753',
     submissions: mockSubmissions,
     onViewCode: vi.fn(),
   };
@@ -59,7 +56,7 @@ describe('CCSubmissionViewerModal', () => {
     render(<CCSubmissionViewerModal {...defaultProps} />);
     const checkButtons = screen.getAllByRole('button', { name: /코드 확인하기/i });
     fireEvent.click(checkButtons[0]);
-    expect(defaultProps.onViewCode).toHaveBeenCalledWith(mockSubmissions[0].id);
+    expect(defaultProps.onViewCode).toHaveBeenCalledWith(mockSubmissions[0].submissionId);
   });
 
   it('calls onClose when close button is clicked', () => {

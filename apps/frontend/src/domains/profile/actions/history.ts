@@ -1,70 +1,124 @@
+import { cookies } from 'next/headers';
 import { SubmissionHistory } from '../types';
 
-export const MOCK_HISTORY: SubmissionHistory[] = [
-  {
-    id: '1',
-    problemId: 1000,
-    problemTitle: 'A+B',
-    tier: 'Bronze V',
-    language: 'Python',
-    memory: '31120KB',
-    time: '40ms',
-    isSuccess: true,
-    timestamp: '2026.01.16 10:30',
-    sourceType: 'SOLO',
-  },
-  {
-    id: '2',
-    problemId: 2557,
-    problemTitle: 'Hello World',
-    tier: 'Bronze V',
-    language: 'C++',
-    memory: '2020KB',
-    time: '0ms',
-    isSuccess: true,
-    timestamp: '2026.01.16 11:00',
-    sourceType: 'STUDY',
-    sourceDetail: '알고리즘 스터디',
-    code: `#include <iostream>\nusing namespace std;\nint main() { cout << "Hello World!"; return 0; }`,
-  },
-  {
-    id: '3',
-    problemId: 1920,
-    problemTitle: '수 찾기',
-    tier: 'Silver IV',
-    language: 'Java',
-    memory: '128000KB',
-    time: '1200ms',
-    isSuccess: true,
-    timestamp: '2026.01.16 14:30',
-    sourceType: 'GAME',
-    sourceDetail: '개인전',
-  },
-  {
-    id: '4',
-    problemId: 1149,
-    problemTitle: 'RGB거리',
-    tier: 'Silver I',
-    language: 'Java',
-    memory: '14536KB',
-    time: '120ms',
-    isSuccess: false,
-    timestamp: '2026.01.12 18:45',
-    sourceType: 'GAME',
-    sourceDetail: '팀전',
-  },
-];
-
-// 필터링 옵션 인터페이스
-export interface HistoryFilter {
-  startDate?: string;
-  endDate?: string;
+export interface FetchHistoryParams {
   tier?: string;
+  date?: string;
   sourceType?: string;
+  status?: string;
+  page?: number;
+  size?: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function getSubmissionHistory(_filter?: HistoryFilter): Promise<SubmissionHistory[]> {
-  await new Promise((resolve) => setTimeout(resolve, 300)); // Mock API delay
-  return MOCK_HISTORY;
+interface SubmissionLogResponse {
+  submissionId: number;
+  userId: number;
+  nickname: string;
+  profileImage: string;
+  memory: number;
+  executionTime: number;
+  language: string;
+  submittedAt: string;
+  problemId: string;
+  problemTitle: string;
+  tier: string;
+  sourceType: string;
+  sourceDetail: string;
+  code: string;
+  result: string; // 제출 결과
+  isSuccess: boolean; // 성공 여부
+}
+
+export async function fetchUserHistory(
+  nickname: string,
+  { tier, date, sourceType, status, page = 0, size = 20 }: FetchHistoryParams,
+): Promise<SubmissionHistory[]> {
+  try {
+    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('access_token')?.value;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (accessToken) {
+      headers['Cookie'] = `access_token=${accessToken}`;
+    }
+
+    // URL Construction
+    const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', page.toString());
+    if (size !== undefined) params.append('size', size.toString());
+    if (tier && tier !== '전체') params.append('tier', tier);
+    if (date) params.append('date', date);
+    if (sourceType && sourceType !== 'ALL') params.append('sourceType', sourceType);
+    if (status && status !== 'ALL') params.append('status', status);
+
+    const endpoint =
+      nickname && nickname !== 'me' ? `/api/users/${nickname}/history` : `/api/users/me/history`;
+
+    const url = `${backendUrl}${endpoint}?${params.toString()}`;
+
+    const res = await fetch(url, {
+      method: 'GET',
+      headers,
+      next: { revalidate: 0 },
+    });
+
+    if (!res.ok) {
+      console.warn(`Failed to fetch history: ${res.status}`);
+      return [];
+    }
+
+    const json = await res.json();
+    if (!json.success || !json.data) {
+      return [];
+    }
+
+    const logs: SubmissionLogResponse[] = json.data.content || [];
+
+    return logs.map((item) => {
+      // sourceType Mapping
+      let sourceType: 'SOLO' | 'STUDY' | 'GAME' = 'SOLO';
+      if (item.sourceType === 'STUDY') sourceType = 'STUDY';
+      else if (item.sourceType === 'GAME') sourceType = 'GAME';
+      else if (item.sourceType === 'EXTENSION') sourceType = 'SOLO';
+
+      // Timestamp formatting - Convert to KST (UTC+9)
+      const formattedDate = item.submittedAt
+        ? new Date(item.submittedAt)
+            .toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Seoul',
+            })
+            .replace(/\. /g, '.')
+            .replace(/\.$/, '')
+            .replace(', ', ' ')
+        : '';
+
+      return {
+        id: String(item.submissionId),
+        problemId: Number(item.problemId), // BOJ ID
+        problemTitle: item.problemTitle || 'Unknown Problem',
+        tier: item.tier || 'Unranked',
+        language: item.language || 'Unknown',
+        memory: `${item.memory || 0}KB`,
+        time: `${item.executionTime || 0}ms`,
+        isSuccess: item.isSuccess ?? false, // Backend value used directly
+        result: item.result, // Raw Result Mapping
+        timestamp: formattedDate,
+        sourceType,
+        sourceDetail: item.sourceDetail,
+        code: item.code,
+      };
+    }); // End map
+  } catch (e) {
+    console.error('Error fetching submission history:', e);
+    return [];
+  }
 }

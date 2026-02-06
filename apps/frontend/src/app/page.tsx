@@ -1,8 +1,43 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
+// import { getMe } from '@/api/userApi';
 
 export default function Home() {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(false);
+
+  /*
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const data = await getMe();
+        if (data.success && data.data) {
+          router.replace('/home');
+          return;
+        }
+      } catch {
+        // 로그인 안 됨 - 랜딩 페이지 표시
+      }
+      setIsChecking(false);
+    };
+
+    void checkAuth();
+  }, [router]);
+  */
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     // 1. 전체 배경: config의 background (#F7F8FC)
     <div className="min-h-screen bg-background font-sans selection:bg-secondary selection:text-primary flex flex-col">
@@ -15,9 +50,9 @@ export default function Home() {
           </span>
         </div>
         <div>
-          <Link href="/login">
-            <Button className="font-bold rounded-md px-6">로그인</Button>
-          </Link>
+          <Button asChild className="font-bold rounded-md px-6">
+            <Link href="/login">로그인</Link>
+          </Button>
         </div>
       </header>
 
@@ -34,14 +69,15 @@ export default function Home() {
             <br className="hidden md:block" /> 알고리즘 실력을 빠르게 향상시키세요.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Link href="/login">
-              <Button
-                size="lg"
-                className="text-lg px-8 py-6 rounded-md shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-1 transition-all flex items-center gap-2 font-bold"
-              >
+            <Button
+              asChild
+              size="lg"
+              className="text-lg px-8 py-6 rounded-md shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-1 transition-all flex items-center gap-2 font-bold"
+            >
+              <Link href="/login">
                 시작하기 <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </section>
 
@@ -120,15 +156,16 @@ export default function Home() {
             <p className="text-white/90 mb-10 text-lg md:text-xl font-medium">
               무료로 가입하고 알고리즘 실력을 키워보세요.
             </p>
-            <Link href="/login">
-              {/* 흰색 버튼에 검은 글씨 (시안 반영) */}
-              <Button
-                size="lg"
-                className="bg-white text-foreground hover:bg-gray-100 text-lg px-8 py-6 rounded-md font-bold shadow-2xl transition-all"
-              >
+            {/* 흰색 버튼에 검은 글씨 (시안 반영) */}
+            <Button
+              asChild
+              size="lg"
+              className="bg-white text-foreground hover:bg-gray-100 text-lg px-8 py-6 rounded-md font-bold shadow-2xl transition-all"
+            >
+              <Link href="/login">
                 무료로 시작하기 <Zap className="w-5 h-5 ml-2 fill-current" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </section>
       </main>

@@ -1,13 +1,12 @@
 package com.peekle.domain.study.dto.socket.request;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-// 방장 위임 요청
 @Getter
 @NoArgsConstructor
-@AllArgsConstructor
+@ToString
 public class StudyDelegateRequest {
     private Long studyId;
     private Long targetUserId;

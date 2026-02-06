@@ -1,22 +1,57 @@
+// --- Configuration ---
+const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
+// 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
+// Local: 확장 프로그램은 Backend(8080)로 직접 연결
+// Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
+const BASE_URL = IS_LOCAL
+    ? 'http://localhost:3000'
+    : 'https://i14a408.p.ssafy.io';
+
+const API_BASE_URL = IS_LOCAL
+    ? 'http://localhost:8080'  // 확장 프로그램은 백엔드 직접 연결
+    : BASE_URL;
+const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
+
 // --- Baekjoon Solver Logic ---
 
 const PROCESSED_SUBMISSIONS_KEY = 'processed_submissions';
 const PEEKLE_TOKEN_KEY = 'peekle_token';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'SOLVED') {
+    if (request.type === 'CHECK_ENV') {
+        sendResponse({
+            version: chrome.runtime.getManifest().version,
+            isLocal: IS_LOCAL,
+            frontendUrl: FRONTEND_BASE_URL,
+            apiUrl: API_BASE_URL
+        });
+        return true;
+    } else if (request.type === 'SOLVED') {
         handleSolvedSubmission(request.payload, sender);
+        return true;
     } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
-        console.log('Background: Saving pending submission and opening tab:', request.payload);
+        console.log('[Background] Received SAVE_PENDING_SUBMISSION:', request.payload);
+
         chrome.storage.local.set({
             'pending_submission': {
                 ...request.payload,
+                // Ensure sourceType is preserved or default to EXTENSION
+                sourceType: request.payload.sourceType || 'EXTENSION',
                 timestamp: Date.now()
             }
         }, () => {
+            console.log('[Background] pending_submission saved to storage.');
             // Open new tab
-            const targetUrl = `https://www.acmicpc.net/submit/${request.payload.problemId}`;
+            const bojId = request.payload.externalId || request.payload.problemId;
+            const targetUrl = `https://www.acmicpc.net/submit/${bojId}`;
+            console.log(`[Background] Opening new tab: ${targetUrl}`);
             chrome.tabs.create({ url: targetUrl });
+            sendResponse({ success: true });
+        });
+        return true;
+    } else if (request.type === 'CLEAR_PENDING_SUBMISSION') {
+        console.log('[Background] Received CLEAR_PENDING_SUBMISSION. Clearing storage.');
+        chrome.storage.local.remove('pending_submission', () => {
             sendResponse({ success: true });
         });
         return true;
@@ -53,13 +88,13 @@ async function getProblemInfo(problemId) {
 
 
 
-async function sendToBackend(data, studyId = null) {
+async function sendToBackend(data, studyProblemId = null) {
     try {
-        const url = studyId
-            ? `http://localhost:8080/api/studies/${studyId}/submit`
-            : 'http://localhost:8080/api/submissions/';
+        const url = studyProblemId
+            ? `${API_BASE_URL}/api/studies/problems/${studyProblemId}/submit`
+            : `${API_BASE_URL}/api/submissions/`;
 
-        console.log(`Sending submission to ${studyId ? 'Study' : 'General'} backend:`, data);
+        console.log(`Sending submission to ${studyProblemId ? 'Study' : 'General'} backend:`, data);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -84,7 +119,7 @@ async function sendToBackend(data, studyId = null) {
 }
 
 async function handleSolvedSubmission(payload, sender) {
-    const { submitId, problemId, result, username, memory, time, language, code } = payload;
+    const { submitId, problemId, result, isSuccess, username, memory, time, language, code, studyId, sourceType } = payload;
 
     // Retrieve both processed history and pending context
     chrome.storage.local.get([PROCESSED_SUBMISSIONS_KEY, 'pending_submission'], async (items) => {
@@ -97,32 +132,28 @@ async function handleSolvedSubmission(payload, sender) {
         }
 
         // New submission
-        console.log(`New correct submission: ${problemId} by ${username}`);
+        console.log(`New submission detected: ${problemId} by ${username} (Success: ${isSuccess})`);
 
         // Fetch problem details (tier, title)
         const problemInfo = await getProblemInfo(problemId);
 
         // --- Context Detection (Study vs. General) ---
-        let targetStudyId = null;
-        console.log('[Debug] Checking Context. Pending:', pending, 'Current Problem:', problemId);
+        // Verify if the solved problem actually matches the pending context
+        const pendingBojId = pending ? String(pending.externalId || pending.problemId) : null;
+        const currentPid = String(problemId);
+        const isMatch = pendingBojId === currentPid;
 
-        // If there's a pending task and the problemId matches, use that studyId
-        if (pending) {
-            const pendingPid = String(pending.problemId);
-            const currentPid = String(problemId);
+        let targetStudyId = (isMatch && pending) ? (pending.studyId || null) : null;
+        let targetSourceType = (isMatch && pending) ? (pending.sourceType || 'EXTENSION') : 'EXTENSION';
+        let studyProblemId = (isMatch && pending) ? (pending.studyProblemId || null) : null;
 
-            console.log(`[Debug] Comparing IDs - Pending: ${pendingPid}, Current: ${currentPid}, Match: ${pendingPid === currentPid}`);
+        console.log(`[Debug] ID Match: ${isMatch} (Solved: ${currentPid}, Pending: ${pendingBojId})`);
+        console.log(`[Debug] Context - StudyId: ${targetStudyId}, SourceType: ${targetSourceType}`);
 
-            if (pendingPid === currentPid) {
-                targetStudyId = pending.studyId;
-                console.log(`[Debug] Matching pending context found. Target Study ID: ${targetStudyId}`);
-                // Clear pending task after matching
-                chrome.storage.local.remove('pending_submission');
-            } else {
-                console.log(`[Debug] IDs do not match or pending is invalid.`);
-            }
-        } else {
-            console.log(`[Debug] No pending submission found in storage.`);
+        // Clean up pending_submission if it matches the solved problem
+        if (isMatch) {
+            console.log(`[Debug] Clearing matching pending submission for problem ${problemId}`);
+            chrome.storage.local.remove('pending_submission');
         }
 
         // --- Send to Backend (Peekle) ---
@@ -157,6 +188,55 @@ async function handleSolvedSubmission(payload, sender) {
             return; // ✅ 백엔드 요청 차단
         }
 
+        // --- [Strict Game Validation] ---
+        if (targetSourceType === 'GAME' && pending) {
+            console.log('[Background] Performing STRICT validation for Game submission');
+
+            // 1. Language Check
+            let pendingLang = (pending.language || '').toLowerCase();
+            // Normalize pending language same as handleSolvedSubmission logic
+            if (pendingLang.includes('python') || pendingLang.includes('pypy')) pendingLang = 'python';
+            else if (pendingLang.includes('java')) pendingLang = 'java';
+            else if (pendingLang.includes('c++') || pendingLang.includes('cpp')) pendingLang = 'C++';
+
+            if (normalizedLang !== pendingLang) {
+                console.error(`[Validation Failed] Language mismatch: Submission(${normalizedLang}) vs IDE(${pendingLang})`);
+                if (sender?.tab) {
+                    chrome.tabs.sendMessage(sender.tab.id, {
+                        type: 'SHOW_FEEDBACK',
+                        payload: {
+                            success: false,
+                            message: `제출 언어가 다릅니다! IDE(${pendingLang})와 동일한 언어로 제출해주세요.`,
+                        }
+                    });
+                }
+                return; // Block submission
+            }
+
+            // 2. Length Check (Trim and normalize line endings for comparison)
+            const cleanCode = (c) => (c || '').replace(/\r\n/g, '\n').trim();
+            const submissionLen = cleanCode(code).length;
+            const pendingLen = cleanCode(pending.code).length;
+
+            console.log(`[Validation] Length Check - Submission: ${submissionLen}, IDE: ${pendingLen}`);
+
+            // Allow 0 tolerance for strict game mode
+            if (submissionLen !== pendingLen) {
+                console.error('[Validation Failed] Code length mismatch');
+                if (sender?.tab) {
+                    chrome.tabs.sendMessage(sender.tab.id, {
+                        type: 'SHOW_FEEDBACK',
+                        payload: {
+                            success: false,
+                            message: "IDE의 코드와 제출된 코드가 다릅니다! 복사한 코드를 그대로 제출해주세요.",
+                        }
+                    });
+                }
+                return; // Block submission
+            }
+            console.log('[Validation Success] Game submission validated.');
+        }
+
         const backendResponse = await sendToBackend({
             problemId: parseInt(problemId) || 0,
             problemTitle: problemInfo ? problemInfo.titleKo : "",
@@ -165,13 +245,14 @@ async function handleSolvedSubmission(payload, sender) {
             code: code,
             memory: memoryInt,
             executionTime: timeInt,
-            // result: result, // Backend assumes success for all received submissions
+            result: result,
+            isSuccess: isSuccess,
             submittedAt: new Date().toISOString(),
             submitId: submitId,
             extensionToken,
             roomId: targetStudyId ? parseInt(targetStudyId) : null,
-            sourceType: targetStudyId ? "STUDY" : "EXTENSION"
-        }, targetStudyId); // Pass studyId if exists
+            sourceType: targetSourceType
+        }, studyProblemId); // Pass studyProblemId if exists
 
         // Save to storage
         processed[submitId] = {
@@ -210,6 +291,23 @@ async function handleSolvedSubmission(payload, sender) {
 }
 
 // Cleanup pending submission if user navigates away from the problem page
+function cleanupStalePendingSubmissions() {
+    chrome.storage.local.get(['pending_submission'], (data) => {
+        const pending = data.pending_submission;
+        if (pending && pending.timestamp) {
+            const fiveMinutes = 5 * 60 * 1000;
+            if (Date.now() - pending.timestamp > fiveMinutes) {
+                console.log('[Background] Clearing stale pending submission (older than 5 mins)');
+                chrome.storage.local.remove('pending_submission');
+            }
+        }
+    });
+}
+
+// Run cleanup periodically
+setInterval(cleanupStalePendingSubmissions, 60000); // Every minute
+
+// Cleanup pending submission if user navigates away from the problem page
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.url) {
         chrome.storage.local.get(['pending_submission'], (data) => {
@@ -221,12 +319,47 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
                 if (bojSubmitMatch) {
                     const navigatedProblemId = bojSubmitMatch[1];
-                    if (String(navigatedProblemId) !== String(pending.problemId)) {
-                        console.log(`User navigated to different problem ${navigatedProblemId}. Clearing pending study context.`);
+                    // Check externalId first (BOJ ID), then fallback to problemId (internal DB ID)
+                    const pendingBojId = pending.externalId || pending.problemId;
+
+                    if (String(navigatedProblemId) !== String(pendingBojId)) {
+                        console.log(`User navigated to different problem ${navigatedProblemId} (Pending: ${pendingBojId}). Clearing pending study context.`);
                         chrome.storage.local.remove('pending_submission');
                     }
                 }
             }
         });
+    }
+});
+
+// --- Auto-Injection on Install ---
+// 확장 프로그램 설치/업데이트 시 현재 열려 있는 탭(프론트엔드)에 content script 강제 주입
+chrome.runtime.onInstalled.addListener(async () => {
+    console.log('[Background] Extension Installed/Updated. Injecting content scripts...');
+
+    // 타겟 URL 패턴 (프론트엔드 도메인)
+    // manifest.json의 host_permissions에 해당 도메인이 있어야 함
+    const targetPattern = IS_LOCAL ? 'http://localhost:3000/*' : 'https://i14a408.p.ssafy.io/*';
+
+    try {
+        // 프론트엔드 탭 찾기
+        const tabs = await chrome.tabs.query({ url: targetPattern });
+
+        for (const tab of tabs) {
+            if (tab.id) {
+                console.log(`[Background] Injecting script into tab ${tab.id} (${tab.url})`);
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['content.js']
+                    });
+                } catch (e) {
+                    // 이미 주입되어 있거나 권한 문제 등 발생 시 무시
+                    console.warn(`[Background] Failed to inject into tab ${tab.id}:`, e);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Background] Error during auto-injection:', e);
     }
 });

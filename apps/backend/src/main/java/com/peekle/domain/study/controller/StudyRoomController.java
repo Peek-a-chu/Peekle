@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -29,7 +30,7 @@ public class StudyRoomController {
     @PostMapping
     public ApiResponse<StudyRoomCreateResponse> createStudyRoom(
             @RequestBody StudyRoomCreateRequest request,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+            @AuthenticationPrincipal Long userId) {
         // userId from header or default 1
 
         StudyRoomCreateResponse response = studyRoomService.createStudyRoom(userId, request);
@@ -40,25 +41,22 @@ public class StudyRoomController {
     @PostMapping("/join")
     public ApiResponse<StudyRoomResponse> joinStudyRoom(
             @RequestBody StudyRoomJoinRequest request,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+            @AuthenticationPrincipal Long userId) {
 
         StudyRoomResponse response = studyRoomService.joinStudyRoom(userId, request);
         return ApiResponse.success(response);
     }
 
-    // 스터디 문제 제출 (가상의 submitStudyProblem 메서드 추가)
-    // 이 메서드는 요청에 따라 새로 추가된 것으로 가정합니다.
-    @PostMapping("/{studyId}/submit")
+    // 스터디 문제 제출 - studyProblemId 기반으로 변경
+    @PostMapping("/problems/{studyProblemId}/submit")
     public ApiResponse<SubmissionResponse> submitStudyProblem(
-            @PathVariable Long studyId,
-            @RequestBody SubmissionRequest request, // Assuming SubmissionRequest DTO exists
+            @PathVariable Long studyProblemId,
+            @RequestBody SubmissionRequest request,
             Principal principal) {
-        System.out.println("[DEBUG] Received Study Specific Submission for Study: " + studyId);
+        System.out.println("[DEBUG] Received Study Specific Submission for StudyProblem: " + studyProblemId);
         System.out.println("[DEBUG] Request: " + request);
 
-        // Assuming studyRoomService has a submitStudyProblem method
-        // And SubmissionResponse DTO exists
-        SubmissionResponse response = studyRoomService.submitStudyProblem(studyId, request);
+        SubmissionResponse response = studyRoomService.submitStudyProblem(studyProblemId, request);
         return ApiResponse.success(response);
     }
 
@@ -67,7 +65,7 @@ public class StudyRoomController {
     public ApiResponse<Page<StudyRoomListResponse>> getMyStudyRooms(
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 6) Pageable pageable,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+            @AuthenticationPrincipal Long userId) {
 
         Page<StudyRoomListResponse> response = studyRoomService.getMyStudyRooms(userId, keyword, pageable);
         return ApiResponse.success(response);
@@ -77,7 +75,7 @@ public class StudyRoomController {
     @GetMapping("/{studyId}")
     public ApiResponse<StudyRoomResponse> getStudyRoom(
             @PathVariable Long studyId,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+            @AuthenticationPrincipal Long userId) {
 
         StudyRoomResponse response = studyRoomService.getStudyRoom(userId, studyId);
         return ApiResponse.success(response);
@@ -87,7 +85,7 @@ public class StudyRoomController {
     @PostMapping("/{studyId}/invite")
     public ApiResponse<StudyInviteCodeResponse> generateInviteCode(
             @PathVariable Long studyId,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+            @AuthenticationPrincipal Long userId) {
 
         StudyInviteCodeResponse response = studyRoomService.createInviteCode(userId, studyId);
         return ApiResponse.success(response);
