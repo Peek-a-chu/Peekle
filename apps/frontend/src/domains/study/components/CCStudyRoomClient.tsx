@@ -80,7 +80,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
   const setParticipants = useRoomStore((state) => state.setParticipants);
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
-  const participants = useRoomStore((state) => state.participants);
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const updateParticipant = useRoomStore((state) => state.updateParticipant);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
@@ -141,13 +140,16 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     const realIsMuted = !isMicrophoneEnabled;
     const realIsVideoOff = !isCameraEnabled;
 
-    const me = participants.find((p) => p.id === currentUserId);
-
     // If Store State differs from Real State, update Store
+    const currentParticipants = useRoomStore.getState().participants;
+    const me = currentParticipants.find((p) => p.id === currentUserId);
+
     if (me && (me.isMuted !== realIsMuted || me.isVideoOff !== realIsVideoOff)) {
       console.log('[MediaSync] Syncing store to match local device', {
         storeMuted: me.isMuted,
         realMuted: realIsMuted,
+        storeVideo: me.isVideoOff,
+        realVideo: realIsVideoOff
       });
       updateParticipant(currentUserId, { isMuted: realIsMuted, isVideoOff: realIsVideoOff });
       // Also notify server via socket
@@ -155,7 +157,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     }
   }, [
     currentUserId,
-    participants,
+    // Removed participants dependency to prevent infinite loop
     localParticipant,
     isMicrophoneEnabled,
     isCameraEnabled,

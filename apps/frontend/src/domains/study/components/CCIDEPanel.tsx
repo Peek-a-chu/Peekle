@@ -475,7 +475,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     return (
       <div
         className={cn(
-          'flex h-full flex-col bg-background min-w-0',
+          'flex h-full flex-col bg-background min-w-0 relative',
           borderColorClass
             ? `border-2 ${borderColorClass} rounded-lg`
             : readOnly
@@ -495,6 +495,28 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           />
         )}
 
+        {/* Desktop Only Overlay (Inline) */}
+        <div className="ide-desktop-overlay absolute inset-0 z-50 items-center justify-center bg-black/90 text-white p-6 text-center">
+            <div className="flex flex-col items-center">
+                <div className="text-xl font-bold">데스크탑 전용 서비스</div>
+                <div className="mt-3 text-sm text-white/70 leading-relaxed">
+                화면 크기가 작아 콘텐츠를 표시할 수 없습니다.
+                <br />
+                더 큰 화면에서 다시 접속해주세요.
+                </div>
+            </div>
+        </div>
+        <style jsx>{`
+            .ide-desktop-overlay {
+                display: flex;
+            }
+            @media (min-width: 900px) and (min-height: 576px) {
+                .ide-desktop-overlay {
+                    display: none;
+                }
+            }
+        `}</style>
+        
         <div className="flex-1 overflow-hidden" onMouseEnter={() => editorRef.current?.focus()}>
           <Editor
             // [중요] 키 변경으로 컴포넌트 완전 재생성
