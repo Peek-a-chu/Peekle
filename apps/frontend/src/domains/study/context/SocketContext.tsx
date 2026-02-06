@@ -8,11 +8,13 @@ import { useAuthStore } from '@/store/auth-store';
 interface SocketContextType {
   client: Client | null;
   connected: boolean;
+  reconnect: () => void;
 }
 
 export const SocketContext = createContext<SocketContextType>({
   client: null,
   connected: false,
+  reconnect: () => {},
 });
 
 export const useSocketContext = () => useContext(SocketContext);
@@ -33,6 +35,12 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
   const shutdownRef = React.useRef<Promise<void> | null>(null);
   const reconnectAttemptRef = React.useRef(0);
   const reconnectTimerRef = React.useRef<number | null>(null);
+  const [manualReconnectTrigger, setManualReconnectTrigger] = useState(0);
+
+  const reconnect = React.useCallback(() => {
+    console.log('[SocketProvider] Manual reconnect requested');
+    setManualReconnectTrigger((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,7 +200,11 @@ export function SocketProvider({ children, roomId, userId }: SocketProviderProps
       }
       setConnected(false);
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, manualReconnectTrigger]);
 
-  return <SocketContext.Provider value={{ client, connected }}>{children}</SocketContext.Provider>;
+  return (
+    <SocketContext.Provider value={{ client, connected, reconnect }}>
+      {children}
+    </SocketContext.Provider>
+  );
 }
