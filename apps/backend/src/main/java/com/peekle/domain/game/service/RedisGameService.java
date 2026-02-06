@@ -212,18 +212,21 @@ public class RedisGameService {
             throw new IllegalStateException("이미 다른 게임에 참여 중입니다. (Game ID: " + currentGameId + ")");
         }
 
-        // 0-1-1. Players Set에 이미 존재하는지 확인 (강력한 멱등성)
-        // USER_CURRENT_GAME 키가 만료되었더라도, 방 멤버 목록에 있다면 패스워드 검증 없이 통과
+        // 0-1-1. Players Set에 이미 존재하는지 확인 (재접속 지원)
+        // USER_CURRENT_GAME 키가 만료되었더라도, 방 멤버 목록에 있다면 재접속 허용
         String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
-        if (redisTemplate.opsForSet().isMember(playersKey, String.valueOf(userId))) {
-            // 다시 USER_CURRENT_GAME 복구
+        boolean isRejoining = redisTemplate.opsForSet().isMember(playersKey, String.valueOf(userId));
+
+        if (isRejoining) {
+            // 재접속: USER_CURRENT_GAME 키 복구하고 성공 처리 (패스워드/상태 검증 불필요)
             redisTemplate.opsForValue().set(
                     String.format(RedisKeyConst.USER_CURRENT_GAME, userId),
                     String.valueOf(roomId));
+            log.info("User {} rejoined game room {}.", userId, roomId);
             return;
         }
 
-        // 0-2. 방 존재 및 비밀번호 확인
+        // 0-2. 방 존재 확인
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
         Map<Object, Object> roomInfo = redisTemplate.opsForHash().entries(infoKey);
 
@@ -231,13 +234,13 @@ public class RedisGameService {
             throw new IllegalArgumentException("존재하지 않는 방입니다.");
         }
 
-        // 0-3. 방 상태 확인 (대기 중일 때만 입장 가능)
+        // 0-3. 방 상태 확인 (신규 입장은 WAITING 상태만 가능)
         String status = (String) redisTemplate.opsForValue().get(String.format(RedisKeyConst.GAME_STATUS, roomId));
         if (status != null && !"WAITING".equals(status)) {
             throw new IllegalStateException("이미 시작되었거나 종료된 방에는 입장할 수 없습니다.");
         }
 
-        // 비밀번호 체크
+        // 비밀번호 체크 (신규 입장 시에만)
         if (roomInfo.containsKey("password")) {
             String roomPassword = (String) roomInfo.get("password");
             if (password == null || !password.equals(roomPassword)) {
@@ -300,36 +303,71 @@ public class RedisGameService {
 
     // 소켓 연결 끊김 처리
     public void handleDisconnect(Long roomId, Long userId) {
-        // [Global Socket] 연결 끊김 시 즉시 퇴장 처리
-        // [Policy] Strict Mode: 게임 중(PLAYING)이라도 연결 끊기면 즉시 퇴장 (새로고침 시 튕김)
-        log.info("User {} disconnected from Room {}. Exiting immediately.", userId, roomId);
+        // 1. 게임 상태 확인
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String status = (String) redisTemplate.opsForValue().get(statusKey);
+
+        // 2. WAITING 상태: 즉시 퇴장 처리 (로비에서 나가면 바로 제거)
+        if ("WAITING".equals(status)) {
+            log.info("🚪 User {} disconnected from lobby (WAITING). Exiting immediately.", userId);
+            exitGameRoom(roomId, userId);
+            return;
+        }
+
+        // 3. PLAYING/END 상태: 재접속 허용 (퇴장하지 않음)
+        if ("PLAYING".equals(status) || "END".equals(status)) {
+            log.info("🔌 User {} disconnected during game ({}). Allowing reconnection.", userId, status);
+            // USER_CURRENT_GAME 키는 유지 (재접속 가능하도록)
+            // GAME_ROOM_PLAYERS에도 유지되어 있으므로 재접속 시 복구 가능
+            return;
+        }
+
+        // 4. 기타 상태 또는 방이 없는 경우: 안전하게 퇴장
+        log.warn("⚠️ User {} disconnected from unknown/invalid state: {}. Exiting for safety.", userId, status);
         exitGameRoom(roomId, userId);
     }
 
     // 방 퇴장
     public void exitGameRoom(Long roomId, Long userId) {
-        // 1. 참여자 목록(Set)에서 제거
+        // 1. 게임 상태 확인
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String status = (String) redisTemplate.opsForValue().get(statusKey);
+
+        // 2. PLAYING/END 상태: Redis 유지하고 LEAVE 이벤트만 발행 (재접속 가능)
+        if ("PLAYING".equals(status) || "END".equals(status)) {
+            log.info("User {} temporarily left game room {} ({}). Allowing reconnection.", userId, roomId, status);
+            // LEAVE 이벤트 발행 (UI 업데이트용)
+            String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
+            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", userId));
+            // Redis 데이터는 유지 (재접속 가능)
+            return;
+        }
+
+        // 3. WAITING 상태 또는 상태 없음: 완전 퇴장 처리 (기존 로직)
+        log.info("User {} exiting game room {} (status: {}). Removing from Redis.", userId, roomId, status);
+
+        // 참여자 목록(Set)에서 제거
         String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
         redisTemplate.opsForSet().remove(playersKey, String.valueOf(userId));
 
         // 유저의 현재 게임 정보 삭제
         redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, userId));
 
-        // 2. 부가 정보 제거 (Ready, Team)
+        // 부가 정보 제거 (Ready, Team)
         redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId),
                 String.valueOf(userId));
         redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId), String.valueOf(userId));
 
-        // 3. LEAVE 이벤트 발행
+        // LEAVE 이벤트 발행
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", userId));
 
-        // 4. 남은 인원 확인
+        // 남은 인원 확인
         Long remainingCount = redisTemplate.opsForSet().size(playersKey);
 
         if (remainingCount != null && remainingCount == 0) {
             // A. 남은 사람이 없으면 -> 방 삭제 (Clean Up)
-            log.info("�️ Game Room {} is empty. Deleting immediately.", roomId);
+            log.info("🗑️ Game Room {} is empty. Deleting immediately.", roomId);
             deleteGameRoom(roomId);
         } else {
             // B. 남은 사람이 있으면 -> 방장 위임 체크
@@ -350,6 +388,52 @@ public class RedisGameService {
                     // HOST_CHANGE 이벤트 발행 (아이콘 변경용)
                     redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", newHostId));
                     log.info("Game Room {} Host Changed: {} -> {}", roomId, userId, newHostId);
+                }
+            }
+        }
+    }
+
+    /**
+     * 게임 포기 (Forfeit) - 모든 상태에서 무조건 Redis 삭제
+     */
+    public void forfeitGameRoom(Long roomId, Long userId) {
+        log.info("User {} forfeited game room {}. Removing from Redis completely.", userId, roomId);
+
+        // 1. 참여자 목록에서 제거
+        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+        redisTemplate.opsForSet().remove(playersKey, String.valueOf(userId));
+
+        // 2. 유저의 현재 게임 정보 삭제
+        redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, userId));
+
+        // 3. 부가 정보 제거
+        redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId),
+                String.valueOf(userId));
+        redisTemplate.opsForHash().delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId), String.valueOf(userId));
+
+        // 4. FORFEIT 이벤트 발행
+        String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("FORFEIT", Map.of("userId", userId)));
+
+        // 5. 남은 인원 확인 및 방장 위임 (exitGameRoom과 동일)
+        Long remainingCount = redisTemplate.opsForSet().size(playersKey);
+
+        if (remainingCount != null && remainingCount == 0) {
+            log.info("🗑️ Game Room {} is empty after forfeit. Deleting immediately.", roomId);
+            deleteGameRoom(roomId);
+        } else {
+            String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+            String hostIdStr = (String) redisTemplate.opsForHash().get(infoKey, "hostId");
+
+            if (hostIdStr != null && hostIdStr.equals(String.valueOf(userId))) {
+                Set<Object> members = redisTemplate.opsForSet().members(playersKey);
+                if (members != null && !members.isEmpty()) {
+                    Object newHostIdObj = members.iterator().next();
+                    String newHostId = String.valueOf(newHostIdObj);
+
+                    redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+                    redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", newHostId));
+                    log.info("Game Room {} Host Changed after forfeit: {} -> {}", roomId, userId, newHostId);
                 }
             }
         }
@@ -757,19 +841,32 @@ public class RedisGameService {
     // 방 목록 조회
     public List<GameRoomResponse> getAllGameRooms() {
         // 1. 모든 방 ID 조회
-
         Set<Object> roomIds = redisTemplate.opsForSet().members(RedisKeyConst.GAME_ROOM_IDS);
         if (roomIds == null || roomIds.isEmpty())
             return Collections.emptyList();
 
         // 2. 각 방의 정보 조회 Safe Parsing
         return roomIds.stream()
+                // 필터링: null이거나 "null" 문자열인 경우 제외
+                .filter(id -> id != null && !"null".equals(String.valueOf(id)))
                 .map(id -> {
                     try {
-                        return getGameRoom(Long.parseLong((String) id));
+                        String roomIdStr = String.valueOf(id);
+                        Long roomId = Long.parseLong(roomIdStr);
+                        return getGameRoom(roomId);
+                    } catch (NumberFormatException e) {
+                        log.error("Invalid room ID format in Redis: '{}'. Skipping corrupted data.", id);
+                        // Redis에서 손상된 데이터 자동 제거
+                        redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, id);
+                        return null;
+                    } catch (IllegalArgumentException e) {
+                        // getGameRoom에서 방이 없을 때 발생
+                        log.warn("Room {} does not exist in Redis. Cleaning up ID from set.", id);
+                        redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, id);
+                        return null;
                     } catch (Exception e) {
-                        log.error("Failed to parse game room info for ID: {}", id, e);
-                        return null; // Skip invalid rooms
+                        log.error("Unexpected error while fetching game room {}: {}", id, e.getMessage());
+                        return null;
                     }
                 })
                 .filter(Objects::nonNull)
@@ -1375,6 +1472,31 @@ public class RedisGameService {
             sb.append(characters.charAt(random.nextInt(characters.length())));
         }
         return sb.toString();
+    }
+
+    /**
+     * 현재 유저가 참여 중인 게임 정보 조회
+     * 재접속 모달을 위한 메서드
+     */
+    public com.peekle.domain.game.dto.response.CurrentGameResponse getUserCurrentGame(Long userId) {
+        Long gameId = getUserCurrentGameId(userId);
+        if (gameId == null) {
+            return null;
+        }
+
+        try {
+            GameRoomResponse room = getGameRoom(gameId);
+            return com.peekle.domain.game.dto.response.CurrentGameResponse.builder()
+                    .roomId(gameId)
+                    .status(room.getStatus())
+                    .title(room.getTitle())
+                    .build();
+        } catch (Exception e) {
+            // 방이 삭제된 경우 USER_CURRENT_GAME 키 정리
+            log.warn("Game room {} not found for user {}. Cleaning up stale reference.", gameId, userId);
+            redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, userId));
+            return null;
+        }
     }
 
 }

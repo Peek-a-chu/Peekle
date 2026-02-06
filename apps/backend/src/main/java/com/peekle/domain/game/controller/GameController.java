@@ -90,4 +90,14 @@ public class GameController {
         return ApiResponse.success(gameService.getGameRoom(roomId));
     }
 
+    /**
+     * 현재 유저의 진행중인 게임 조회 API
+     * 재접속 모달을 위한 엔드포인트
+     */
+    @GetMapping("/current")
+    public ApiResponse<com.peekle.domain.game.dto.response.CurrentGameResponse> getCurrentGame(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(gameService.getUserCurrentGame(userId));
+    }
+
 }
