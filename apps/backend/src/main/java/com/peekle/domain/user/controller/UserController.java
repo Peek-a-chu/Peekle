@@ -81,7 +81,7 @@ public class UserController {
             @AuthenticationPrincipal Long userId,
             @RequestBody TokenValidationRequest request) {
 
-        boolean isValidUserToken = userService.validateExtensionToken(userId, request.token());
+        boolean isValidUserToken = userService.validateExtensionToken(userId, request.token(), request.bojId());
         return ApiResponse.success(new TokenValidationResponse(isValidUserToken));
     }
 
