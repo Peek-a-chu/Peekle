@@ -112,8 +112,15 @@ export function GamePlayLayout({
     }
   });
 
-  // Online Count Calculation
-  const onlineCount = allOnlineUserIds.size;
+  // Team Filtering Logic
+  const myTeam = participants.find((p) => p.id === currentUserId)?.team;
+  const visibleParticipants =
+    gameState.teamType === 'TEAM' && myTeam
+      ? participants.filter((p) => p.team === myTeam)
+      : participants;
+
+  // Filtered Online Count
+  const visibleOnlineCount = visibleParticipants.filter((p) => allOnlineUserIds.has(p.id)).length;
 
   return (
     <div className={cn('flex h-screen flex-col bg-background', className)}>
@@ -193,7 +200,7 @@ export function GamePlayLayout({
             <GamePlayCenterPanel
               code={code}
               language={language}
-              participants={participants}
+              participants={visibleParticipants} // Use filtered participants
               currentUserId={currentUserId}
               onCodeChange={onCodeChange}
               onLanguageChange={onLanguageChange}
@@ -227,22 +234,22 @@ export function GamePlayLayout({
         >
           <div className="w-80 h-full">
             <GameRightPanel
-              onlineCount={onlineCount}
-              totalCount={participants.length}
+              onlineCount={visibleOnlineCount} // Use filtered online count
+              totalCount={visibleParticipants.length} // Use filtered total count
               onFold={() => setIsRightPanelFolded(true)}
               chatContent={
                 <GameChatPanel
                   messages={messages}
-                  participants={participants}
+                  participants={participants} // Keep full list for chat
                   currentUserId={currentUserId}
-                  isHost={participants.find(p => p.id === currentUserId)?.isHost || false}
+                  isHost={participants.find((p) => p.id === currentUserId)?.isHost || false}
                   onSendMessage={onSendMessage}
                   teamType={gameState.teamType}
                 />
               }
               participantsContent={
                 <GameParticipantPanel
-                  participants={participants}
+                  participants={visibleParticipants} // Use filtered participants
                   currentUserId={currentUserId}
                   isHost={isHost}
                   micState={micState}
@@ -257,7 +264,7 @@ export function GamePlayLayout({
             />
           </div>
         </aside>
-      </div >
+      </div>
 
       {/* 게임 결과 모달 */}
       < CCGameResultModal

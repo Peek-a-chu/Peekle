@@ -1,12 +1,12 @@
 'use client';
 
-import { use, useEffect } from 'react';
+import { use, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useGameWaitingRoom } from '@/domains/game/hooks/useGameWaitingRoom';
 import { GameWaitingRoomLayout } from '@/domains/game/layout';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
-import { getGameRoom } from '@/domains/game/api/game-api';
+import { getGameRoom, cancelRoomReservation } from '@/domains/game/api/game-api';
 import { GameRoomDetail } from '@/domains/game/types/game-types';
 
 interface GameRoomPageProps {
@@ -39,6 +39,14 @@ function ConnectedGameWaitingRoom({
     changeTeam,
     isLoading,
   } = useGameWaitingRoom(roomId);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    if (room?.status === 'PLAYING') {
+      router.replace(`/game/${roomId}/play`);
+    }
+  }, [room?.status, roomId, router]);
 
   if (isLoading || !room) {
     return (
@@ -91,9 +99,15 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
   const [previewRoom, setPreviewRoom] = useState<GameRoomDetail | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(!preJoined);
 
+  // Ref to track if we are intentionally joining, to prevent cancellation on unmount
+  const isJoiningRef = useRef(false);
+
   useEffect(() => {
     // 이미 프리조인 상태(로비에서 진입)라면 미리보기 로딩 필요 없음
-    if (preJoined) return;
+    if (preJoined) {
+      isJoiningRef.current = true; // Mark as joining/joined so we don't cancel
+      return;
+    }
 
     const fetchPreview = async () => {
       try {
@@ -113,15 +127,33 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
     };
 
     fetchPreview();
+
+    // Cleanup: If component unmounts and we are NOT joining (e.g. refresh, back button, close tab), cancel reservation
+    return () => {
+      if (!isJoiningRef.current) {
+        // Attempt to clean up reservation. 
+        // Note: If browser is closing, this might not complete without keepalive, 
+        // but apiFetch uses fetch which supports it if configured, or at least we try.
+        cancelRoomReservation(roomId).catch(err => console.error(err));
+      }
+    };
   }, [roomId, preJoined, router]);
 
   const handleJoin = (mic: boolean, cam: boolean) => {
+    isJoiningRef.current = true;
     setInitialMediaState({ mic, cam });
     setIsJoinedByPreJoin(true);
   };
 
-  const handleCancel = () => {
-    window.location.href = '/game';
+  const handleCancel = async () => {
+    // Explicit cancel button click
+    try {
+      await cancelRoomReservation(roomId);
+    } catch (e) {
+      console.error('Failed to cancel reservation:', e);
+    } finally {
+      window.location.href = '/game';
+    }
   };
 
   // 1. 이미 입장 확인됨 (로비 등에서 옴) -> 바로 입장 처리 컴포넌트 렌더링
@@ -150,6 +182,7 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
         description={`${previewRoom.mode === 'TIME_ATTACK' ? '타임어택' : '스피드'} 모드의 게임 대기방입니다.`}
         onJoin={handleJoin}
         onCancel={handleCancel}
+        joinLabel="게임 입장"
       />
     );
   }

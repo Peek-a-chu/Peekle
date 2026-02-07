@@ -392,8 +392,13 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     }
   }, [roomId]);
 
-  const onCountdownComplete = useCallback(() => {
-    router.push(`/game/${roomId}/play`);
+  const onCountdownComplete = useCallback((mediaState?: { mic: boolean; cam: boolean }) => {
+    const query = new URLSearchParams();
+    if (mediaState) {
+      query.set('mic', String(mediaState.mic));
+      query.set('cam', String(mediaState.cam));
+    }
+    router.push(`/game/${roomId}/play?${query.toString()}`);
   }, [router, roomId]);
 
 

@@ -134,14 +134,14 @@ export const CCPreJoinModal = ({
       return;
     }
 
-    if (!user) {
-      // 인증 조회 실패/지연 시에도 무한 "확인 중..."에 머무르지 않도록 종료
-      setExtensionStatus('NOT_INSTALLED');
+    if (isChecking) {
+      setExtensionStatus('LOADING');
       return;
     }
 
-    if (isChecking) {
-      setExtensionStatus('LOADING');
+    if (!user) {
+      // 인증 조회 실패/지연 시에도 무한 "확인 중..."에 머무르지 않도록 종료
+      setExtensionStatus('NOT_INSTALLED');
       return;
     }
 
