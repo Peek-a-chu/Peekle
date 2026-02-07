@@ -203,6 +203,18 @@ public class RedisGameService {
             if ("WORKBOOK".equals(problemSource)) {
                 try {
                     List<Problem> allProblems = getAllProblemsForPreview(roomId);
+
+                    // [Validation] 요청한 문제 갯수가 문제집의 실제 문제 갯수보다 많으면 오류 발생
+                    int requestedProblemCount = request.getProblemCount();
+                    int availableProblemCount = allProblems.size();
+
+                    if (requestedProblemCount > availableProblemCount) {
+                        throw new com.peekle.global.exception.BusinessException(
+                                com.peekle.global.exception.ErrorCode.GAME_PROBLEM_COUNT_EXCEEDED,
+                                String.format("문제집에 있는 문제(%d개)보다 더 많은 문제(%d개)를 요청할 수 없습니다.",
+                                        availableProblemCount, requestedProblemCount));
+                    }
+
                     if (!allProblems.isEmpty()) {
                         String previewKey = String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId);
                         redisTemplate.delete(previewKey); // 초기화
@@ -219,9 +231,14 @@ public class RedisGameService {
                         log.info("📋 [Room Creation] Cached {} problems for workbook preview (Room {})",
                                 allProblems.size(), roomId);
                     }
+                } catch (com.peekle.global.exception.BusinessException e) {
+                    // 검증 실패 시 롤백하고 예외 전파 (프론트엔드에서 토스트로 표시)
+                    log.warn("❌ [Room Creation Validation Failed] {}", e.getMessage());
+                    deleteGameRoom(roomId);
+                    throw e;
                 } catch (Exception e) {
                     log.warn("⚠️ Failed to cache problems during room creation: {}", e.getMessage());
-                    // 실패해도 방 생성은 계속 진행
+                    // 다른 예외는 방 생성을 계속 진행
                 }
             }
 

@@ -58,7 +58,8 @@ public enum ErrorCode {
 
     // Game
     GAME_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "GAME_001", "게임 방을 찾을 수 없습니다."),
-    GAME_INVALID_ROOM_DATA(HttpStatus.INTERNAL_SERVER_ERROR, "GAME_002", "게임 방 데이터가 손상되었습니다.");
+    GAME_INVALID_ROOM_DATA(HttpStatus.INTERNAL_SERVER_ERROR, "GAME_002", "게임 방 데이터가 손상되었습니다."),
+    GAME_PROBLEM_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "GAME_003", "문제집의 문제 개수보다 많은 문제를 요청할 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
