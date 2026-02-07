@@ -219,7 +219,10 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
                     {getIcon(activity.category, activity.description)}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                    <p
+                      className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors"
+                      title={activity.description.replace(/^Solved problem: /, '')}
+                    >
                       {activity.description.replace(/^Solved problem: /, '')}
                     </p>
                     <p className="text-[11px] text-muted-foreground font-medium">
