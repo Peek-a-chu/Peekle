@@ -464,6 +464,7 @@ public class RedisGameService {
         startData.put("problems", problemList);
         startData.put("startTime", Long.parseLong((String) redisTemplate.opsForValue()
                 .get(String.format(RedisKeyConst.GAME_START_TIME, roomId))));
+        startData.put("serverTime", System.currentTimeMillis());
 
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", startData));
 
@@ -959,6 +960,7 @@ public class RedisGameService {
                 .workbookTitle(workbookTitle)
                 .problems(problems.isEmpty() ? null : problems)
                 .startTime(startTime)
+                .serverTime(System.currentTimeMillis())
                 .build();
     }
 

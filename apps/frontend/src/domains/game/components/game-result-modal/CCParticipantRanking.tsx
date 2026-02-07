@@ -37,7 +37,7 @@ export function CCParticipantRanking({ participants, mode, teamType }: CCPartici
         <span className="w-10 text-center">Rank</span>
         <span className="flex-1 ml-4">User</span>
         <span className="w-20 text-center mr-2">{mode === 'SPEED_RACE' ? 'Time' : 'Solved'}</span>
-        <span className="w-24 text-right">Score</span>
+        {mode !== 'SPEED_RACE' && <span className="w-24 text-right">Score</span>}
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 pt-3 pb-2 space-y-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -106,13 +106,15 @@ export function CCParticipantRanking({ participants, mode, teamType }: CCPartici
                   )}
                 </div>
 
-                <div className="w-24 text-right shrink-0">
-                  <span
-                    className={`text-lg font-black tracking-tight ${p.isMe ? 'text-yellow-400' : 'text-muted-foreground'}`}
-                  >
-                    {p.score.toLocaleString()}
-                  </span>
-                </div>
+                {mode !== 'SPEED_RACE' && (
+                  <div className="w-24 text-right shrink-0">
+                    <span
+                      className={`text-lg font-black tracking-tight ${p.isMe ? 'text-yellow-400' : 'text-muted-foreground'}`}
+                    >
+                      {p.score.toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );

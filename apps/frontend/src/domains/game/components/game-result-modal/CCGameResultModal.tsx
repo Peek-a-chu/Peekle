@@ -94,6 +94,7 @@ export function CCGameResultModal({ isOpen, onClose, data }: CCGameResultModalPr
                 playTime={playTime}
                 isOpen={isOpen}
                 mode={mode}
+                showScore={mode !== 'SPEED_RACE'}
               />
 
               {/* 오른쪽: 전체 순위*/}

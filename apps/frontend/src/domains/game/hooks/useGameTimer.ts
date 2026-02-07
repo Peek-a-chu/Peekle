@@ -50,8 +50,8 @@ export function useGameTimer({
     if (mode === 'countdown') {
       if (initialTime > 0) setTime(initialTime);
     } else {
-      // countup 모드일 때는 0으로 초기화 (또는 initialTime 사용 가능)
-      setTime(0);
+      // countup 모드일 때도 initialTime을 사용하여 재개 가능하도록 함
+      setTime(initialTime);
     }
   }, [initialTime, mode]);
 

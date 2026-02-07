@@ -85,6 +85,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
   const [isGracePeriod, setIsGracePeriod] = useState(false);
   const [graceTime, setGraceTime] = useState(60);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
+  const [clockOffset, setClockOffset] = useState(0);
 
   // 소켓 연결
   const { client, connected } = useGameSocketConnection(roomId, currentUserId);
@@ -105,6 +106,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             teamType: room.teamType,
             timeLimit: room.timeLimit,
             startTime: room.startTime,
+            serverTime: room.serverTime,
             remainingTime: room.timeLimit, // [TEST] Seconds directly
             problems: room.problems || [],
             participants: (room.participants || []).map((p: any) => ({
@@ -114,6 +116,11 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             })),
           };
           setGameState(playState);
+          if (room.serverTime) {
+            const offset = Date.now() - room.serverTime;
+            setClockOffset(offset);
+            console.log(`[TimerSync] Clock offset calculated: ${offset}ms (Client: ${Date.now()}, Server: ${room.serverTime})`);
+          }
           if (playState.problems.length > 0) {
             setSelectedProblemId(playState.problems[0].id);
           }
@@ -167,12 +174,18 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
                 ...prev,
                 status: 'PLAYING',
                 startTime: data.startTime,
+                serverTime: data.serverTime,
                 problems: (data.problems || []).map((p: any) => ({
                   ...p,
                   status: 'UNSOLVED',
                 })),
               };
             });
+            if (data.serverTime) {
+              const offset = Date.now() - data.serverTime;
+              setClockOffset(offset);
+              console.log(`[TimerSync] Clock offset updated from START event: ${offset}ms`);
+            }
             if (data.problems && data.problems.length > 0) {
               setSelectedProblemId(data.problems[0].id);
             }
@@ -242,7 +255,11 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
           // Toast for verification (Validation Step 13)
           const toastNickname = data.nickname || `${data.userId}번 유저`;
-          toast.info(`[점수 갱신] ${toastNickname}: ${data.score}점 (${data.solvedCount}문제)`);
+          if (gameState?.mode === 'SPEED_RACE') {
+            toast.info(`[기록 갱신] ${toastNickname}님이 문제를 해결했습니다!`);
+          } else {
+            toast.info(`[점수 갱신] ${toastNickname}: ${data.score}점 (${data.solvedCount}문제)`);
+          }
 
           setGameState((prev) => {
             if (!prev) return null;
@@ -377,7 +394,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
   const calculateRemainingTime = () => {
     if (!gameState?.startTime) return gameState?.timeLimit ?? 1800;
-    const now = Date.now();
+    const now = Date.now() - clockOffset;
     // startTime is in milliseconds (System.currentTimeMillis from backend)
     const elapsedSeconds = Math.floor((now - gameState.startTime) / 1000);
     const remaining = gameState.timeLimit - elapsedSeconds;
@@ -386,7 +403,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
   const calculateElapsedSeconds = () => {
     if (!gameState?.startTime) return 0;
-    const now = Date.now();
+    const now = Date.now() - clockOffset;
     return Math.floor((now - gameState.startTime) / 1000);
   };
 

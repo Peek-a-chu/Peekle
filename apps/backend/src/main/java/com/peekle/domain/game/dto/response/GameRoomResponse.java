@@ -30,6 +30,7 @@ public class GameRoomResponse {
     private String workbookTitle; // 문제집 제목 (문제집인 경우)
     private java.util.List<ProblemInfo> problems;
     private Long startTime; // 게임 시작 시간 (Timestamp)
+    private Long serverTime; // 현재 서버 시간 (Timestamp)
 
     @Getter
     @Builder
