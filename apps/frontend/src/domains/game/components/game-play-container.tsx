@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+import { useState, useEffect } from 'react';
 import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
 import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout';
 import { GameLiveKitWrapper } from '@/domains/game/components/GameLiveKitWrapper';
-// import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
+import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
+import { CCSpeedGameResultModal } from './game-result-modal/CCSpeedGameResultModal';
 
 interface GamePlayContainerProps {
   roomId: string;
@@ -31,7 +34,15 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
     onlineUserIds,
   } = useGamePlayRoom(roomId);
 
+  const router = useRouter();
+
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (gameState?.status === 'WAITING') {
+      router.replace(`/game/${roomId}`);
+    }
+  }, [gameState?.status, roomId, router]);
 
   // 로딩 상태
   if (isLoading || !gameState) {
@@ -81,16 +92,22 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
       </button>
       */}
 
-      {/* 게임 결과 모달 -Step 15에서 정식 구현 예정 */}
-      {/* 
-      {isResultModalOpen && (
-        <CCGameResultModal
-          isOpen={isResultModalOpen}
-          onClose={() => setIsResultModalOpen(false)}
-          data={null as any}
-        />
+      {/* 게임 결과 모달 */}
+      {isResultModalOpen && gameState?.result && (
+        gameState.mode === 'SPEED_RACE' && gameState.teamType === 'INDIVIDUAL' ? (
+          <CCSpeedGameResultModal
+            isOpen={isResultModalOpen}
+            onClose={() => setIsResultModalOpen(false)}
+            data={null as any} // TODO: 실제 데이터 매핑 필요
+          />
+        ) : (
+          <CCGameResultModal
+            isOpen={isResultModalOpen}
+            onClose={() => setIsResultModalOpen(false)}
+            data={null as any} // TODO: 실제 데이터 매핑 필요
+          />
+        )
       )}
-      */}
     </>
   );
 }

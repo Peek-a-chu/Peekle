@@ -40,6 +40,14 @@ function ConnectedGameWaitingRoom({
     isLoading,
   } = useGameWaitingRoom(roomId);
 
+  const router = useRouter();
+
+  useEffect(() => {
+    if (room?.status === 'PLAYING') {
+      router.replace(`/game/${roomId}/play`);
+    }
+  }, [room?.status, roomId, router]);
+
   if (isLoading || !room) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -150,6 +158,7 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
         description={`${previewRoom.mode === 'TIME_ATTACK' ? '타임어택' : '스피드'} 모드의 게임 대기방입니다.`}
         onJoin={handleJoin}
         onCancel={handleCancel}
+        joinLabel="게임 입장"
       />
     );
   }
