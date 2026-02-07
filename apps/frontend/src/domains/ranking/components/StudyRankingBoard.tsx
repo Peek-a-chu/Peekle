@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
 import { getRankings, type RankResponse } from '@/api/rankingApi';
 import { TopThreePodium } from './TopThreePodium';
 import { StudyRankingList } from './StudyRankingList';
@@ -100,8 +99,13 @@ export function StudyRankingBoard(): React.ReactNode {
       <StudyRankingList
         rankings={rankings}
         onStudyClick={handleStudyClick}
+        highlightedStudyId={null}
         scope={scope}
         onScopeChange={handleScopeChange}
+        sortBy="RANK"
+        onSortByChange={() => {}}
+        searchTerm=""
+        onSearchChange={() => {}}
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
       >

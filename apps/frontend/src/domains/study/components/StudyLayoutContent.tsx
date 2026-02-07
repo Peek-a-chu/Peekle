@@ -28,6 +28,8 @@ export function StudyLayoutContent({
   onUnfoldRightPanel,
   className,
 }: StudyLayoutContentProps) {
+  const hasRightPanel = Boolean(rightPanel);
+
   return (
     <div className={cn('flex h-screen flex-col bg-background text-foreground', className)}>
       {/* Header */}
@@ -53,7 +55,7 @@ export function StudyLayoutContent({
           className={cn(
             'relative flex min-w-0 flex-1 flex-col transition-all duration-300',
             isLeftPanelFolded && 'pl-12',
-            isRightPanelFolded && 'pr-12',
+            hasRightPanel && isRightPanelFolded && 'pr-12',
           )}
         >
           {/* Unfold Left Panel Button - Visible only when left folded */}
@@ -72,7 +74,7 @@ export function StudyLayoutContent({
           )}
 
           {/* Unfold Right Panel Button - Visible only when right folded */}
-          {isRightPanelFolded && (
+          {hasRightPanel && isRightPanelFolded && (
             <div className="absolute right-2 top-2 z-10">
               <Button
                 variant="ghost"
@@ -89,15 +91,16 @@ export function StudyLayoutContent({
           {centerPanel}
         </main>
 
-        {/* Right Panel */}
-        <aside
-          className={cn(
-            'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card transition-all duration-300 ease-in-out',
-            isRightPanelFolded ? 'w-0 border-l-0 overflow-hidden' : 'w-80',
-          )}
-        >
-          <div className="w-80 h-full">{rightPanel}</div>
-        </aside>
+        {hasRightPanel && (
+          <aside
+            className={cn(
+              'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card transition-all duration-300 ease-in-out',
+              isRightPanelFolded ? 'w-0 border-l-0 overflow-hidden' : 'w-80',
+            )}
+          >
+            <div className="w-80 h-full">{rightPanel}</div>
+          </aside>
+        )}
       </div>
     </div>
   );

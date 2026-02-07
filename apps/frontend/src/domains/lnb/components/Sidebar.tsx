@@ -54,7 +54,7 @@ const Sidebar = ({ user }: SidebarProps) => {
       </nav>
 
       {/* Footer Section */}
-      <div className="p-4 mt-auto">
+      <div className="px-2 py-4 mt-auto">
         <SidebarItem icon={Settings} label="설정" onClick={() => openModal()} isActive={isOpen} />
       </div>
     </aside>
