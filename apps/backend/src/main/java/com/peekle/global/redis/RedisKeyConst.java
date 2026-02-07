@@ -102,6 +102,9 @@ public class RedisKeyConst {
     // 문제 해결 여부 (Set) -> game:{gameId}:problem:{problemId}:solved
     public static final String GAME_SOLVED_PROBLEM = "game:%d:problem:%d:solved";
 
+    // Game Room Online Users (Set) -> game:{gameId}:online_users
+    public static final String GAME_ROOM_ONLINE = "game:%d:online_users";
+
     // User Session (Value) -> user:{userId}:session -> sessionId
     public static final String USER_SESSION = "user:%d:session";
 

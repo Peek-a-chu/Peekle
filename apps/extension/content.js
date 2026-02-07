@@ -171,14 +171,17 @@ function scanForSuccess() {
 // Initial scan
 scanForSuccess();
 
-// Observe for dynamic updates in the table
-const statusTable = document.getElementById('status-table');
-if (statusTable) {
-    observer = new MutationObserver(() => {
+// BaekjoonHub style: Poll every 2 seconds instead of MutationObserver
+let loader = null;
+const username = getUsername();
+
+if (username && window.location.href.includes('/status')) {
+    loader = setInterval(() => {
         scanForSuccess();
-    });
-    observer.observe(statusTable, { childList: true, subtree: true });
+    }, 2000);
+    console.log('[Peekle] Started 2-second polling for submissions');
 }
+
 
 // --- Auto-Fill Submission Logic ---
 

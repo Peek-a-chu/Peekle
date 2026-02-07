@@ -1406,7 +1406,36 @@ public class RedisGameService {
         // 9. 종료 타이머 키 삭제
         redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_TIMER, roomId));
 
-        log.info("✅ Game {} finished successfully. Winner: {}", roomId, winner);
+        // 10. 게임 종료 후 모든 Redis 데이터 삭제 (깔끔하게 정리)
+        log.info("🗑️ Cleaning up all Redis data for finished game {}", roomId);
+
+        // 게임 기본 정보
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_STATUS, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_START_TIME, roomId));
+
+        // 랭킹 데이터
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_RANKING, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId));
+
+        // 참여자 및 팀 데이터
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_ONLINE, roomId));
+
+        // 문제 데이터
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId));
+
+        // 각 유저별 점수 키 삭제 (참여자 목록 순회)
+        if (rankingSet != null) {
+            for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
+                Long uId = Long.parseLong(String.valueOf(entry.getValue()));
+                redisTemplate.delete(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, uId));
+            }
+        }
+
+        log.info("✅ Game {} finished and cleaned up successfully. Winner: {}", roomId, winner);
     }
 
     public Long getUserCurrentGameId(Long userId) {

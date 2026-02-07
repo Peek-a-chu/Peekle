@@ -69,6 +69,9 @@ public class GameSocketController {
                     SocketResponse.of("ERROR", "Video connection failed"));
         }
 
+        // [New] Add to online users list
+        gameAfterService.addOnlineUser(request.getGameId(), userId);
+
         // [New] Broadcast updated online user list
         gameAfterService.broadcastOnlineUsers(request.getGameId());
     }

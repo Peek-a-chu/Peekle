@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronRight, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { useParticipants } from '@livekit/components-react'; // Added import
 import { Button } from '@/components/ui/button';
 import { ActionModal } from '@/components/common/Modal';
 import { GamePlayHeader } from '@/domains/game/components/game-play-header';
@@ -99,8 +100,20 @@ export function GamePlayLayout({
     onForfeit();
   };
 
+  // LiveKit Participants for Online Status
+  const liveKitParticipants = useParticipants();
+
+  // Merge Socket Online IDs + LiveKit Online IDs
+  const allOnlineUserIds = new Set(onlineUserIds);
+  liveKitParticipants.forEach((p) => {
+    const userId = parseInt(p.identity, 10);
+    if (!isNaN(userId)) {
+      allOnlineUserIds.add(userId);
+    }
+  });
+
   // Online Count Calculation
-  const onlineCount = onlineUserIds.size;
+  const onlineCount = allOnlineUserIds.size;
 
   return (
     <div className={cn('flex h-screen flex-col bg-background', className)}>
@@ -237,7 +250,8 @@ export function GamePlayLayout({
                   onMuteAll={handleMuteAll}
                   onKick={() => { }}
                   onDelegate={() => { }}
-                  onlineUserIds={onlineUserIds}
+                  onlineUserIds={allOnlineUserIds}
+                  teamType={gameState.teamType}
                 />
               }
             />

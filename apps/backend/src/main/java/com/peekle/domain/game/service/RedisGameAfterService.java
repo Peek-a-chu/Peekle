@@ -21,21 +21,34 @@ public class RedisGameAfterService {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * 현재 방에 참여 중인 유저 중, 소켓 연결이 되어 있는(온라인) 유저 ID 목록을 반환
+     * 유저를 게임 온라인 목록에 추가
+     */
+    public void addOnlineUser(Long gameId, Long userId) {
+        String onlineKey = String.format(RedisKeyConst.GAME_ROOM_ONLINE, gameId);
+        redisTemplate.opsForSet().add(onlineKey, userId);
+    }
+
+    /**
+     * 유저를 게임 온라인 목록에서 제거
+     */
+    public void removeOnlineUser(Long gameId, Long userId) {
+        String onlineKey = String.format(RedisKeyConst.GAME_ROOM_ONLINE, gameId);
+        redisTemplate.opsForSet().remove(onlineKey, userId);
+    }
+
+    /**
+     * 현재 방에 참여 중인(소켓 연결된) 유저 ID 목록을 반환
      */
     public Set<Long> getOnlineUserIds(Long roomId) {
-        // 1. 방 참여자 목록 조회
-        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
-        Set<Object> members = redisTemplate.opsForSet().members(playersKey);
+        String onlineKey = String.format(RedisKeyConst.GAME_ROOM_ONLINE, roomId);
+        Set<Object> members = redisTemplate.opsForSet().members(onlineKey);
 
         if (members == null || members.isEmpty()) {
             return Set.of();
         }
 
-        // 2. 각 유저의 세션 존재 여부 확인 (Active Session = Online)
         return members.stream()
                 .map(id -> Long.parseLong(String.valueOf(id)))
-                .filter(userId -> Boolean.TRUE.equals(redisTemplate.hasKey("user:" + userId + ":session")))
                 .collect(Collectors.toSet());
     }
 

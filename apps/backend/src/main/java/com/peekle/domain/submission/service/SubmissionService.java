@@ -63,25 +63,32 @@ public class SubmissionService {
         // 0. 검증 (Extension 변조 방지) - AC(성공)일 때만 검증, 단 TEST_TOKEN이면 패스
         if (!"TEST_TOKEN".equals(token) && request.getIsSuccess() && user.getBojId() != null
                 && !user.getBojId().isEmpty()) {
-            try {
-                submissionValidator.validateSubmission(
-                        String.valueOf(request.getProblemId()),
-                        user.getBojId(),
-                        request.getSubmitId(),
-                        request.getCode());
-            } catch (BusinessException e) {
-                // 검증 실패 시: 저장하지 않고 실패 응답 반환
-                System.out.println("❌ Submission Validation Failed: " + e.getMessage());
-                return SubmissionResponse.builder()
-                        .success(false)
-                        .message("검증 실패: " + e.getMessage())
-                        .build();
-            } catch (Exception e) {
-                System.out.println("❌ Submission Validation Error: " + e.getMessage());
-                return SubmissionResponse.builder()
-                        .success(false)
-                        .message("검증 중 오류 발생: " + e.getMessage())
-                        .build();
+
+            // GAME이 아닌 경우 코드가 null이면 검증 건너뛰기 (일시적인 fetch 실패 허용)
+            if (!"GAME".equals(request.getSourceType())
+                    && (request.getCode() == null || request.getCode().trim().isEmpty())) {
+                System.out.println("⚠️ Code is null/empty for non-GAME submission. Skipping validation.");
+            } else {
+                try {
+                    submissionValidator.validateSubmission(
+                            String.valueOf(request.getProblemId()),
+                            user.getBojId(),
+                            request.getSubmitId(),
+                            request.getCode());
+                } catch (BusinessException e) {
+                    // 검증 실패 시: 저장하지 않고 실패 응답 반환
+                    System.out.println("❌ Submission Validation Failed: " + e.getMessage());
+                    return SubmissionResponse.builder()
+                            .success(false)
+                            .message("검증 실패: " + e.getMessage())
+                            .build();
+                } catch (Exception e) {
+                    System.out.println("❌ Submission Validation Error: " + e.getMessage());
+                    return SubmissionResponse.builder()
+                            .success(false)
+                            .message("검증 중 오류 발생: " + e.getMessage())
+                            .build();
+                }
             }
         } else if (!request.getIsSuccess()) {
             // WA, RTE, TLE 등 실패한 제출은 검증 없이 저장

@@ -51,6 +51,9 @@ public class GameWebSocketListener {
                     // [Modified] 단순 퇴장이 아니라 상태에 따라 처리 (재접속 지원)
                     gameService.handleDisconnect(gameId, userId);
 
+                    // [New] Remove from online logic
+                    gameAfterService.removeOnlineUser(gameId, userId);
+
                     // [New] Broadcast updated online user list (after disconnect handling)
                     gameAfterService.broadcastOnlineUsers(gameId);
                 } catch (Exception e) {
