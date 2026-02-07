@@ -26,7 +26,9 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   const showLoading = !initialData && isLoading;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProblem, setSelectedProblem] = useState<{ id: string; title: string } | null>(null);
+  const [selectedProblem, setSelectedProblem] = useState<{ id: string; title: string } | null>(
+    null,
+  );
   const [canRetry, setCanRetry] = useState(false);
 
   useEffect(() => {
@@ -55,7 +57,7 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   return (
     <div className="bg-card border border-border rounded-2xl p-6 h-full transition-colors duration-300">
       {/* 헤더 */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-primary" />
         <div>
           <h3 className="font-bold text-foreground">AI 추천 문제</h3>
@@ -68,7 +70,9 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
         {showLoading ? (
           <div className="flex flex-col items-center justify-center py-10 gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground font-medium">AI가 문제를 생성 중이에요...</p>
+            <p className="text-sm text-muted-foreground font-medium">
+              AI가 문제를 생성 중이에요...
+            </p>
             <div className="flex flex-col items-center gap-1">
               <Button
                 variant="outline"
