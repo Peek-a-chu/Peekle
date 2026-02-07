@@ -1,5 +1,4 @@
-'use client';
-
+import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Crown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +12,7 @@ interface ParticipantCardProps {
   isHost?: boolean;
   onKick?: () => void;
   isSelf?: boolean;
+  localStream?: MediaStream | null;
 }
 
 export function ParticipantCard({
@@ -21,7 +21,16 @@ export function ParticipantCard({
   isHost = false,
   onKick,
   isSelf = false,
+  localStream,
 }: ParticipantCardProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && localStream) {
+      videoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
   if (isEmpty || !participant) {
     // 빈 슬롯: 라이트 모드(bg-muted/border-border), 다크 모드(bg-[#121A28]/border-white/20)
     return (
@@ -73,12 +82,24 @@ export function ParticipantCard({
         </div>
       )}
 
-      <UserIcon
-        src={participant.profileImg}
-        nickname={participant.nickname}
-        size={40}
-        className="border-none ring-2 ring-primary/10 dark:ring-white/5"
-      />
+      {localStream ? (
+        <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-primary dark:ring-primary/80">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="h-full w-full object-cover scale-x-[-1]"
+          />
+        </div>
+      ) : (
+        <UserIcon
+          src={participant.profileImg}
+          nickname={participant.nickname}
+          size={40}
+          className="border-none ring-2 ring-primary/10 dark:ring-white/5"
+        />
+      )}
 
       {/* 닉네임: 라이트(foreground), 다크(#E8EEF9) */}
       <span className="mt-2 text-xs font-bold tracking-tight text-foreground dark:text-[#E8EEF9]">

@@ -23,6 +23,7 @@ interface ParticipantGridProps {
   isHost: boolean;
   onKickParticipant: (participantId: number) => void;
   currentUserId: number;
+  localStream?: MediaStream | null;
 }
 
 export function ParticipantGrid({
@@ -33,6 +34,7 @@ export function ParticipantGrid({
   isHost,
   onKickParticipant,
   currentUserId,
+  localStream,
 }: ParticipantGridProps) {
   // 정렬 순서: 방장 > 준비완료 > 준비대기
   const sortedParticipants = [...participants].sort((a, b) => {
@@ -53,6 +55,7 @@ export function ParticipantGrid({
       isHost={isHost} // Viewing user is host?
       onKick={() => setKickTarget(participant)}
       isSelf={participant.id === currentUserId}
+      localStream={participant.id === currentUserId ? localStream : undefined}
     />
   );
 

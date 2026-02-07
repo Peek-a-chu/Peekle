@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useState, useEffect } from 'react';
 import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
@@ -35,6 +35,9 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
   } = useGamePlayRoom(roomId);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialMic = searchParams.get('mic') === 'true';
+  const initialCam = searchParams.get('cam') === 'true';
 
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
 
@@ -59,7 +62,11 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
   // 게임 화면 렌더링
   return (
     <>
-      <GameLiveKitWrapper roomId={gameState.roomId}>
+      <GameLiveKitWrapper
+        roomId={gameState.roomId}
+        initialMicEnabled={initialMic}
+        initialCamEnabled={initialCam}
+      >
         <GamePlayLayout
           gameState={gameState}
           problems={gameState.problems}
