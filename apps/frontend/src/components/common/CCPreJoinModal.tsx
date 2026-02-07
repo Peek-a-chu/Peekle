@@ -53,7 +53,7 @@ export const CCPreJoinModal = ({
   onCancel,
 }: CCPreJoinModalProps) => {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, checkAuth, isLoading: isAuthLoading } = useAuthStore();
   const isBojLinked = !!user?.bojId;
 
   // Extension Check State
@@ -72,6 +72,12 @@ export const CCPreJoinModal = ({
   // Polling State for Installation Check
   const [isPolling, setIsPolling] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      void checkAuth();
+    }
+  }, [user, checkAuth]);
 
   // Stop polling if status changes to INSTALLED or LINKED
   useEffect(() => {
@@ -119,7 +125,17 @@ export const CCPreJoinModal = ({
 
   // Check Extension Logic
   useEffect(() => {
-    if (!user) return;
+    if (isAuthLoading) {
+      setExtensionStatus('LOADING');
+      return;
+    }
+
+    if (!user) {
+      // 인증 조회 실패/지연 시에도 무한 "확인 중..."에 머무르지 않도록 종료
+      setExtensionStatus('NOT_INSTALLED');
+      return;
+    }
+
     if (isChecking) {
       setExtensionStatus('LOADING');
       return;
@@ -162,7 +178,7 @@ export const CCPreJoinModal = ({
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isInstalled, extensionToken, extensionVersion, isChecking]);
+  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, REQUIRED_VERSION]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
@@ -232,6 +248,14 @@ export const CCPreJoinModal = ({
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+
+  const handleCancel = useCallback(() => {
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+    router.push('/study');
+  }, [onCancel, router]);
 
   // ---------------------------------------------------------------------------
   // 1. Device Enumeration
@@ -499,16 +523,14 @@ export const CCPreJoinModal = ({
                 <span>{description || '멤버들과 함께 진행해 보세요'}</span>
               </div>
             </div>
-            {onCancel && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onCancel}
-                className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-full"
-              >
-                <X size={20} />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCancel}
+              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-full"
+            >
+              <X size={20} />
+            </Button>
           </div>
 
           {/* Body Grid */}
@@ -778,7 +800,7 @@ export const CCPreJoinModal = ({
 
               <Button
                 variant="ghost"
-                onClick={onCancel}
+                onClick={handleCancel}
                 className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 h-11 px-6"
               >
                 취소
