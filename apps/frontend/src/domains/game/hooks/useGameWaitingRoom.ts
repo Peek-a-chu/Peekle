@@ -89,22 +89,22 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
           setRoom(data);
           setIsLoading(false);
 
-          // 입장 메시지 추가
-          const currentUser = data.participants.find(p => p.id === userId);
-          if (currentUser) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `system-enter-self-${Date.now()}`,
-                senderId: -1,
-                senderNickname: 'System',
-                profileImg: '',
-                content: `${currentUser.nickname}님이 입장했습니다.`,
-                timestamp: Date.now(),
-                type: 'SYSTEM' as const,
-              },
-            ]);
-          }
+          // 입장 메시지 추가 (Socket 이벤트로 처리하므로 제거)
+          // const currentUser = data.participants.find(p => p.id === userId);
+          // if (currentUser) {
+          //   setMessages((prev) => [
+          //     ...prev,
+          //     {
+          //       id: `system-enter-self-${Date.now()}`,
+          //       senderId: -1,
+          //       senderNickname: 'System',
+          //       profileImg: '',
+          //       content: `${currentUser.nickname}님이 입장했습니다.`,
+          //       timestamp: Date.now(),
+          //       type: 'SYSTEM' as const,
+          //     },
+          //   ]);
+          // }
         } else {
           toast.error('방 정보를 불러올 수 없습니다.');
           router.push('/game');
