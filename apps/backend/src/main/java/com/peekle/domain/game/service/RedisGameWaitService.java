@@ -337,15 +337,25 @@ public class RedisGameWaitService {
         String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
         String status = (String) redisTemplate.opsForValue().get(statusKey);
 
+        // Backup check: If status is null but start time exists, treat as PLAYING
+        if (status == null) {
+            String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, roomId);
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(startTimeKey))) {
+                status = "PLAYING";
+                log.info("⚠️ Status was null but GAME_START_TIME exists. Treating Room {} as PLAYING.", roomId);
+            }
+        }
+
         if ("PLAYING".equals(status) || "END".equals(status)) {
             log.info("User {} temporarily left game room {} ({}). Allowing reconnection.", userId, roomId, status);
             String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
-            Map<String, Object> leaveData = Map.of(
-                    "userId", userId,
-                    "nickname", user.getNickname());
-            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", leaveData));
+            // User might be null if already deleted, so try/catch or optional
+            userRepository.findById(userId).ifPresent(user -> {
+                Map<String, Object> leaveData = Map.of(
+                        "userId", userId,
+                        "nickname", user.getNickname());
+                redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("LEAVE", leaveData));
+            });
             return;
         }
 

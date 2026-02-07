@@ -14,6 +14,7 @@ interface CCMyResultSectionProps {
   playTime: number;
   isOpen: boolean;
   mode: 'SPEED_RACE' | 'TIME_ATTACK';
+  showScore?: boolean;
 }
 
 const getRankDisplay = (rank: number) => {
@@ -69,6 +70,7 @@ export function CCMyResultSection({
   playTime,
   isOpen,
   mode,
+  showScore = true,
 }: CCMyResultSectionProps) {
   const myRank = myResult?.rank || 0;
   const gainedPoints = personalStats.pointsGained;
@@ -108,11 +110,13 @@ export function CCMyResultSection({
         </div>
 
         {/* 2. 획득 포인트 */}
-        <div className="flex flex-col items-center">
-          <div className="text-[48px] leading-none font-black text-transparent bg-clip-text bg-gradient-to-b from-primary via-primary to-primary/60 drop-shadow-md tabular-nums">
-            +{animatedPoints}p
+        {showScore && (
+          <div className="flex flex-col items-center">
+            <div className="text-[48px] leading-none font-black text-transparent bg-clip-text bg-gradient-to-b from-primary via-primary to-primary/60 drop-shadow-md tabular-nums">
+              +{animatedPoints}p
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 3. 리그 정보  */}
         <div className="w-full transform scale-[0.88] origin-center relative z-10 opacity-90 hover:opacity-100 transition-opacity">

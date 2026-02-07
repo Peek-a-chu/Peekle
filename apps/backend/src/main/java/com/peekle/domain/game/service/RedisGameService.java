@@ -1059,28 +1059,32 @@ public class RedisGameService {
 
         redisTemplate.expire(solvedKey, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
 
-        // 3. 경과 시간 계산
+        // 3. 경과 시간 계산 (초 단위)
         String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, gameId);
         String startTimeStr = (String) redisTemplate.opsForValue().get(startTimeKey);
 
         long startTime = (startTimeStr != null) ? Long.parseLong(startTimeStr) : System.currentTimeMillis();
         long elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000;
+        long elapsedMinutes = elapsedSeconds / 60; // 분 단위 변환
 
-        // 4. 개인 기록 업데이트 (Hash: solvedCount, totalTime)
+        // 4. 개인 기록 업데이트 (Hash: solvedCount, totalMinutes)
         String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, userId);
         redisTemplate.opsForHash().increment(scoreKey, "solvedCount", 1);
-        redisTemplate.opsForHash().increment(scoreKey, "totalTime", elapsedSeconds);
-        redisTemplate.opsForHash().put(scoreKey, "lastSolvedSeconds", String.valueOf(elapsedSeconds));
-        // [NEW] 마지막 문제 해결 시간 기록 (게임 시작 기준 경과 시간, 초 단위)
-        redisTemplate.opsForHash().put(scoreKey, "lastSolvedSeconds", String.valueOf(elapsedSeconds));
+        redisTemplate.opsForHash().increment(scoreKey, "totalMinutes", elapsedMinutes);
         redisTemplate.expire(scoreKey, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
 
-        // 5. 랭킹 점수 계산 & 업데이트 (ZSet)
-        // 공식: (푼 문제 수 * 5000) - 경과 시간
+        // 5. ICPC 스타일 랭킹 점수 계산 & 업데이트 (ZSet)
+        // 공식: (푼 문제 수 × 100,000,000) - 총 시간(분)
+        // → 문제 수가 많을수록, 시간이 적을수록 높은 점수
         Object solvedCountObj = redisTemplate.opsForHash().get(scoreKey, "solvedCount");
-        int solvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 1;
+        Object totalMinutesObj = redisTemplate.opsForHash().get(scoreKey, "totalMinutes");
 
-        double score = (solvedCount * 5000) - elapsedSeconds;
+        int solvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 1;
+        long totalMinutes = (totalMinutesObj != null) ? Long.parseLong(String.valueOf(totalMinutesObj))
+                : elapsedMinutes;
+
+        // ICPC 점수: 푼 문제 수 우선, 시간은 타이브레이커
+        double score = (solvedCount * 100000000.0) - totalMinutes;
 
         // 팀전 여부 확인 및 팀 점수 반영
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, gameId);
