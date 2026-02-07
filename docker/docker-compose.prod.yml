@@ -117,7 +117,14 @@ services:
       - "127.0.0.1:6379:6379" # localhost에서만 접근 가능 (Host Network인 LiveKit 연동용)
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-peekle-redis-password}", "ping"]
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${REDIS_PASSWORD:-peekle-redis-password}",
+          "ping",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -175,16 +182,14 @@ services:
     container_name: peekle-livekit
     command: --config /livekit.yaml
     restart: unless-stopped
-    network_mode: "host"  # Required for WebRTC performance
+    network_mode: "host" # Required for WebRTC performance
     volumes:
       - ./livekit/livekit.yaml:/livekit.yaml
       - nginx-certs:/etc/letsencrypt:ro
     environment:
       - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
-    user: root  # Required to read SSL certificates
+    user: root # Required to read SSL certificates
     logging: *default-logging
-
-
 
 networks:
   peekle-network:

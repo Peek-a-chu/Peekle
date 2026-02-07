@@ -163,6 +163,7 @@ export const useStudySocketSubscription = (studyId: number) => {
     // 3. Subscribe Private User Topic (For ROOM_INFO, ERROR etc)
     let privateSubscription: any = null;
     let videoTokenSubscription: any = null;
+    let ideRestoreSubscription: any = null;
 
     const clearOnlineSyncTimer = () => {
       if (onlineSyncTimerRef.current) {
@@ -211,6 +212,9 @@ export const useStudySocketSubscription = (studyId: number) => {
         if (videoTokenSubscription) {
           videoTokenSubscription.unsubscribe();
         }
+        if (ideRestoreSubscription) {
+          ideRestoreSubscription.unsubscribe();
+        }
 
         const privateTopic = `/topic/studies/${studyId}/info/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Private:', privateTopic);
@@ -235,6 +239,13 @@ export const useStudySocketSubscription = (studyId: number) => {
         const videoTokenTopic = `/topic/studies/${studyId}/video-token/${effectiveUserId}`;
         console.log('[StudySocket] Subscribing to Video Token:', videoTokenTopic);
         videoTokenSubscription = client.subscribe(videoTokenTopic, (message) => {
+          handleSocketMessage(message);
+        });
+
+        // Subscribe my IDE stream to receive Redis-restored code on room re-entry.
+        const ideRestoreTopic = `/topic/studies/rooms/${studyId}/ide/${effectiveUserId}`;
+        console.log('[StudySocket] Subscribing to IDE Restore:', ideRestoreTopic);
+        ideRestoreSubscription = client.subscribe(ideRestoreTopic, (message) => {
           handleSocketMessage(message);
         });
 
@@ -493,6 +504,22 @@ export const useStudySocketSubscription = (studyId: number) => {
             setVideoToken(token);
             break;
           }
+          case 'IDE': {
+            const restoredProblemId = Number(data?.problemId);
+            if (Number.isNaN(restoredProblemId) || restoredProblemId <= 0) break;
+
+            window.dispatchEvent(
+              new CustomEvent('study-ide-restored', {
+                detail: {
+                  studyId,
+                  problemId: restoredProblemId,
+                  code: data?.code ?? '',
+                  lang: data?.lang ?? null,
+                },
+              }),
+            );
+            break;
+          }
           case 'SOLVED': {
             // Problem Solved - trigger refetch & toast
             const { problemId, userId: solverId, nickname, earnedPoints } = data;
@@ -555,6 +582,7 @@ export const useStudySocketSubscription = (studyId: number) => {
       curriculumSubscription.unsubscribe();
       if (privateSubscription) privateSubscription.unsubscribe();
       if (videoTokenSubscription) videoTokenSubscription.unsubscribe();
+      if (ideRestoreSubscription) ideRestoreSubscription.unsubscribe();
 
       // 3. Leave Study (Session Exit)
       // Do NOT send explicit LEAVE here.

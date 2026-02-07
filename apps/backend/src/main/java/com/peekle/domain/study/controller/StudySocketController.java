@@ -165,11 +165,15 @@ public class StudySocketController {
 
                         // 4. IDE Restore
                         for (ProblemStatusResponse problem : curriculum) {
+                                // Redis IDE key uses studyProblemId as problem key in this project.
+                                Long redisProblemKey = problem.getStudyProblemId() != null
+                                                ? problem.getStudyProblemId()
+                                                : problem.getProblemId();
                                 IdeResponse savedCode = redisIdeService.getCode(studyId,
-                                                problem.getProblemId(), userId);
+                                                redisProblemKey, userId);
                                 if (savedCode != null) {
                                         messagingTemplate.convertAndSend(
-                                                        "/topic/studies/" + studyId + "/ide/" + userId,
+                                                        "/topic/studies/rooms/" + studyId + "/ide/" + userId,
                                                         SocketResponse.of("IDE", savedCode));
                                 }
                         }

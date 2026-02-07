@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { CCStudyHeader as StudyHeader } from './CCStudyHeader';
 import { CCProblemListPanel as ProblemListPanel } from './CCProblemListPanel';
 import { CCCenterPanel as CenterPanel } from './CCCenterPanel';
+import { CCVideoGrid as VideoGrid } from './CCVideoGrid';
 import { CCRightPanel as RightPanel } from './CCRightPanel';
 import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
@@ -117,11 +118,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [compactTab, setCompactTab] = useState<'problems' | 'ide'>('problems');
 
   // Global state for selected problem
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
+  const lastSelectedProblemStorageKey = `peekle:study:${studyId}:last-selected-problem`;
 
   useEffect(() => {
     // Reset selected problem and view mode when mounting study room
@@ -317,6 +321,15 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     window.postMessage({ type: 'PEEKLE_CLEAR_PENDING' }, '*');
   }, []);
 
+  useEffect(() => {
+    const syncViewport = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
   const handleSelectProblem = (problem: Problem): void => {
     console.log('[StudyRoomClient] Selecting problem:', problem);
     // Ensure ID is a valid number
@@ -333,6 +346,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       problem.title,
       problem.externalId || String((problem as any).number),
     );
+
+    if (studyProblemId) {
+      try {
+        sessionStorage.setItem(lastSelectedProblemStorageKey, String(studyProblemId));
+      } catch {
+        // Ignore storage write failures
+      }
+    }
   };
 
   const handleDateChange = (date: Date): void => {
@@ -343,6 +364,122 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const handleToggleLeftPanel = (): void => {
     setIsLeftPanelFolded(!isLeftPanelFolded);
   };
+
+  const isCompactLayout = viewport.width > 0 && (viewport.width < 1000 || viewport.height < 768);
+  const hideCurrentProblemLabel = viewport.width >= 1000 && viewport.width < 1100;
+
+  const problemList = (
+    <ProblemListPanel
+      problems={problems.map((p: any) => ({
+        ...p,
+        problemId: p.id ?? p.problemId,
+        solvedMemberCount: p.solvedMemberCount ?? 0,
+      }))}
+      selectedDate={selectedDate}
+      onDateChange={handleDateChange}
+      onAddProblem={addProblem}
+      onRemoveProblem={deleteProblem}
+      onSelectProblem={handleSelectProblem}
+      selectedStudyProblemId={selectedStudyProblemId ?? undefined}
+      onToggleFold={handleToggleLeftPanel}
+      isFolded={isLeftPanelFolded}
+      submissions={submissions}
+      onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
+      showFoldButton={!isCompactLayout}
+    />
+  );
+
+  useEffect(() => {
+    if (selectedStudyProblemId || problems.length === 0) return;
+
+    let cachedStudyProblemId: number | null = null;
+    try {
+      const raw = sessionStorage.getItem(lastSelectedProblemStorageKey);
+      cachedStudyProblemId = raw ? Number(raw) : null;
+    } catch {
+      cachedStudyProblemId = null;
+    }
+
+    if (!cachedStudyProblemId) return;
+
+    const matchedProblem = problems.find((p: any) => {
+      const studyProblemId = Number((p as any).studyProblemId ?? (p as any).id);
+      return studyProblemId === cachedStudyProblemId;
+    });
+
+    if (matchedProblem) {
+      handleSelectProblem(matchedProblem);
+    }
+  }, [selectedStudyProblemId, problems, lastSelectedProblemStorageKey]);
+
+  if (isCompactLayout) {
+    return (
+      <>
+        <SettingsModal />
+        <div className="flex h-screen flex-col bg-background text-foreground">
+          <header className="shrink-0 border-b border-border">
+            <StudyHeader
+              onBack={handleBack}
+              onAddProblem={handleAddProblem}
+              onInvite={handleInvite}
+              onSettings={handleSettings}
+              selectedDate={selectedDate}
+              onDateChange={handleDateChange}
+            />
+          </header>
+
+          <div className="shrink-0 border-b border-border bg-card px-3 py-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${
+                  compactTab === 'problems'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => setCompactTab('problems')}
+              >
+                문제선택
+              </button>
+              <button
+                type="button"
+                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${
+                  compactTab === 'ide'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => setCompactTab('ide')}
+              >
+                IDE
+              </button>
+            </div>
+          </div>
+
+          <VideoGrid
+            onWhiteboardClick={handleWhiteboardClick}
+            className="shrink-0 bg-card"
+          />
+
+          <div className="min-h-0 flex-1">
+            {compactTab === 'problems' ? (
+              problemList
+            ) : (
+              <CenterPanel
+                compactMode
+                onWhiteboardClick={handleWhiteboardClick}
+                onMicToggle={handleMicToggle}
+                onVideoToggle={handleVideoToggle}
+                onWhiteboardToggle={handleWhiteboardToggle}
+                onSettingsClick={handleSettings}
+                hideCurrentProblemLabel={hideCurrentProblemLabel}
+                className="h-full"
+              />
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -358,25 +495,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
             onDateChange={handleDateChange}
           />
         }
-        leftPanel={
-          <ProblemListPanel
-            problems={problems.map((p: any) => ({
-              ...p,
-              problemId: p.id ?? p.problemId,
-              solvedMemberCount: p.solvedMemberCount ?? 0,
-            }))}
-            selectedDate={selectedDate}
-            onDateChange={handleDateChange}
-            onAddProblem={addProblem}
-            onRemoveProblem={deleteProblem}
-            onSelectProblem={handleSelectProblem}
-            selectedStudyProblemId={selectedStudyProblemId ?? undefined}
-            onToggleFold={handleToggleLeftPanel}
-            isFolded={isLeftPanelFolded}
-            submissions={submissions}
-            onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
-          />
-        }
+        leftPanel={problemList}
         centerPanel={
           <CenterPanel
             onWhiteboardClick={handleWhiteboardClick}
@@ -384,6 +503,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
             onVideoToggle={handleVideoToggle}
             onWhiteboardToggle={handleWhiteboardToggle}
             onSettingsClick={handleSettings}
+            hideCurrentProblemLabel={hideCurrentProblemLabel}
           />
         }
         rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}

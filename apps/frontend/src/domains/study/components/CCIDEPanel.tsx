@@ -399,10 +399,6 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       // 확실한 동기화를 위해 한 번 더 설정합니다.
       editor.setValue(code);
 
-      if (!readOnly && onCodeChange) {
-        onCodeChange(code);
-      }
-
       const container = editor.getContainerDomNode();
       const preventClipboard = (e: Event): void => {
         e.preventDefault();
@@ -475,7 +471,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     return (
       <div
         className={cn(
-          'flex h-full flex-col bg-background min-w-0 relative ide-panel-mobile-fullscreen',
+          'flex h-full flex-col bg-background min-w-0 relative',
           borderColorClass
             ? `border-2 ${borderColorClass} rounded-lg`
             : readOnly
@@ -495,26 +491,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           />
         )}
 
-        {/* Mobile Fullscreen Style */}
-        <style jsx>{`
-          @media (max-width: 899px), (max-height: 575px) {
-            .ide-panel-mobile-fullscreen {
-              position: fixed !important;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              z-index: 9999;
-              width: 100vw;
-              height: 100vh;
-              border: none !important;
-              border-radius: 0 !important;
-              margin: 0 !important;
-            }
-          }
-        `}</style>
-        
-        <div className="flex-1 overflow-hidden" onMouseEnter={() => editorRef.current?.focus()}>
+        <div className="flex-1 min-h-0 overflow-hidden" onMouseEnter={() => editorRef.current?.focus()}>
           <Editor
             // [중요] 키 변경으로 컴포넌트 완전 재생성
             key={`${language}-${modelId}`}

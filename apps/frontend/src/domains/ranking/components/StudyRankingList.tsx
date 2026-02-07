@@ -1,14 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Search, ChevronDown, ChevronUp, ArrowDownUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
+import type { RankResponse } from '@/api/rankingApi';
 import PeopleIcon from '@/assets/icons/people.svg';
 import TrophyIcon from '@/assets/icons/trophy.svg';
-import ZoomIcon from '@/assets/icons/zoom.svg';
-import { UserIcon } from '@/components/UserIcon';
 import { CCUserProfileModal } from '@/components/common/CCUserProfileModal';
 
 interface StudyRankingListProps {
@@ -16,57 +13,29 @@ interface StudyRankingListProps {
   expandedIds: number[];
   onToggleExpand: (studyId: number) => void;
   onStudyClick: (studyId: number) => void;
+  highlightedStudyId?: number | null;
   scope: 'ALL' | 'MINE';
   onScopeChange: (scope: 'ALL' | 'MINE') => void;
+  sortBy?: 'RANK' | 'POINT' | 'MEMBERS';
+  onSortByChange?: (sortBy: 'RANK' | 'POINT' | 'MEMBERS') => void;
   children?: React.ReactNode;
   isLoading?: boolean;
   searchTerm?: string;
   onSearchChange?: (term: string) => void;
 }
 
-const MemberAvatars = ({
-  members,
-  limit = 4,
-}: {
-  members: StudyMemberResponse[];
-  limit?: number;
-}): React.ReactNode => (
-  <div className="flex items-center -space-x-2">
-    {members.slice(0, limit).map((m) => {
-      const displayImg = m.profileImgThumb || m.profileImg;
-      return displayImg ? (
-        <img
-          key={m.userId}
-          src={encodeURI(displayImg)}
-          alt={m.nickname}
-          className="h-7 w-7 rounded-full border-2 border-white bg-slate-100 object-cover ring-1 ring-slate-100"
-          title={m.nickname}
-        />
-      ) : (
-        <div
-          key={m.userId}
-          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-500 ring-1 ring-slate-100"
-          title={m.nickname}
-        >
-          {m.nickname.charAt(0)}
-        </div>
-      );
-    })}
-    {members.length > limit && (
-      <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-500 ring-1 ring-slate-100">
-        +{members.length - limit}
-      </div>
-    )}
-  </div>
-);
+const tableCols = 'grid-cols-[4.5rem_minmax(0,1fr)_7rem_8.5rem_4.5rem]';
 
 export function StudyRankingList({
   rankings,
   expandedIds,
   onToggleExpand,
   onStudyClick,
+  highlightedStudyId = null,
   scope,
   onScopeChange,
+  sortBy = 'RANK',
+  onSortByChange,
   children,
   isLoading = false,
   searchTerm = '',
@@ -89,16 +58,15 @@ export function StudyRankingList({
       />
       {children}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Search Bar matching GlobalSearchBar */}
-        <div className="relative flex-1 max-w-lg">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative flex-1 max-w-xl">
           <div className="relative">
             <button className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors">
               <Search className="h-full w-full" />
             </button>
             <input
               type="text"
-              placeholder="스터디를 검색해보세요."
+              placeholder="팀 이름으로 검색해보세요."
               className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-4 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground h-10"
               value={searchTerm}
               onChange={(e) => onSearchChange?.(e.target.value)}
@@ -106,46 +74,74 @@ export function StudyRankingList({
           </div>
         </div>
 
-        {/* Scope Toggle matching Container.svg style */}
-        <div className="flex bg-[#F7F8FC] p-1 rounded-lg border border-[#D8DFE4] dark:bg-muted dark:border-border">
-          <button
-            onClick={() => onScopeChange('ALL')}
-            className={cn(
-              'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all',
-              scope === 'ALL'
-                ? 'bg-white text-[#040C13] shadow-sm ring-1 ring-black/5 dark:bg-background dark:text-foreground dark:ring-white/10'
-                : 'text-[#798d9c] hover:text-[#040C13] dark:text-muted-foreground dark:hover:text-foreground',
-            )}
-          >
-            <TrophyIcon
-              className={cn('w-4 h-4', scope === 'ALL' ? 'text-primary' : 'text-[#59656E] dark:text-muted-foreground')}
-            />
-            <span>전체 팀</span>
-          </button>
-          <button
-            onClick={() => onScopeChange('MINE')}
-            className={cn(
-              'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all',
-              scope === 'MINE'
-                ? 'bg-white text-[#040C13] shadow-sm ring-1 ring-black/5 dark:bg-background dark:text-foreground dark:ring-white/10'
-                : 'text-[#798d9c] hover:text-[#040C13] dark:text-muted-foreground dark:hover:text-foreground',
-            )}
-          >
-            <PeopleIcon
-              className={cn('w-4 h-4', scope === 'MINE' ? 'text-primary' : 'text-[#59656E] dark:text-muted-foreground')}
-            />
-            <span>내 팀</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-[#D8DFE4] bg-[#F7F8FC] p-1 dark:border-border dark:bg-muted">
+            <button
+              onClick={() => onScopeChange('ALL')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-bold transition-all',
+                scope === 'ALL'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-[#60717E] hover:text-[#040C13] dark:text-muted-foreground dark:hover:text-foreground',
+              )}
+            >
+              <TrophyIcon className="h-4 w-4" />
+              전체 팀
+            </button>
+            <button
+              onClick={() => onScopeChange('MINE')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-bold transition-all',
+                scope === 'MINE'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-[#60717E] hover:text-[#040C13] dark:text-muted-foreground dark:hover:text-foreground',
+              )}
+            >
+              <PeopleIcon className="h-4 w-4" />
+              내 팀
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 rounded-lg border border-input bg-background px-2 py-1">
+            <ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground" />
+            <button
+              className={cn(
+                'rounded-md px-2 py-1 text-xs font-semibold',
+                sortBy === 'RANK' ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
+              )}
+              onClick={() => onSortByChange?.('RANK')}
+            >
+              기본
+            </button>
+            <button
+              className={cn(
+                'rounded-md px-2 py-1 text-xs font-semibold',
+                sortBy === 'POINT' ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
+              )}
+              onClick={() => onSortByChange?.('POINT')}
+            >
+              점수순
+            </button>
+            <button
+              className={cn(
+                'rounded-md px-2 py-1 text-xs font-semibold',
+                sortBy === 'MEMBERS' ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
+              )}
+              onClick={() => onSortByChange?.('MEMBERS')}
+            >
+              인원순
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Table Header Row */}
-      <div className="hidden md:grid grid-cols-[4rem_1fr_5rem_6rem_3rem] gap-4 px-6 py-2 text-sm font-medium text-slate-400 dark:text-muted-foreground">
+      <div className={cn('hidden md:grid gap-4 px-6 py-2 text-sm font-medium text-slate-400 dark:text-muted-foreground', tableCols)}>
         <div className="text-center">순위</div>
         <div>팀 이름</div>
         <div className="text-center">인원</div>
-        <div className="text-right pr-2">총 점수</div>
-        <div></div>
+        <div className="text-right">총 점수</div>
+        <div className="text-center">상세</div>
       </div>
 
       {/* List Items */}
@@ -174,14 +170,18 @@ export function StudyRankingList({
               return (
                 <div
                   key={ranking.studyId}
+                  id={`ranking-study-${ranking.studyId}`}
                   className={cn(
-                    'group relative flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm transition-all duration-200 overflow-hidden',
-                    'hover:shadow-md hover:border-slate-300 dark:bg-card dark:border-border dark:hover:border-primary/50',
+                    'group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-200',
+                    'border-slate-200 hover:border-slate-300 dark:border-border dark:bg-card dark:hover:border-primary/50',
+                    highlightedStudyId === ranking.studyId &&
+                      'ring-2 ring-primary/40 border-primary/40',
                   )}
                 >
                   <div
                     className={cn(
-                      'grid grid-cols-[4rem_1fr_5rem_6rem_3rem] gap-4 items-center p-3 cursor-pointer select-none',
+                      'grid items-center gap-4 p-3 cursor-pointer select-none',
+                      tableCols,
                       isExpanded ? 'bg-slate-50/50 dark:bg-muted/50' : '',
                     )}
                     onClick={() => onToggleExpand(ranking.studyId)}
@@ -213,7 +213,8 @@ export function StudyRankingList({
                         {ranking.totalPoint.toLocaleString()}점
                       </div>
                     </div>
-                    <div className="flex justify-center text-slate-300">
+                    <div className="flex items-center justify-center gap-1 text-slate-400 dark:text-muted-foreground">
+                      <span className="text-xs font-semibold">{isExpanded ? '닫기' : '상세'}</span>
                       {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </div>
                   </div>

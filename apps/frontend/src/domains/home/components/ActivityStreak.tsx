@@ -13,7 +13,38 @@ interface ActivityStreakProps {
 }
 
 // 사용 가능한 년도들 (동적 생성)
-const CURRENT_YEAR = new Date().getFullYear();
+const MIN_VISIBLE_YEAR = 2025;
+
+const getKstToday = () => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const year = Number(parts.find((part) => part.type === 'year')?.value ?? '1970');
+  const month = Number(parts.find((part) => part.type === 'month')?.value ?? '01');
+  const day = Number(parts.find((part) => part.type === 'day')?.value ?? '01');
+
+  return { year, month, day };
+};
+
+const KST_TODAY = getKstToday();
+const CURRENT_YEAR = KST_TODAY.year;
+const MIN_MONTH_LABEL_GAP_WEEKS = 3;
+
+interface DayCell {
+  date: string | null;
+  count: number;
+}
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const ActivityStreak = ({
   onDateSelect,
@@ -37,6 +68,10 @@ const ActivityStreak = ({
     const years = new Set<number>();
     years.add(CURRENT_YEAR); // 현재 년도는 항상 포함
 
+    for (let year = MIN_VISIBLE_YEAR; year <= CURRENT_YEAR; year += 1) {
+      years.add(year);
+    }
+
     allData.forEach((item) => {
       const year = new Date(item.date).getFullYear();
       if (!isNaN(year)) {
@@ -47,47 +82,41 @@ const ActivityStreak = ({
     return Array.from(years).sort((a, b) => a - b);
   }, [allData]);
 
-  // 선택된 년도 데이터만 필터링 (로컬에서 전체 날짜 생성)
-  const yearData = useMemo(() => {
-    // 1. 해당 연도의 모든 날짜 생성
-    const fullDates: { date: string; count: number }[] = [];
-    const startDate = new Date(`${selectedYear}-01-01`);
-    const endDate = new Date(`${selectedYear}-12-31`);
-
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
-      fullDates.push({ date: dateStr, count: 0 });
-    }
-
-    // 2. 실제 데이터 매핑
+  const weekData = useMemo(() => {
+    const startDate = new Date(selectedYear, 0, 1);
+    const endDate =
+      selectedYear === CURRENT_YEAR
+        ? new Date(selectedYear, KST_TODAY.month - 1, KST_TODAY.day)
+        : new Date(selectedYear, 11, 31);
     const dataMap = new Map(allData.map((item) => [item.date, item.count]));
 
-    return fullDates.map((item) => ({
-      ...item,
-      count: dataMap.get(item.date) || 0,
-    }));
+    const fullDates: DayCell[] = [];
+    const leadingPlaceholders = startDate.getDay();
+    for (let i = 0; i < leadingPlaceholders; i += 1) {
+      fullDates.push({ date: null, count: 0 });
+    }
+
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateStr = formatLocalDate(d);
+      fullDates.push({ date: dateStr, count: dataMap.get(dateStr) || 0 });
+    }
+
+    const trailingPlaceholders = (7 - (fullDates.length % 7)) % 7;
+    for (let i = 0; i < trailingPlaceholders; i += 1) {
+      fullDates.push({ date: null, count: 0 });
+    }
+
+    const weeks: DayCell[][] = [];
+    for (let i = 0; i < fullDates.length; i += 7) {
+      weeks.push(fullDates.slice(i, i + 7));
+    }
+
+    return weeks;
   }, [allData, selectedYear]);
-
-  // 데이터를 월별로 그룹화
-  const monthlyData = useMemo(() => {
-    const months: { [key: string]: { date: string; count: number }[] } = {};
-
-    yearData.forEach((item) => {
-      const date = new Date(item.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-      if (!months[monthKey]) {
-        months[monthKey] = [];
-      }
-      months[monthKey].push(item);
-    });
-
-    return months;
-  }, [yearData]);
 
   // 색상 계산 (문제 풀이 수에 따라)
   const getColor = (count: number) => {
-    if (count === 0) return 'bg-muted/30';
+    if (count === 0) return 'bg-primary/10';
     if (count <= 2) return 'bg-primary/30';
     if (count <= 4) return 'bg-primary/60';
     return 'bg-primary';
@@ -95,8 +124,8 @@ const ActivityStreak = ({
 
   // 해당 년도 총 문제 수 계산
   const totalProblems = useMemo(() => {
-    return yearData.reduce((sum, item) => sum + item.count, 0);
-  }, [yearData]);
+    return weekData.flat().reduce((sum, item) => sum + (item.date ? item.count : 0), 0);
+  }, [weekData]);
 
   // 날짜 클릭 핸들러
   const handleDateClick = (date: string) => {
@@ -106,11 +135,42 @@ const ActivityStreak = ({
     onDateSelect?.(date);
   };
 
-  // 월 이름 포맷
-  const formatMonth = (monthKey: string) => {
-    const [, month] = monthKey.split('-');
-    return `${month}월`;
-  };
+  const monthLabelPositions = useMemo(() => {
+    const labels: { label: string; weekIndex: number; month: number }[] = [];
+    const seen = new Set<number>();
+
+    weekData.forEach((week, weekIndex) => {
+      week.forEach((day) => {
+        if (!day.date) return;
+        const month = Number(day.date.slice(5, 7));
+        const dayOfMonth = Number(day.date.slice(8, 10));
+        if (dayOfMonth === 1 && !seen.has(month)) {
+          seen.add(month);
+          labels.push({ label: `${String(month).padStart(2, '0')}월`, weekIndex, month });
+        }
+      });
+    });
+
+    if (!labels.some((item) => item.month === 1)) {
+      labels.unshift({ label: '01월', weekIndex: 0, month: 1 });
+    }
+
+    const filtered: { label: string; weekIndex: number }[] = [];
+    let lastWeekIndex = -MIN_MONTH_LABEL_GAP_WEEKS;
+    labels.forEach((item) => {
+      if (item.weekIndex - lastWeekIndex < MIN_MONTH_LABEL_GAP_WEEKS) {
+        if (item.month === 12 && filtered.length > 0) {
+          filtered[filtered.length - 1] = { label: item.label, weekIndex: item.weekIndex };
+          lastWeekIndex = item.weekIndex;
+        }
+        return;
+      }
+      filtered.push({ label: item.label, weekIndex: item.weekIndex });
+      lastWeekIndex = item.weekIndex;
+    });
+
+    return filtered;
+  }, [weekData]);
 
   return (
     <div className="p-6 transition-colors duration-300">
@@ -151,29 +211,51 @@ const ActivityStreak = ({
       </div>
 
       {/* 히트맵 */}
-      <div className="overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden p-1">
-        <div className="flex gap-1 min-w-max">
-          {Object.entries(monthlyData).map(([monthKey, days]) => (
-            <div key={monthKey} className="flex flex-col gap-1">
-              <span className="text-[10px] text-muted-foreground/70 mb-1 h-3">
-                {formatMonth(monthKey)}
+      <div className="w-full p-1">
+        <div className="w-full relative">
+          <div className="relative h-4 mb-2">
+            {monthLabelPositions.map((item) => (
+              <span
+                key={`${item.label}-${item.weekIndex}`}
+                className="absolute text-[10px] text-muted-foreground/70"
+                style={{
+                  left: `${(item.weekIndex / 53) * 100}%`,
+                }}
+              >
+                {item.label}
               </span>
-              <div className="grid grid-rows-7 grid-flow-col gap-px">
-                {days.map((day) => (
-                  <button
-                    key={day.date}
-                    onClick={() => handleDateClick(day.date)}
-                    className={`w-2.5 h-2.5 rounded-[2px] transition-all ${getColor(day.count === 0 ? 0 : day.count)} ${
-                      selectedDate === day.date
-                        ? 'ring-1 ring-primary ring-offset-1 relative z-10'
-                        : 'hover:ring-1 hover:ring-border'
-                    }`}
-                    title={`${day.date}: ${day.count}문제`}
-                  />
-                ))}
+            ))}
+          </div>
+          <div
+            className="grid gap-1 w-full"
+            style={{
+              gridTemplateColumns: 'repeat(53, minmax(0, 1fr))',
+            }}
+          >
+            {weekData.map((week, weekIndex) => (
+              <div key={`week-${weekIndex}`} className="grid grid-rows-7 gap-1">
+                {week.map((day, dayIndex) =>
+                  day.date ? (
+                    <button
+                      key={day.date}
+                      onClick={() => handleDateClick(day.date as string)}
+                      className={`w-full max-w-[14px] justify-self-center aspect-square rounded-[2px] transition-all ${getColor(day.count)} ${
+                        selectedDate === day.date
+                          ? 'ring-1 ring-primary ring-offset-1 relative z-10'
+                          : 'hover:ring-1 hover:ring-border'
+                      }`}
+                      title={`${day.date}: ${day.count}문제`}
+                    />
+                  ) : (
+                    <div
+                      key={`empty-${weekIndex}-${dayIndex}`}
+                      className="w-full max-w-[14px] justify-self-center aspect-square"
+                    />
+                  ),
+                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
@@ -181,7 +263,7 @@ const ActivityStreak = ({
       <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
         <span>적음</span>
         <div className="flex gap-0.5">
-          <div className="w-3 h-3 rounded-sm bg-muted/30" />
+          <div className="w-3 h-3 rounded-sm bg-primary/10" />
           <div className="w-3 h-3 rounded-sm bg-primary/30" />
           <div className="w-3 h-3 rounded-sm bg-primary/60" />
           <div className="w-3 h-3 rounded-sm bg-primary" />
