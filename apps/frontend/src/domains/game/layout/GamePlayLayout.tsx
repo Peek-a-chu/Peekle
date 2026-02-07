@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronRight, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ActionModal } from '@/components/common/Modal';
 import { GamePlayHeader } from '@/domains/game/components/game-play-header';
 import { GameProblemListPanel } from '@/domains/game/components/game-problem-list-panel';
 import { GamePlayCenterPanel } from '@/domains/game/components/game-play-center-panel';
-import { ChatPanel } from '@/domains/game/components/chat-panel';
+import { GameRightPanel } from '@/domains/game/components/GameRightPanel';
+import { GameChatPanel } from '@/domains/game/components/GameChatPanel';
+import { GameParticipantPanel } from '@/domains/game/components/GameParticipantPanel';
 import { GameControlBar } from '@/domains/game/components/game-control-bar';
 import {
   GamePlayState,
@@ -17,6 +19,11 @@ import {
   ChatMessage,
 } from '@/domains/game/types/game-types';
 import { CCGameResultModal } from '@/domains/game/components/game-result-modal/CCGameResultModal';
+import SettingsModal from '@/domains/settings/components/SettingsModal';
+
+// Constants for resizing
+const RIGHT_PANEL_MIN_WIDTH = 260;
+const RIGHT_PANEL_MAX_WIDTH = 480;
 
 interface GamePlayLayoutProps {
   className?: string;
@@ -36,6 +43,7 @@ interface GamePlayLayoutProps {
   onSendMessage: (content: string) => void;
   onLeave: () => void;
   onForfeit: () => void;
+  onlineUserIds: Set<number>;
 }
 
 export function GamePlayLayout({
@@ -56,6 +64,7 @@ export function GamePlayLayout({
   onSendMessage,
   onLeave,
   onForfeit,
+  onlineUserIds,
 }: GamePlayLayoutProps) {
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
@@ -64,6 +73,8 @@ export function GamePlayLayout({
   // 미디어 상태 관리 (Mock)
   const [micState, setMicState] = useState<Record<string, boolean>>({});
   const [camState, setCamState] = useState<Record<string, boolean>>({});
+
+  const isHost = participants.find((p) => p.id === currentUserId)?.isHost || false;
 
   const handleMuteAll = () => {
     const newState: Record<string, boolean> = {};
@@ -77,19 +88,7 @@ export function GamePlayLayout({
     setCamState((prev) => ({ ...prev, ...newState }));
   };
 
-  const handleMyMicToggle = () => {
-    setMicState((prev) => ({
-      ...prev,
-      [currentUserId]: !prev[currentUserId],
-    }));
-  };
 
-  const handleMyVideoToggle = () => {
-    setCamState((prev) => ({
-      ...prev,
-      [currentUserId]: !prev[currentUserId],
-    }));
-  };
 
   const handleForfeitClick = () => {
     setIsForfeitModalOpen(true);
@@ -99,6 +98,9 @@ export function GamePlayLayout({
     setIsForfeitModalOpen(false);
     onForfeit();
   };
+
+  // Online Count Calculation
+  const onlineCount = onlineUserIds.size;
 
   return (
     <div className={cn('flex h-screen flex-col bg-background', className)}>
@@ -114,117 +116,140 @@ export function GamePlayLayout({
       />
 
       {/* 메인 콘텐츠 */}
-      <div className="flex flex-1 min-h-0">
+      <div className="relative flex min-h-0 flex-1">
         {/* 좌측: 문제 목록 */}
-        <div
+        <aside
           className={cn(
-            'shrink-0 border-r border-border transition-all duration-300',
-            isLeftPanelFolded ? 'w-12' : 'w-64',
+            'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card transition-all duration-300 ease-in-out',
+            isLeftPanelFolded ? 'w-0 border-r-0 overflow-hidden' : 'w-72',
           )}
         >
-          <GameProblemListPanel
-            problems={problems}
-            selectedProblemId={selectedProblemId}
-            onSelectProblem={onSelectProblem}
-            mode={gameState.mode}
-            teamType={gameState.teamType}
-            participants={participants}
-            isFolded={isLeftPanelFolded}
-            onToggleFold={() => setIsLeftPanelFolded((prev) => !prev)}
-            currentUserId={currentUserId}
-          />
-        </div>
+          <div className="w-72 h-full">
+            <GameProblemListPanel
+              problems={problems}
+              selectedProblemId={selectedProblemId}
+              onSelectProblem={onSelectProblem}
+              mode={gameState.mode}
+              teamType={gameState.teamType}
+              participants={participants}
+              isFolded={isLeftPanelFolded}
+              onToggleFold={() => setIsLeftPanelFolded((prev) => !prev)}
+              currentUserId={currentUserId}
+            />
+          </div>
+        </aside>
 
         {/* 중앙: IDE */}
-        <div className="flex-1 min-w-0">
-          <GamePlayCenterPanel
-            code={code}
-            language={language}
-            participants={participants}
-            currentUserId={currentUserId}
-            onCodeChange={onCodeChange}
-            onLanguageChange={onLanguageChange}
-            onSubmit={onSubmit}
-            externalId={problems.find((p) => p.id === selectedProblemId)?.externalId}
-            selectedProblemUrl={
-              problems.find((p) => p.id === selectedProblemId)
-                ? `https://www.acmicpc.net/problem/${problems.find((p) => p.id === selectedProblemId)!.externalId}`
-                : undefined
-            }
-            micState={micState}
-            camState={camState}
-          />
-        </div>
-
-        {/* 우측: 채팅 패널 */}
-        <div
+        <main
           className={cn(
-            'shrink-0 border-l border-border transition-all duration-300',
-            isRightPanelFolded ? 'w-12' : 'w-80',
+            'relative flex min-w-0 flex-1 flex-col transition-all duration-300',
+            isLeftPanelFolded && 'pl-12',
           )}
         >
-          {isRightPanelFolded ? (
-            <div className="flex h-full flex-col items-center py-4">
+          {/* Unfold Left Panel Button */}
+          {isLeftPanelFolded && (
+            <div className="absolute left-2 top-2 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsLeftPanelFolded(false)}
+                className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur text-muted-foreground hover:text-foreground hover:bg-background"
+                title="문제 목록 펼치기"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Unfold Right Panel Button - Only when folded */}
+          {isRightPanelFolded && (
+            <div className="absolute right-2 top-2 z-10">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsRightPanelFolded(false)}
-                className="h-8 w-8"
+                className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur text-muted-foreground hover:text-foreground hover:bg-background"
                 title="채팅 패널 펼치기"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <PanelRightOpen className="h-4 w-4" />
               </Button>
             </div>
-          ) : (
-            <div className="flex h-full flex-col">
-              {/* 패널 헤더 */}
-              <div className="flex h-10 shrink-0 items-center border-b border-border bg-card px-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsRightPanelFolded(true)}
-                  className="h-8 w-8"
-                  title="패널 접기"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              {/* 채팅 패널 */}
-              <div className="flex-1 min-h-0">
-                <ChatPanel
+          )}
+
+          <div className="flex-1 min-h-0">
+            <GamePlayCenterPanel
+              code={code}
+              language={language}
+              participants={participants}
+              currentUserId={currentUserId}
+              onCodeChange={onCodeChange}
+              onLanguageChange={onLanguageChange}
+              onSubmit={onSubmit}
+              externalId={problems.find((p) => p.id === selectedProblemId)?.externalId}
+              selectedProblemUrl={
+                problems.find((p) => p.id === selectedProblemId)
+                  ? `https://www.acmicpc.net/problem/${problems.find((p) => p.id === selectedProblemId)!.externalId}`
+                  : undefined
+              }
+              micState={micState}
+              camState={camState}
+            />
+          </div>
+
+          {/* 하단 미디어 컨트롤 바 */}
+          <GameControlBar
+            className="shrink-0"
+            onSettingsClick={() => {
+              console.log('Settings clicked');
+            }}
+          />
+        </main>
+
+        {/* 우측: 채팅/참여자 패널 */}
+        <aside
+          className={cn(
+            'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card transition-all duration-300 ease-in-out',
+            isRightPanelFolded ? 'w-0 border-l-0 overflow-hidden' : 'w-80',
+          )}
+        >
+          <div className="w-80 h-full">
+            <GameRightPanel
+              onlineCount={onlineCount}
+              totalCount={participants.length}
+              onFold={() => setIsRightPanelFolded(true)}
+              chatContent={
+                <GameChatPanel
                   messages={messages}
                   participants={participants}
                   currentUserId={currentUserId}
-                  isHost={participants.find((p) => p.id === currentUserId)?.isHost || false}
+                  isHost={participants.find(p => p.id === currentUserId)?.isHost || false}
                   onSendMessage={onSendMessage}
-                  onMuteAll={handleMuteAll}
-                  onTurnOffAllCams={handleTurnOffAllCams}
-                  micState={micState}
-                  camState={camState}
                   teamType={gameState.teamType}
                 />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 하단 미디어 컨트롤 바 */}
-      <GameControlBar
-        className="border-t border-border bg-card py-2"
-        isMuted={micState[currentUserId] || false}
-        isVideoOff={camState[currentUserId] || false}
-        onMicToggle={handleMyMicToggle}
-        onVideoToggle={handleMyVideoToggle}
-        onSettingsClick={() => {
-          console.log('Settings clicked');
-        }}
-      />
+              }
+              participantsContent={
+                <GameParticipantPanel
+                  participants={participants}
+                  currentUserId={currentUserId}
+                  isHost={isHost}
+                  micState={micState}
+                  camState={camState}
+                  onMuteAll={handleMuteAll}
+                  onKick={() => { }}
+                  onDelegate={() => { }}
+                  onlineUserIds={onlineUserIds}
+                />
+              }
+            />
+          </div>
+        </aside>
+      </div >
 
       {/* 게임 결과 모달 */}
-      <CCGameResultModal
+      < CCGameResultModal
         isOpen={gameState.status === 'END'}
-        onClose={() => { }}
+        onClose={() => { }
+        }
         data={{
           participants: (gameState.result?.ranking || []).map((r, idx) => ({
             userId: r.userId,
@@ -267,6 +292,9 @@ export function GamePlayLayout({
         confirmText="포기하기"
         variant="destructive"
       />
-    </div>
+
+      {/* 설정 모달 */}
+      <SettingsModal />
+    </div >
   );
 }

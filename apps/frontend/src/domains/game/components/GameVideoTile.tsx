@@ -23,8 +23,8 @@ export function GameVideoTile({ participant, className, isCurrentUser }: GameVid
     return (
         <div
             className={cn(
-                'relative flex h-24 w-32 shrink-0 flex-col items-center justify-center overflow-hidden rounded-lg border border-border bg-muted',
-                'transition-all',
+                'relative h-40 w-52 shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+                'hover:ring-2 hover:ring-primary/50 transition-all',
                 isCurrentUser && 'ring-2 ring-primary',
                 className,
             )}
@@ -36,25 +36,21 @@ export function GameVideoTile({ participant, className, isCurrentUser }: GameVid
                 />
             ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gray-900 text-muted-foreground">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-white text-lg font-medium shadow-sm">
-                        {participant.name?.charAt(0) || participant.identity?.charAt(0) || <User className="h-6 w-6" />}
-                    </div>
+                    <User className="h-10 w-10" />
                 </div>
             )}
 
-            {/* Nickname */}
-            <div className="absolute bottom-1 left-0 right-0 px-1">
-                <div className="text-center">
-                    <span className="text-xs font-medium text-white truncate drop-shadow-md">
-                        {participant.name || participant.identity} {isCurrentUser && '(나)'}
-                    </span>
-                </div>
+            {/* Nickname - 스터디 룸처럼 좌측 하단 */}
+            <div className="absolute bottom-1 left-2 max-w-[80%]">
+                <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
+                    {participant.name || participant.identity} {isCurrentUser && '(나)'}
+                </span>
             </div>
 
-            {/* Mic Off Indicator */}
+            {/* Mic Off Indicator - 스터디 룸처럼 더 크고 명확하게 */}
             {!isAudioEnabled && (
-                <div className="absolute top-1 right-1 rounded-full bg-red-500/80 p-0.5 shadow-sm">
-                    <MicOff className="h-3 w-3 text-white" />
+                <div className="absolute top-2 right-2 rounded-full bg-red-500 p-1.5 shadow-lg border border-red-600 animate-in fade-in zoom-in duration-300">
+                    <MicOff className="h-4 w-4 text-white stroke-[2.5px]" />
                 </div>
             )}
         </div>

@@ -84,11 +84,11 @@ export function GamePlayCenterPanel({
     <div className={cn('flex h-full flex-col', className)}>
       {/* 화상 타일 헤더 */}
       <div className="flex items-center justify-between border-b border-border bg-card px-4 h-14 shrink-0">
-        <span className="text-sm font-medium">화상 타일</span>
+        <span className="text-sm font-medium text-foreground">화상 타일</span>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-6 w-6 text-muted-foreground hover:text-foreground"
           onClick={toggleVideoGrid}
           title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
         >

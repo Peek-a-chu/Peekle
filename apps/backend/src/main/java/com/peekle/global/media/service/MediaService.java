@@ -39,9 +39,18 @@ public class MediaService {
         return token.toJwt();
     }
 
-    // 게임방 LiveKit 접속을 위한 Access Token 생성
+    // 게임방 LiveKit 접속을 위한 Access Token 생성 (기본)
     public String createGameAccessToken(Long gameId, Long userId, String nickname) {
+        return createGameAccessToken(gameId, userId, nickname, null);
+    }
+
+    // 게임방 LiveKit 접속을 위한 Access Token 생성 (Team Suffix 지원)
+    public String createGameAccessToken(Long gameId, Long userId, String nickname, String roomSuffix) {
         String roomName = "game_" + gameId;
+        if (roomSuffix != null && !roomSuffix.isEmpty()) {
+            roomName += "_" + roomSuffix;
+        }
+
         // DUPLICATE_IDENTITY 방지를 위해 UUID를 결합하여 고유 Identity 생성
         String identity = userId + "_" + java.util.UUID.randomUUID().toString();
         AccessToken token = new AccessToken(apiKey, secret);

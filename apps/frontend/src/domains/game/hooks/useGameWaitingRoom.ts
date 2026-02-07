@@ -198,7 +198,50 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
             type: 'SYSTEM' as const,
           },
         ]);
-        fetchRoom();
+
+        // 참여자 목록 즉시 업데이트
+        if (event.data && event.data.userId) {
+          setRoom(prev => {
+            if (!prev) return null;
+
+            // 이미 목록에 있는지 확인
+            const existingIndex = prev.participants.findIndex(p => p.id === Number(event.data.userId));
+
+            if (existingIndex >= 0) {
+              // 이미 있으면 정보 업데이트
+              const updatedParticipants = [...prev.participants];
+              updatedParticipants[existingIndex] = {
+                id: Number(event.data.userId),
+                nickname: event.data.nickname,
+                profileImg: event.data.profileImg || '',
+                isHost: event.data.host ?? false,
+                status: event.data.ready ? 'READY' : 'NOT_READY',
+                team: event.data.team as Team,
+              };
+              return {
+                ...prev,
+                participants: updatedParticipants,
+              };
+            } else {
+              // 없으면 새로 추가
+              return {
+                ...prev,
+                participants: [
+                  ...prev.participants,
+                  {
+                    id: Number(event.data.userId),
+                    nickname: event.data.nickname,
+                    profileImg: event.data.profileImg || '',
+                    isHost: event.data.host ?? false,
+                    status: event.data.ready ? 'READY' : 'NOT_READY',
+                    team: event.data.team as Team,
+                  },
+                ],
+                currentPlayers: prev.currentPlayers + 1,
+              };
+            }
+          });
+        }
         break;
       case 'LEAVE': // [수정] EXIT -> LEAVE (백엔드와 맞춤)
         // 시스템 메시지 추가

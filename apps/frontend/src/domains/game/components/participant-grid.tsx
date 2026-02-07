@@ -85,8 +85,23 @@ export function ParticipantGrid({
 
   if (isTeamMode) {
     // 팀전: 레드팀과 블루팀으로 분리
-    const redTeam = sortedParticipants.filter((p) => p.team === 'RED');
-    const blueTeam = sortedParticipants.filter((p) => p.team === 'BLUE');
+    let redTeam = sortedParticipants.filter((p) => p.team === 'RED');
+    let blueTeam = sortedParticipants.filter((p) => p.team === 'BLUE');
+
+    // 팀이 없는 참여자들 (백엔드에서 team 속성을 안 보내는 경우 대응)
+    const noTeamParticipants = sortedParticipants.filter((p) => !p.team);
+
+    // 팀이 없는 참여자들을 RED/BLUE에 균등 분배
+    if (noTeamParticipants.length > 0) {
+      noTeamParticipants.forEach((p, index) => {
+        if (index % 2 === 0) {
+          redTeam.push(p);
+        } else {
+          blueTeam.push(p);
+        }
+      });
+    }
+
     const halfMax = maxPlayers / 2; // 팀당 최대 인원
 
     const redEmptySlots = Math.max(0, halfMax - redTeam.length);

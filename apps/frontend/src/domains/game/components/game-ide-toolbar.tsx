@@ -2,6 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Copy, Moon, Sun, Send } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const LANGUAGES = [
   { value: 'python', label: 'Python 3' },
@@ -27,44 +29,78 @@ export function GameIDEToolbar({
   onSubmit,
 }: GameIDEToolbarProps) {
   return (
-    <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
-      <div className="flex items-center gap-3">
-        {/* Language Select */}
-        <select
-          value={language}
-          onChange={(e) => onLanguageChange?.(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          {LANGUAGES.map((lang) => (
-            <option key={lang.value} value={lang.value}>
-              {lang.label}
-            </option>
-          ))}
-        </select>
+    <TooltipProvider>
+      <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
+        <div className="flex items-center gap-3">
+          {/* Language Select */}
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange?.(e.target.value)}
+            className={cn(
+              'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring text-foreground font-medium',
+            )}
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onThemeToggle}
+                className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+              >
+                {theme === 'light' ? (
+                  <Moon className="h-[22px] w-[22px] stroke-[2px]" />
+                ) : (
+                  <Sun className="h-[22px] w-[22px] stroke-[2px]" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>테마 변경</TooltipContent>
+          </Tooltip>
+
+          {/* Copy */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onCopy}
+                className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+              >
+                <Copy className="h-[22px] w-[22px] stroke-[2px]" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              코드 복사 <span className="ml-1 opacity-60 text-xs">Ctrl+C</span>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Submit */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                onClick={onSubmit}
+                className="ml-1 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-95 px-4 h-10 border border-primary-foreground/10"
+              >
+                <Send className="h-4 w-4 stroke-[2.5px]" />
+                <span className="font-bold text-sm">제출</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>문제 제출하기</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-
-      <div className="flex items-center gap-2">
-        {/* Theme Toggle */}
-        <Button variant="ghost" size="icon" onClick={onThemeToggle} title="테마 변경">
-          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-        </Button>
-
-        {/* Copy */}
-        <Button variant="ghost" size="icon" onClick={onCopy} title="코드 복사">
-          <Copy className="h-4 w-4" />
-        </Button>
-
-        {/* Submit - 항상 표시 */}
-        <Button
-          size="sm"
-          onClick={onSubmit}
-          className="gap-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50"
-          title="제출하기"
-        >
-          <Send className="h-3 w-3" />
-          <span className="text-xs">제출</span>
-        </Button>
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

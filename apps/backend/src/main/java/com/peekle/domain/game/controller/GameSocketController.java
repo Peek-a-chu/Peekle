@@ -2,7 +2,11 @@ package com.peekle.domain.game.controller;
 
 import com.peekle.domain.game.dto.request.GameChatRequest;
 import com.peekle.domain.game.dto.request.GameCommonRequest;
+import com.peekle.domain.game.dto.request.GameEnterRequest;
+import com.peekle.domain.game.dto.request.GameTeamRequest;
+import com.peekle.domain.game.service.RedisGameAfterService;
 import com.peekle.domain.game.service.RedisGameService;
+import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.socket.SocketResponse;
@@ -23,10 +27,11 @@ public class GameSocketController {
     private final MediaService mediaService;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
+    private final RedisGameAfterService gameAfterService;
 
     // 방 입장
     @MessageMapping("/games/enter")
-    public void enter(@Payload com.peekle.domain.game.dto.request.GameEnterRequest request,
+    public void enter(@Payload GameEnterRequest request,
             SimpMessageHeaderAccessor headerAccessor) {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
@@ -39,10 +44,20 @@ public class GameSocketController {
         // LiveKit 토큰 발급 및 전송
         try {
             String nickname = userRepository.findById(userId)
-                    .map(com.peekle.domain.user.entity.User::getNickname)
+                    .map(User::getNickname)
                     .orElse("Player " + userId);
-            String token = mediaService.createGameAccessToken(request.getGameId(), userId, nickname);
-            log.info("Generated LiveKit token for user {}, game {}", userId, request.getGameId());
+
+            // 팀전 여부 확인 및 팀별 방 분리
+            String teamType = gameService.getTeamType(request.getGameId());
+            String roomSuffix = null;
+            if ("TEAM".equals(teamType)) {
+                roomSuffix = gameService.getUserTeam(request.getGameId(), userId);
+                log.info("Team Mode Detected. Assigning User {} to Video Room Suffix: {}", userId, roomSuffix);
+            }
+
+            String token = mediaService.createGameAccessToken(request.getGameId(), userId, nickname, roomSuffix);
+            log.info("Generated LiveKit token for user {}, game {} (Suffix: {})", userId, request.getGameId(),
+                    roomSuffix);
 
             messagingTemplate.convertAndSend(
                     "/topic/games/" + request.getGameId() + "/video-token/" + userId,
@@ -53,16 +68,24 @@ public class GameSocketController {
                     "/topic/games/" + request.getGameId() + "/video-token/" + userId,
                     SocketResponse.of("ERROR", "Video connection failed"));
         }
+
+        // [New] Broadcast updated online user list
+        gameAfterService.broadcastOnlineUsers(request.getGameId());
     }
 
     // 팀 변경
     @MessageMapping("/games/team")
-    public void changeTeam(@Payload com.peekle.domain.game.dto.request.GameTeamRequest request,
+    public void changeTeam(@Payload GameTeamRequest request,
             SimpMessageHeaderAccessor headerAccessor) {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.changeTeam(request.getGameId(), userId, request.getTeam());
+        try {
+            gameService.changeTeam(request.getGameId(), userId, request.getTeam());
+        } catch (Exception e) {
+            log.error("Failed to change team: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 방 퇴장
@@ -71,7 +94,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.exitGameRoom(request.getGameId(), userId);
+        try {
+            gameService.exitGameRoom(request.getGameId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to leave game: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 준비
@@ -80,7 +108,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.toggleReady(request.getGameId(), userId);
+        try {
+            gameService.toggleReady(request.getGameId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to toggle ready: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 게임 시작
@@ -89,7 +122,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.startGame(request.getGameId(), userId);
+        try {
+            gameService.startGame(request.getGameId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to start game {}: {}", request.getGameId(), e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 채팅
@@ -98,7 +136,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.sendChatMessage(request, userId);
+        try {
+            gameService.sendChatMessage(request, userId);
+        } catch (Exception e) {
+            log.error("Failed to send chat: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 코드 저장
@@ -108,7 +151,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.updateCode(request, userId);
+        try {
+            gameService.updateCode(request, userId);
+        } catch (Exception e) {
+            log.error("Failed to update code: {}", e.getMessage());
+            // 코드는 너무 빈번하므로 에러 전송 생략 가능하나 일단 로그만
+        }
     }
 
     // 코드 불러오기
@@ -118,7 +166,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.loadCode(request, userId);
+        try {
+            gameService.loadCode(request, userId);
+        } catch (Exception e) {
+            log.error("Failed to load code: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 코드 제출 알림 (길이 저장용)
@@ -128,7 +181,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.submitCode(request, userId);
+        try {
+            gameService.submitCode(request, userId);
+        } catch (Exception e) {
+            log.error("Failed to submit code: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 강퇴
@@ -138,7 +196,12 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.kickParticipant(request.getGameId(), userId, request.getTargetUserId());
+        try {
+            gameService.kickParticipant(request.getGameId(), userId, request.getTargetUserId());
+        } catch (Exception e) {
+            log.error("Failed to kick user: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
     }
 
     // 게임 포기
@@ -147,7 +210,23 @@ public class GameSocketController {
         Long userId = getUserId(headerAccessor);
         if (userId == null)
             return;
-        gameService.forfeitGameRoom(request.getGameId(), userId);
+        try {
+            gameService.forfeitGameRoom(request.getGameId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to forfeit game: {}", e.getMessage());
+            sendError(userId, request.getGameId(), e.getMessage());
+        }
+    }
+
+    // [New] 온라인 유저 목록 요청
+    @MessageMapping("/games/connected-users")
+    public void getConnectedUsers(@Payload GameCommonRequest request, SimpMessageHeaderAccessor headerAccessor) {
+        Long userId = getUserId(headerAccessor);
+        if (userId == null)
+            return;
+
+        // 요청한 시점의 상태를 브로드캐스트 (모두에게 최신화)
+        gameAfterService.broadcastOnlineUsers(request.getGameId());
     }
 
     private Long getUserId(SimpMessageHeaderAccessor headerAccessor) {
@@ -157,5 +236,13 @@ public class GameSocketController {
             return null;
         }
         return Long.parseLong(String.valueOf(userIdObj));
+    }
+
+    private void sendError(Long userId, Long gameId, String message) {
+        if (userId != null && gameId != null) {
+            messagingTemplate.convertAndSend(
+                    "/topic/games/" + gameId + "/error/" + userId,
+                    SocketResponse.of("ERROR", message));
+        }
     }
 }

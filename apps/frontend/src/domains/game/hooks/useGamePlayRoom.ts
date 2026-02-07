@@ -58,12 +58,15 @@ interface UseGamePlayRoomReturn {
   submitCode: () => void;
   leaveRoom: () => void;
   forfeitGame: () => void;
+
+  // 온라인 상태
+  onlineUserIds: Set<number>;
 }
 
 const DEFAULT_CODE: Record<string, string> = {
-  python: `# Enter your Python code here\nprint("Hello, World!")`,
-  java: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}`,
-  cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`,
+  python: `import sys\n\n# 코드를 작성해주세요\nprint("Hello World")`,
+  java: `import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println("Hello World");\n    }\n}`,
+  cpp: `#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << "Hello World" << endl;\n    return 0;\n}`,
 };
 
 export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
@@ -81,6 +84,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isGracePeriod, setIsGracePeriod] = useState(false);
   const [graceTime, setGraceTime] = useState(60);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
 
   // 소켓 연결
   const { client, connected } = useGameSocketConnection(roomId, currentUserId);
@@ -293,7 +297,38 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
       }
     });
 
-    // 5. Send WebSocket ENTER message to trigger VIDEO_TOKEN generation
+    // 5. Subscibe to Connected Users (Online Status)
+    const onlineSub = client.subscribe(`/topic/games/${roomId}/connected-users`, (msg) => {
+      try {
+        const users = JSON.parse(msg.body); // Expecting number[] of userIds
+        if (Array.isArray(users)) {
+          setOnlineUserIds(new Set(users.map(Number)));
+        }
+      } catch (e) {
+        console.error('Failed to parse connected users:', e);
+      }
+    });
+
+    // 6. Subscribe to User-Specific Errors
+    const errorSub = client.subscribe(`/topic/games/${roomId}/error/${currentUserId}`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type === 'ERROR') {
+          toast.error(response.data);
+        }
+      } catch (e) {
+        console.error('Failed to parse error message:', e);
+      }
+    });
+
+    // 7. Request Initial Connected Users
+    console.log('[GamePlayRoom] Requesting connected users list');
+    client.publish({
+      destination: '/pub/games/connected-users',
+      body: JSON.stringify({ gameId: roomId })
+    });
+
+    // 7. Send WebSocket ENTER message to trigger VIDEO_TOKEN generation
     // This must happen AFTER subscriptions are set up to receive the token
     console.log('[GamePlayRoom] Sending WebSocket ENTER to trigger VIDEO_TOKEN');
     client.publish({
@@ -306,6 +341,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
       chatSub.unsubscribe();
       rankingSub.unsubscribe();
       videoTokenSub.unsubscribe();
+      onlineSub.unsubscribe();
+      errorSub.unsubscribe();
       clearVideoToken();
     };
   }, [client, connected, roomId, roomIdString, currentUserId, setVideoToken, clearVideoToken]);
@@ -515,5 +552,6 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     submitCode,
     leaveRoom,
     forfeitGame,
+    onlineUserIds,
   };
 }

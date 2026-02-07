@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { GamePlayParticipant } from '@/domains/game/types/game-types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useParticipants } from '@livekit/components-react';
 import { GameVideoTile } from './GameVideoTile';
@@ -103,19 +103,24 @@ export function GameVideoGrid({
                 // Fallback when LiveKit participant is not yet connected
                 <div
                   className={cn(
-                    'relative flex h-24 w-32 shrink-0 flex-col items-center justify-center rounded-lg border transition-colors',
-                    isMe ? 'border-2 border-primary' : 'border',
+                    'relative flex h-40 w-52 shrink-0 items-center justify-center overflow-hidden rounded-lg border transition-all',
+                    'hover:ring-2 hover:ring-primary/50',
+                    isMe ? 'border-2 border-primary ring-2 ring-primary' : 'border border-border',
                     participant.team === 'RED' && 'bg-red-50/30',
                     participant.team === 'BLUE' && 'bg-blue-50/30',
                     !participant.team && 'bg-muted/50',
                   )}
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-white text-lg font-medium shadow-sm opacity-50">
-                    {participant.nickname.charAt(0)}
+                  <div className="flex h-full w-full items-center justify-center bg-gray-900 text-muted-foreground opacity-70">
+                    <User className="h-10 w-10" />
                   </div>
-                  <span className="mt-2 text-xs font-medium text-muted-foreground truncate max-w-[100px]">
-                    {participant.nickname}
-                  </span>
+
+                  {/* 닉네임 - 좌측 하단 */}
+                  <div className="absolute bottom-1 left-2 max-w-[80%]">
+                    <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
+                      {participant.nickname}
+                    </span>
+                  </div>
                 </div>
               )}
 
