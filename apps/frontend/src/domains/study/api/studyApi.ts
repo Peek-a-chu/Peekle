@@ -89,11 +89,18 @@ export async function fetchMyStudies(page = 0, keyword = ''): Promise<StudyListR
 }
 
 // 4. Create Study
+export interface CreateStudyResponse {
+  inviteCode?: string;
+  id?: number;
+  studyId?: number;
+  roomId?: number;
+}
+
 export async function createStudy(
   title: string,
   description?: string,
-): Promise<{ inviteCode: string }> {
-  const res = await apiFetch<{ inviteCode: string }>(`/api/studies`, {
+): Promise<CreateStudyResponse> {
+  const res = await apiFetch<CreateStudyResponse>(`/api/studies`, {
     method: 'POST',
     body: JSON.stringify({ title, description: description || '' }),
   });
