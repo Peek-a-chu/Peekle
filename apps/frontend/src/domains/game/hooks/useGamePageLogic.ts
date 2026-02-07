@@ -6,6 +6,8 @@ import {
   getGameRooms,
   createGameRoom,
   enterGameRoom,
+  reserveRoomSlot,
+  confirmRoomReservation,
   type GameCreateRequest,
 } from '@/domains/game/api/game-api';
 import {
@@ -163,13 +165,34 @@ export function useGamePageLogic() {
       return;
     }
 
-    if (room.isPrivate) {
-      // 비공개 방일 경우 비밀번호 모달 표시
-      setSelectedRoom(room);
-      setPasswordModalOpen(true);
-    } else {
-      // 공개 방일 경우 바로 이동 (페이지에서 프리조인/입장 처리)
-      router.push(`/game/${room.id}`);
+    // 🎫 Step 1: Try to reserve a slot first
+    try {
+      const reservation = await reserveRoomSlot(room.id);
+
+      if (!reservation) {
+        toast.error('예약에 실패했습니다.');
+        return;
+      }
+
+      // Reservation succeeded, proceed with entry
+      if (room.isPrivate) {
+        // 비공개 방일 경우 비밀번호 모달 표시
+        setSelectedRoom(room);
+        setPasswordModalOpen(true);
+      } else {
+        // 공개 방일 경우 바로 이동 (페이지에서 프리조인/입장 처리)
+        router.push(`/game/${room.id}`);
+      }
+    } catch (error: any) {
+      // Check error code from API response
+      const errorCode = error?.code || error?.error?.code;
+
+      if (errorCode === 'GAME_004') {
+        // GAME_ROOM_FULL
+        toast.error('방이 가득 찼습니다.');
+      } else {
+        toast.error(error.message || '방 입장에 실패했습니다.');
+      }
     }
   };
 
@@ -177,7 +200,9 @@ export function useGamePageLogic() {
     if (!selectedRoom) return;
 
     try {
-      const success = await enterGameRoom(selectedRoom.id, password);
+      // Use confirmReservation instead of enterGameRoom
+      // The reservation was already made in handleRoomClick
+      const success = await confirmRoomReservation(selectedRoom.id, password);
       if (success) {
         setPasswordModalOpen(false);
         router.push(`/game/${selectedRoom.id}`);

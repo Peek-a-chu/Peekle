@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { useGameSocketConnection } from './useGameSocketConnection';
-import { getGameRoom, kickUser, enterGameRoom } from '@/domains/game/api/game-api';
+import { getGameRoom, kickUser, enterGameRoom, confirmRoomReservation, cancelRoomReservation } from '@/domains/game/api/game-api';
 import { GameRoomDetail, ChatMessage, Team } from '@/domains/game/types/game-types';
 import { toast } from 'sonner';
 
@@ -78,8 +78,9 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
 
     const enter = async () => {
       try {
-        // enterGameRoom이 방 정보를 반환하므로 중복 조회 불필요
-        const data = await enterGameRoom(roomId);
+        // confirmRoomReservation이 방 정보를 반환
+        // 로비에서 이미 reserveRoomSlot을 호출한 상태
+        const data = await confirmRoomReservation(roomId);
         hasEnteredRef.current = true;
 
         if (data) {
@@ -118,6 +119,18 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
 
     enter();
   }, [roomId, router, userId]);
+
+  // Cleanup: Cancel reservation if user exits before entering room
+  useEffect(() => {
+    return () => {
+      // Only cancel if we haven't successfully entered (hasEnteredRef will be false)
+      if (roomId && !hasEnteredRef.current) {
+        cancelRoomReservation(roomId).catch(err => {
+          console.warn('Failed to cancel reservation on cleanup:', err);
+        });
+      }
+    };
+  }, [roomId]);
 
   // 소켓 이벤트 처리
   useEffect(() => {

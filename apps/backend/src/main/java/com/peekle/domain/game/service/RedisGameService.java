@@ -2,6 +2,7 @@ package com.peekle.domain.game.service;
 
 import com.peekle.domain.game.dto.request.GameChatRequest;
 import com.peekle.domain.game.dto.request.GameCreateRequest;
+import com.peekle.domain.game.dto.response.CurrentGameResponse;
 import com.peekle.domain.game.dto.response.GameRoomResponse;
 import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
@@ -1981,7 +1982,7 @@ public class RedisGameService {
      * 현재 유저가 참여 중인 게임 정보 조회
      * 재접속 모달을 위한 메서드
      */
-    public com.peekle.domain.game.dto.response.CurrentGameResponse getUserCurrentGame(Long userId) {
+    public CurrentGameResponse getUserCurrentGame(Long userId) {
         Long gameId = getUserCurrentGameId(userId);
         if (gameId == null) {
             return null;
@@ -1989,7 +1990,7 @@ public class RedisGameService {
 
         try {
             GameRoomResponse room = getGameRoom(gameId);
-            return com.peekle.domain.game.dto.response.CurrentGameResponse.builder()
+            return CurrentGameResponse.builder()
                     .roomId(gameId)
                     .status(room.getStatus())
                     .title(room.getTitle())
@@ -1999,6 +2000,198 @@ public class RedisGameService {
             log.warn("Game room {} not found for user {}. Cleaning up stale reference.", gameId, userId);
             redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, userId));
             return null;
+        }
+    }
+
+    public Map<String, Object> reserveRoomSlot(Long roomId, Long userId) {
+        String lockKey = String.format(RedisKeyConst.LOCK_GAME_RESERVE, roomId);
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            if (!lock.tryLock(500, 1000, TimeUnit.MILLISECONDS)) {
+                // Lock acquisition failed - likely due to high concurrency or room is full
+                log.warn("⚠️ Failed to acquire lock for Room {} reservation by User {}", roomId, userId);
+                throw new com.peekle.global.exception.BusinessException(
+                        com.peekle.global.exception.ErrorCode.GAME_ROOM_FULL);
+            }
+
+            // 1. Check if user already in room
+            String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+            boolean isInRoom = Boolean.TRUE.equals(
+                    redisTemplate.opsForSet().isMember(playersKey, String.valueOf(userId)));
+
+            if (isInRoom) {
+                return Map.of("success", true, "status", "ALREADY_IN_ROOM", "ttl", 0);
+            }
+
+            // 2. Check if user has existing reservation
+            String reservationKey = String.format(RedisKeyConst.GAME_ROOM_RESERVATION, roomId, userId);
+            Boolean hasReservation = redisTemplate.hasKey(reservationKey);
+
+            if (Boolean.TRUE.equals(hasReservation)) {
+                // Extend TTL
+                redisTemplate.expire(reservationKey, 30, TimeUnit.SECONDS);
+                return Map.of("success", true, "status", "EXTENDED", "ttl", 30);
+            }
+
+            // 3. Check room capacity (current players + reservations)
+            String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+            String maxPlayersStr = (String) redisTemplate.opsForHash().get(infoKey, "maxPlayers");
+            int maxPlayers = Integer.parseInt(maxPlayersStr != null ? maxPlayersStr : "8");
+
+            Long currentPlayers = redisTemplate.opsForSet().size(playersKey);
+            int currentCount = currentPlayers != null ? currentPlayers.intValue() : 0;
+
+            String countKey = String.format(RedisKeyConst.GAME_ROOM_RESERVED_COUNT, roomId);
+            Object reservedCountObj = redisTemplate.opsForValue().get(countKey);
+            int reservedCount = 0;
+            if (reservedCountObj != null) {
+                if (reservedCountObj instanceof Integer) {
+                    reservedCount = (Integer) reservedCountObj;
+                } else if (reservedCountObj instanceof Long) {
+                    reservedCount = ((Long) reservedCountObj).intValue();
+                } else if (reservedCountObj instanceof String) {
+                    reservedCount = Integer.parseInt((String) reservedCountObj);
+                }
+            }
+
+            if (currentCount + reservedCount >= maxPlayers) {
+                throw new com.peekle.global.exception.BusinessException(
+                        com.peekle.global.exception.ErrorCode.GAME_ROOM_FULL);
+            }
+
+            // 4. Create reservation
+            redisTemplate.opsForValue().set(reservationKey, "RESERVED", 30, TimeUnit.SECONDS);
+
+            // 5. Increment reserved counter
+            redisTemplate.opsForValue().increment(countKey);
+            redisTemplate.expire(countKey, 60, TimeUnit.SECONDS);
+
+            // 🆕 6. Add user to players set immediately (prejoin shows as entered in lobby)
+            redisTemplate.opsForSet().add(playersKey, String.valueOf(userId));
+
+            // 7. Broadcast player count update to lobby
+            Long newPlayerCount = redisTemplate.opsForSet().size(playersKey);
+            int playerCount = newPlayerCount != null ? newPlayerCount.intValue() : 1;
+
+            Map<String, Object> lobbyPlayerData = new HashMap<>();
+            lobbyPlayerData.put("roomId", roomId);
+            lobbyPlayerData.put("currentPlayers", playerCount);
+            redisPublisher.publish(
+                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                    SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
+
+            log.info("🎫 User {} reserved slot in Room {} - currentPlayers: {}", userId, roomId, playerCount);
+            return Map.of("success", true, "status", "RESERVED", "ttl", 30);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new com.peekle.global.exception.BusinessException(
+                    com.peekle.global.exception.ErrorCode.INTERNAL_SERVER_ERROR);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * Confirm reservation and enter room (called when clicking "확인" button)
+     * If reservation exists, use it; otherwise try atomic entry
+     */
+    public void confirmReservation(Long roomId, Long userId, String password) {
+        String lockKey = String.format(RedisKeyConst.LOCK_GAME_CONFIRM, roomId);
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            if (!lock.tryLock(500, 1000, TimeUnit.MILLISECONDS)) {
+                log.warn("⚠️ Failed to acquire lock for Room {} confirmation by User {}", roomId, userId);
+                throw new com.peekle.global.exception.BusinessException(
+                        com.peekle.global.exception.ErrorCode.GAME_ROOM_FULL);
+            }
+
+            String reservationKey = String.format(RedisKeyConst.GAME_ROOM_RESERVATION, roomId, userId);
+            Boolean hasReservation = redisTemplate.hasKey(reservationKey);
+
+            if (Boolean.TRUE.equals(hasReservation)) {
+                // Reservation valid: Delete reservation and enter
+                deleteReservation(roomId, userId);
+                log.info("✅ User {} confirmed reservation for Room {}", userId, roomId);
+                enterGameRoom(roomId, userId, password);
+            } else {
+                // Reservation expired or never existed: Try atomic entry
+                log.warn("⏰ Reservation expired for User {} in Room {}. Attempting direct entry.", userId, roomId);
+
+                // Check capacity one more time
+                String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+                String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+                String maxPlayersStr = (String) redisTemplate.opsForHash().get(infoKey, "maxPlayers");
+                int maxPlayers = Integer.parseInt(maxPlayersStr != null ? maxPlayersStr : "8");
+
+                Long currentPlayers = redisTemplate.opsForSet().size(playersKey);
+                int currentCount = currentPlayers != null ? currentPlayers.intValue() : 0;
+
+                if (currentCount >= maxPlayers) {
+                    throw new com.peekle.global.exception.BusinessException(
+                            com.peekle.global.exception.ErrorCode.GAME_ROOM_FULL);
+                }
+
+                enterGameRoom(roomId, userId, password);
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new com.peekle.global.exception.BusinessException(
+                    com.peekle.global.exception.ErrorCode.INTERNAL_SERVER_ERROR);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * Cancel reservation (called when prejoin modal closes without confirming)
+     */
+    public void cancelReservation(Long roomId, Long userId) {
+        String reservationKey = String.format(RedisKeyConst.GAME_ROOM_RESERVATION, roomId, userId);
+        Boolean hasReservation = redisTemplate.hasKey(reservationKey);
+
+        if (Boolean.TRUE.equals(hasReservation)) {
+            deleteReservation(roomId, userId);
+
+            // Remove user from players set (they were added during reservation)
+            String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+            redisTemplate.opsForSet().remove(playersKey, String.valueOf(userId));
+
+            // Broadcast player count update to lobby
+            Long newPlayerCount = redisTemplate.opsForSet().size(playersKey);
+            int playerCount = newPlayerCount != null ? newPlayerCount.intValue() : 0;
+
+            Map<String, Object> lobbyPlayerData = new HashMap<>();
+            lobbyPlayerData.put("roomId", roomId);
+            lobbyPlayerData.put("currentPlayers", playerCount);
+            redisPublisher.publish(
+                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                    SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
+
+            log.info("❌ User {} cancelled reservation for Room {} - currentPlayers: {}", userId, roomId, playerCount);
+        }
+    }
+
+    /**
+     * Helper method to delete reservation and decrement counter
+     */
+    private void deleteReservation(Long roomId, Long userId) {
+        String reservationKey = String.format(RedisKeyConst.GAME_ROOM_RESERVATION, roomId, userId);
+        redisTemplate.delete(reservationKey);
+
+        String countKey = String.format(RedisKeyConst.GAME_ROOM_RESERVED_COUNT, roomId);
+        Long remaining = redisTemplate.opsForValue().decrement(countKey);
+
+        // Clean up counter if it reaches 0
+        if (remaining != null && remaining <= 0) {
+            redisTemplate.delete(countKey);
         }
     }
 

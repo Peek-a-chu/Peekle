@@ -140,4 +140,16 @@ public class RedisKeyConst {
     // Game Room Broadcasted (Value) -> game:room:{roomId}:broadcasted -> "true"
     public static final String GAME_ROOM_BROADCASTED = "game:room:%d:broadcasted";
 
+    // Game Room Reservation (Value) -> game:room:{roomId}:reservation:{userId} ->
+    // "RESERVED" (TTL: 30s)
+    public static final String GAME_ROOM_RESERVATION = "game:room:%d:reservation:%d";
+
+    // Game Room Reserved Count (Value) -> game:room:{roomId}:reserved_count ->
+    // counter
+    public static final String GAME_ROOM_RESERVED_COUNT = "game:room:%d:reserved_count";
+
+    // Reservation Lock (Lock)
+    public static final String LOCK_GAME_RESERVE = "lock:game:reserve:%d";
+    public static final String LOCK_GAME_CONFIRM = "lock:game:confirm:%d";
+
 }

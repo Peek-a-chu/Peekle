@@ -8,7 +8,7 @@ import {
   ChatMessage,
   Team,
 } from '@/domains/game/types/game-types';
-import { getGameRoom, enterGameRoom } from '@/domains/game/api/game-api';
+import { getGameRoom, enterGameRoom, confirmRoomReservation } from '@/domains/game/api/game-api';
 import { useGameTimer } from './useGameTimer';
 import { useGameSocketConnection } from './useGameSocketConnection';
 import { useAuthStore } from '@/store/auth-store';

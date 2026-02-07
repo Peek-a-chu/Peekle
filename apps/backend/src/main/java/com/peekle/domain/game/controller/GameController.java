@@ -108,4 +108,40 @@ public class GameController {
         return ApiResponse.success(gameService.getUserCurrentGame(userId));
     }
 
+    /**
+     * 방 슬롯 예약 API (프리조인 진입 시 호출)
+     * 30초 TTL로 소프트 예약을 생성하여 방이 꽉 찼을 때 미리 차단
+     */
+    @PostMapping("/{roomId}/reserve")
+    public ApiResponse<java.util.Map<String, Object>> reserveSlot(@PathVariable Long roomId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
+        java.util.Map<String, Object> result = gameService.reserveRoomSlot(roomId, userId);
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * 예약 확정 및 입장 API (확인 버튼 클릭 시 호출)
+     * 예약이 있으면 사용, 없으면 원자적 입장 시도
+     */
+    @PostMapping("/{roomId}/confirm")
+    public ApiResponse<GameRoomResponse> confirmReservation(@PathVariable Long roomId,
+            @RequestBody(required = false) GameEnterRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
+        String password = request != null ? request.getPassword() : null;
+        gameService.confirmReservation(roomId, userId, password);
+        // 입장 후 방 정보 반환
+        GameRoomResponse roomInfo = gameService.getGameRoom(roomId);
+        return ApiResponse.success(roomInfo);
+    }
+
+    /**
+     * 예약 취소 API (프리조인 모달 닫을 때 호출, 선택적)
+     */
+    @DeleteMapping("/{roomId}/reserve")
+    public ApiResponse<Void> cancelReservation(@PathVariable Long roomId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Long userId) {
+        gameService.cancelReservation(roomId, userId);
+        return ApiResponse.success(null);
+    }
+
 }

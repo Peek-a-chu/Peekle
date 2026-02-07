@@ -309,3 +309,106 @@ export async function getGameRoomByCode(code: string): Promise<GameRoom | null> 
         return null;
     }
 }
+
+// ========== ROOM RESERVATION SYSTEM ==========
+
+export interface ReservationResponse {
+    success: boolean;
+    status: 'RESERVED' | 'EXTENDED' | 'ALREADY_IN_ROOM';
+    ttl: number; // Time to live in seconds
+}
+
+/**
+ * 방 슬롯 예약 (프리조인 진입 시 호출)
+ * 30초 TTL로 소프트 예약 생성
+ */
+export async function reserveRoomSlot(roomId: string | number): Promise<ReservationResponse | null> {
+    try {
+        const response = await apiFetch<ReservationResponse>(`/api/games/${roomId}/reserve`, {
+            method: 'POST',
+        });
+
+        if (!response.success || !response.data) {
+            console.error('Failed to reserve room slot:', response.error);
+            throw response.error || { code: 'UNKNOWN', message: '예약에 실패했습니다.' };
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error('Error reserving room slot:', error);
+        throw error;
+    }
+}
+
+/**
+ * 예약 확정 및 입장 (확인 버튼 클릭 시 호출)
+ * @returns 입장한 방의 상세 정보
+ */
+export async function confirmRoomReservation(roomId: string | number, password?: string): Promise<GameRoomDetail | null> {
+    try {
+        const response = await apiFetch<GameRoomDetailResponse>(`/api/games/${roomId}/confirm`, {
+            method: 'POST',
+            body: JSON.stringify({ password }),
+        });
+
+        if (!response.success || !response.data) {
+            console.error('Failed to confirm reservation:', response.error);
+            throw response.error || { code: 'UNKNOWN', message: '입장에 실패했습니다.' };
+        }
+
+        // GameRoomDetailResponse를 GameRoomDetail로 변환
+        const data = response.data;
+        return {
+            id: data.roomId,
+            title: data.title,
+            mode: data.mode as GameMode,
+            teamType: data.teamType as TeamType,
+            status: data.status as GameStatus,
+            currentPlayers: data.currentPlayers,
+            maxPlayers: data.maxPlayers,
+            timeLimit: data.timeLimit,
+            problemCount: data.problemCount,
+            host: data.host,
+            isPrivate: data.isSecret,
+            tags: data.tags,
+            tierMin: data.tierMin || '브론즈',
+            tierMax: data.tierMax || '다이아',
+            workbookTitle: data.workbookTitle,
+            participants: (data.participants || []).map(p => ({
+                id: p.id,
+                nickname: p.nickname,
+                profileImg: p.profileImg,
+                isHost: p.host,
+                status: p.ready ? 'READY' : 'NOT_READY',
+                team: p.team as Team,
+            })),
+            problems: (data.problems || []).map(p => ({
+                id: p.id,
+                externalId: p.externalId,
+                title: p.title,
+                tier: p.tier,
+                url: p.url,
+                status: 'UNSOLVED',
+            })),
+        };
+    } catch (error) {
+        console.error('Error confirming reservation:', error);
+        throw error;
+    }
+}
+
+/**
+ * 예약 취소 (프리조인 모달 닫을 때 호출, 선택적)
+ */
+export async function cancelRoomReservation(roomId: string | number): Promise<boolean> {
+    try {
+        const response = await apiFetch<void>(`/api/games/${roomId}/reserve`, {
+            method: 'DELETE',
+        });
+
+        return response.success;
+    } catch (error) {
+        console.error('Error cancelling reservation:', error);
+        return false;
+    }
+}
