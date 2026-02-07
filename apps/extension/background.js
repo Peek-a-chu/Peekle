@@ -1,5 +1,5 @@
 // --- Configuration ---
-const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
+const IS_LOCAL = true; // false = 배포(Production), true = 로컬(Local)
 // 통합된 Base URL (API & Frontend 모두 동일 도메인/포트 사용)
 // Local: 확장 프로그램은 Backend(8080)로 직접 연결
 // Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)

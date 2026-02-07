@@ -29,6 +29,7 @@ public class GameRoomResponse {
     private String tierMax;
     private String workbookTitle; // 문제집 제목 (문제집인 경우)
     private java.util.List<ProblemInfo> problems;
+    private Long startTime; // 게임 시작 시간 (Timestamp)
 
     @Getter
     @Builder

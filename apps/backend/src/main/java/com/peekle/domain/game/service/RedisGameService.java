@@ -30,7 +30,6 @@ import com.peekle.domain.user.entity.User;
 
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
-import com.peekle.domain.workbook.entity.Workbook;
 import com.peekle.domain.workbook.entity.WorkbookProblem;
 import com.peekle.domain.workbook.repository.WorkbookProblemRepository;
 import com.peekle.domain.workbook.repository.WorkbookRepository;
@@ -49,7 +48,6 @@ public class RedisGameService {
     private final ProblemRepository problemRepository;
     private final WorkbookRepository workbookRepository;
     private final WorkbookProblemRepository workbookProblemRepository;
-    private final TagRepository tagRepository;
     private final RedisGameWaitService waitService;
     private final RedisGameRoomManager roomManager;
 
@@ -464,6 +462,8 @@ public class RedisGameService {
 
         startData.put("gameId", roomId);
         startData.put("problems", problemList);
+        startData.put("startTime", Long.parseLong((String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_START_TIME, roomId))));
 
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", startData));
 
@@ -930,6 +930,11 @@ public class RedisGameService {
             }
         }
 
+        // 게임 시작 시간 조회
+        String startTimeStr = (String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_START_TIME, roomId));
+        Long startTime = startTimeStr != null ? Long.parseLong(startTimeStr) : null;
+
         return GameRoomResponse.builder()
                 .roomId(roomId)
                 .title((String) info.get("title"))
@@ -948,6 +953,7 @@ public class RedisGameService {
                 .participants(participants)
                 .workbookTitle(workbookTitle)
                 .problems(problems.isEmpty() ? null : problems)
+                .startTime(startTime)
                 .build();
     }
 

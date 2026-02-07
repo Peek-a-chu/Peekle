@@ -103,7 +103,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             title: room.title,
             mode: room.mode,
             teamType: room.teamType,
-            timeLimit: room.timeLimit, // [TEST] Seconds directly
+            timeLimit: room.timeLimit,
+            startTime: room.startTime,
             remainingTime: room.timeLimit, // [TEST] Seconds directly
             problems: room.problems || [],
             participants: (room.participants || []).map((p: any) => ({
@@ -165,6 +166,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
               return {
                 ...prev,
                 status: 'PLAYING',
+                startTime: data.startTime,
                 problems: (data.problems || []).map((p: any) => ({
                   ...p,
                   status: 'UNSOLVED',
@@ -372,9 +374,25 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
   // 타이머
   const isSpeedRace = gameState?.mode === 'SPEED_RACE';
+
+  const calculateRemainingTime = () => {
+    if (!gameState?.startTime) return gameState?.timeLimit ?? 1800;
+    const now = Date.now();
+    // startTime is in milliseconds (System.currentTimeMillis from backend)
+    const elapsedSeconds = Math.floor((now - gameState.startTime) / 1000);
+    const remaining = gameState.timeLimit - elapsedSeconds;
+    return remaining > 0 ? remaining : 0;
+  };
+
+  const calculateElapsedSeconds = () => {
+    if (!gameState?.startTime) return 0;
+    const now = Date.now();
+    return Math.floor((now - gameState.startTime) / 1000);
+  };
+
   const timerInitialTime = isGracePeriod
     ? graceTime
-    : (isSpeedRace ? 0 : (gameState?.remainingTime ?? 1800));
+    : (isSpeedRace ? calculateElapsedSeconds() : calculateRemainingTime());
   const timeUpToastShownRef = useRef(false);
 
   // Room ID가 변경되면 토스트/유예상태 초기화

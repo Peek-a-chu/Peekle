@@ -43,6 +43,7 @@ interface GameRoomResponse {
         tier: string;
         url: string;
     }[];
+    startTime?: number;
 }
 
 interface GameRoomDetailResponse extends GameRoomResponse {
@@ -97,6 +98,7 @@ export async function getGameRooms(): Promise<GameRoom[]> {
                 url: p.url,
                 status: 'UNSOLVED' as const, // Default status
             })),
+            startTime: room.startTime,
         }));
     } catch (error) {
         console.error('Error fetching game rooms:', error);
@@ -147,6 +149,7 @@ export async function getGameRoom(roomId: string | number): Promise<GameRoomDeta
                 url: p.url,
                 status: 'UNSOLVED',
             })),
+            startTime: data.startTime,
         };
     } catch (error) {
         console.error('Error fetching game room:', error);
@@ -226,6 +229,7 @@ export async function enterGameRoom(roomId: string | number, password?: string):
                 url: p.url,
                 status: 'UNSOLVED',
             })),
+            startTime: data.startTime,
         };
     } catch (error) {
         console.error('Error entering game room:', error);
@@ -303,6 +307,7 @@ export async function getGameRoomByCode(code: string): Promise<GameRoom | null> 
             tierMin: room.tierMin || '브론즈',
             tierMax: room.tierMax || '다이아',
             workbookTitle: room.workbookTitle,
+            startTime: room.startTime,
         };
     } catch (error) {
         console.error('Error fetching game room by code:', error);
@@ -390,6 +395,7 @@ export async function confirmRoomReservation(roomId: string | number, password?:
                 url: p.url,
                 status: 'UNSOLVED',
             })),
+            startTime: data.startTime,
         };
     } catch (error) {
         console.error('Error confirming reservation:', error);

@@ -35,6 +35,7 @@ export interface GameRoom {
     tierMax: string;
     workbookTitle?: string; // 문제집 제목 (문제집인 경우)
     problems?: GameProblem[]; // 문제 목록 (문제집인 경우 미리보기용)
+    startTime?: number; // 게임 시작 시간 (Timestamp)
 }
 
 export interface GameRoomDetail extends GameRoom {
@@ -74,6 +75,7 @@ export interface GamePlayState {
     mode: GameMode;
     teamType: TeamType;
     timeLimit: number;
+    startTime?: number;
     remainingTime: number;
     problems: GameProblem[];
     participants: GamePlayParticipant[];
