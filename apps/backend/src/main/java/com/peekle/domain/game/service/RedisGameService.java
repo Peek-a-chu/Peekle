@@ -466,14 +466,29 @@ public class RedisGameService {
 
                     // 방 정보에 새로운 방장 업데이트
                     redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+
                     // HOST_CHANGE 이벤트 발행 (닉네임 포함)
                     User newHost = userRepository.findById(Long.valueOf(newHostId))
                             .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+                    // [Fix] Redis Host Info Update
+                    redisTemplate.opsForHash().put(infoKey, "hostNickname", newHost.getNickname());
+                    redisTemplate.opsForHash().put(infoKey, "hostProfileImg",
+                            newHost.getProfileImg() != null ? newHost.getProfileImg() : "");
                     Map<String, Object> hostChangeData = Map.of(
                             "newHostId", newHostId,
                             "newHostNickname", newHost.getNickname());
                     redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", hostChangeData));
                     log.info("Game Room {} Host Changed: {} -> {}", roomId, userId, newHostId);
+
+                    // [New] 로비 브로드캐스트: 방장 변경 알림
+                    Map<String, Object> lobbyHostData = new HashMap<>();
+                    lobbyHostData.put("roomId", roomId);
+                    lobbyHostData.put("hostNickname", newHost.getNickname());
+                    redisPublisher.publish(
+                            new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                            SocketResponse.of("LOBBY_HOST_UPDATE", lobbyHostData));
+                    log.info("📢 [Lobby] Host changed for Room {} -> {}", roomId, newHost.getNickname());
                 }
             }
 
@@ -532,14 +547,29 @@ public class RedisGameService {
                     String newHostId = String.valueOf(newHostIdObj);
 
                     redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+
                     // HOST_CHANGE 이벤트 발행 (닉네임 포함)
                     User newHost = userRepository.findById(Long.valueOf(newHostId))
                             .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+                    // [Fix] Redis Host Info Update
+                    redisTemplate.opsForHash().put(infoKey, "hostNickname", newHost.getNickname());
+                    redisTemplate.opsForHash().put(infoKey, "hostProfileImg",
+                            newHost.getProfileImg() != null ? newHost.getProfileImg() : "");
                     Map<String, Object> hostChangeData = Map.of(
                             "newHostId", newHostId,
                             "newHostNickname", newHost.getNickname());
                     redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("HOST_CHANGE", hostChangeData));
                     log.info("Game Room {} Host Changed after forfeit: {} -> {}", roomId, userId, newHostId);
+
+                    // [New] 로비 브로드캐스트: 방장 변경 알림
+                    Map<String, Object> lobbyHostData = new HashMap<>();
+                    lobbyHostData.put("roomId", roomId);
+                    lobbyHostData.put("hostNickname", newHost.getNickname());
+                    redisPublisher.publish(
+                            new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                            SocketResponse.of("LOBBY_HOST_UPDATE", lobbyHostData));
+                    log.info("📢 [Lobby] Host changed for Room {} -> {}", roomId, newHost.getNickname());
                 }
             }
 
@@ -666,9 +696,15 @@ public class RedisGameService {
                 String newHostId = String.valueOf(newHostIdObj);
 
                 redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+
                 // HOST_CHANGE 이벤트 발행 (닉네임 포함)
                 User newHost = userRepository.findById(Long.valueOf(newHostId))
                         .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+                // [Fix] Redis Host Info Update
+                redisTemplate.opsForHash().put(infoKey, "hostNickname", newHost.getNickname());
+                redisTemplate.opsForHash().put(infoKey, "hostProfileImg",
+                        newHost.getProfileImg() != null ? newHost.getProfileImg() : "");
                 Map<String, Object> hostChangeData = Map.of(
                         "newHostId", newHostId,
                         "newHostNickname", newHost.getNickname());
@@ -1139,9 +1175,15 @@ public class RedisGameService {
                 String newHostId = String.valueOf(newHostIdObj);
 
                 redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
+
                 // HOST_CHANGE 이벤트 발행 (닉네임 포함)
                 User newHost = userRepository.findById(Long.valueOf(newHostId))
                         .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+                // [Fix] Redis Host Info Update
+                redisTemplate.opsForHash().put(infoKey, "hostNickname", newHost.getNickname());
+                redisTemplate.opsForHash().put(infoKey, "hostProfileImg",
+                        newHost.getProfileImg() != null ? newHost.getProfileImg() : "");
                 Map<String, Object> hostChangeData = Map.of(
                         "newHostId", newHostId,
                         "newHostNickname", newHost.getNickname());

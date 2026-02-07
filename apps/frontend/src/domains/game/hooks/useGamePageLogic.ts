@@ -93,6 +93,23 @@ export function useGamePageLogic() {
         ),
       );
     },
+    onHostUpdated: (data: any) => {
+      console.log('[Lobby] Host updated:', data);
+      // 방장 정보 업데이트
+      setRooms((prev) =>
+        prev.map((room) =>
+          room.id === data.roomId
+            ? {
+              ...room,
+              host: {
+                ...room.host,
+                nickname: data.hostNickname,
+              },
+            }
+            : room,
+        ),
+      );
+    },
   });
 
   // 초기 데이터 로딩

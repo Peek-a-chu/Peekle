@@ -8,6 +8,7 @@ interface LobbyEventHandlers {
     onRoomUpdated?: (data: any) => void;
     onRoomDeleted?: (data: any) => void;
     onPlayerUpdate?: (data: any) => void;
+    onHostUpdated?: (data: any) => void;
 }
 
 /**
@@ -54,6 +55,9 @@ export function useGameLobbySocket(handlers: LobbyEventHandlers) {
                         break;
                     case 'LOBBY_PLAYER_UPDATE':
                         handlersRef.current.onPlayerUpdate?.(data);
+                        break;
+                    case 'LOBBY_HOST_UPDATE':
+                        handlersRef.current.onHostUpdated?.(data);
                         break;
                     default:
                         console.warn('[GameLobby] Unknown event type:', type);
