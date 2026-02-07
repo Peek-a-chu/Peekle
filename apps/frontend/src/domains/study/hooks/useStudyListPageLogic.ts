@@ -59,8 +59,13 @@ export function useStudyListPageLogic() {
     router.push(`/study/${studyId}`);
   };
 
-  const handleCreateSuccess = async () => {
+  const handleCreateSuccess = async (createdStudyId?: number) => {
     setCreateModalOpen(false);
+    if (createdStudyId) {
+      router.push(`/study/${createdStudyId}`);
+      return;
+    }
+
     // Refetch to get the newly created study
     setIsLoading(true);
     try {
