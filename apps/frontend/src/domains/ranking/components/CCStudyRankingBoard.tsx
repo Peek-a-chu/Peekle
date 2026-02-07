@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getRankings, type RankResponse } from '@/api/rankingApi';
 import { useDebounce } from '@/hooks/useDebounce';
 import { TopThreePodium } from './TopThreePodium';
@@ -19,6 +19,9 @@ export function CCStudyRankingBoard(): React.ReactNode {
   const [topThreeRankings, setTopThreeRankings] = useState<RankResponse[]>([]);
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'RANK' | 'POINT' | 'MEMBERS'>('RANK');
+  const [focusStudyId, setFocusStudyId] = useState<number | null>(null);
+  const [highlightedStudyId, setHighlightedStudyId] = useState<number | null>(null);
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   const pageSize = 10;
@@ -88,12 +91,53 @@ export function CCStudyRankingBoard(): React.ReactNode {
   };
 
   const handleStudyClick = (studyId: number): void => {
+    // Podium click should always land on the canonical ranking view
+    // (page 1 / ALL scope / no search filter), then open and focus the target team.
+    if (searchTerm) setSearchTerm('');
     if (scope !== 'ALL') setScope('ALL');
     if (currentPage !== 0) setCurrentPage(0);
+    setFocusStudyId(studyId);
+    setHighlightedStudyId(studyId);
 
     // Expand the clicked study if not already expanded
     setExpandedIds((prev) => (prev.includes(studyId) ? prev : [...prev, studyId]));
   };
+
+  useEffect(() => {
+    if (!focusStudyId || isLoading || currentPage !== 0 || scope !== 'ALL') return;
+    const hasTarget = rankings.some((ranking) => ranking.studyId === focusStudyId);
+    if (!hasTarget) return;
+
+    const element = document.getElementById(`ranking-study-${focusStudyId}`);
+    if (!element) return;
+
+    requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.setAttribute('tabindex', '-1');
+      (element as HTMLElement).focus({ preventScroll: true });
+      setFocusStudyId(null);
+    });
+  }, [focusStudyId, isLoading, currentPage, scope, rankings]);
+
+  useEffect(() => {
+    if (!highlightedStudyId) return;
+    const timer = window.setTimeout(() => setHighlightedStudyId(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [highlightedStudyId]);
+
+  const sortedRankings = useMemo(() => {
+    const copied = [...rankings];
+    if (sortBy === 'POINT') {
+      copied.sort((a, b) => b.totalPoint - a.totalPoint || a.rank - b.rank);
+      return copied;
+    }
+    if (sortBy === 'MEMBERS') {
+      copied.sort((a, b) => b.memberCount - a.memberCount || a.rank - b.rank);
+      return copied;
+    }
+    copied.sort((a, b) => a.rank - b.rank);
+    return copied;
+  }, [rankings, sortBy]);
 
   if (error) {
     return (
@@ -108,12 +152,15 @@ export function CCStudyRankingBoard(): React.ReactNode {
   return (
     <div className="space-y-8">
       <StudyRankingList
-        rankings={rankings}
+        rankings={sortedRankings}
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
         onStudyClick={handleStudyClick}
+        highlightedStudyId={highlightedStudyId}
         scope={scope}
         onScopeChange={handleScopeChange}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
         isLoading={isLoading}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
