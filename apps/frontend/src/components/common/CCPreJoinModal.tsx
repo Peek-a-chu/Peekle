@@ -44,6 +44,8 @@ interface CCPreJoinModalProps {
   description?: string;
   onJoin: (micEnabled: boolean, camEnabled: boolean) => void;
   onCancel?: () => void;
+  joinLabel?: string;
+  isLoading?: boolean;
 }
 
 export const CCPreJoinModal = ({
@@ -51,6 +53,8 @@ export const CCPreJoinModal = ({
   description,
   onJoin,
   onCancel,
+  joinLabel,
+  isLoading = false,
 }: CCPreJoinModalProps) => {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuthStore();
@@ -853,9 +857,13 @@ export const CCPreJoinModal = ({
               ) : (
                 <Button
                   onClick={handleJoinClick}
+                  disabled={isLoading}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11 px-8 rounded-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  미팅 시작
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  {joinLabel || '미팅 시작'}
                 </Button>
               )}
             </div>
@@ -904,6 +912,6 @@ export const CCPreJoinModal = ({
           </div>
         }
       />
-    </TooltipProvider>
+    </TooltipProvider >
   );
 };

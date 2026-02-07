@@ -120,6 +120,9 @@ export function GameWaitingRoomLayout({
             maxPlayers={room.maxPlayers}
             currentPlayers={room.currentPlayers}
             teamType={room.teamType}
+            isHost={isHost}
+            onKickParticipant={onKickParticipant}
+            currentUserId={currentUserId}
           />
 
           {/* 액션 버튼 */}
