@@ -105,19 +105,12 @@ export function GameParticipantCard({
                 {/* Profile & Status */}
                 <div className="relative shrink-0">
                     <div className="relative h-10 w-10 overflow-hidden rounded-full border border-border/50 bg-muted">
-                        {shouldShowVideo && videoTrack ? (
-                            <VideoTrack
-                                trackRef={videoTrack}
-                                className="h-full w-full object-cover scale-x-[-1]"
-                            />
-                        ) : (
-                            <UserIcon
-                                src={participant.profileImg}
-                                nickname={participant.nickname}
-                                size={40}
-                                className="w-full h-full"
-                            />
-                        )}
+                        <UserIcon
+                            src={participant.profileImg}
+                            nickname={participant.nickname}
+                            size={40}
+                            className="w-full h-full"
+                        />
                     </div>
 
                     {/* Status Dot */}
