@@ -1604,21 +1604,20 @@ public class RedisGameService {
             redisTemplate.opsForValue().increment(countKey);
             redisTemplate.expire(countKey, 60, TimeUnit.SECONDS);
 
-            // 🆕 6. Add user to players set immediately (prejoin shows as entered in lobby)
-            redisTemplate.opsForSet().add(playersKey, String.valueOf(userId));
+            // 6. Broadcast logic removed from here as we don't treat reserved users as
+            // fully joined yet
+            // The lobby will update when they confirm and enter
 
-            // 7. Broadcast player count update to lobby
-            Long newPlayerCount = redisTemplate.opsForSet().size(playersKey);
-            int playerCount = newPlayerCount != null ? newPlayerCount.intValue() : 1;
+            // Broadcast player count update to lobby (Optional: if we want to show reserved
+            // usage? maybe not)
+            // For now, let's NOT broadcast lobby update on reserve, only on confirm.
+            // But to keep behavior consistent, we can just log.
 
-            Map<String, Object> lobbyPlayerData = new HashMap<>();
-            lobbyPlayerData.put("roomId", roomId);
-            lobbyPlayerData.put("currentPlayers", playerCount);
-            redisPublisher.publish(
-                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
-                    SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
+            currentPlayers = redisTemplate.opsForSet().size(playersKey);
+            int playerCount = currentPlayers != null ? currentPlayers.intValue() : 0;
 
-            log.info("🎫 User {} reserved slot in Room {} - currentPlayers: {}", userId, roomId, playerCount);
+            log.info("🎫 User {} reserved slot in Room {} - currentPlayers: {} (Reserved count increased)", userId,
+                    roomId, playerCount);
             return Map.of("success", true, "status", "RESERVED", "ttl", 30);
 
         } catch (InterruptedException e) {
@@ -1697,22 +1696,9 @@ public class RedisGameService {
         if (Boolean.TRUE.equals(hasReservation)) {
             deleteReservation(roomId, userId);
 
-            // Remove user from players set (they were added during reservation)
-            String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
-            redisTemplate.opsForSet().remove(playersKey, String.valueOf(userId));
-
-            // Broadcast player count update to lobby
-            Long newPlayerCount = redisTemplate.opsForSet().size(playersKey);
-            int playerCount = newPlayerCount != null ? newPlayerCount.intValue() : 0;
-
-            Map<String, Object> lobbyPlayerData = new HashMap<>();
-            lobbyPlayerData.put("roomId", roomId);
-            lobbyPlayerData.put("currentPlayers", playerCount);
-            redisPublisher.publish(
-                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
-                    SocketResponse.of("LOBBY_PLAYER_UPDATE", lobbyPlayerData));
-
-            log.info("❌ User {} cancelled reservation for Room {} - currentPlayers: {}", userId, roomId, playerCount);
+            // No need to remove from players key or broadcast, as we didn't add them in
+            // reserveRoomSlot
+            log.info("❌ User {} cancelled reservation for Room {} (Reserved count decremented)", userId, roomId);
         }
     }
 

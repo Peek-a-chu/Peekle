@@ -40,6 +40,7 @@ public class Problem {
 
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     @JoinTable(name = "problem_tags", joinColumns = @JoinColumn(name = "problem_id"), inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    @Builder.Default
     private Set<Tag> tags = new HashSet<>();
 
     public Problem(String source, String externalId, String title, String tier, String url) {
