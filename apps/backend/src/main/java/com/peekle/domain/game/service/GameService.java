@@ -50,6 +50,7 @@ public class GameService {
         // 방 정보 조회 (메타데이터용)
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, gameId);
         String mode = (String) redisTemplate.opsForHash().get(infoKey, "mode");
+        String roomTitle = (String) redisTemplate.opsForHash().get(infoKey, "title");
 
         Map<Long, Integer> gainedPointsMap = new HashMap<>();
         int totalPlayers = rankingSet.size();
@@ -134,10 +135,11 @@ public class GameService {
                 userRepository.save(user);
 
                 // 포인트 로그 저장
-                String description = String.format("게임 결과 보상 (Game ID: %d, 순위: %d)", gameId, finalRank + 1);
+                String displayTitle = roomTitle != null ? roomTitle : String.valueOf(gameId);
+                String description = String.format("게임 결과 보상 (방: %s, 순위: %d)", displayTitle, finalRank + 1);
                 String metadata = String.format(
-                        "{\"rank\": %d, \"roomId\": \"%d\", \"title\": \"게임 결과 보상\", \"mode\": \"%s\", \"teamType\": \"%s\"}",
-                        finalRank + 1, gameId, mode != null ? mode : "UNKNOWN",
+                        "{\"rank\": %d, \"roomId\": \"%d\", \"roomTitle\": \"%s\", \"title\": \"게임 결과 보상\", \"mode\": \"%s\", \"teamType\": \"%s\"}",
+                        finalRank + 1, gameId, displayTitle.replace("\"", "\\\""), mode != null ? mode : "UNKNOWN",
                         teamType != null ? teamType : "UNKNOWN");
 
                 PointLog pointLog = new PointLog(

@@ -1069,10 +1069,11 @@ public class RedisGameService {
         long elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000;
         long elapsedMinutes = elapsedSeconds / 60; // 분 단위 변환
 
-        // 4. 개인 기록 업데이트 (Hash: solvedCount, totalMinutes)
+        // 4. 개인 기록 업데이트 (Hash: solvedCount, totalMinutes, lastSolvedSeconds)
         String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, gameId, userId);
         redisTemplate.opsForHash().increment(scoreKey, "solvedCount", 1);
         redisTemplate.opsForHash().increment(scoreKey, "totalMinutes", elapsedMinutes);
+        redisTemplate.opsForHash().put(scoreKey, "lastSolvedSeconds", String.valueOf(elapsedSeconds));
         redisTemplate.expire(scoreKey, 6, TimeUnit.HOURS); // 6시간 후 자동 삭제
 
         // 5. ICPC 스타일 랭킹 점수 계산 & 업데이트 (ZSet)
@@ -1085,8 +1086,8 @@ public class RedisGameService {
         long totalMinutes = (totalMinutesObj != null) ? Long.parseLong(String.valueOf(totalMinutesObj))
                 : elapsedMinutes;
 
-        // ICPC 점수: 푼 문제 수 우선, 시간은 타이브레이커
-        double score = (solvedCount * 100000000.0) - totalMinutes;
+        // ICPC 점수: 푼 문제 수 우선, 시간은 타이브레이커 (초 단위 정밀도 적용)
+        double score = (solvedCount * 100000000.0) - elapsedSeconds;
 
         // 팀전 여부 확인 및 팀 점수 반영
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, gameId);
