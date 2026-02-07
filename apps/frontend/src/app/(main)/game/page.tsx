@@ -42,8 +42,8 @@ export default function GamesPage(): React.ReactNode {
   const [showReconnectModal, setShowReconnectModal] = useState(false);
 
   useEffect(() => {
-    // PLAYING 또는 END 상태의 게임이 있으면 모달 표시
-    if (!isLoading && currentGame && (currentGame.status === 'PLAYING' || currentGame.status === 'END')) {
+    // PLAYING 상태의 게임만 모달 표시 (END는 제외)
+    if (!isLoading && currentGame && currentGame.status === 'PLAYING') {
       setShowReconnectModal(true);
     }
   }, [currentGame, isLoading]);

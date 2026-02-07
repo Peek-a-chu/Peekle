@@ -805,7 +805,7 @@ public class RedisGameService {
         }
     }
 
-    // 방 목록 조회
+    // 방 목록 조회 (WAITING, PLAYING 상태만)
     public List<GameRoomResponse> getAllGameRooms() {
         // 1. 모든 방 ID 조회
         Set<Object> roomIds = redisTemplate.opsForSet().members(RedisKeyConst.GAME_ROOM_IDS);
@@ -837,6 +837,11 @@ public class RedisGameService {
                     }
                 })
                 .filter(Objects::nonNull)
+                // 끝난 게임 제외 - WAITING, PLAYING만 표시
+                .filter(room -> {
+                    GameStatus status = room.getStatus();
+                    return status == GameStatus.WAITING || status == GameStatus.PLAYING;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -1421,6 +1426,7 @@ public class RedisGameService {
         // 참여자 및 팀 데이터
         redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId));
         redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId)); // Ready 상태 삭제
         redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_ONLINE, roomId));
 
         // 문제 데이터
