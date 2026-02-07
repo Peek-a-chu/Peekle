@@ -6,6 +6,7 @@ import { GameReconnectModal } from '@/domains/game/components/game-reconnect-mod
 import { useGamePageLogic } from '@/domains/game/hooks/useGamePageLogic';
 import { useCurrentGame } from '@/domains/game/hooks/useCurrentGame';
 import { GameLayoutHeader, GameLayoutFilter, GameLayoutContent } from '@/domains/game/layout';
+import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { useEffect, useState } from 'react';
 
 export default function GamesPage(): React.ReactNode {
@@ -28,6 +29,11 @@ export default function GamesPage(): React.ReactNode {
     handleRoomClick,
     handlePasswordSubmit,
     handleCreateRoom,
+    // PreJoin related
+    showPreJoinModal,
+    setShowPreJoinModal,
+    creationFormData,
+    handleFinalCreateRoom,
     resetFilters,
   } = useGamePageLogic();
 
@@ -102,6 +108,18 @@ export default function GamesPage(): React.ReactNode {
         roomTitle={selectedRoom?.title || ''}
         onSubmit={handlePasswordSubmit}
       />
+
+      {/* 방 생성 전 프리조인 모달 */}
+      {showPreJoinModal && creationFormData && (
+        <CCPreJoinModal
+          roomTitle={creationFormData.title}
+          description="방 생성 전, 카메라와 마이크를 확인해주세요."
+          onJoin={handleFinalCreateRoom}
+          onCancel={() => setShowPreJoinModal(false)}
+          joinLabel="방 생성하기"
+          isLoading={isCreatingRoom}
+        />
+      )}
 
 
     </>

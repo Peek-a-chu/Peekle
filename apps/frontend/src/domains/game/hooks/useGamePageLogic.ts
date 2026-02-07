@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
 import {
   getGameRooms,
@@ -22,6 +23,7 @@ export type StatusFilter = GameStatus | 'ALL';
 
 export function useGamePageLogic() {
   const router = useRouter();
+  const { user } = useAuthStore();
 
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
   const [selectedTeamType, setSelectedTeamType] = useState<TeamType | null>(null);
@@ -47,6 +49,13 @@ export function useGamePageLogic() {
   useGameLobbySocket({
     onRoomCreated: (data: any) => {
       console.log('[Lobby] New room created:', data);
+
+      // 내가 만든 방이면 목록에 추가하지 않음 (로비에서 깜빡임 방지 & 바로 입장 처리됨)
+      if (user && data.host?.id === user.id) {
+        console.log('[Lobby] Skipping own room creation event:', data.roomId);
+        return;
+      }
+
       // 새 방 추가
       const newRoom: GameRoom = {
         id: data.roomId,
@@ -54,19 +63,20 @@ export function useGamePageLogic() {
         mode: data.mode as GameMode,
         teamType: data.teamType as TeamType,
         status: data.status as GameStatus,
-        isPrivate: data.isPrivate,
+        isPrivate: data.isSecret, // Backend sends "isSecret", Frontend uses "isPrivate"
         maxPlayers: data.maxPlayers,
         currentPlayers: data.currentPlayers,
-        timeLimit: 0, // Backend doesn't send this in lobby broadcast
-        problemCount: 0, // Backend doesn't send this in lobby broadcast
+        timeLimit: data.timeLimit || 0,
+        problemCount: data.problemCount || 0,
         host: {
-          id: 0, // Backend doesn't send host ID in lobby broadcast
-          nickname: data.hostNickname,
-          profileImg: '',
+          id: data.host?.id || 0,
+          nickname: data.host?.nickname || data.hostNickname || 'Unknown',
+          profileImg: data.host?.profileImg || '',
         },
-        tags: [],
-        tierMin: '',
-        tierMax: '',
+        tags: data.tags || [],
+        tierMin: data.tierMin || 'Bronze 5',
+        tierMax: data.tierMax || 'Gold 1',
+        workbookTitle: data.workbookTitle,
       };
       setRooms((prev) => [newRoom, ...prev]);
     },
@@ -175,40 +185,54 @@ export function useGamePageLogic() {
 
 
 
+  // PreJoin Modal State
+  const [creationFormData, setCreationFormData] = useState<GameCreationFormData | null>(null);
+  const [showPreJoinModal, setShowPreJoinModal] = useState(false);
+
+  // 1단계: 방 생성 모달에서 "생성하기" 클릭 시 -> 프리조인 모달 오픈
   const handleCreateRoom = async (formData: GameCreationFormData) => {
     if (isCreatingRoom) return;
+    setCreationFormData(formData);
+    setCreateModalOpen(false);
+    setShowPreJoinModal(true);
+  };
+
+  // 2단계: 프리조인 모달에서 "방 생성하기" 클릭 시 -> 실제 API 호출
+  const handleFinalCreateRoom = async (micEnabled: boolean, camEnabled: boolean) => {
+    if (!creationFormData || isCreatingRoom) return;
     setIsCreatingRoom(true);
 
     try {
       // GameCreationFormData -> GameCreateRequest 변환
       const requestData: GameCreateRequest = {
-        title: formData.title,
-        mode: formData.mode,
-        teamType: formData.teamType,
-        maxPlayers: formData.maxPlayers,
-        timeLimit: formData.timeLimit,
-        problemCount: formData.problemCount,
-        password: formData.password || undefined, // 빈 문자열이면 undefined 처리
-        problemSource: formData.problemSource,
-        tierMin: formData.tierMin,
-        tierMax: formData.tierMax,
-        selectedWorkbookId: formData.selectedWorkbookId || undefined, // null -> undefined 변환
-        selectedTags: formData.selectedTags,
+        title: creationFormData.title,
+        mode: creationFormData.mode,
+        teamType: creationFormData.teamType,
+        maxPlayers: creationFormData.maxPlayers,
+        timeLimit: creationFormData.timeLimit,
+        problemCount: creationFormData.problemCount,
+        password: creationFormData.password || undefined,
+        problemSource: creationFormData.problemSource,
+        tierMin: creationFormData.tierMin,
+        tierMax: creationFormData.tierMax,
+        selectedWorkbookId: creationFormData.selectedWorkbookId || undefined,
+        selectedTags: creationFormData.selectedTags,
       };
 
       const roomId = await createGameRoom(requestData);
       if (roomId) {
-        toast.success('방이 생성되었습니다.');
-        setCreateModalOpen(false);
-        // await refreshRooms(); // 방 목록 새로고침 대기 제거 -> 즉시 입장
-        router.push(`/game/${roomId}`);
+        // toast.success('방이 생성되었습니다.');
+        // setShowPreJoinModal(false); // 리다이렉트 될 때까지 모달 유지
+        // setCreationFormData(null);
+        // 미디어 상태는 로컬 스토리지나 컨텍스트에 저장할 수도 있음 (현재는 단순히 넘김)
+        router.push(`/game/${roomId}?prejoined=true&mic=${micEnabled}&cam=${camEnabled}`);
       } else {
         toast.error('방 생성에 실패했습니다.');
-        setIsCreatingRoom(false);
       }
     } catch (error) {
       console.error(error);
       toast.error('방 생성 중 오류가 발생했습니다.');
+    } finally {
       setIsCreatingRoom(false);
     }
   };
@@ -239,6 +263,12 @@ export function useGamePageLogic() {
     handleRoomClick,
     handlePasswordSubmit,
     handleCreateRoom,
+    // PreJoin related
+    showPreJoinModal,
+    setShowPreJoinModal,
+    creationFormData,
+    handleFinalCreateRoom,
+    // isCreatingRoom, // Exposed for loading state (ALREADY EXPOSED ABOVE)
     resetFilters,
   };
 }

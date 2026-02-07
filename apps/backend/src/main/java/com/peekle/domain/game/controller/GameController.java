@@ -30,6 +30,7 @@ public class GameController {
 
     @GetMapping
     public ApiResponse<List<GameRoomResponse>> getRooms() {
+
         return ApiResponse.success(gameService.getAllGameRooms());
     }
 

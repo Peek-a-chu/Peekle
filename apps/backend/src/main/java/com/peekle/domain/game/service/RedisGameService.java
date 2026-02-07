@@ -228,21 +228,10 @@ public class RedisGameService {
                 }
             }
 
-            // 5. 로비 브로드캐스트: 새 방 생성 알림
-            Map<String, Object> lobbyCreateData = new HashMap<>();
-            lobbyCreateData.put("roomId", roomId);
-            lobbyCreateData.put("title", request.getTitle());
-            lobbyCreateData.put("mode", request.getMode().name());
-            lobbyCreateData.put("teamType", request.getTeamType().name());
-            lobbyCreateData.put("maxPlayers", request.getMaxPlayers());
-            lobbyCreateData.put("currentPlayers", 1); // Host
-            lobbyCreateData.put("status", GameStatus.WAITING.name());
-            lobbyCreateData.put("isPrivate", request.getPassword() != null && !request.getPassword().isEmpty());
-            lobbyCreateData.put("hostNickname", host.getNickname());
-            redisPublisher.publish(
-                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
-                    SocketResponse.of("LOBBY_ROOM_CREATED", lobbyCreateData));
-            log.info("📢 [Lobby] Game Room {} Created - Broadcasting to lobby", roomId);
+            // 5. BroadCast 지연 (Delay to enterGameRoom)
+            // 방장(Host)이 실제로 소켓으로 입장했을 때 브로드캐스트하기 위해 여기서는 생략함.
+            // "ghost room" 방지 목적.
+            log.info("🔨 [Create Room] Room {} Created in Redis. Broadcast delayed until Host enters.", roomId);
 
             return roomId;
 
@@ -338,6 +327,85 @@ public class RedisGameService {
         redisTemplate.opsForValue().set(
                 String.format(RedisKeyConst.USER_CURRENT_GAME, userId),
                 String.valueOf(roomId));
+
+        // [New] Delayed Broadcast Logic
+        // 방장이 최초 입장 시에만 로비에 방 생성 알림을 보냄
+        String broadcastKey = String.format(RedisKeyConst.GAME_ROOM_BROADCASTED, roomId);
+        String hostIdStr = (String) roomInfo.get("hostId");
+
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(broadcastKey))) {
+            if (hostIdStr != null && hostIdStr.equals(String.valueOf(userId))) {
+                // Construct Lobby Data
+                Map<String, Object> lobbyCreateData = new HashMap<>();
+                lobbyCreateData.put("roomId", roomId);
+                lobbyCreateData.put("title", (String) roomInfo.get("title"));
+                lobbyCreateData.put("mode", (String) roomInfo.get("mode"));
+                lobbyCreateData.put("teamType", (String) roomInfo.get("teamType"));
+                lobbyCreateData.put("maxPlayers", Integer.parseInt((String) roomInfo.get("maxPlayers")));
+                lobbyCreateData.put("currentPlayers", 1);
+                lobbyCreateData.put("status", GameStatus.WAITING.name());
+
+                String roomPwd = (String) roomInfo.get("password");
+                lobbyCreateData.put("isSecret", roomPwd != null && !roomPwd.isBlank());
+
+                // Host Info
+                Map<String, Object> hostInfo = new HashMap<>();
+                hostInfo.put("id", userId);
+                String hNickname = (String) roomInfo.get("hostNickname"); // stored in createGameRoom
+                String hProfile = (String) roomInfo.get("hostProfileImg");
+
+                // Fallback if not in redis (should be there though)
+                if (hNickname == null) {
+                    User hUser = userRepository.findById(userId).orElse(null);
+                    if (hUser != null) {
+                        hNickname = hUser.getNickname();
+                        hProfile = hUser.getProfileImg();
+                    }
+                }
+                hostInfo.put("nickname", hNickname != null ? hNickname : "Unknown");
+                hostInfo.put("profileImg", hProfile != null ? hProfile : "");
+                lobbyCreateData.put("host", hostInfo);
+
+                // Other fields
+                String tLimit = (String) roomInfo.get("timeLimit");
+                lobbyCreateData.put("timeLimit", tLimit != null ? Integer.parseInt(tLimit) : 0);
+
+                String pCount = (String) roomInfo.get("problemCount");
+                lobbyCreateData.put("problemCount", pCount != null ? Integer.parseInt(pCount) : 0);
+
+                lobbyCreateData.put("tierMin", roomInfo.getOrDefault("tierMin", "Bronze 5"));
+                lobbyCreateData.put("tierMax", roomInfo.getOrDefault("tierMax", "Gold 1"));
+
+                // Tags
+                String tagsStr = (String) roomInfo.get("tags");
+                if (tagsStr != null && !tagsStr.isEmpty()) {
+                    List<String> tagsList = Arrays.asList(tagsStr.split(","));
+                    lobbyCreateData.put("tags", translateTagsToKo(tagsList));
+                } else {
+                    lobbyCreateData.put("tags", Collections.emptyList());
+                }
+
+                // Workbook Title
+                String selWbId = (String) roomInfo.get("selectedWorkbookId");
+                if (selWbId != null) {
+                    try {
+                        Long wbId = selWbId.startsWith("wb") ? Long.parseLong(selWbId.replace("wb", ""))
+                                : Long.parseLong(selWbId);
+                        String wbTitle = workbookRepository.findById(wbId).map(Workbook::getTitle).orElse(null);
+                        lobbyCreateData.put("workbookTitle", wbTitle);
+                    } catch (Exception e) {
+                    }
+                }
+
+                redisPublisher.publish(
+                        new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                        SocketResponse.of("LOBBY_ROOM_CREATED", lobbyCreateData));
+
+                // Mark as broadcasted
+                redisTemplate.opsForValue().set(broadcastKey, "true");
+                log.info("📢 [Lobby] Game Room {} Broadcasted via enterGameRoom (Host Connected)", roomId);
+            }
+        }
 
         // 로비 브로드캐스트: 플레이어 입장 알림
         Long currentPlayers = redisTemplate.opsForSet().size(playersKey);
