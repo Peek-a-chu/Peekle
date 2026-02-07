@@ -8,48 +8,25 @@ import {
   type GameCreationFormData,
 } from '@/domains/game/types/game-types';
 import { gameModes } from '@/domains/game/constants/game-constants';
-import type { RefObject } from 'react';
 
 interface GameCreationStepModeProps {
   formData: GameCreationFormData;
-  titleError: boolean;
-  titleInputRef: RefObject<HTMLInputElement | null>;
   onUpdateForm: <K extends keyof GameCreationFormData>(
     key: K,
     value: GameCreationFormData[K],
   ) => void;
   onModeSelect: (mode: GameMode, teamType: TeamType) => void;
-  onTitleErrorReset: () => void;
 }
 
 export function GameCreationStepMode({
   formData,
-  titleError,
-  titleInputRef,
   onUpdateForm,
   onModeSelect,
-  onTitleErrorReset,
 }: GameCreationStepModeProps) {
   const isTeamMode = formData.teamType === 'TEAM';
 
   return (
     <div className="space-y-2">
-      {/* 방 제목 */}
-      <div className="space-y-2">
-        <Label htmlFor="title">방 제목</Label>
-        <Input
-          id="title"
-          ref={titleInputRef}
-          placeholder="게임방 제목을 입력하세요"
-          value={formData.title}
-          onChange={(e) => {
-            onUpdateForm('title', e.target.value);
-            if (e.target.value.trim()) onTitleErrorReset();
-          }}
-        />
-        {titleError && <p className="text-sm text-destructive">게임 방 제목을 입력해주세요.</p>}
-      </div>
-
       {/* 공개/비공개 + 비밀번호 */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">

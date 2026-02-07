@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
@@ -9,7 +10,7 @@ import {
 } from '@/domains/game/types/game-types';
 import { BOJ_TIERS } from '@/domains/game/constants/game-constants';
 import { getWorkbooks, type WorkbookListResponse } from '@/domains/workbook/api/workbookApi';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { tagApi, type Tag } from '@/domains/game/api/tagApi';
 
@@ -31,6 +32,7 @@ export function GameCreationStepProblem({
   const [workbooks, setWorkbooks] = useState<WorkbookListResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [conflictWorkbookId, setConflictWorkbookId] = useState<string | null>(null);
 
   // 태그 목록 조회
   useEffect(() => {
@@ -73,6 +75,31 @@ export function GameCreationStepProblem({
       workbook.description.toLowerCase().includes(query)
     );
   });
+
+  // 문제집 선택 핸들러 (검증 포함)
+  const handleWorkbookSelect = (workbookId: string, problemCount: number) => {
+    if (problemCount < formData.problemCount) {
+      // 충돌 발생: 인라인 경고 표시
+      setConflictWorkbookId(workbookId);
+    } else {
+      // 충돌 없음: 바로 선택
+      onUpdateForm('selectedWorkbookId', workbookId);
+      setConflictWorkbookId(null);
+    }
+  };
+
+  // 문제 수 자동 조정 + 선택
+  const handleAutoAdjust = (workbookId: string, problemCount: number) => {
+    onUpdateForm('problemCount', problemCount);
+    onUpdateForm('selectedWorkbookId', workbookId);
+    setConflictWorkbookId(null);
+    toast.success(`문제 수를 ${problemCount}개로 조정했어요`);
+  };
+
+  // 선택 취소
+  const handleCancelSelection = () => {
+    setConflictWorkbookId(null);
+  };
 
   return (
     <div className="space-y-6 pt-6">
@@ -177,30 +204,74 @@ export function GameCreationStepProblem({
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : filteredWorkbooks.length > 0 ? (
-              filteredWorkbooks.map((workbook) => (
-                <button
-                  key={workbook.id}
-                  type="button"
-                  onClick={() => onUpdateForm('selectedWorkbookId', String(workbook.id))}
-                  className={cn(
-                    'w-full rounded-lg border p-4 text-left transition-colors',
-                    formData.selectedWorkbookId === String(workbook.id)
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">{workbook.title}</h4>
-                      <p className="text-sm text-muted-foreground">{workbook.description}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium">{workbook.problemCount}문제</span>
-                      <p className="text-xs text-muted-foreground">by {workbook.creator.nickname}</p>
-                    </div>
+              filteredWorkbooks.map((workbook) => {
+                const isConflict = conflictWorkbookId === String(workbook.id);
+                const isSelected = formData.selectedWorkbookId === String(workbook.id);
+
+                return (
+                  <div key={workbook.id} className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleWorkbookSelect(String(workbook.id), workbook.problemCount)}
+                      className={cn(
+                        'w-full rounded-lg border p-4 text-left transition-colors',
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : isConflict
+                            ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20'
+                            : 'border-border hover:border-primary/50',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">{workbook.title}</h4>
+                          <p className="text-sm text-muted-foreground">{workbook.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-medium">{workbook.problemCount}문제</span>
+                          <p className="text-xs text-muted-foreground">by {workbook.creator.nickname}</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* 충돌 경고 & 해결 옵션 */}
+                    {isConflict && (
+                      <div className="rounded-lg border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20 p-4 space-y-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-500 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                              선택한 문제집은 {workbook.problemCount}문제만 포함해요
+                            </p>
+                            <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                              현재 설정은 {formData.problemCount}문제예요. 어떻게 할까요?
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleAutoAdjust(String(workbook.id), workbook.problemCount)}
+                            className="flex-1"
+                          >
+                            문제 수를 {workbook.problemCount}개로 줄이고 선택
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelSelection}
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </button>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 {workbooks.length === 0 ? '등록된 문제집이 없습니다.' : '검색 결과가 없습니다.'}

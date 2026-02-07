@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { useGameSocketConnection } from './useGameSocketConnection';
-import { getGameRoom, kickUser, enterGameRoom } from '@/domains/game/api/game-api';
+import { getGameRoom, kickUser, enterGameRoom, confirmRoomReservation, cancelRoomReservation } from '@/domains/game/api/game-api';
 import { GameRoomDetail, ChatMessage, Team } from '@/domains/game/types/game-types';
 import { toast } from 'sonner';
 
@@ -48,19 +48,25 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
   const isReady = currentParticipant?.status === 'READY';
 
   // 방 정보 조회
-  const fetchRoom = useCallback(async () => {
-    if (!roomId) return;
+  const fetchRoom = useCallback(async (): Promise<GameRoomDetail | null> => {
+    if (!roomId) return null;
     try {
       const data = await getGameRoom(roomId);
       if (data) {
+        console.log('🎮 [Game Room Data]', data);
+        console.log('📚 workbookTitle:', data.workbookTitle);
+        console.log('📝 problems:', data.problems);
         setRoom(data);
+        return data;
       } else {
         toast.error('방 정보를 불러올 수 없습니다.');
         router.push('/game');
+        return null;
       }
     } catch (error) {
       console.error('Failed to fetch room:', error);
       toast.error('방 정보를 불러오는 중 오류가 발생했습니다.');
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -72,10 +78,38 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
 
     const enter = async () => {
       try {
-        // [수정] 멱등성 보장: 백엔드에서 이미 참여중이면 성공 처리하므로 안심하고 호출
-        await enterGameRoom(roomId);
+        // confirmRoomReservation이 방 정보를 반환
+        // 로비에서 이미 reserveRoomSlot을 호출한 상태
+        const data = await confirmRoomReservation(roomId);
         hasEnteredRef.current = true;
-        fetchRoom(); // 입장 후 정보 갱신
+
+        if (data) {
+          console.log('🎮 [Game Room Data]', data);
+          console.log('📚 workbookTitle:', data.workbookTitle);
+          console.log('📝 problems:', data.problems);
+          setRoom(data);
+          setIsLoading(false);
+
+          // 입장 메시지 추가 (Socket 이벤트로 처리하므로 제거)
+          // const currentUser = data.participants.find(p => p.id === userId);
+          // if (currentUser) {
+          //   setMessages((prev) => [
+          //     ...prev,
+          //     {
+          //       id: `system-enter-self-${Date.now()}`,
+          //       senderId: -1,
+          //       senderNickname: 'System',
+          //       profileImg: '',
+          //       content: `${currentUser.nickname}님이 입장했습니다.`,
+          //       timestamp: Date.now(),
+          //       type: 'SYSTEM' as const,
+          //     },
+          //   ]);
+          // }
+        } else {
+          toast.error('방 정보를 불러올 수 없습니다.');
+          router.push('/game');
+        }
       } catch (error) {
         console.error('Failed to enter room:', error);
         toast.error('방 입장에 실패했습니다.');
@@ -84,7 +118,19 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     };
 
     enter();
-  }, [roomId, fetchRoom, router]);
+  }, [roomId, router, userId]);
+
+  // Cleanup: Cancel reservation if user exits before entering room
+  useEffect(() => {
+    return () => {
+      // Only cancel if we haven't successfully entered (hasEnteredRef will be false)
+      if (roomId && !hasEnteredRef.current) {
+        cancelRoomReservation(roomId).catch(err => {
+          console.warn('Failed to cancel reservation on cleanup:', err);
+        });
+      }
+    };
+  }, [roomId]);
 
   // 소켓 이벤트 처리
   useEffect(() => {
@@ -139,7 +185,78 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
   const handleRoomEvent = (event: any) => {
     switch (event.type) {
       case 'ENTER':
+        // 시스템 메시지 추가
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-enter-${Date.now()}`,
+            senderId: -1,
+            senderNickname: 'System',
+            profileImg: '',
+            content: `${event.data.nickname || '사용자'}님이 입장했습니다.`,
+            timestamp: Date.now(),
+            type: 'SYSTEM' as const,
+          },
+        ]);
+
+        // 참여자 목록 즉시 업데이트
+        if (event.data && event.data.userId) {
+          setRoom(prev => {
+            if (!prev) return null;
+
+            // 이미 목록에 있는지 확인
+            const existingIndex = prev.participants.findIndex(p => p.id === Number(event.data.userId));
+
+            if (existingIndex >= 0) {
+              // 이미 있으면 정보 업데이트
+              const updatedParticipants = [...prev.participants];
+              updatedParticipants[existingIndex] = {
+                id: Number(event.data.userId),
+                nickname: event.data.nickname,
+                profileImg: event.data.profileImg || '',
+                isHost: event.data.host ?? false,
+                status: event.data.ready ? 'READY' : 'NOT_READY',
+                team: event.data.team as Team,
+              };
+              return {
+                ...prev,
+                participants: updatedParticipants,
+              };
+            } else {
+              // 없으면 새로 추가
+              return {
+                ...prev,
+                participants: [
+                  ...prev.participants,
+                  {
+                    id: Number(event.data.userId),
+                    nickname: event.data.nickname,
+                    profileImg: event.data.profileImg || '',
+                    isHost: event.data.host ?? false,
+                    status: event.data.ready ? 'READY' : 'NOT_READY',
+                    team: event.data.team as Team,
+                  },
+                ],
+                currentPlayers: prev.currentPlayers + 1,
+              };
+            }
+          });
+        }
+        break;
       case 'LEAVE': // [수정] EXIT -> LEAVE (백엔드와 맞춤)
+        // 시스템 메시지 추가
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-leave-${Date.now()}`,
+            senderId: -1,
+            senderNickname: 'System',
+            profileImg: '',
+            content: `${event.data.nickname || '사용자'}님이 나갔습니다.`,
+            timestamp: Date.now(),
+            type: 'SYSTEM' as const,
+          },
+        ]);
         fetchRoom();
         break;
       case 'KICK':
@@ -147,8 +264,20 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
           toast.error(event.data.message || '강퇴되었습니다.');
           router.push('/game');
         } else {
+          // 시스템 메시지 추가
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `system-kick-${Date.now()}`,
+              senderId: -1,
+              senderNickname: 'System',
+              profileImg: '',
+              content: `${event.data.nickname || '사용자'}님이 강퇴되었습니다.`,
+              timestamp: Date.now(),
+              type: 'SYSTEM' as const,
+            },
+          ]);
           fetchRoom();
-          toast.info('참여자가 강퇴되었습니다.');
         }
         break;
       case 'READY':
@@ -180,6 +309,22 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
             };
           });
         }
+        break;
+      case 'HOST_CHANGE':
+        // 시스템 메시지 추가
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-host-${Date.now()}`,
+            senderId: -1,
+            senderNickname: 'System',
+            profileImg: '',
+            content: `${event.data.newHostNickname || '사용자'}님이 방장이 되었습니다.`,
+            timestamp: Date.now(),
+            type: 'SYSTEM' as const,
+          },
+        ]);
+        fetchRoom();
         break;
       case 'START':
         setIsCountingDown(true);

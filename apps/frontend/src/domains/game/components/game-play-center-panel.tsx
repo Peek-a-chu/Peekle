@@ -61,13 +61,15 @@ export function GamePlayCenterPanel({
     // 2. 게임 서버에 제출 알림
     onSubmit();
 
-    // 3. 확장 프로그램 자동 제출 요청
-    if (externalId) {
+    // 3. 확장 프로그램 자동 제출 요청 및 제출 페이지 이동
+    const targetExternalId = externalId || selectedProblemUrl?.split('/').pop();
+
+    if (targetExternalId) {
       window.postMessage(
         {
           type: 'PEEKLE_SUBMIT_CODE',
           payload: {
-            externalId: externalId,
+            externalId: targetExternalId,
             code: code,
             language: language,
             sourceType: 'GAME',
@@ -75,13 +77,6 @@ export function GamePlayCenterPanel({
         },
         '*',
       );
-    } else if (selectedProblemUrl) {
-      // Fallback: URL에서 추출 시도 (구형 로직 대응용)
-      let submitUrl = selectedProblemUrl;
-      if (submitUrl.includes('/problem/')) {
-        submitUrl = submitUrl.replace('/problem/', '/submit/');
-      }
-      window.open(submitUrl, '_blank');
     }
   };
 
@@ -89,11 +84,11 @@ export function GamePlayCenterPanel({
     <div className={cn('flex h-full flex-col', className)}>
       {/* 화상 타일 헤더 */}
       <div className="flex items-center justify-between border-b border-border bg-card px-4 h-14 shrink-0">
-        <span className="text-sm font-medium">화상 타일</span>
+        <span className="text-sm font-medium text-foreground">화상 타일</span>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-6 w-6 text-muted-foreground hover:text-foreground"
           onClick={toggleVideoGrid}
           title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
         >
@@ -110,8 +105,6 @@ export function GamePlayCenterPanel({
         <GameVideoGrid
           participants={participants}
           currentUserId={currentUserId}
-          micState={micState}
-          camState={camState}
         />
       )}
 

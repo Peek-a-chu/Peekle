@@ -3,6 +3,8 @@
 import { Zap, Settings, FileText, CheckCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { type GameCreationFormData } from '@/domains/game/types/game-types';
 import { useGameCreationForm } from '@/domains/game/hooks/useGameCreationForm';
@@ -17,6 +19,7 @@ interface GameCreationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit?: (formData: GameCreationFormData) => void;
+  isLoading?: boolean;
 }
 
 const STEPS = [
@@ -26,7 +29,7 @@ const STEPS = [
   { id: 3, label: '확인', icon: CheckCircle },
 ];
 
-export function GameCreationModal({ open, onOpenChange, onSubmit }: GameCreationModalProps) {
+export function GameCreationModal({ open, onOpenChange, onSubmit, isLoading = false }: GameCreationModalProps) {
   const {
     currentStep,
     formData,
@@ -87,16 +90,31 @@ export function GameCreationModal({ open, onOpenChange, onSubmit }: GameCreation
 
           {/* 오른쪽 콘텐츠 영역 */}
           <div className="flex-1 flex flex-col">
+            {/* 공통: 방 제목 (모든 스텝에서 표시) */}
+            <div className="px-6 pt-6 pb-4 border-b">
+              <div className="space-y-2">
+                <Label htmlFor="title">방 제목</Label>
+                <Input
+                  id="title"
+                  ref={titleInputRef}
+                  placeholder="게임방 제목을 입력하세요"
+                  value={formData.title}
+                  onChange={(e) => {
+                    updateForm('title', e.target.value);
+                    if (e.target.value.trim()) setTitleError(false);
+                  }}
+                  className={cn(titleError && 'border-destructive focus-visible:ring-destructive')}
+                />
+                {titleError && <p className="text-sm text-destructive">게임 방 제목을 입력해주세요.</p>}
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto p-6">
               {/* Step 1: 모드 */}
               {currentStep === 0 && (
                 <GameCreationStepMode
                   formData={formData}
-                  titleError={titleError}
-                  titleInputRef={titleInputRef}
                   onUpdateForm={updateForm}
                   onModeSelect={handleModeSelect}
-                  onTitleErrorReset={() => setTitleError(false)}
                 />
               )}
 
@@ -145,7 +163,16 @@ export function GameCreationModal({ open, onOpenChange, onSubmit }: GameCreation
                   </Button>
                 )}
                 {currentStep === 3 ? (
-                  <Button onClick={handleSubmit}>생성하기</Button>
+                  <Button onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        생성 중...
+                      </>
+                    ) : (
+                      '생성하기'
+                    )}
+                  </Button>
                 ) : (
                   <Button onClick={() => setCurrentStep(currentStep + 1)}>다음</Button>
                 )}

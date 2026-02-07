@@ -131,7 +131,6 @@ export function useGameCreationForm(
     // 제목 검증
     if (!formData.title.trim()) {
       setTitleError(true);
-      setCurrentStep(0); // Step 1(모드)로 이동
       setTimeout(() => {
         titleInputRef.current?.focus();
       }, 100);

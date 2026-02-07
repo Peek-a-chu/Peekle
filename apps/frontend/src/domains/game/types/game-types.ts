@@ -31,12 +31,15 @@ export interface GameRoom {
     };
     isPrivate: boolean;
     tags: string[];
+    tierMin: string;
+    tierMax: string;
+    workbookTitle?: string; // 문제집 제목 (문제집인 경우)
+    problems?: GameProblem[]; // 문제 목록 (문제집인 경우 미리보기용)
+    startTime?: number; // 게임 시작 시간 (Timestamp)
 }
 
 export interface GameRoomDetail extends GameRoom {
     participants: Participant[];
-    tierMin: string;
-    tierMax: string;
     problems?: GameProblem[];
 }
 
@@ -48,6 +51,7 @@ export interface ChatMessage {
     content: string;
     timestamp: number | string;
     senderTeam?: Team;
+    type?: 'USER' | 'SYSTEM'; // 일반 메시지 vs 시스템 메시지
 }
 
 export interface GameProblem {
@@ -71,6 +75,7 @@ export interface GamePlayState {
     mode: GameMode;
     teamType: TeamType;
     timeLimit: number;
+    startTime?: number;
     remainingTime: number;
     problems: GameProblem[];
     participants: GamePlayParticipant[];

@@ -8,10 +8,12 @@ import {
   ChatMessage,
   Team,
 } from '@/domains/game/types/game-types';
-import { getGameRoom, enterGameRoom } from '@/domains/game/api/game-api';
+import { getGameRoom, enterGameRoom, confirmRoomReservation } from '@/domains/game/api/game-api';
 import { useGameTimer } from './useGameTimer';
 import { useGameSocketConnection } from './useGameSocketConnection';
 import { useAuthStore } from '@/store/auth-store';
+import { useGameLiveKitStore } from './useGameLiveKitStore';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 // 문제별 코드 상태 (언어별로 저장)
@@ -54,18 +56,25 @@ interface UseGamePlayRoomReturn {
 
   // 액션
   submitCode: () => void;
+  leaveRoom: () => void;
+  forfeitGame: () => void;
+
+  // 온라인 상태
+  onlineUserIds: Set<number>;
 }
 
 const DEFAULT_CODE: Record<string, string> = {
-  python: `# Enter your Python code here\nprint("Hello, World!")`,
-  java: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}`,
-  cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`,
+  python: `import sys\n\n# 코드를 작성해주세요\nprint("Hello World")`,
+  java: `import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println("Hello World");\n    }\n}`,
+  cpp: `#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << "Hello World" << endl;\n    return 0;\n}`,
 };
 
 export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
   const roomId = Number(roomIdString);
+  const router = useRouter();
   const { user } = useAuthStore();
   const currentUserId = user?.id || 0;
+  const { setVideoToken, clearVideoToken } = useGameLiveKitStore();
 
   const [gameState, setGameState] = useState<GamePlayState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,6 +82,9 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
   const [problemCodes, setProblemCodes] = useState<ProblemCodeState>({});
   const [currentLanguage, setCurrentLanguage] = useState('python');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isGracePeriod, setIsGracePeriod] = useState(false);
+  const [graceTime, setGraceTime] = useState(60);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
 
   // 소켓 연결
   const { client, connected } = useGameSocketConnection(roomId, currentUserId);
@@ -82,10 +94,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     const init = async () => {
       setIsLoading(true);
       try {
-        // [추가] 방 입장 처리 (멱등성 보장)
-        await enterGameRoom(roomIdString);
-
-        const room = await getGameRoom(roomIdString);
+        // enterGameRoom이 방 정보를 반환하므로 중복 조회 불필요
+        const room = await enterGameRoom(roomIdString);
         if (room) {
           // GameRoomDetail -> GamePlayState 변환
           const playState: GamePlayState = {
@@ -93,7 +103,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             title: room.title,
             mode: room.mode,
             teamType: room.teamType,
-            timeLimit: room.timeLimit, // [TEST] Seconds directly
+            timeLimit: room.timeLimit,
+            startTime: room.startTime,
             remainingTime: room.timeLimit, // [TEST] Seconds directly
             problems: room.problems || [],
             participants: (room.participants || []).map((p: any) => ({
@@ -155,6 +166,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
               return {
                 ...prev,
                 status: 'PLAYING',
+                startTime: data.startTime,
                 problems: (data.problems || []).map((p: any) => ({
                   ...p,
                   status: 'UNSOLVED',
@@ -172,6 +184,14 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             break;
           case 'SCORE_UPDATE':
             // 팀 점수 및 개인 변동 업데이트 처리
+            break;
+          case 'FINISH_TIMER_START':
+            console.log('⏱️ FINISH_TIMER_START event received:', data);
+            toast.info(`${data.nickname}님이 모든 문제를 풀었습니다! 1분 후 게임이 종료됩니다.`, {
+              duration: 5000,
+            });
+            setIsGracePeriod(true);
+            setGraceTime(data.remainSeconds || 60);
             break;
           case 'GAME_END':
             console.log('🏆 GAME_END event received:', data);
@@ -263,12 +283,71 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
       }
     });
 
+    // 4. VIDEO_TOKEN Subscription (LiveKit)
+    const videoTokenSub = client.subscribe(`/topic/games/${roomId}/video-token/${currentUserId}`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type === 'VIDEO_TOKEN') {
+          console.log('[GamePlayRoom] VIDEO_TOKEN received');
+          setVideoToken(response.data);
+        } else if (response.type === 'ERROR') {
+          console.error('[GamePlayRoom] VIDEO_TOKEN error:', response.data);
+          toast.error('화상 연결에 실패했습니다.');
+        }
+      } catch (e) {
+        console.error('Failed to parse video token message:', e);
+      }
+    });
+
+    // 5. Subscibe to Connected Users (Online Status)
+    const onlineSub = client.subscribe(`/topic/games/${roomId}/connected-users`, (msg) => {
+      try {
+        const users = JSON.parse(msg.body); // Expecting number[] of userIds
+        if (Array.isArray(users)) {
+          setOnlineUserIds(new Set(users.map(Number)));
+        }
+      } catch (e) {
+        console.error('Failed to parse connected users:', e);
+      }
+    });
+
+    // 6. Subscribe to User-Specific Errors
+    const errorSub = client.subscribe(`/topic/games/${roomId}/error/${currentUserId}`, (msg) => {
+      try {
+        const response = JSON.parse(msg.body);
+        if (response.type === 'ERROR') {
+          toast.error(response.data);
+        }
+      } catch (e) {
+        console.error('Failed to parse error message:', e);
+      }
+    });
+
+    // 7. Request Initial Connected Users
+    console.log('[GamePlayRoom] Requesting connected users list');
+    client.publish({
+      destination: '/pub/games/connected-users',
+      body: JSON.stringify({ gameId: roomId })
+    });
+
+    // 7. Send WebSocket ENTER message to trigger VIDEO_TOKEN generation
+    // This must happen AFTER subscriptions are set up to receive the token
+    console.log('[GamePlayRoom] Sending WebSocket ENTER to trigger VIDEO_TOKEN');
+    client.publish({
+      destination: '/pub/games/enter',
+      body: JSON.stringify({ gameId: roomId })
+    });
+
     return () => {
       roomSub.unsubscribe();
       chatSub.unsubscribe();
       rankingSub.unsubscribe();
+      videoTokenSub.unsubscribe();
+      onlineSub.unsubscribe();
+      errorSub.unsubscribe();
+      clearVideoToken();
     };
-  }, [client, connected, roomId, roomIdString]);
+  }, [client, connected, roomId, roomIdString, currentUserId, setVideoToken, clearVideoToken]);
 
   const updateProblemStatus = (
     problemId: number,
@@ -295,17 +374,36 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
   // 타이머
   const isSpeedRace = gameState?.mode === 'SPEED_RACE';
-  const timerInitialTime = isSpeedRace ? 0 : (gameState?.remainingTime ?? 1800);
+
+  const calculateRemainingTime = () => {
+    if (!gameState?.startTime) return gameState?.timeLimit ?? 1800;
+    const now = Date.now();
+    // startTime is in milliseconds (System.currentTimeMillis from backend)
+    const elapsedSeconds = Math.floor((now - gameState.startTime) / 1000);
+    const remaining = gameState.timeLimit - elapsedSeconds;
+    return remaining > 0 ? remaining : 0;
+  };
+
+  const calculateElapsedSeconds = () => {
+    if (!gameState?.startTime) return 0;
+    const now = Date.now();
+    return Math.floor((now - gameState.startTime) / 1000);
+  };
+
+  const timerInitialTime = isGracePeriod
+    ? graceTime
+    : (isSpeedRace ? calculateElapsedSeconds() : calculateRemainingTime());
   const timeUpToastShownRef = useRef(false);
 
-  // Room ID가 변경되면 토스트 플래그 초기화
+  // Room ID가 변경되면 토스트/유예상태 초기화
   useEffect(() => {
     timeUpToastShownRef.current = false;
+    setIsGracePeriod(false);
   }, [roomIdString]);
 
-  const { formattedTime, time } = useGameTimer({
+  const { formattedTime, time, reset } = useGameTimer({
     initialTime: timerInitialTime,
-    mode: isSpeedRace ? 'countup' : 'countdown',
+    mode: (isSpeedRace && !isGracePeriod) ? 'countup' : 'countdown',
     autoStart: gameState !== null,
     onTimeUp: useCallback(() => {
       if (!isSpeedRace && !timeUpToastShownRef.current) {
@@ -428,6 +526,31 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     }
   }, [selectedProblemId, gameState, currentCode, currentLanguage, client, connected, roomId]);
 
+  // 퇴장 처리 (잠시 나가기 - PLAYING/END 상태에서는 Redis 유지)
+  const leaveRoom = useCallback(() => {
+    // WebSocket 메시지 전송
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/games/leave',
+        body: JSON.stringify({ gameId: roomId }),
+      });
+    }
+    router.push('/game');
+    toast.info('대기실로 이동합니다.');
+  }, [client, connected, roomId, router]);
+
+  // 게임 포기 처리 (포기하기 - 모든 상태에서 Redis 삭제)
+  const forfeitGame = useCallback(() => {
+    if (client && connected) {
+      client.publish({
+        destination: '/pub/games/forfeit',
+        body: JSON.stringify({ gameId: roomId }),
+      });
+      toast.warning('게임을 포기했습니다.');
+      router.push('/game');
+    }
+  }, [client, connected, roomId, router]);
+
   return {
     gameState,
     isLoading,
@@ -445,5 +568,8 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     messages,
     sendMessage,
     submitCode,
+    leaveRoom,
+    forfeitGame,
+    onlineUserIds,
   };
 }

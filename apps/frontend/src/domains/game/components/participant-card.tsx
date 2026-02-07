@@ -1,17 +1,27 @@
 'use client';
 
 import Image from 'next/image';
-import { Crown } from 'lucide-react';
+import { Crown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserIcon } from '@/components/UserIcon';
 import type { Participant } from '@/domains/game/types/game-types';
+import { Button } from '@/components/ui/button';
 
 interface ParticipantCardProps {
   participant?: Participant;
   isEmpty?: boolean;
+  isHost?: boolean;
+  onKick?: () => void;
+  isSelf?: boolean;
 }
 
-export function ParticipantCard({ participant, isEmpty = false }: ParticipantCardProps) {
+export function ParticipantCard({
+  participant,
+  isEmpty = false,
+  isHost = false,
+  onKick,
+  isSelf = false,
+}: ParticipantCardProps) {
   if (isEmpty || !participant) {
     // 빈 슬롯: 라이트 모드(bg-muted/border-border), 다크 모드(bg-[#121A28]/border-white/20)
     return (
@@ -29,6 +39,11 @@ export function ParticipantCard({ participant, isEmpty = false }: ParticipantCar
   const isReady = participant.status === 'READY';
   const team = participant.team;
 
+  const handleKickClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onKick?.();
+  };
+
   return (
     <div
       className={cn(
@@ -40,6 +55,21 @@ export function ParticipantCard({ participant, isEmpty = false }: ParticipantCar
       {participant.isHost && (
         <div className="absolute top-1.5 left-2">
           <Crown className="h-3.5 w-3.5 text-yellow-500 opacity-80 dark:text-white/75 dark:opacity-100" />
+        </div>
+      )}
+
+      {/* Kick Button (Only for Host viewing other players) */}
+      {isHost && !isSelf && (
+        <div className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+            onClick={handleKickClick}
+            title="강퇴하기"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
 

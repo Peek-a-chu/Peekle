@@ -54,6 +54,10 @@ public class RedisKeyConst {
     // /topic/games/{gameId}/room
     public static final String TOPIC_GAME_ROOM = "topic/games/%d/room";
 
+    // Game Lobby Topic (Pub/Sub) - Global lobby broadcast
+    // /topic/games/lobby
+    public static final String TOPIC_GAME_LOBBY = "topic/games/lobby";
+
     // /sub/games/{gameId}/chat/global
     public static final String TOPIC_GAME_CHAT_GLOBAL = "topic/games/%d/chat/global";
 
@@ -98,6 +102,9 @@ public class RedisKeyConst {
     // 문제 해결 여부 (Set) -> game:{gameId}:problem:{problemId}:solved
     public static final String GAME_SOLVED_PROBLEM = "game:%d:problem:%d:solved";
 
+    // Game Room Online Users (Set) -> game:{gameId}:online_users
+    public static final String GAME_ROOM_ONLINE = "game:%d:online_users";
+
     // User Session (Value) -> user:{userId}:session -> sessionId
     public static final String USER_SESSION = "user:%d:session";
 
@@ -116,10 +123,36 @@ public class RedisKeyConst {
     // 게임 내 문제 목록 (List) -> game:%d:problems
     public static final String GAME_PROBLEMS = "game:%d:problems";
 
+    // 대기실용 문제 미리보기 (List) -> game:%d:problems:preview
+    public static final String GAME_PROBLEMS_PREVIEW = "game:%d:problems:preview";
+
     // 게임 제출 예상 코드 길이 (Value) -> game:%d:problem:%d:user:%d:expected_length
     public static final String GAME_EXPECTED_LENGTH = "game:%d:problem:%d:user:%d:expected_length";
 
     // 게임 내 경고 알림 (Pub/Sub) -> topic/games/%d/alert/%d
     public static final String TOPIC_GAME_ALERT = "topic/games/%d/alert/%d";
+
+    // 게임 초대 코드 (String: Code -> roomId)
+    public static final String GAME_INVITE_CODE = "game:invite:code:%s";
+    // 게임 방 초대 코드 (String: roomId -> Code)
+    public static final String GAME_ROOM_INVITE_CODE = "game:room:invite:%d";
+
+    // 개인전 스피드 레이스 1등 종료 타이머 시작 여부 (Value)
+    public static final String GAME_FINISH_TIMER = "game:room:%d:finish_timer";
+
+    // Game Room Broadcasted (Value) -> game:room:{roomId}:broadcasted -> "true"
+    public static final String GAME_ROOM_BROADCASTED = "game:room:%d:broadcasted";
+
+    // Game Room Reservation (Value) -> game:room:{roomId}:reservation:{userId} ->
+    // "RESERVED" (TTL: 30s)
+    public static final String GAME_ROOM_RESERVATION = "game:room:%d:reservation:%d";
+
+    // Game Room Reserved Count (Value) -> game:room:{roomId}:reserved_count ->
+    // counter
+    public static final String GAME_ROOM_RESERVED_COUNT = "game:room:%d:reserved_count";
+
+    // Reservation Lock (Lock)
+    public static final String LOCK_GAME_RESERVE = "lock:game:reserve:%d";
+    public static final String LOCK_GAME_CONFIRM = "lock:game:confirm:%d";
 
 }

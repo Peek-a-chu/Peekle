@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { RoomSettingsPanel } from '../components/room-settings-panel';
 import { ParticipantGrid } from '../components/participant-grid';
 import { WaitingRoomChatPanel } from '../components/WaitingRoomChatPanel';
-import { InviteModal } from '../components/invite-modal';
+import { GameInviteModal } from '../components/game-invite-modal';
 import { GameCountdownOverlay } from '../components/game-countdown-overlay';
 import type { GameRoomDetail, ChatMessage } from '@/domains/game/types/game-types';
 
@@ -110,6 +110,8 @@ export function GameWaitingRoomLayout({
             tierMin={room.tierMin}
             tierMax={room.tierMax}
             tags={room.tags}
+            problems={room.problems}
+            workbookTitle={room.workbookTitle}
           />
 
           {/* 참여자 그리드 */}
@@ -118,6 +120,9 @@ export function GameWaitingRoomLayout({
             maxPlayers={room.maxPlayers}
             currentPlayers={room.currentPlayers}
             teamType={room.teamType}
+            isHost={isHost}
+            onKickParticipant={onKickParticipant}
+            currentUserId={currentUserId}
           />
 
           {/* 액션 버튼 */}
@@ -176,7 +181,7 @@ export function GameWaitingRoomLayout({
       </div>
 
       {/* 초대 모달 */}
-      <InviteModal open={inviteModalOpen} onOpenChange={onInviteModalChange} roomId={room.id} />
+      <GameInviteModal open={inviteModalOpen} onOpenChange={onInviteModalChange} roomId={room.id} />
 
       {/* 카운트다운 오버레이 */}
       <GameCountdownOverlay isActive={isCountingDown} onComplete={onCountdownComplete} />

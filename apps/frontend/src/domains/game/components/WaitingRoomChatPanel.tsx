@@ -17,6 +17,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { UserIcon } from '@/components/UserIcon';
 import type { ChatMessage, Participant } from '@/domains/game/types/game-types';
 
 interface WaitingRoomChatPanelProps {
@@ -84,6 +85,18 @@ export function WaitingRoomChatPanel({
                     <CardContent className="flex-1 overflow-y-auto p-3">
                         <div className="space-y-3">
                             {messages.map((message) => {
+                                // 시스템 메시지 렌더링
+                                if (message.type === 'SYSTEM') {
+                                    return (
+                                        <div key={message.id} className="flex justify-center py-1">
+                                            <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                                                {message.content}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                // 일반 메시지 렌더링
                                 const isMe = message.senderId === currentUserId;
                                 return (
                                     <div
@@ -91,13 +104,12 @@ export function WaitingRoomChatPanel({
                                         className={cn('flex gap-2', isMe ? 'flex-row-reverse' : 'flex-row')}
                                     >
                                         {!isMe && (
-                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-purple-500 text-xs font-medium text-white">
-                                                {message.profileImg ? (
-                                                    <img src={message.profileImg} alt={message.senderNickname} className="h-full w-full rounded-full object-cover" />
-                                                ) : (
-                                                    (message.senderNickname || '?').charAt(0)
-                                                )}
-                                            </div>
+                                            <UserIcon
+                                                src={message.profileImg}
+                                                nickname={message.senderNickname}
+                                                size={32}
+                                                className="shrink-0"
+                                            />
                                         )}
                                         <div className={cn('max-w-[70%]', isMe ? 'text-right' : 'text-left')}>
                                             {!isMe && (
@@ -157,13 +169,12 @@ export function WaitingRoomChatPanel({
                                         className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted"
                                     >
                                         {/* 아바타 */}
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-purple-500 text-sm font-medium text-white shadow-sm">
-                                            {participant.profileImg ? (
-                                                <img src={participant.profileImg} alt={participant.nickname} className="h-full w-full rounded-full object-cover" />
-                                            ) : (
-                                                participant.nickname.charAt(0)
-                                            )}
-                                        </div>
+                                        <UserIcon
+                                            src={participant.profileImg}
+                                            nickname={participant.nickname}
+                                            size={40}
+                                            className="shrink-0"
+                                        />
 
                                         {/* 이름 및 상태 */}
                                         <div className="flex-1 overflow-hidden">

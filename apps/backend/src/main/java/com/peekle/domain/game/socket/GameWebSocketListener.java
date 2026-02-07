@@ -16,6 +16,7 @@ import java.util.Map;
 public class GameWebSocketListener {
 
     private final RedisGameService gameService;
+    private final com.peekle.domain.game.service.RedisGameAfterService gameAfterService;
 
     @EventListener
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
@@ -49,6 +50,12 @@ public class GameWebSocketListener {
                     // 게임 방 퇴장 처리 (자동 위임, 빈 방 삭제 등 포함)
                     // [Modified] 단순 퇴장이 아니라 상태에 따라 처리 (재접속 지원)
                     gameService.handleDisconnect(gameId, userId);
+
+                    // [New] Remove from online logic
+                    gameAfterService.removeOnlineUser(gameId, userId);
+
+                    // [New] Broadcast updated online user list (after disconnect handling)
+                    gameAfterService.broadcastOnlineUsers(gameId);
                 } catch (Exception e) {
                     log.error("[Game] Error during disconnect cleanup", e);
                 }

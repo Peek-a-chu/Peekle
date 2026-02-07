@@ -26,7 +26,7 @@ export function useGameTimer({
   onTimeUp,
   autoStart = true,
 }: UseGameTimerOptions): UseGameTimerReturn {
-  const startTime = mode === 'countup' ? 0 : initialTime;
+  const startTime = initialTime;
   const [time, setTime] = useState(startTime);
   const [isRunning, setIsRunning] = useState(false);
 

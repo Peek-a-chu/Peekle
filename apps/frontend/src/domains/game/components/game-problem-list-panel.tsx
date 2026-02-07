@@ -43,7 +43,7 @@ export function GameProblemListPanel({
           variant="ghost"
           size="icon"
           onClick={onToggleFold}
-          className="h-8 w-8"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
           title="문제 목록 펼치기"
         >
           <ChevronRight className="h-4 w-4" />
@@ -56,12 +56,12 @@ export function GameProblemListPanel({
     <div className={cn('flex h-full flex-col bg-card', className)}>
       {/* 헤더 */}
       <div className="flex items-center justify-between border-b border-border px-4 h-14 shrink-0">
-        <span className="text-sm font-medium">문제 목록</span>
+        <span className="text-sm font-medium text-foreground">문제 목록</span>
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggleFold}
-          className="h-8 w-8"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
           title="문제 목록 접기"
         >
           <ChevronLeft className="h-4 w-4" />
