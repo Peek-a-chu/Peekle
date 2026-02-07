@@ -5,7 +5,7 @@ import { CCVideoTile } from '@/domains/study/components/CCVideoTile';
 import { CCWhiteboardTile as WhiteboardTile } from '@/domains/study/components/CCWhiteboardTile';
 import { cn } from '@/lib/utils';
 import { useParticipants } from '@livekit/components-react';
-import { useMemo } from 'react';
+import { useMemo, useRef, type WheelEvent } from 'react';
 import { toast } from 'sonner';
 import { User } from 'lucide-react';
 
@@ -15,6 +15,7 @@ interface CCVideoGridProps {
 }
 
 export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const participants = useParticipants();
   const roomStoreParticipants = useRoomStore((state) => state.participants);
@@ -109,11 +110,23 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
     }
   };
 
+  const handleWheelScroll = (e: WheelEvent<HTMLDivElement>) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+
+    e.preventDefault();
+    scroller.scrollLeft += e.deltaY;
+  };
+
   return (
     <div
+      ref={scrollerRef}
+      onWheel={handleWheelScroll}
       data-tour="video-grid"
       className={cn(
-        'flex gap-2 overflow-x-auto border-b border-border bg-card p-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
+        'flex gap-2 overflow-x-auto overflow-y-hidden border-b border-border bg-card p-3 pb-2',
         className,
       )}
     >

@@ -23,6 +23,8 @@ interface CCCenterPanelProps {
   onVideoToggle?: () => void;
   onWhiteboardToggle?: () => void;
   onSettingsClick?: () => void;
+  compactMode?: boolean;
+  hideCurrentProblemLabel?: boolean;
   className?: string;
 }
 
@@ -33,8 +35,19 @@ export function CCCenterPanel({
   onVideoToggle,
   onWhiteboardToggle,
   onSettingsClick,
+  compactMode = false,
+  hideCurrentProblemLabel = false,
   className,
 }: CCCenterPanelProps) {
+  const getDraftStorageKey = (
+    roomIdValue: number | null,
+    studyProblemIdValue: number | null,
+    languageValue: string,
+  ) => {
+    if (!roomIdValue || !studyProblemIdValue) return null;
+    return `peekle:study:${roomIdValue}:problem:${studyProblemIdValue}:lang:${languageValue}`;
+  };
+
   const {
     isVideoGridFolded,
     toggleVideoGrid,
@@ -69,7 +82,7 @@ export function CCCenterPanel({
   const isWhiteboardVisible = isWhiteboardOverlayOpen && !!selectedProblemTitle;
 
   // Show right panel when viewing other's code OR whiteboard is open
-  const showRightPanel = isViewingOther || isWhiteboardVisible;
+  const showRightPanel = !compactMode && (isViewingOther || isWhiteboardVisible);
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -80,6 +93,15 @@ export function CCCenterPanel({
   // [Problem Selection] Save current code before switching, then request new problem's code
   const handleCodeChange = (code: string): void => {
     myLatestCodeRef.current = code;
+    const draftKey = getDraftStorageKey(roomId, selectedStudyProblemId, language);
+    if (draftKey) {
+      try {
+        sessionStorage.setItem(draftKey, code);
+      } catch {
+        // Ignore storage write failures
+      }
+    }
+
     if (socket && roomId && selectedStudyProblemId) {
       socket.publish({
         destination: '/pub/ide/update',
@@ -100,28 +122,46 @@ export function CCCenterPanel({
     onWhiteboardToggle?.();
   };
 
+  useEffect(() => {
+    const draftKey = getDraftStorageKey(roomId, selectedStudyProblemId, language);
+    if (!draftKey) return;
+
+    try {
+      const cachedDraft = sessionStorage.getItem(draftKey);
+      if (cachedDraft === null) return;
+
+      myLatestCodeRef.current = cachedDraft;
+      setRestoredCode(cachedDraft);
+      setRestoreVersion((prev) => prev + 1);
+    } catch {
+      // Ignore storage read failures
+    }
+  }, [roomId, selectedStudyProblemId, language]);
+
   return (
     <div className={cn('flex h-full flex-col min-w-0 min-h-0', className)}>
       {/* Video Grid Header */}
-      <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
-        <span className="text-sm font-medium">화상 타일</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={toggleVideoGrid}
-          title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
-        >
-          {isVideoGridFolded ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronUp className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+      {!compactMode && (
+        <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
+          <span className="text-sm font-medium">화상 타일</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={toggleVideoGrid}
+            title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
+          >
+            {isVideoGridFolded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronUp className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Video Grid */}
-      {!isVideoGridFolded && <VideoGrid onWhiteboardClick={onWhiteboardClick} />}
+      {!compactMode && !isVideoGridFolded && <VideoGrid onWhiteboardClick={onWhiteboardClick} />}
 
       {/* IDE Area */}
       <div
@@ -142,6 +182,7 @@ export function CCCenterPanel({
               onResetView={resetToOnlyMine}
               disabled={!selectedProblemTitle && !isViewingOther}
               problemExternalId={selectedProblemExternalId}
+              currentProblemLabel={hideCurrentProblemLabel ? null : selectedProblemTitle}
               // Standard Handlers
               onLanguageChange={(lang) => leftPanelRef.current?.setLanguage(lang)}
               onThemeToggle={handleThemeToggle}
@@ -222,7 +263,8 @@ export function CCCenterPanel({
               }}
               // Toggles
               showSubmit={!isViewingOther}
-              showChatRef={true} // Always show Ref Chat
+              showChatRef={!compactMode}
+              showThemeToggle={!compactMode}
             />
           </div>
         </div>
@@ -284,12 +326,14 @@ export function CCCenterPanel({
       </div>
 
       {/* Control Bar */}
-      <ControlBar
-        onMicToggle={onMicToggle}
-        onVideoToggle={onVideoToggle}
-        onWhiteboardToggle={handleWhiteboardToggleWrapper}
-        onSettingsClick={onSettingsClick}
-      />
+      {!compactMode && (
+        <ControlBar
+          onMicToggle={onMicToggle}
+          onVideoToggle={onVideoToggle}
+          onWhiteboardToggle={handleWhiteboardToggleWrapper}
+          onSettingsClick={onSettingsClick}
+        />
+      )}
     </div>
   );
 }

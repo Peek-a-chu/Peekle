@@ -56,11 +56,13 @@ export function CCStudyCard({
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {/* 랭킹 번호 배지 */}
             {displayRank !== undefined && (
-              <Badge className="shrink-0 bg-primary/10 text-primary">#{displayRank}</Badge>
+              <Badge className="shrink-0 bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground">
+                #{displayRank}
+              </Badge>
             )}
             <Badge
               variant="outline"
-              className="bg-primary/10 text-black font-bold border-primary/20"
+              className="bg-primary/15 text-primary font-bold border-primary/40 dark:bg-primary/20 dark:text-primary-foreground"
             >
               스터디 점수: {rankingPoint}
             </Badge>
@@ -76,7 +78,7 @@ export function CCStudyCard({
           {isCurrentUserOwner && (
             <Badge
               variant="secondary"
-              className="shrink-0 gap-1 bg-gray-100 text-black font-bold border-gray-200"
+              className="shrink-0 gap-1 bg-muted text-foreground font-bold border-border"
             >
               <Crown className="h-3 w-3" />
               방장

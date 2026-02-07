@@ -21,6 +21,8 @@ export interface CCIDEToolbarProps {
   theme?: 'light' | 'vs-dark';
   showSubmit?: boolean;
   showChatRef?: boolean;
+  showThemeToggle?: boolean;
+  currentProblemLabel?: string | null;
   onLanguageChange?: (lang: string) => void;
   onThemeToggle?: () => void;
   onCopy?: () => void;
@@ -41,6 +43,8 @@ export function CCIDEToolbar({
   theme = 'light',
   showSubmit = true,
   showChatRef = true,
+  showThemeToggle = true,
+  currentProblemLabel,
   onLanguageChange,
   onThemeToggle,
   onCopy,
@@ -60,7 +64,7 @@ export function CCIDEToolbar({
   return (
     <TooltipProvider>
       <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Language Select - Always Visible */}
           <select
             value={language}
@@ -77,6 +81,15 @@ export function CCIDEToolbar({
               </option>
             ))}
           </select>
+
+          {currentProblemLabel && (
+            <div className="hidden md:flex min-w-0 items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground/90">
+              <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground">
+                풀고있는문제
+              </span>
+              <span className="truncate font-medium">{currentProblemLabel}</span>
+            </div>
+          )}
 
           {/* View Mode Banner - Conditional (Next to Select) */}
           {isViewingOther && (
@@ -115,25 +128,26 @@ export function CCIDEToolbar({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Theme Toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onThemeToggle}
-                disabled={disabled}
-                className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
-              >
-                {theme === 'light' ? (
-                  <Moon className="h-[22px] w-[22px] stroke-[2px]" />
-                ) : (
-                  <Sun className="h-[22px] w-[22px] stroke-[2px]" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>테마 변경</TooltipContent>
-          </Tooltip>
+          {showThemeToggle && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onThemeToggle}
+                  disabled={disabled}
+                  className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                >
+                  {theme === 'light' ? (
+                    <Moon className="h-[22px] w-[22px] stroke-[2px]" />
+                  ) : (
+                    <Sun className="h-[22px] w-[22px] stroke-[2px]" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>테마 변경</TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Copy */}
           <Tooltip>

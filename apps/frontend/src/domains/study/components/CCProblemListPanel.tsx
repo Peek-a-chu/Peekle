@@ -33,6 +33,7 @@ export interface CCProblemListPanelProps {
   submissions?: Submission[];
   onFetchSubmissions?: (problemId: number) => void;
   historyDates?: Date[];
+  showFoldButton?: boolean;
 }
 
 export function CCProblemListPanel({
@@ -48,6 +49,7 @@ export function CCProblemListPanel({
   submissions = [],
   onFetchSubmissions,
   historyDates,
+  showFoldButton = true,
 }: CCProblemListPanelProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
@@ -127,14 +129,16 @@ export function CCProblemListPanel({
             <Plus className="mr-1 h-3 w-3" />
             문제 추가
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground p-0 h-8 gap-4"
-            onClick={onToggleFold}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          {showFoldButton && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground p-0 h-8 gap-4"
+              onClick={onToggleFold}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -160,16 +164,19 @@ export function CCProblemListPanel({
         ) : (
           <ul className="space-y-3 p-4">
             {(problems || []).map((problem, idx) => {
+              const studyProblemId = Number((problem as any).studyProblemId ?? (problem as any).id);
               // Some API responses may include duplicate/missing problemId; ensure a stable unique key.
               const key =
-                typeof problem.problemId === 'number' && Number.isFinite(problem.problemId)
-                  ? `problem-${problem.problemId}`
+                Number.isFinite(studyProblemId) && studyProblemId > 0
+                  ? `problem-${studyProblemId}`
+                  : typeof problem.problemId === 'number' && Number.isFinite(problem.problemId)
+                    ? `problem-${problem.problemId}`
                   : `problem-${problem.title || 'unknown'}-${idx}`;
               return (
                 <li key={key}>
                   <CCProblemCard
                     problem={problem}
-                    isSelected={selectedStudyProblemId === problem.problemId}
+                    isSelected={selectedStudyProblemId === studyProblemId}
                     onSelect={() => onSelectProblem?.(problem)}
                     onOpenSubmission={handleOpenSubmission}
                     onRemove={

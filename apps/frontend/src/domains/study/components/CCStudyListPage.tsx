@@ -8,13 +8,10 @@ import { CCStudyCard } from '@/domains/study/components/CCStudyCard';
 import { CCJoinStudyModal } from '@/domains/study/components/CCJoinStudyModal';
 import { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
 import type { StudyListContent, StudyRoomDetail } from '@/domains/study/types';
-import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export function CCStudyListPage() {
-  const router = useRouter(); // Use local router for final navigation
-  const [selectedStudyForJoin, setSelectedStudyForJoin] = useState<StudyListContent | null>(null);
+  const router = useRouter();
 
   const {
     studies,
@@ -35,32 +32,12 @@ export function CCStudyListPage() {
   const handleInviteSuccess = (study: StudyRoomDetail) => {
     setJoinModalOpen(false);
     void refetch();
-    // Simulate StudyListContent for the modal
-    setSelectedStudyForJoin({
-      id: study.id,
-      title: study.title,
-      description: '', // Not available in detail
-      isActive: true,
-      createdAt: '',
-      memberCount: study.members.length,
-      profileImages: [],
-      rankingPoint: 0,
-      owner: { id: 0, nickname: '' }, // Dummy owner
-    });
+    // Move to study room first; pre-join modal should appear inside room page.
+    router.push(`/study/${study.id}`);
   };
 
   const handleCardClick = (studyId: number) => {
-    const study = studies.find((s) => s.id === studyId);
-    if (study) {
-      setSelectedStudyForJoin(study);
-    }
-  };
-
-  const handlePreJoin = (mic: boolean, cam: boolean) => {
-    if (!selectedStudyForJoin) return;
-    router.push(
-      `/study/${selectedStudyForJoin.id}?prejoined=true&mic=${mic}&cam=${cam}`
-    );
+    router.push(`/study/${studyId}`);
   };
 
   return (
@@ -147,16 +124,6 @@ export function CCStudyListPage() {
         onOpenChange={setCreateModalOpen}
         onSuccess={handleCreateSuccess}
       />
-
-      {/* Pre-Join Modal Overlay */}
-      {selectedStudyForJoin && (
-        <CCPreJoinModal
-          roomTitle={selectedStudyForJoin.title}
-          description={selectedStudyForJoin.description}
-          onJoin={handlePreJoin}
-          onCancel={() => setSelectedStudyForJoin(null)}
-        />
-      )}
     </div>
   );
 }

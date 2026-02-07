@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 interface CCCreateStudyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (createdStudyId?: number) => void | Promise<void>;
 }
 
 export function CCCreateStudyModal({ open, onOpenChange, onSuccess }: CCCreateStudyModalProps) {
@@ -52,13 +52,13 @@ export function CCCreateStudyModal({ open, onOpenChange, onSuccess }: CCCreateSt
     setError('');
 
     try {
-      await createStudy(title.trim(), description.trim());
+      const created = await createStudy(title.trim(), description.trim());
+      const createdStudyId = created.studyId ?? created.id ?? created.roomId;
       toast.success('스터디 방이 생성되었습니다!');
       setTitle('');
       setDescription('');
       onOpenChange(false);
-      // Trigger refetch in parent hook, which will navigate to the newest study
-      onSuccess();
+      await onSuccess(createdStudyId);
     } catch (err) {
       const message = err instanceof Error ? err.message : '생성에 실패했습니다';
       setError(message);
