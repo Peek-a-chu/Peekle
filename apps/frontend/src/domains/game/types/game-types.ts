@@ -34,6 +34,7 @@ export interface GameRoom {
     tierMin: string;
     tierMax: string;
     workbookTitle?: string; // 문제집 제목 (문제집인 경우)
+    problems?: GameProblem[]; // 문제 목록 (문제집인 경우 미리보기용)
 }
 
 export interface GameRoomDetail extends GameRoom {

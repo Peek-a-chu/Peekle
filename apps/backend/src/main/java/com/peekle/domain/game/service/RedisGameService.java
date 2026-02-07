@@ -197,11 +197,8 @@ public class RedisGameService {
             // 3. 방 목록(Set)에 ID 추가 (검색용)
             redisTemplate.opsForSet().add(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
 
-            // 4. 방정 참여 처리 & Ready (Host는 자동 Ready)
-            enterGameRoom(roomId, hostId, request.getPassword());
-            toggleReady(roomId, hostId); // true
-
-            // 4.5 문제 전체 조회 및 캐싱 (WORKBOOK 모드일 때만)
+            // 3.5 문제 전체 조회 및 캐싱 (WORKBOOK 모드일 때만)
+            // [CRITICAL] enterGameRoom 이전에 실행하여 브로드캐스트 시 문제 목록이 포함되도록 함
             String problemSource = (String) roomInfo.getOrDefault("problemSource", "BOJ_RANDOM");
             if ("WORKBOOK".equals(problemSource)) {
                 try {
@@ -227,6 +224,10 @@ public class RedisGameService {
                     // 실패해도 방 생성은 계속 진행
                 }
             }
+
+            // 4. 방정 참여 처리 & Ready (Host는 자동 Ready)
+            enterGameRoom(roomId, hostId, request.getPassword());
+            toggleReady(roomId, hostId); // true
 
             // 5. BroadCast 지연 (Delay to enterGameRoom)
             // 방장(Host)이 실제로 소켓으로 입장했을 때 브로드캐스트하기 위해 여기서는 생략함.
@@ -393,7 +394,29 @@ public class RedisGameService {
                                 : Long.parseLong(selWbId);
                         String wbTitle = workbookRepository.findById(wbId).map(Workbook::getTitle).orElse(null);
                         lobbyCreateData.put("workbookTitle", wbTitle);
+
+                        // [New] Workbook Problem List for Tooltip (Fetch from Preview Cache)
+                        String previewKey = String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId);
+                        List<Object> pList = redisTemplate.opsForList().range(previewKey, 0, -1);
+                        List<Map<String, Object>> problems = new ArrayList<>();
+
+                        if (pList != null) {
+                            for (Object item : pList) {
+                                if (item instanceof Map) {
+                                    Map<String, String> pInfo = (Map<String, String>) item;
+                                    problems.add(Map.of(
+                                            "id", Long.parseLong(pInfo.get("id")),
+                                            "externalId", pInfo.get("externalId"),
+                                            "title", pInfo.get("title"),
+                                            "tier", pInfo.get("tier"),
+                                            "url", pInfo.get("url")));
+                                }
+                            }
+                            lobbyCreateData.put("problems", problems);
+                        }
+
                     } catch (Exception e) {
+                        log.error("Failed to add workbook info to lobby broadcast", e);
                     }
                 }
 

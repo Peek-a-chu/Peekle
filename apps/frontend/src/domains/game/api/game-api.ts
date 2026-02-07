@@ -36,6 +36,13 @@ interface GameRoomResponse {
     tierMin?: string;
     tierMax?: string;
     workbookTitle?: string;
+    problems?: {
+        id: number;
+        externalId: string;
+        title: string;
+        tier: string;
+        url: string;
+    }[];
 }
 
 interface GameRoomDetailResponse extends GameRoomResponse {
@@ -46,13 +53,6 @@ interface GameRoomDetailResponse extends GameRoomResponse {
         host: boolean;
         ready: boolean;
         team?: string;
-    }[];
-    problems?: {
-        id: number;
-        externalId: string;
-        title: string;
-        tier: string;
-        url: string;
     }[];
 }
 
@@ -89,6 +89,14 @@ export async function getGameRooms(): Promise<GameRoom[]> {
             tierMin: room.tierMin || '브론즈',
             tierMax: room.tierMax || '다이아',
             workbookTitle: room.workbookTitle,
+            problems: (room.problems || []).map(p => ({
+                id: p.id,
+                externalId: p.externalId,
+                title: p.title,
+                tier: p.tier,
+                url: p.url,
+                status: 'UNSOLVED' as const, // Default status
+            })),
         }));
     } catch (error) {
         console.error('Error fetching game rooms:', error);

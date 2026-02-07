@@ -48,8 +48,6 @@ export function useGamePageLogic() {
   // 실시간 로비 이벤트 핸들러
   useGameLobbySocket({
     onRoomCreated: (data: any) => {
-      console.log('[Lobby] New room created:', data);
-
       // 내가 만든 방이면 목록에 추가하지 않음 (로비에서 깜빡임 방지 & 바로 입장 처리됨)
       if (user && data.host?.id === user.id) {
         console.log('[Lobby] Skipping own room creation event:', data.roomId);
@@ -77,6 +75,14 @@ export function useGamePageLogic() {
         tierMin: data.tierMin || 'Bronze 5',
         tierMax: data.tierMax || 'Gold 1',
         workbookTitle: data.workbookTitle,
+        problems: (data.problems || []).map((p: any) => ({
+          id: Number(p.id),
+          externalId: p.externalId,
+          title: p.title,
+          tier: p.tier,
+          url: p.url,
+          status: 'UNSOLVED',
+        })),
       };
       setRooms((prev) => [newRoom, ...prev]);
     },
