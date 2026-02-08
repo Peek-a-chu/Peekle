@@ -61,6 +61,7 @@ export function GameCreationStepProblem({
   const [workbooks, setWorkbooks] = useState<WorkbookListResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [isTagsLoading, setIsTagsLoading] = useState(true);
   const [conflictWorkbookId, setConflictWorkbookId] = useState<string | null>(null);
 
   // 태그 목록 조회
@@ -71,6 +72,8 @@ export function GameCreationStepProblem({
         setTags(data);
       } catch (error) {
         console.error('Failed to fetch tags:', error);
+      } finally {
+        setIsTagsLoading(false);
       }
     };
     fetchTags();
@@ -269,7 +272,7 @@ export function GameCreationStepProblem({
             {/* 2. 검색창 */}
             <div className="relative">
               <Input
-                placeholder="태그 검색 (예: dp, BFS, 다익스트라)"
+                placeholder="태그 검색 (예: dp, BFS, 데이크스트라)"
                 value={tagSearchQuery}
                 onChange={(e) => {
                   setTagSearchQuery(e.target.value);
@@ -293,8 +296,10 @@ export function GameCreationStepProblem({
             </div>
 
             {/* 3. 태그 목록 (Filtered) */}
-            {tags.length === 0 ? (
+            {isTagsLoading ? (
               <div className="text-sm text-muted-foreground p-2">태그를 불러오는 중...</div>
+            ) : tags.length === 0 ? (
+              <div className="text-sm text-muted-foreground p-2">등록된 태그가 없습니다.</div>
             ) : (
               <div className="border rounded-md max-h-[200px] overflow-y-auto p-2 bg-background/50">
                 {filteredTags.length > 0 ? (
