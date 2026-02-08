@@ -8,6 +8,7 @@ import { GameWaitingRoomLayout } from '@/domains/game/layout';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { getGameRoom, cancelRoomReservation } from '@/domains/game/api/game-api';
 import { GameRoomDetail } from '@/domains/game/types/game-types';
+import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 
 interface GameRoomPageProps {
   params: Promise<{
@@ -17,11 +18,10 @@ interface GameRoomPageProps {
 
 function ConnectedGameWaitingRoom({
   roomId,
-  initialMediaState,
 }: {
   roomId: string;
-  initialMediaState: { mic: boolean; cam: boolean };
 }) {
+  const { isMicOn, isCamOn } = useSettingsStore();
   const {
     room,
     messages,
@@ -91,10 +91,7 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
   const paramCam = searchParams.get('cam') === 'true';
 
   const [isJoinedByPreJoin, setIsJoinedByPreJoin] = useState(preJoined);
-  const [initialMediaState, setInitialMediaState] = useState({
-    mic: preJoined ? paramMic : false,
-    cam: preJoined ? paramCam : true,
-  });
+  // initialMediaState removed (using global store)
 
   const [previewRoom, setPreviewRoom] = useState<GameRoomDetail | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(!preJoined);
@@ -141,7 +138,7 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
 
   const handleJoin = (mic: boolean, cam: boolean) => {
     isJoiningRef.current = true;
-    setInitialMediaState({ mic, cam });
+    // Media state is now handled by useSettingsStore in CCPreJoinModal
     setIsJoinedByPreJoin(true);
   };
 
@@ -159,7 +156,7 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
   // 1. 이미 입장 확인됨 (로비 등에서 옴) -> 바로 입장 처리 컴포넌트 렌더링
   // 2. 프리조인 모달을 통해 입장 -> 입장 처리 컴포넌트 렌더링
   if (isJoinedByPreJoin) {
-    return <ConnectedGameWaitingRoom roomId={roomId} initialMediaState={initialMediaState} />;
+    return <ConnectedGameWaitingRoom roomId={roomId} />;
   }
 
   // 3. 프리조인 단계: 로딩 중

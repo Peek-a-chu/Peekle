@@ -1,9 +1,10 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 import { useState, useEffect } from 'react';
 import { useGamePlayRoom } from '@/domains/game/hooks/useGamePlayRoom';
+import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { GamePlayLayout } from '@/domains/game/layout/GamePlayLayout';
 import { GameLiveKitWrapper } from '@/domains/game/components/GameLiveKitWrapper';
 import { CCGameResultModal } from './game-result-modal/CCGameResultModal';
@@ -34,10 +35,8 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
     onlineUserIds,
   } = useGamePlayRoom(roomId);
 
+  const { isMicOn, isCamOn } = useSettingsStore();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialMic = searchParams.get('mic') === 'true';
-  const initialCam = searchParams.get('cam') === 'true';
 
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
 
@@ -64,8 +63,8 @@ export function GamePlayContainer({ roomId }: GamePlayContainerProps) {
     <>
       <GameLiveKitWrapper
         roomId={gameState.roomId}
-        initialMicEnabled={initialMic}
-        initialCamEnabled={initialCam}
+        initialMicEnabled={isMicOn}
+        initialCamEnabled={isCamOn}
       >
         <GamePlayLayout
           gameState={gameState}

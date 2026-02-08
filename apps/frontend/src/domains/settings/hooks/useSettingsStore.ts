@@ -28,6 +28,14 @@ interface SettingsState {
   setSpeakerVolume: (volume: number) => void;
   toggleMicTest: () => void;
   toggleSpeakerTest: () => void;
+
+  // Media State
+  isMicOn: boolean;
+  isCamOn: boolean;
+  toggleMic: () => void;
+  toggleCam: () => void;
+  setMicOn: (isOn: boolean) => void;
+  setCamOn: (isOn: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -43,6 +51,8 @@ export const useSettingsStore = create<SettingsState>()(
       speakerVolume: 80,
       isMicTestRunning: false,
       isSpeakerTestRunning: false,
+      isMicOn: false, // Default initial state
+      isCamOn: true,  // Default initial state
 
       openModal: (tab = 'theme') => set({ isOpen: true, activeTab: tab }),
       closeModal: () => set({ isOpen: false }),
@@ -55,6 +65,11 @@ export const useSettingsStore = create<SettingsState>()(
       toggleMicTest: () => set((state) => ({ isMicTestRunning: !state.isMicTestRunning })),
       toggleSpeakerTest: () =>
         set((state) => ({ isSpeakerTestRunning: !state.isSpeakerTestRunning })),
+
+      toggleMic: () => set((state) => ({ isMicOn: !state.isMicOn })),
+      toggleCam: () => set((state) => ({ isCamOn: !state.isCamOn })),
+      setMicOn: (isOn) => set({ isMicOn: isOn }),
+      setCamOn: (isOn) => set({ isCamOn: isOn }),
     }),
     {
       name: 'settings-storage',
@@ -64,6 +79,8 @@ export const useSettingsStore = create<SettingsState>()(
         selectedSpeakerId: state.selectedSpeakerId,
         micVolume: state.micVolume,
         speakerVolume: state.speakerVolume,
+        isMicOn: state.isMicOn,
+        isCamOn: state.isCamOn,
       }),
     },
   ),

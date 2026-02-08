@@ -82,24 +82,12 @@ export function ParticipantCard({
         </div>
       )}
 
-      {localStream ? (
-        <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-primary dark:ring-primary/80">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="h-full w-full object-cover scale-x-[-1]"
-          />
-        </div>
-      ) : (
-        <UserIcon
-          src={participant.profileImg}
-          nickname={participant.nickname}
-          size={40}
-          className="border-none ring-2 ring-primary/10 dark:ring-white/5"
-        />
-      )}
+      <UserIcon
+        src={participant.profileImg}
+        nickname={participant.nickname}
+        size={40}
+        className="border-none ring-2 ring-primary/10 dark:ring-white/5"
+      />
 
       {/* 닉네임: 라이트(foreground), 다크(#E8EEF9) */}
       <span className="mt-2 text-xs font-bold tracking-tight text-foreground dark:text-[#E8EEF9]">
