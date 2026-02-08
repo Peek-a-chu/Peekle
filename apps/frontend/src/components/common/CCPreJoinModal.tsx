@@ -65,7 +65,7 @@ export const CCPreJoinModal = ({
 
   // Version Check from R2
   const { versionInfo, isLoading: isVersionLoading } = useExtensionVersionCheck();
-  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.8';
+  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.9';
   const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
   type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING' | 'VERSION_MISMATCH';
@@ -134,21 +134,20 @@ export const CCPreJoinModal = ({
       return;
     }
 
-    if (isChecking) {
+    if (isChecking || isVersionLoading) {
       setExtensionStatus('LOADING');
       return;
     }
 
-    if (!user) {
-      // 인증 조회 실패/지연 시에도 무한 "확인 중..."에 머무르지 않도록 종료
-      setExtensionStatus('NOT_INSTALLED');
-      return;
-    }
+    // User check removed to allow extension detection even if not logged in
+    // if (!user) { ... }
 
     const checkTokenValidity = async (token: string) => {
+      if (!user) return;
       try {
         const res = await fetch(`/api/users/me/validate-token`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, bojId: user.bojId }),
         });
@@ -175,19 +174,19 @@ export const CCPreJoinModal = ({
       }
     };
 
-    if (extensionToken) {
+    if (extensionToken && user) {
       void checkTokenValidity(extensionToken);
     } else if (isInstalled) {
-      // Even if not linked, check version if installed
+      // Even if not linked (or user not logged in), check version if installed
       if (extensionVersion && extensionVersion !== REQUIRED_VERSION) {
         setExtensionStatus('VERSION_MISMATCH');
       } else {
-        setExtensionStatus('INSTALLED'); // Installed but not linked
+        setExtensionStatus('INSTALLED'); // Installed but not linked or not logged in
       }
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, REQUIRED_VERSION]);
+  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, isVersionLoading, REQUIRED_VERSION]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
@@ -221,6 +220,7 @@ export const CCPreJoinModal = ({
   };
 
   // Settings Store
+  // Settings Store
   const {
     selectedCameraId,
     selectedMicId,
@@ -232,11 +232,15 @@ export const CCPreJoinModal = ({
     setSpeaker,
     setMicVolume,
     setSpeakerVolume,
+    isMicOn,
+    isCamOn,
+    setMicOn,
+    setCamOn,
   } = useSettingsStore();
 
   // Local State
-  const [isMicOn, setIsMicOn] = useState(false);
-  const [isCamOn, setIsCamOn] = useState(true);
+  // const [isMicOn, setIsMicOn] = useState(false); // Removed
+  // const [isCamOn, setIsCamOn] = useState(true); // Removed
   const [micLevel, setMicLevel] = useState(0);
   const [isSpeakerTestRunning, setIsSpeakerTestRunning] = useState(false);
   const [isMicTestRunning, setIsMicTestRunning] = useState(false);
@@ -320,7 +324,7 @@ export const CCPreJoinModal = ({
         }
       } catch (e) {
         console.warn('Camera preview failed', e);
-        setIsCamOn(false);
+        setCamOn(false);
         toast.error('카메라를 시작할 수 없습니다.');
       }
     };
@@ -729,7 +733,7 @@ export const CCPreJoinModal = ({
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
-                onClick={() => setIsMicOn(!isMicOn)}
+                onClick={() => setMicOn(!isMicOn)}
                 className={cn(
                   'h-11 px-5 rounded-lg transition-all flex gap-3 min-w-[140px] justify-start font-medium',
                   isMicOn
@@ -747,7 +751,7 @@ export const CCPreJoinModal = ({
 
               <Button
                 variant="outline"
-                onClick={() => setIsCamOn(!isCamOn)}
+                onClick={() => setCamOn(!isCamOn)}
                 className={cn(
                   'h-11 px-5 rounded-lg transition-all flex gap-3 min-w-[140px] justify-start font-medium',
                   isCamOn

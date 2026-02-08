@@ -32,7 +32,7 @@ export function GameVideoTile({ participant, className, isCurrentUser }: GameVid
             {shouldShowVideo ? (
                 <VideoTrack
                     trackRef={videoTrackRef}
-                    className={cn('h-full w-full object-cover scale-x-[-1]')}
+                    className={cn('h-full w-full object-cover')}
                 />
             ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gray-900 text-muted-foreground">

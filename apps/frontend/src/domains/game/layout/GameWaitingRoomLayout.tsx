@@ -9,6 +9,7 @@ import { ParticipantGrid } from '../components/participant-grid';
 import { WaitingRoomChatPanel } from '../components/WaitingRoomChatPanel';
 import { GameInviteModal } from '../components/game-invite-modal';
 import { GameCountdownOverlay } from '../components/game-countdown-overlay';
+import { WaitingRoomMediaPanel } from '../components/WaitingRoomMediaPanel';
 import type { GameRoomDetail, ChatMessage } from '@/domains/game/types/game-types';
 import { useState, useEffect, useRef } from 'react';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
@@ -60,11 +61,14 @@ export function GameWaitingRoomLayout({
   onChangeTeam,
 }: GameWaitingRoomLayoutProps) {
   const router = useRouter();
-  const { selectedCameraId, selectedMicId } = useSettingsStore();
-
-  // Media State
-  const [isMicOn, setIsMicOn] = useState(false);
-  const [isCamOn, setIsCamOn] = useState(true);
+  const {
+    selectedCameraId,
+    selectedMicId,
+    isMicOn,
+    isCamOn,
+    setMicOn,
+    setCamOn,
+  } = useSettingsStore();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   // Camera Preview Logic
@@ -93,7 +97,7 @@ export function GameWaitingRoomLayout({
         setLocalStream(stream);
       } catch (e) {
         console.warn('Camera preview failed', e);
-        setIsCamOn(false);
+        setCamOn(false);
         toast.error('카메라를 시작할 수 없습니다.');
       }
     };
@@ -182,31 +186,14 @@ export function GameWaitingRoomLayout({
             isHost={isHost}
             onKickParticipant={onKickParticipant}
             currentUserId={currentUserId}
-            localStream={localStream}
           />
 
           {/* 액션 버튼 */}
           <div className="flex justify-center items-center gap-4 pt-2 relative">
             {/* 좌측 하단 미디어 컨트롤 */}
+            {/* 좌측 하단 미디어 컨트롤 (제거됨 - 상단 패널로 이동) */}
             <div className="absolute left-0 bottom-0 flex gap-2">
-              <Button
-                variant={isMicOn ? 'secondary' : 'outline'}
-                size="icon"
-                className={isMicOn ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted-foreground'}
-                onClick={() => setIsMicOn(!isMicOn)}
-                title={isMicOn ? '마이크 끄기' : '마이크 켜기'}
-              >
-                {isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant={isCamOn ? 'secondary' : 'outline'}
-                size="icon"
-                className={isCamOn ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted-foreground'}
-                onClick={() => setIsCamOn(!isCamOn)}
-                title={isCamOn ? '카메라 끄기' : '카메라 켜기'}
-              >
-                {isCamOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-              </Button>
+              {/* Moved to "My Media Settings" panel */}
             </div>
 
             {room.teamType === 'TEAM' && (!isReady || isHost) && (
@@ -247,6 +234,10 @@ export function GameWaitingRoomLayout({
               </Button>
             )}
           </div>
+
+          <WaitingRoomMediaPanel
+            localStream={localStream}
+          />
         </main>
 
         {/* 우측: 채팅 패널 */}
