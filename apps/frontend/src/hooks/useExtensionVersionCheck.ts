@@ -33,8 +33,8 @@ export function useExtensionVersionCheck() {
 
                 // Fallback to hardcoded version if R2 fails
                 setVersionInfo({
-                    latestVersion: '0.0.8',
-                    minVersion: '0.0.7',
+                    latestVersion: '0.0.9',
+                    minVersion: '0.0.9',
                     downloadUrl: 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip',
                 });
             } finally {

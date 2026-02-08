@@ -65,7 +65,7 @@ export const CCPreJoinModal = ({
 
   // Version Check from R2
   const { versionInfo, isLoading: isVersionLoading } = useExtensionVersionCheck();
-  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.8';
+  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.9';
   const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
   type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING' | 'VERSION_MISMATCH';
@@ -134,7 +134,7 @@ export const CCPreJoinModal = ({
       return;
     }
 
-    if (isChecking) {
+    if (isChecking || isVersionLoading) {
       setExtensionStatus('LOADING');
       return;
     }
@@ -187,7 +187,7 @@ export const CCPreJoinModal = ({
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, REQUIRED_VERSION]);
+  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, isVersionLoading, REQUIRED_VERSION]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
