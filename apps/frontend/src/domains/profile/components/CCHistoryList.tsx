@@ -95,6 +95,12 @@ export function CCHistoryList({ initialHistory }: Props) {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  const handleGoBack = () => {
+    // pathname usually ends with /history, remove it to navigate up
+    const profilePath = pathname.replace(/\/history$/, '');
+    router.push(profilePath);
+  };
+
   const handleDateSelect = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     setFilterDate(dateStr);
@@ -166,7 +172,7 @@ export function CCHistoryList({ initialHistory }: Props) {
           <div className="flex-none mb-6 space-y-4">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => window.history.back()}
+                onClick={handleGoBack}
                 className="p-2 hover:bg-muted rounded-full transition text-muted-foreground hover:text-foreground"
               >
                 ←
@@ -280,13 +286,12 @@ export function CCHistoryList({ initialHistory }: Props) {
                       </span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold text-white
-                                      ${
-                                        item.tier.includes('Bronze')
-                                          ? 'bg-amber-700'
-                                          : item.tier.includes('Silver')
-                                            ? 'bg-slate-400'
-                                            : 'bg-yellow-500' // Gold etc
-                                      }`}
+                                      ${item.tier.includes('Bronze')
+                            ? 'bg-amber-700'
+                            : item.tier.includes('Silver')
+                              ? 'bg-slate-400'
+                              : 'bg-yellow-500' // Gold etc
+                          }`}
                       >
                         {item.tier}
                       </span>
