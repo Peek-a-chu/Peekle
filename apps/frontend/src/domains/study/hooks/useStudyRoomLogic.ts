@@ -47,8 +47,15 @@ export function useStudyRoomLogic() {
   const { historyDates, refresh: refreshDates } = useProblemDates(Number(studyId));
   const { submissions, loadSubmissions } = useSubmissions(Number(studyId));
 
-  const handleAddProblem = async (title: string, number: number, tags?: string[]) => {
-    await addProblem(title, number, tags);
+  const handleAddProblem = async (
+    title: string,
+    number: number | null,
+    tags?: string[],
+    problemId?: number,
+    date?: string,
+    customLink?: string,
+  ) => {
+    await addProblem(title, number, tags, problemId, date, customLink);
     await refreshDates(); // Refresh calendar dots
   };
 
