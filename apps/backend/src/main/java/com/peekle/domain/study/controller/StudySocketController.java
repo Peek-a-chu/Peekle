@@ -416,6 +416,8 @@ public class StudySocketController {
                                 StudyProblemAddRequest addRequest = StudyProblemAddRequest
                                                 .builder()
                                                 .problemId(request.getProblemId())
+                                                .customTitle(request.getCustomTitle())
+                                                .customLink(request.getCustomLink())
                                                 .problemDate(request.getProblemDate())
                                                 .build();
 
@@ -439,7 +441,7 @@ public class StudySocketController {
 
                         } else if ("REMOVE".equalsIgnoreCase(request.getAction())) {
                                 ProblemStatusResponse removedProblem = studyCurriculumService.removeProblem(userId,
-                                                studyId, request.getProblemId());
+                                                studyId, request.getProblemId(), request.getStudyProblemId());
 
                                 String nickname = getUserNickname(userId);
                                 // [SYSTEM] 문제 삭제 알림

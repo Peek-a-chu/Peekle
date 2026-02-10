@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { cn, getBojTierName, getBojTierColorClass } from '@/lib/utils';
-import { ExternalLink, Users, Lightbulb, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Users, Lightbulb, CheckCircle2, FileText } from 'lucide-react';
 import { DailyProblem as Problem } from '@/domains/study/types';
 import { Button } from '@/components/ui/button';
 import { Box } from 'lucide-react';
@@ -13,6 +13,7 @@ interface CCProblemCardProps {
   onSelect?: () => void;
   onOpenSubmission?: (problemId: number) => void;
   onRemove?: () => void;
+  onOpenDescription?: () => void;
   className?: string; // Added className prop
 }
 
@@ -22,13 +23,16 @@ export function CCProblemCard({
   onSelect,
   onOpenSubmission,
   onRemove,
+  onOpenDescription,
   className,
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
 
-  // Use externalId (BOJ problem number) for display and URL, fallback to problemId
-  const problemNumber = problem.externalId || String(problem.problemId);
-  const problemUrl = `https://www.acmicpc.net/problem/${problemNumber}`;
+  // Use externalId (BOJ problem number) for display and URL, fallback to problemId or custom title
+  const isCustom = !problem.problemId;
+  const problemNumber = problem.externalId || (isCustom ? 'Custom' : String(problem.problemId));
+  const problemUrl = isCustom ? problem.customLink : `https://www.acmicpc.net/problem/${problemNumber}`;
+  const displayTitle = problem.customTitle || problem.title;
 
   return (
     <div
@@ -69,9 +73,14 @@ export function CCProblemCard({
       {/* Top Row: Title & Icons */}
       <div className="flex flex-col gap-2 mb-2 w-full pr-6">
         <div className="flex items-start justify-between w-full">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground text-sm line-clamp-1">
-              {problemNumber}. {problem.title}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-medium text-foreground text-sm line-clamp-1 min-w-0 break-all">
+              {isCustom ? (
+                <span className="text-muted-foreground text-xs mr-1 shrink-0">[Custom]</span>
+              ) : (
+                <span className="mr-1 shrink-0">{problemNumber}.</span>
+              )}
+              {displayTitle}
             </span>
             {problemUrl && (
               <a
@@ -79,7 +88,7 @@ export function CCProblemCard({
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
               >
                 <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-foreground" />
               </a>
@@ -120,11 +129,30 @@ export function CCProblemCard({
           className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenSubmission?.(problem.problemId);
+            if (!isCustom) {
+              onOpenSubmission?.(problem.problemId!); // Assuming non-custom has ID
+            } else {
+              // Custom problem might not have BOJ submissions
+            }
           }}
+          disabled={isCustom}
           aria-label="view submissions"
+          title="제출 내역 보기"
         >
           <Box className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDescription?.();
+          }}
+          title="문제 설명/메모 보기"
+        >
+          <FileText className="h-4 w-4" />
         </Button>
 
         <div className="flex items-center gap-3">

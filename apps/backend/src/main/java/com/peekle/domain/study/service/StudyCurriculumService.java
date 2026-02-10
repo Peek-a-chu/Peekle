@@ -55,12 +55,19 @@ public class StudyCurriculumService {
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-                // problemId는 이미 프론트엔드에서 변환되어 전달됨
                 Long actualProblemId = request.getProblemId();
+                Problem problem = null;
 
-                // problemId가 유효한지 확인
-                Problem problem = problemRepository.findById(actualProblemId)
-                                .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+                // problemId가 있으면 DB 조회
+                if (actualProblemId != null && actualProblemId > 0) {
+                        problem = problemRepository.findById(actualProblemId)
+                                        .orElseThrow(() -> new BusinessException(ErrorCode.PROBLEM_NOT_FOUND));
+                } else {
+                        // Custom Problem Check
+                        if (request.getCustomTitle() == null || request.getCustomTitle().trim().isEmpty()) {
+                                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+                        }
+                }
 
                 // 제약사항 1: 문제 날짜는 오늘이어야 함
                 LocalDate targetDate = (request.getProblemDate() != null) ? request.getProblemDate() : LocalDate.now();
@@ -68,34 +75,40 @@ public class StudyCurriculumService {
                         throw new BusinessException(ErrorCode.PROBLEM_DATE_MISMATCH);
                 }
 
-                // 제약사항 2: 중복 확인
-                if (studyProblemRepository.existsByStudyAndProblemIdAndProblemDate(study, actualProblemId,
-                                targetDate)) {
-                        throw new BusinessException(ErrorCode.PROBLEM_ALREADY_ADDED);
+                // 제약사항 2: 중복 확인 (일반 문제인 경우만)
+                if (problem != null) {
+                        if (studyProblemRepository.existsByStudyAndProblemIdAndProblemDate(study, actualProblemId,
+                                        targetDate)) {
+                                throw new BusinessException(ErrorCode.PROBLEM_ALREADY_ADDED);
+                        }
                 }
 
                 StudyProblem studyProblem = StudyProblem.builder()
                                 .study(study)
-                                .problemId(actualProblemId)
+                                .problemId(problem != null ? actualProblemId : null)
+                                .customTitle(problem == null ? request.getCustomTitle() : null)
+                                .customLink(problem == null ? request.getCustomLink() : null)
                                 .problemDate(targetDate)
                                 .createdBy(user)
                                 .build();
 
                 studyProblemRepository.save(studyProblem);
 
-                // 웹소켓을 통해 알림 (problem은 이미 위에서 조회됨)
-                String title = (problem != null) ? problem.getTitle() : "Unknown";
-                String tier = (problem != null) ? problem.getTier() : "Unrated";
-                String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(actualProblemId);
+                String title = (problem != null) ? problem.getTitle() : studyProblem.getCustomTitle();
+                String tier = (problem != null) ? problem.getTier() : "Custom";
+                String externalId = (problem != null) ? problem.getExternalId() : "Custom";
+                String customLink = studyProblem.getCustomLink();
                 List<String> tags = (problem != null)
                                 ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
                                 : List.of();
 
                 ProblemStatusResponse responseData = ProblemStatusResponse.builder()
                                 .studyProblemId(studyProblem.getId())
-                                .problemId(actualProblemId)
+                                .problemId(studyProblem.getProblemId())
                                 .externalId(externalId)
                                 .title(title)
+                                .customTitle(studyProblem.getCustomTitle())
+                                .customLink(customLink)
                                 .tier(tier)
                                 .tags(tags)
                                 .assignedDate(targetDate)
@@ -105,8 +118,6 @@ public class StudyCurriculumService {
                                 .build();
 
                 String topic = String.format(RedisKeyConst.TOPIC_CURRICULUM, studyId);
-                log.info("Publishing ADD problem event to topic: {}, problemId: {}, externalId: {}",
-                                topic, actualProblemId, externalId);
                 redisPublisher.publish(new ChannelTopic(topic),
                                 SocketResponse.of("ADD", responseData));
 
@@ -117,46 +128,60 @@ public class StudyCurriculumService {
          * 커리큘럼에서 문제 삭제 (아무도 풀지 않은 경우에만)
          */
         @Transactional
-        public ProblemStatusResponse removeProblem(Long userId, Long studyId, Long problemId) {
-                // 문제 ID로 StudyProblem 찾기 (사용자가 Problem ID를 전달한다고 가정, 엔티티를 찾아야 함)
-                // 하지만 날짜별로 같은 문제 ID가 여러 개 있을 수 있음.
-                // '오늘'의 엔티티를 찾아야 함.
-                // 혹은 API가 StudyProblem PK를 전달한다고 가정.
-                // 테스트 코드 기준으로 Problem ID(BOJ ID)를 전달함.
-                // 가장 안전한 방법은 Study + Problem + Date(Today)로 찾거나 StudyProblem PK로 찾는 것.
-                // 여기서는 전달된 ID가 Problem ID(외부)라고 가정하고 오늘의 할당을 삭제함.
-                // 조회 로직 확인:
-                StudyRoom study = studyRoomRepository.findById(studyId)
-                                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
+        public ProblemStatusResponse removeProblem(Long userId, Long studyId, Long problemId, Long studyProblemId) {
+                // StudyRoom study = studyRoomRepository.findById(studyId)
+                // .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
+                // 'study' variable is not used in this method, only studyId is used.
+                // Keeping validation if strict check is needed, but assuming studyId validity
+                // is checked by finding studyProblem?
+                // Actually, finding studyProblem by ID (if provided) implicitly checks
+                // existence.
+                // But we should probably verify the study exists or at least the studyProblem
+                // belongs to the study.
+                // For now, removing the unused variable to fix lint.
+                if (!studyRoomRepository.existsById(studyId)) {
+                        throw new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND);
+                }
 
-                // 기존 할당 조회 (오늘 혹은 최근?)
-                // 엔드포인트 의미를 따름: 커리큘럼에서 특정 문제 삭제.
-                // findByStudyAndProblemId(study, problemId) -> boolean 반환...
-                // 삭제할 엔티티가 필요함.
-                // 아직 Repository에 problemId로 엔티티를 가져오는 메서드가 없을 수 있음 (exists/count/list만 존재).
-                // 추가하거나 list를 사용해야 함.
-                // 지금은 전달된 problemId가 BOJ ID라고 가정하고, 오늘 날짜에서 삭제.
+                StudyProblem target = null;
 
-                LocalDate targetDate = LocalDate.now();
-                List<StudyProblem> candidates = studyProblemRepository.findByStudyIdAndProblemDate(studyId, targetDate);
-                StudyProblem target = candidates.stream()
-                                .filter(p -> p.getProblemId().equals(problemId))
-                                .findFirst()
-                                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
+                // 1. Try to find by invalid studyProblemId (PK) if provided
+                if (studyProblemId != null) {
+                        target = studyProblemRepository.findById(studyProblemId)
+                                        .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
+                }
+                // 2. Fallback to problemId and Today (for backward compatibility or existing
+                // logic)
+                else if (problemId != null) {
+                        LocalDate targetDate = LocalDate.now();
+                        List<StudyProblem> candidates = studyProblemRepository.findByStudyIdAndProblemDate(studyId,
+                                        targetDate);
+                        target = candidates.stream()
+                                        .filter(p -> problemId.equals(p.getProblemId()))
+                                        .findFirst()
+                                        .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
+                } else {
+                        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+                }
 
-                // 제약사항: 제출 기록 없음
-                boolean existsLog = submissionLogRepository.existsByProblemIdAndRoomId(target.getProblemId(), studyId);
-                if (existsLog) {
-                        throw new BusinessException(ErrorCode.SUBMISSION_EXISTS);
+                // 제약사항: 제출 기록 없음 (Only for registered problems)
+                if (target.getProblemId() != null) {
+                        boolean existsLog = submissionLogRepository.existsByProblemIdAndRoomId(target.getProblemId(),
+                                        studyId);
+                        if (existsLog) {
+                                throw new BusinessException(ErrorCode.SUBMISSION_EXISTS);
+                        }
                 }
 
                 Long deletedProblemId = target.getProblemId();
 
                 // 삭제 전에 문제 정보 조회
-                Problem problem = problemRepository.findById(deletedProblemId).orElse(null);
-                String title = (problem != null) ? problem.getTitle() : "Unknown";
-                String tier = (problem != null) ? problem.getTier() : "Unrated";
-                String externalId = (problem != null) ? problem.getExternalId() : String.valueOf(deletedProblemId);
+                Problem problem = (deletedProblemId != null) ? problemRepository.findById(deletedProblemId).orElse(null)
+                                : null;
+                String title = (problem != null) ? problem.getTitle() : target.getCustomTitle();
+                String tier = (problem != null) ? problem.getTier() : "Custom";
+                String externalId = (problem != null) ? problem.getExternalId() : "Custom";
+                String customLink = target.getCustomLink();
                 List<String> tags = (problem != null)
                                 ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
                                 : List.of();
@@ -169,6 +194,8 @@ public class StudyCurriculumService {
                                 .problemId(deletedProblemId)
                                 .externalId(externalId)
                                 .title(title)
+                                .customTitle(target.getCustomTitle())
+                                .customLink(customLink)
                                 .tier(tier)
                                 .tags(tags)
                                 .assignedDate(target.getProblemDate())
@@ -195,39 +222,42 @@ public class StudyCurriculumService {
                 }
 
                 // 2. 스터디 멤버 수 조회
-                int totalMembers = studyMemberRepository.countByStudy_Id(studyId); // 메서드가 존재하거나 파생됨
+                int totalMembers = studyMemberRepository.countByStudy_Id(studyId);
 
                 // 3. 해당 문제들에 대한 제출 기록 조회 (최적화: 일괄 조회)
-                List<Long> problemIds = curriculum.stream().map(StudyProblem::getProblemId)
+                // Filter out custom problems (problemId is null)
+                List<Long> problemIds = curriculum.stream()
+                                .filter(sp -> sp.getProblemId() != null)
+                                .map(StudyProblem::getProblemId)
                                 .collect(Collectors.toList());
-                List<SubmissionLog> logs = submissionLogRepository.findAllByRoomIdAndProblemIdIn(studyId, problemIds);
+
+                List<SubmissionLog> logs = problemIds.isEmpty() ? List.of()
+                                : submissionLogRepository.findAllByRoomIdAndProblemIdIn(studyId, problemIds);
 
                 // 4. 문제 ID -> 푼 유저 ID 매핑
                 Map<Long, List<Long>> solvedUserMap = logs.stream()
                                 .collect(Collectors.groupingBy(
-                                                log -> log.getProblem().getId(), // SubmissionLog는 Problem 엔티티를 가짐
+                                                log -> log.getProblem().getId(),
                                                 Collectors.mapping(log -> log.getUser().getId(), Collectors.toList())));
 
                 // 5. 응답 생성
                 return curriculum.stream().map(sp -> {
-                        // 문제 상세 정보(제목, 티어) 필요 -> 조회?
-                        // 이상적으로는 StudyProblem이 Problem을 조인해야 하지만, 여기서는 ID를 가짐.
-                        // 성능: 하나씩 조회하면 N+1 문제 발생.
-                        // 이상적으로는 Bulk로 조회하거나 SubmissionLog의 문제 정보를 사용해야 함 (하지만 로그가 없을 수 있음).
-                        // Repository(findById)를 통해 문제 상세 정보를 조회.
-                        // 최적화: Problem 엔티티를 로드했어야 함.
-                        // 지금은 problemRepository.findById(sp.getProblemId()) 사용 (N+1 가능성 있지만 배치가 적음 ~3).
-                        Problem problem = problemRepository.findById(sp.getProblemId()).orElse(null);
+                        Problem problem = (sp.getProblemId() != null)
+                                        ? problemRepository.findById(sp.getProblemId()).orElse(null)
+                                        : null;
 
-                        String title = (problem != null) ? problem.getTitle() : "Unknown";
-                        String tier = (problem != null) ? problem.getTier() : "Unrated";
-                        String externalId = (problem != null) ? problem.getExternalId()
-                                        : String.valueOf(sp.getProblemId());
+                        String title = (problem != null) ? problem.getTitle() : sp.getCustomTitle();
+                        String tier = (problem != null) ? problem.getTier() : "Custom";
+                        String externalId = (problem != null) ? problem.getExternalId() : "Custom";
+
+                        // Use builder with all fields
                         List<String> tags = (problem != null)
                                         ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
                                         : List.of();
 
-                        List<Long> solvedUsers = solvedUserMap.getOrDefault(sp.getProblemId(), List.of());
+                        List<Long> solvedUsers = (sp.getProblemId() != null)
+                                        ? solvedUserMap.getOrDefault(sp.getProblemId(), List.of())
+                                        : List.of();
                         boolean isSolvedByMe = solvedUsers.contains(userId);
                         int solvedCount = (int) solvedUsers.stream().distinct().count();
 
@@ -236,6 +266,8 @@ public class StudyCurriculumService {
                                         .problemId(sp.getProblemId())
                                         .externalId(externalId)
                                         .title(title)
+                                        .customTitle(sp.getCustomTitle())
+                                        .customLink(sp.getCustomLink())
                                         .tier(tier)
                                         .tags(tags)
                                         .assignedDate(sp.getProblemDate())

@@ -162,20 +162,35 @@ export function useProblems(studyId: number, dateString?: string) {
     useStudySocketActions();
 
   const addProblem = useCallback(
-    async (title: string, number: number, tags?: string[], problemId?: number, date?: string) => {
+    async (title: string, number: number | null, tags?: string[], problemId?: number, date?: string, customLink?: string) => {
       try {
         let actualProblemId = problemId;
 
-        // problemId가 제공되지 않으면 externalId로 조회
-        if (!actualProblemId) {
+        // problemId가 제공되지 않고 number(externalId)가 있으면 조회 시도
+        if (!actualProblemId && number) {
           // number is externalId (BOJ problem number), convert to problemId
+          // Custom problem might not have number/externalId
           actualProblemId = await getProblemIdByExternalId(String(number), 'BOJ');
         }
+
+        // Custom Problem Case: problemId is null/undefined AND (customLink is present OR actualProblemId is still null)
+        // If we found actualProblemId, it's a BOJ problem.
+        // If not, and we have custom title/link, treat as custom.
 
         if (actualProblemId) {
           socketAddProblem(actualProblemId, date);
         } else {
-          throw new Error('Failed to find problem ID');
+          // Custom Problem
+          if (title && customLink) {
+            socketAddProblem(null, date, title, customLink);
+          } else if (customLink) {
+            // Fallback if title is missing but link is there? Logic depends on requirements.
+            // Assuming title is required for custom problems.
+            console.error('Title and Link are required for custom problems');
+          } else {
+            // If we failed to find ID and it's not a custom problem attempt
+            if (number) throw new Error('Failed to find problem ID');
+          }
         }
       } catch (error) {
         console.error('Failed to add problem:', error);
@@ -186,9 +201,9 @@ export function useProblems(studyId: number, dateString?: string) {
   );
 
   const deleteProblem = useCallback(
-    async (problemId: number) => {
+    async (problemId: number, studyProblemId?: number) => {
       try {
-        socketRemoveProblem(problemId);
+        socketRemoveProblem(problemId, studyProblemId);
       } catch (error) {
         console.error('Failed to delete problem:', error);
       }

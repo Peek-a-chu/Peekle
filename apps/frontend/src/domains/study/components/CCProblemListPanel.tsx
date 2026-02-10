@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, FileText, Plus } from 'lucide-react';
+import { ChevronLeft, FileText, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CCCalendarWidget, CCInlineCalendar } from './CCCalendarWidget';
 import { CCProblemCard } from './CCProblemCard';
@@ -10,6 +10,7 @@ import { DailyProblem, Submission } from '@/domains/study/types';
 import { CCSubmissionViewerModal } from './CCSubmissionViewerModal';
 import { CCAddProblemModal } from './CCAddProblemModal';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { CCCustomProblemView } from './CCCustomProblemView';
 
 // Re-export Problem type from types.ts to maintain potential compatibility if imported elsewhere
 export type { DailyProblem as Problem } from '@/domains/study/types';
@@ -25,11 +26,13 @@ export interface CCProblemListPanelProps {
   onDateChange: (date: Date) => void;
   onAddProblem?: (
     title: string,
-    number: number,
+    number: number | null,
     tags?: string[],
     problemId?: number,
+    date?: string,
+    customLink?: string,
   ) => Promise<void>;
-  onRemoveProblem?: (problemId: number) => Promise<void>;
+  onRemoveProblem?: (problemId: number, studyProblemId?: number) => Promise<void>;
   submissions?: Submission[];
   onFetchSubmissions?: (problemId: number) => void;
   historyDates?: Date[];
@@ -57,9 +60,14 @@ export function CCProblemListPanel({
   const [selectedSubmissionProblemId, setSelectedSubmissionProblemId] = useState<number | null>(
     null,
   );
+  // State for Flip/Custom View
+  const [isFlipped, setIsFlipped] = useState(false);
 
   const setViewMode = useRoomStore((state) => state.setViewMode);
   const setTargetSubmission = useRoomStore((state) => state.setTargetSubmission);
+
+  // Get roomId from store
+  const roomId = useRoomStore((state) => state.roomId);
 
   const handleDateSelect = (date: Date) => {
     onDateChange(date);
@@ -95,22 +103,59 @@ export function CCProblemListPanel({
 
   const handleAddProblem = async (
     title: string,
-    number: number,
+    number: number | null,
     tags?: string[],
     problemId?: number,
+    date?: string,
+    customLink?: string,
   ) => {
     if (onAddProblem) {
-      await onAddProblem(title, number, tags, problemId);
+      await onAddProblem(title, number, tags, problemId, date, customLink);
     }
   };
 
-  const handleRemoveProblem = async (problemId: number) => {
+  const handleRemoveProblem = async (problemId: number, studyProblemId?: number) => {
     if (onRemoveProblem) {
-      await onRemoveProblem(problemId);
+      // Pass studyProblemId if your remove handler supports it.
+      // Ideally the parent onRemoveProblem should take (problemId, studyProblemId)
+      // For now we just call it with problemId, but we might need to update props interface if we want to support strict removal.
+      // But looking at useProblems/useSocket, we updated them to take studyProblemId.
+      // We should update the interface of onRemoveProblem here too.
+      await onRemoveProblem(problemId, studyProblemId);
     }
   };
+
+  // Logic to find current selected problem object
+  const currentSelectedProblem = problems.find((p) => {
+    const pId = (p as any).studyProblemId ?? (p as any).id;
+    return pId === selectedStudyProblemId;
+  });
 
   const selectedProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
+
+  const handleOpenDescription = (problem: DailyProblem) => {
+    onSelectProblem?.(problem);
+    setIsFlipped(true);
+  };
+
+  // If flipped and we have a selected problem, show the custom view
+  if (isFlipped && selectedStudyProblemId && currentSelectedProblem && roomId) {
+    return (
+      <CCCustomProblemView
+        studyId={roomId}
+        problemId={selectedStudyProblemId}
+        problemTitle={currentSelectedProblem.title}
+        externalLink={
+          (currentSelectedProblem as any).customLink ||
+          (currentSelectedProblem.externalId && currentSelectedProblem.externalId !== 'Custom'
+            ? `https://www.acmicpc.net/problem/${currentSelectedProblem.externalId}`
+            : undefined)
+        }
+        onBack={() => setIsFlipped(false)}
+        className={className}
+      />
+    );
+  }
 
   return (
     <div className={cn('flex h-full flex-col relative bg-card', className)} data-tour="problem-list">
@@ -122,6 +167,8 @@ export function CCProblemListPanel({
           onToggle={() => setIsCalendarOpen(!isCalendarOpen)}
         />
         <div className="flex items-center gap-2">
+
+
           <Button
             onClick={() => setAddProblemModalOpen(true)}
             className="bg-primary hover:bg-primary/90 text-white h-8 text-xs px-3 shadow-sm"
@@ -171,7 +218,7 @@ export function CCProblemListPanel({
                   ? `problem-${studyProblemId}`
                   : typeof problem.problemId === 'number' && Number.isFinite(problem.problemId)
                     ? `problem-${problem.problemId}`
-                  : `problem-${problem.title || 'unknown'}-${idx}`;
+                    : `problem-${problem.title || 'unknown'}-${idx}`;
               return (
                 <li key={key}>
                   <CCProblemCard
@@ -180,8 +227,9 @@ export function CCProblemListPanel({
                     onSelect={() => onSelectProblem?.(problem)}
                     onOpenSubmission={handleOpenSubmission}
                     onRemove={
-                      onRemoveProblem ? () => handleRemoveProblem(problem.problemId) : undefined
+                      onRemoveProblem ? () => handleRemoveProblem(problem.problemId, studyProblemId) : undefined
                     }
+                    onOpenDescription={() => handleOpenDescription(problem)}
                   />
                 </li>
               );

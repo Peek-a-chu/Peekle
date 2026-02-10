@@ -11,7 +11,10 @@ import java.time.LocalDate;
 @ToString
 public class CurriculumSocketRequest {
     private Long studyId;
+    private Long studyProblemId; // PK of StudyProblem
     private Long problemId;
+    private String customTitle;
+    private String customLink;
     private LocalDate problemDate; // Optional
     private String action; // "ADD" or "REMOVE"
 }

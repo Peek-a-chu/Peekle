@@ -12,7 +12,7 @@ const LEFT_PANEL_MAX_WIDTH = 420;
 export function StudyLayoutLeftPanel() {
   const {
     problems,
-    handleAddProblem,
+    onAddProblemHandler,
     handleSelectProblem,
     selectedStudyProblemId,
     historyDates,
@@ -67,7 +67,7 @@ export function StudyLayoutLeftPanel() {
           problems={problems}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
-          onAddProblem={handleAddProblem}
+          onAddProblem={onAddProblemHandler}
           onSelectProblem={handleSelectProblem}
           selectedStudyProblemId={selectedStudyProblemId}
           onToggleFold={toggleLeftPanel}
