@@ -80,6 +80,24 @@ export function CCCenterPanel({
   const resizeStartY = useRef<number>(0);
   const resizeStartHeight = useRef<number>(0);
 
+  // Font Size State
+  const [fontSize, setFontSize] = useState<number>(14);
+
+  // Load font size from local storage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ide-font-size');
+      if (saved) {
+        setFontSize(parseInt(saved, 10));
+      }
+    }
+  }, []);
+
+  const handleFontSizeChange = (newSize: number) => {
+    setFontSize(newSize);
+    localStorage.setItem('ide-font-size', newSize.toString());
+  };
+
   const startResizingVideo = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -223,6 +241,7 @@ export function CCCenterPanel({
             <IDEToolbar
               language={language}
               theme={theme}
+              fontSize={fontSize}
               // Conditional Props based on View Mode
               viewingUser={isViewingOther ? viewingUser : null}
               viewMode={viewMode}
@@ -234,6 +253,7 @@ export function CCCenterPanel({
               // Standard Handlers
               onLanguageChange={(lang) => leftPanelRef.current?.setLanguage(lang)}
               onThemeToggle={handleThemeToggle}
+              onFontSizeChange={handleFontSizeChange}
               onCopy={() => {
                 void handleCopy();
               }}
@@ -330,7 +350,9 @@ export function CCCenterPanel({
                 language={language}
                 onLanguageChange={handleLanguageChange}
                 theme={theme}
+                fontSize={fontSize}
                 hideToolbar // Pass this so it doesn't render double toolbar
+                onFontSizeChange={handleFontSizeChange}
                 onCodeChange={handleCodeChange}
                 restoredCode={restoredCode}
                 restoreVersion={restoreVersion}
@@ -363,6 +385,8 @@ export function CCCenterPanel({
                     viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
                   }
                   theme={theme} // Sync theme
+                  fontSize={fontSize}
+                  onFontSizeChange={handleFontSizeChange}
                   borderColorClass={
                     viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
                   }

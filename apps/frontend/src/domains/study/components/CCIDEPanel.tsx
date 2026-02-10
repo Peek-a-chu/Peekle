@@ -58,10 +58,12 @@ interface CCIDEPanelProps {
   hideToolbar?: boolean;
   language?: string;
   theme?: 'light' | 'vs-dark';
+  fontSize?: number;
   borderColorClass?: string;
   onEditorMount?: (editor: Parameters<OnMount>[0]) => void;
   onLanguageChange?: (lang: string) => void;
   onThemeChange?: (theme: 'light' | 'vs-dark') => void;
+  onFontSizeChange?: (size: number) => void;
   onCodeChange?: (code: string) => void;
   editorId?: string;
   restoredCode?: string | null;
@@ -77,10 +79,12 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       hideToolbar = false,
       language: propLanguage,
       theme: propTheme,
+      fontSize = 14,
       borderColorClass,
       onEditorMount,
       onLanguageChange: propOnLanguageChange,
       onThemeChange: propOnThemeChange,
+      onFontSizeChange: propOnFontSizeChange,
       onCodeChange,
       editorId = 'default',
       restoredCode,
@@ -160,6 +164,12 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
     const setPendingCodeShare = useRoomStore((state) => state.setPendingCodeShare);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Font size prop ref for event listeners
+    const fontSizeRef = useRef(fontSize);
+    useEffect(() => {
+      fontSizeRef.current = fontSize;
+    }, [fontSize]);
 
     // ----------------------------------------------------------------------
     // 초기화 및 Props 동기화 로직
@@ -404,7 +414,55 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         e.preventDefault();
         e.stopPropagation();
       };
+
+      // 폰트 크기 조절 이벤트 리스너 (Wheel + Ctrl)
+      const handleWheel = (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!propOnFontSizeChange) return;
+
+          const currentSize = fontSizeRef.current;
+          let newSize = currentSize;
+
+          if (e.deltaY < 0) {
+            newSize = Math.min(40, currentSize + 1); // Scroll Up -> Increase
+          } else {
+            newSize = Math.max(5, currentSize - 1); // Scroll Down -> Decrease
+          }
+
+          if (newSize !== currentSize) {
+            propOnFontSizeChange(newSize);
+          }
+        }
+      };
+
       const handleKeyDown = (e: KeyboardEvent): void => {
+        // Font Size Shorcuts (Ctrl + Up/Down)
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            if (propOnFontSizeChange) {
+              e.preventDefault();
+              e.stopPropagation();
+
+              const currentSize = fontSizeRef.current;
+              let newSize = currentSize;
+
+              if (e.key === 'ArrowUp') {
+                newSize = Math.min(40, currentSize + 1);
+              } else {
+                newSize = Math.max(5, currentSize - 1);
+              }
+
+              if (newSize !== currentSize) {
+                propOnFontSizeChange(newSize);
+              }
+              return;
+            }
+          }
+        }
+
         if (!readOnlyRef.current) return;
         const allowedKeys = [
           'ArrowUp',
@@ -451,6 +509,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       container.addEventListener('cut', preventClipboard);
       container.addEventListener('paste', preventClipboard);
       container.addEventListener('keydown', handleKeyDown as EventListener, true);
+      container.addEventListener('wheel', handleWheel as EventListener, { capture: true, passive: false });
     };
 
     useImperativeHandle(ref, () => ({
@@ -491,7 +550,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           />
         )}
 
-        <div className="flex-1 min-h-0 overflow-hidden" onMouseEnter={() => editorRef.current?.focus()}>
+        <div className="flex-1 min-h-0 overflow-hidden">
           <Editor
             // [중요] 키 변경으로 컴포넌트 완전 재생성
             key={`${language}-${modelId}`}
@@ -523,7 +582,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
             options={{
               readOnly: readOnly,
               fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
-              fontSize: 14,
+              fontSize: fontSize,
               minimap: { enabled: false },
               wordWrap: 'on',
               automaticLayout: true,
@@ -531,7 +590,6 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
             }}
           />
         </div>
-
         {/* 확인 모달 */}
         {isConfirmModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">

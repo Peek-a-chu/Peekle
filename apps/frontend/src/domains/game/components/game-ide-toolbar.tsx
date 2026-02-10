@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, Send } from 'lucide-react';
+import { Copy, Moon, Sun, Send, Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -14,8 +15,10 @@ const LANGUAGES = [
 export interface GameIDEToolbarProps {
   language?: string;
   theme?: 'light' | 'vs-dark';
+  fontSize?: number;
   onLanguageChange?: (lang: string) => void;
   onThemeToggle?: () => void;
+  onFontSizeChange?: (size: number) => void;
   onCopy?: () => void;
   onSubmit?: () => void;
 }
@@ -23,11 +26,67 @@ export interface GameIDEToolbarProps {
 export function GameIDEToolbar({
   language = 'python',
   theme = 'light',
+  fontSize = 14,
   onLanguageChange,
   onThemeToggle,
+  onFontSizeChange,
   onCopy,
   onSubmit,
 }: GameIDEToolbarProps) {
+  // Use local state for the input field to allow users to clear it while typing
+  const [inputValue, setInputValue] = useState<string>(fontSize.toString());
+
+  // Sync internal state if prop changes from outside (e.g. shortcuts)
+  useEffect(() => {
+    setInputValue(fontSize.toString());
+  }, [fontSize]);
+
+  const handleDecreaseFont = () => {
+    if (onFontSizeChange && fontSize > 5) {
+      onFontSizeChange(fontSize - 1);
+    }
+  };
+
+  const handleIncreaseFont = () => {
+    if (onFontSizeChange && fontSize < 40) {
+      onFontSizeChange(fontSize + 1);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && onFontSizeChange) {
+      // We still update parent for immediate preview if it's within a reasonable range
+      // but we don't clamp it here.
+      if (num >= 5 && num <= 40) {
+        onFontSizeChange(num);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    let num = parseInt(inputValue, 10);
+    if (isNaN(num)) {
+      num = 14; // Default on invalid
+    }
+
+    // Clamp to range
+    const clamped = Math.max(5, Math.min(40, num));
+    setInputValue(clamped.toString());
+    if (onFontSizeChange) {
+      onFontSizeChange(clamped);
+    }
+  };
+
+  const handleKeyDownInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
@@ -49,6 +108,52 @@ export function GameIDEToolbar({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Font Size Control */}
+          <div className="flex items-center gap-1 mr-2 bg-muted/50 rounded-md p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDecreaseFont}
+                  disabled={fontSize <= 5}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>폰트 작게</TooltipContent>
+            </Tooltip>
+
+            <input
+              type="number"
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDownInput}
+              className="w-10 text-center text-xs font-mono text-muted-foreground bg-transparent border-none focus:outline-none focus:text-foreground appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              min={5}
+              max={40}
+            />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleIncreaseFont}
+                  disabled={fontSize >= 40}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>폰트 크게</TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="w-px h-4 bg-border mx-1" />
+
           {/* Theme Toggle */}
           <Tooltip>
             <TooltipTrigger asChild>
