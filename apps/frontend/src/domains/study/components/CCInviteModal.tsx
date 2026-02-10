@@ -61,7 +61,7 @@ export function CCInviteModal({ isOpen, onClose }: CCInviteModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>친구 초대하기</DialogTitle>
           <DialogDescription>

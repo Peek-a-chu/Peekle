@@ -59,7 +59,7 @@ export function CCJoinStudyModal({ open, onOpenChange, onSuccess }: CCJoinStudyM
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="max-w-[400px]">
         <DialogHeader>
           <DialogTitle>스터디 참여하기</DialogTitle>
           <DialogDescription>초대 코드를 입력하여 스터디에 참여하세요.</DialogDescription>

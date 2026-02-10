@@ -44,7 +44,7 @@ export function PasswordModal({ open, onOpenChange, roomTitle, onSubmit }: Passw
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Lock className="h-5 w-5 text-muted-foreground" />

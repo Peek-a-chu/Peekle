@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive } from 'lucide-react';
+import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -83,9 +83,12 @@ export function CCIDEToolbar({
           </select>
 
           {currentProblemLabel && (
-            <div className="hidden md:flex min-w-0 items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground/90">
-              <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground">
+            <div className="flex min-w-0 shrink items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground/90 max-w-[240px]">
+              <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground hidden lg:inline-block">
                 풀고있는문제
+              </span>
+              <span className="lg:hidden mr-2 shrink-0 text-muted-foreground">
+                <FileText className="h-3.5 w-3.5" />
               </span>
               <span className="truncate font-medium">{currentProblemLabel}</span>
             </div>

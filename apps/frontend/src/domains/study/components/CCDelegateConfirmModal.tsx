@@ -25,7 +25,7 @@ export function CCDelegateConfirmModal({
 }: CCDelegateConfirmModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>방장 위임</DialogTitle>
           <DialogDescription className="pt-2">
@@ -35,7 +35,7 @@ export function CCDelegateConfirmModal({
             위임 후에는 방 설정 및 멤버 관리 권한이 이전됩니다.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="sm:justify-end gap-2">
+        <DialogFooter className="justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             취소
           </Button>

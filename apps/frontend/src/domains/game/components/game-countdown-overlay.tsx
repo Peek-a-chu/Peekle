@@ -456,37 +456,8 @@ export function GameCountdownOverlay({ isActive, onComplete }: GameCountdownOver
           border-right-width: 3px;
         }
 
-        /* 반응형 */
-        @media (max-width: 768px) {
-          .rotating-rings {
-            width: 250px;
-            height: 250px;
-          }
-          .hexagon-frame {
-            width: 200px;
-            height: 200px;
-          }
-          .corner {
-            width: 50px;
-            height: 50px;
-          }
-          .corner-tl,
-          .corner-tr {
-            top: 20px;
-          }
-          .corner-bl,
-          .corner-br {
-            bottom: 20px;
-          }
-          .corner-tl,
-          .corner-bl {
-            left: 20px;
-          }
-          .corner-tr,
-          .corner-br {
-            right: 20px;
-          }
-        }
+        /* 반응형 - 제거됨 */
+
       `}</style>
     </div>
   );
