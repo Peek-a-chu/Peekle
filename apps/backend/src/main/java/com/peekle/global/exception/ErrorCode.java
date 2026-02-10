@@ -61,7 +61,13 @@ public enum ErrorCode {
     GAME_INVALID_ROOM_DATA(HttpStatus.INTERNAL_SERVER_ERROR, "GAME_002", "게임 방 데이터가 손상되었습니다."),
     GAME_PROBLEM_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "GAME_003", "문제집의 문제 개수보다 많은 문제를 요청할 수 없습니다."),
     GAME_ROOM_FULL(HttpStatus.CONFLICT, "GAME_004", "방이 가득 찼습니다."),
-    GAME_RESERVATION_EXPIRED(HttpStatus.GONE, "GAME_005", "예약이 만료되었습니다.");
+    GAME_RESERVATION_EXPIRED(HttpStatus.GONE, "GAME_005", "예약이 만료되었습니다."),
+    GAME_ALREADY_STARTED(HttpStatus.CONFLICT, "GAME_006", "이미 시작되었거나 종료된 방입니다."),
+    GAME_PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "GAME_007", "비밀번호가 일치하지 않습니다."),
+    ALREADY_IN_GAME(HttpStatus.CONFLICT, "GAME_008", "이미 다른 게임에 참여 중입니다."),
+    GAME_TEAM_FULL(HttpStatus.CONFLICT, "GAME_009", "해당 팀은 이미 가득 찼습니다."),
+    GAME_NOT_HOST(HttpStatus.FORBIDDEN, "GAME_010", "방장만 수행할 수 있는 작업입니다."),
+    GAME_CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "GAME_011", "자기 자신을 강퇴할 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

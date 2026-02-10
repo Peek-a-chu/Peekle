@@ -52,6 +52,7 @@ export function GameCreationModal({ open, onOpenChange, onSubmit, isLoading = fa
     handleTagToggle,
     handleStepChange,
     handleSubmit,
+    handleNextStep,
     handleClose,
     setCurrentStep,
     setTitleError,
@@ -174,7 +175,7 @@ export function GameCreationModal({ open, onOpenChange, onSubmit, isLoading = fa
                     )}
                   </Button>
                 ) : (
-                  <Button onClick={() => setCurrentStep(currentStep + 1)}>다음</Button>
+                  <Button onClick={handleNextStep}>다음</Button>
                 )}
               </div>
             </div>

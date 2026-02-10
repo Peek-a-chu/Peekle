@@ -77,6 +77,24 @@ export const CCPreJoinModal = ({
   const [isPolling, setIsPolling] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Helper: Compare versions (SemVer)
+  // Returns:
+  // -1 if v1 < v2
+  //  0 if v1 == v2
+  //  1 if v1 > v2
+  const compareVersions = (v1: string, v2: string) => {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const num1 = parts1[i] || 0;
+      const num2 = parts2[i] || 0;
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+    }
+    return 0;
+  };
+
   useEffect(() => {
     if (!user) {
       void checkAuth();
@@ -160,7 +178,7 @@ export const CCPreJoinModal = ({
 
         if (json.data?.valid) {
           // Check version if linked
-          if (extensionVersion && extensionVersion !== REQUIRED_VERSION) {
+          if (extensionVersion && compareVersions(extensionVersion, REQUIRED_VERSION) < 0) {
             setExtensionStatus('VERSION_MISMATCH');
           } else {
             setExtensionStatus('LINKED');
@@ -178,7 +196,7 @@ export const CCPreJoinModal = ({
       void checkTokenValidity(extensionToken);
     } else if (isInstalled) {
       // Even if not linked (or user not logged in), check version if installed
-      if (extensionVersion && extensionVersion !== REQUIRED_VERSION) {
+      if (extensionVersion && compareVersions(extensionVersion, REQUIRED_VERSION) < 0) {
         setExtensionStatus('VERSION_MISMATCH');
       } else {
         setExtensionStatus('INSTALLED'); // Installed but not linked or not logged in

@@ -164,7 +164,7 @@ export function GameWaitingRoomLayout({
       {/* 메인 콘텐츠 */}
       <div className="flex min-h-0 flex-1">
         {/* 좌측: 방 설정 + 참여자 그리드 */}
-        <main className="flex flex-1 flex-col gap-3 p-4">
+        <main className="flex flex-1 flex-col gap-3 p-4 overflow-y-auto">
           {/* 방 설정 패널 */}
           <RoomSettingsPanel
             timeLimit={room.timeLimit}

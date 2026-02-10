@@ -32,7 +32,7 @@ export function CCSpeedParticipantRanking({ participants }: CCSpeedParticipantRa
             <div className="flex items-center text-xs font-bold text-muted-foreground px-4 mb-2 uppercase tracking-wider opacity-70">
                 <span className="w-10 text-center">Rank</span>
                 <span className="flex-1 ml-4">User</span>
-                <span className="w-32 text-center text-primary/80">Time</span>
+                <span className="w-32 text-center text-primary/80">Record</span>
                 {/* Score 컬럼 제거, Time 컬럼 강조 */}
             </div>
 
@@ -82,11 +82,11 @@ export function CCSpeedParticipantRanking({ participants }: CCSpeedParticipantRa
 
                                 <div
                                     className={`w-32 text-center font-bold text-xl flex items-center justify-center ${isFailed
-                                        ? 'text-red-500 text-base'
+                                        ? 'text-muted-foreground text-base'
                                         : (p.isMe ? 'text-yellow-400' : 'text-primary')
                                         }`}
                                 >
-                                    {formatTime(p.clearTime)}
+                                    {isFailed ? `${p.solvedCount || 0} Solved` : formatTime(p.clearTime)}
                                 </div>
                             </div>
                         </div>

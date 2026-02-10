@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 
 import java.util.*;
 
@@ -80,7 +82,7 @@ public class RedisGameWaitService {
         Map<Object, Object> roomInfo = redisTemplate.opsForHash().entries(infoKey);
 
         if (roomInfo.isEmpty()) {
-            throw new IllegalArgumentException("존재하지 않는 방입니다.");
+            throw new BusinessException(ErrorCode.GAME_ROOM_NOT_FOUND);
         }
         return roomInfo;
     }
@@ -89,14 +91,14 @@ public class RedisGameWaitService {
         // 방 상태 확인
         String status = (String) redisTemplate.opsForValue().get(String.format(RedisKeyConst.GAME_STATUS, roomId));
         if (status != null && !"WAITING".equals(status)) {
-            throw new IllegalStateException("이미 시작되었거나 종료된 방에는 입장할 수 없습니다.");
+            throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
         }
 
         // 비밀번호 체크
         if (roomInfo.containsKey("password")) {
             String roomPassword = (String) roomInfo.get("password");
             if (password == null || !password.equals(roomPassword)) {
-                throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+                throw new BusinessException(ErrorCode.GAME_PASSWORD_MISMATCH);
             }
         }
     }
@@ -121,7 +123,8 @@ public class RedisGameWaitService {
                 publishEnterEvent(roomId, userId, roomInfo);
                 return true;
             }
-            throw new IllegalStateException("이미 다른 게임에 참여 중입니다. (Game ID: " + currentGameId + ")");
+            throw new BusinessException(ErrorCode.ALREADY_IN_GAME,
+                    "이미 다른 게임에 참여 중입니다. (Game ID: " + currentGameId + ")");
         }
 
         // USER_CURRENT_GAME 키가 없더라도 Players Set에 있다면 재접속
@@ -296,7 +299,7 @@ public class RedisGameWaitService {
 
         long teamCount = teams.values().stream().filter(teamColor::equals).count();
         if (teamCount >= 4) {
-            throw new IllegalStateException(teamColor + "팀은 이미 가득 찼습니다.");
+            throw new BusinessException(ErrorCode.GAME_TEAM_FULL);
         }
 
         redisTemplate.opsForHash().put(teamsKey, String.valueOf(userId), teamColor);
@@ -372,7 +375,7 @@ public class RedisGameWaitService {
 
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Map<String, Object> leaveData = Map.of(
                 "userId", userId,
                 "nickname", user.getNickname());
@@ -396,7 +399,7 @@ public class RedisGameWaitService {
                     redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
 
                     User newHost = userRepository.findById(Long.valueOf(newHostId))
-                            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
                     redisTemplate.opsForHash().put(infoKey, "hostNickname", newHost.getNickname());
                     redisTemplate.opsForHash().put(infoKey, "hostProfileImg",
@@ -444,7 +447,7 @@ public class RedisGameWaitService {
 
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Map<String, Object> forfeitData = Map.of(
                 "userId", userId,
                 "nickname", user.getNickname());
@@ -468,7 +471,7 @@ public class RedisGameWaitService {
                     redisTemplate.opsForHash().put(infoKey, "hostId", newHostId);
 
                     User newHost = userRepository.findById(Long.valueOf(newHostId))
-                            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
                     redisTemplate.opsForHash().put(infoKey, "hostNickname", newHost.getNickname());
                     redisTemplate.opsForHash().put(infoKey, "hostProfileImg",
@@ -524,10 +527,10 @@ public class RedisGameWaitService {
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
         String hostIdStr = (String) redisTemplate.opsForHash().get(infoKey, "hostId");
         if (hostIdStr == null || !hostIdStr.equals(String.valueOf(userId))) {
-            throw new IllegalStateException("방장만 유저를 강퇴할 수 있습니다.");
+            throw new BusinessException(ErrorCode.GAME_NOT_HOST);
         }
         if (userId.equals(targetUserId)) {
-            throw new IllegalStateException("자기 자신을 강퇴할 수 없습니다.");
+            throw new BusinessException(ErrorCode.GAME_CANNOT_KICK_SELF);
         }
 
         log.info("User {} (Host) kicking user {} from game room {}", userId, targetUserId, roomId);
@@ -544,7 +547,7 @@ public class RedisGameWaitService {
 
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         User kickedUser = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Map<String, Object> kickData = Map.of(
                 "userId", targetUserId,
                 "nickname", kickedUser.getNickname(),
@@ -566,7 +569,7 @@ public class RedisGameWaitService {
         // ENTER 이벤트 발행 (전체 참여자 정보 포함)
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Team 정보 조회 (팀전인 경우)
         String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);

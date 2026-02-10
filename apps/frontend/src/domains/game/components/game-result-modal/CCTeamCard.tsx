@@ -67,14 +67,12 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
         <h3 className={`text-2xl font-black italic tracking-tighter uppercase ${theme.text}`}>
           {teamColor} TEAM
         </h3>
-        {mode !== 'SPEED_RACE' && (
-          <div className="text-right">
-            <span className="text-xs font-bold text-muted-foreground block uppercase">
-              Total Solved
-            </span>
-            <span className={`text-3xl font-black ${theme.text} leading-none`}>{score}</span>
-          </div>
-        )}
+        <div className="text-right">
+          <span className="text-xs font-bold text-muted-foreground block uppercase">
+            Total Solved
+          </span>
+          <span className={`text-3xl font-black ${theme.text} leading-none`}>{score}</span>
+        </div>
       </div>
 
       {/* Participants */}
@@ -124,8 +122,8 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
 
               {/* Stats */}
               <div className="flex items-center gap-4 text-sm">
-                <div className={`w-16 text-right font-medium tabular-nums ${isFailed ? 'text-red-500 font-bold text-xs' : 'text-muted-foreground/80'}`}>
-                  {mode === 'SPEED_RACE' ? formatTime(p.clearTime) : `${p.solvedCount || 0} Solved`}
+                <div className={`w-16 text-right font-medium tabular-nums ${isFailed ? 'text-muted-foreground/80' : 'text-muted-foreground/80'}`}>
+                  {`${p.solvedCount || 0} Solved`}
                 </div>
                 {mode !== 'SPEED_RACE' && (
                   <div className={`w-16 text-right font-black tabular-nums ${theme.text}`}>

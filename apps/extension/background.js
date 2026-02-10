@@ -15,7 +15,8 @@ const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
 // --- Baekjoon Solver Logic ---
 
 const PROCESSED_SUBMISSIONS_KEY = 'processed_submissions';
-const PEEKLE_TOKEN_KEY = 'peekle_token';
+const PEEKLE_TOKEN_KEY = IS_LOCAL ? 'peekle_token_local' : 'peekle_token_prod';
+const PEEKLE_USER_DATA_KEY = IS_LOCAL ? 'userData_local' : 'userData_prod';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'CHECK_ENV') {
@@ -29,6 +30,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.type === 'SOLVED') {
         handleSolvedSubmission(request.payload, sender);
         return true;
+    } else if (request.type === 'GET_POPUP_DATA') {
+        chrome.storage.local.get([PEEKLE_TOKEN_KEY, PEEKLE_USER_DATA_KEY], (items) => {
+            sendResponse({
+                token: items[PEEKLE_TOKEN_KEY],
+                userData: items[PEEKLE_USER_DATA_KEY]
+            });
+        });
+        return true;
     } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
         console.log('[Background] Received SAVE_PENDING_SUBMISSION:', request.payload);
 
@@ -37,7 +46,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 ...request.payload,
                 // Ensure sourceType is preserved or default to EXTENSION
                 sourceType: request.payload.sourceType || 'EXTENSION',
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                openerTabId: sender.tab ? sender.tab.id : null // Save the tab that initiated this
             }
         }, () => {
             console.log('[Background] pending_submission saved to storage.');
@@ -55,12 +65,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true });
         });
         return true;
+    } else if (request.type === 'GET_TOKEN') {
+        getPeekleToken().then(token => sendResponse({ token }));
+        return true;
+    } else if (request.type === 'SET_TOKEN') {
+        const { token, userData } = request.payload;
+        const storageData = { [PEEKLE_TOKEN_KEY]: token };
+        if (userData) {
+            storageData[PEEKLE_USER_DATA_KEY] = userData;
+        }
+        chrome.storage.local.set(storageData, () => {
+            // Also clear the OTHER key to avoid confusion if we switched env?
+            // Optional, but might be good.
+            // For now just save.
+            sendResponse({ success: true });
+        });
+        return true;
+    } else if (request.type === 'REMOVE_TOKEN') {
+        chrome.storage.local.remove([PEEKLE_TOKEN_KEY, PEEKLE_USER_DATA_KEY], () => {
+            sendResponse({ success: true });
+        });
+        return true;
     }
     return true; // Keep channel open
 });
 
 
-// storage에서 토큰 가져오기 (콜백 API를 Promise로 래핑)
 function getPeekleToken() {
     return new Promise((resolve) => {
         try {
@@ -271,10 +301,33 @@ async function handleSolvedSubmission(payload, sender) {
             if (backendResponse) {
                 // If it's a tab context, send to that tab
                 if (sender && sender.tab) {
+                    const shouldAutoClose = isSuccess && (targetSourceType === 'STUDY' || targetSourceType === 'GAME');
+                    const feedbackPayload = {
+                        ...backendResponse,
+                        submitId, // Explicitly pass submitId back
+                        autoCloseDelay: shouldAutoClose ? 3000 : 0
+                    };
+
                     chrome.tabs.sendMessage(sender.tab.id, {
                         type: 'SHOW_FEEDBACK',
-                        payload: backendResponse
+                        payload: feedbackPayload
                     });
+
+                    // [Feature] Auto-close tab for successful STUDY/GAME submissions
+                    if (shouldAutoClose) {
+                        console.log(`[Background] Auto-closing tab ${sender.tab.id} in 3s for ${targetSourceType} success.`);
+                        setTimeout(() => {
+                            // Close the current tab
+                            chrome.tabs.remove(sender.tab.id).catch(e => console.log('Tab already closed'));
+
+                            // [New] Activate the opener tab (Peekle) if it exists
+                            if (pending && pending.openerTabId) {
+                                chrome.tabs.update(pending.openerTabId, { active: true }).catch(err => {
+                                    console.log('[Background] Failed to switch back to opener tab:', err);
+                                });
+                            }
+                        }, 3000);
+                    }
                 }
             } else {
                 // Network error or backend down
