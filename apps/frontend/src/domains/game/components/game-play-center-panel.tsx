@@ -40,7 +40,23 @@ export function GamePlayCenterPanel({
 }: GamePlayCenterPanelProps) {
   const [isVideoGridFolded, setIsVideoGridFolded] = useState(false);
   const [theme, setTheme] = useState<'light' | 'vs-dark'>('light');
+  const [fontSize, setFontSize] = useState<number>(14);
   const idePanelRef = useRef<CCIDEPanelRef>(null);
+
+  // Load font size from local storage on mount
+  useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ide-font-size');
+      if (saved) {
+        setFontSize(parseInt(saved, 10));
+      }
+    }
+  });
+
+  const handleFontSizeChange = (newSize: number) => {
+    setFontSize(newSize);
+    localStorage.setItem('ide-font-size', newSize.toString());
+  };
 
   const toggleVideoGrid = () => {
     setIsVideoGridFolded((prev) => !prev);
@@ -119,8 +135,10 @@ export function GamePlayCenterPanel({
             <GameIDEToolbar
               language={language}
               theme={theme}
+              fontSize={fontSize}
               onLanguageChange={onLanguageChange}
               onThemeToggle={toggleTheme}
+              onFontSizeChange={handleFontSizeChange}
               onCopy={handleCopy}
               onSubmit={handleSubmit}
             />
@@ -135,9 +153,11 @@ export function GamePlayCenterPanel({
             initialCode={code}
             language={language}
             theme={theme}
+            fontSize={fontSize}
             hideToolbar
             onLanguageChange={onLanguageChange}
             onThemeChange={setTheme}
+            onFontSizeChange={handleFontSizeChange}
             onCodeChange={onCodeChange} // 코드 변경 시 상위 컴포넌트(problemCodes)에 저장
             sourceType="GAME"
           />

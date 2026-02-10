@@ -1,7 +1,6 @@
-'use client';
-
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText } from 'lucide-react';
+import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText, Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -19,12 +18,14 @@ const LANGUAGES = [
 export interface CCIDEToolbarProps {
   language?: string;
   theme?: 'light' | 'vs-dark';
+  fontSize?: number;
   showSubmit?: boolean;
   showChatRef?: boolean;
   showThemeToggle?: boolean;
   currentProblemLabel?: string | null;
   onLanguageChange?: (lang: string) => void;
   onThemeToggle?: () => void;
+  onFontSizeChange?: (size: number) => void;
   onCopy?: () => void;
   onRefChat?: () => void;
   onSubmit?: () => void;
@@ -41,12 +42,14 @@ export interface CCIDEToolbarProps {
 export function CCIDEToolbar({
   language = 'python',
   theme = 'light',
+  fontSize = 14,
   showSubmit = true,
   showChatRef = true,
   showThemeToggle = true,
   currentProblemLabel,
   onLanguageChange,
   onThemeToggle,
+  onFontSizeChange,
   onCopy,
   onRefChat,
   onSubmit,
@@ -60,6 +63,56 @@ export function CCIDEToolbar({
   const isRealtime = viewMode === 'SPLIT_REALTIME';
   const isSaved = viewMode === 'SPLIT_SAVED';
   const isViewingOther = viewMode !== 'ONLY_MINE';
+
+  // Use local state for the input field to allow users to clear it while typing
+  const [inputValue, setInputValue] = useState<string>(fontSize.toString());
+
+  // Sync internal state if prop changes from outside (e.g. shortcuts)
+  useEffect(() => {
+    setInputValue(fontSize.toString());
+  }, [fontSize]);
+
+  const handleDecreaseFont = () => {
+    if (onFontSizeChange && fontSize > 5) {
+      onFontSizeChange(fontSize - 1);
+    }
+  };
+
+  const handleIncreaseFont = () => {
+    if (onFontSizeChange && fontSize < 40) {
+      onFontSizeChange(fontSize + 1);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && onFontSizeChange) {
+      if (num >= 5 && num <= 40) {
+        onFontSizeChange(num);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    let num = parseInt(inputValue, 10);
+    if (isNaN(num)) {
+      num = 14;
+    }
+    const clamped = Math.max(5, Math.min(40, num));
+    setInputValue(clamped.toString());
+    if (onFontSizeChange) {
+      onFontSizeChange(clamped);
+    }
+  };
+
+  const handleKeyDownInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -113,12 +166,11 @@ export function CCIDEToolbar({
               <span>
                 {isRealtime
                   ? `${viewingUser?.nickname}의 코드 실시간 열람 중`
-                  : `${targetSubmission?.username}${
-                      targetSubmission?.username === 'PS러버' ||
-                      targetSubmission?.username === 'CodeNinja'
-                        ? ' (Bot)'
-                        : ''
-                    }의 저장된 코드 열람 중`}
+                  : `${targetSubmission?.username}${targetSubmission?.username === 'PS러버' ||
+                    targetSubmission?.username === 'CodeNinja'
+                    ? ' (Bot)'
+                    : ''
+                  }의 저장된 코드 열람 중`}
               </span>
               {isSaved && targetSubmission && (
                 <span className="text-xs opacity-75 font-normal">
@@ -131,6 +183,53 @@ export function CCIDEToolbar({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Font Size Control */}
+          <div className="flex items-center gap-1 mr-2 bg-muted/50 rounded-md p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDecreaseFont}
+                  disabled={disabled || fontSize <= 5}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>폰트 작게</TooltipContent>
+            </Tooltip>
+
+            <input
+              type="number"
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDownInput}
+              disabled={disabled}
+              className="w-10 text-center text-xs font-mono text-muted-foreground bg-transparent border-none focus:outline-none focus:text-foreground appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              min={5}
+              max={40}
+            />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleIncreaseFont}
+                  disabled={disabled || fontSize >= 40}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>폰트 크게</TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="w-px h-4 bg-border mx-1" />
+
           {showThemeToggle && (
             <Tooltip>
               <TooltipTrigger asChild>
