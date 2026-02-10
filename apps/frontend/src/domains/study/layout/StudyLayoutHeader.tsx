@@ -10,14 +10,14 @@ interface BaseProps {
 }
 
 export function StudyLayoutHeader({ className }: BaseProps) {
-  const { handleBack, handleAddProblem, handleInvite, handleSettings } = useStudyRoomLogic();
+  const { handleBack, onAddProblemHandler, handleInvite, handleSettings } = useStudyRoomLogic();
   const { selectedDate, setSelectedDate } = useStudyStore();
 
   return (
     <header className={cn('shrink-0 border-b border-border', className)}>
       <StudyHeader
         onBack={handleBack}
-        onAddProblem={handleAddProblem}
+        onAddProblem={onAddProblemHandler}
         onInvite={handleInvite}
         onSettings={handleSettings}
         selectedDate={selectedDate}

@@ -210,11 +210,20 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   const handleAddProblem = async (
     title: string,
-    number: number,
+    number: number | null,
     tags?: string[],
     problemId?: number,
+    date?: string,
+    customLink?: string,
   ): Promise<void> => {
-    await addProblem(title, number, tags, problemId, format(selectedDate, 'yyyy-MM-dd'));
+    await addProblem(
+      title,
+      number,
+      tags,
+      problemId,
+      date || format(selectedDate, 'yyyy-MM-dd'),
+      customLink,
+    );
     console.log('Add problem clicked in header');
   };
 
