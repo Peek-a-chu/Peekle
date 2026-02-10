@@ -126,6 +126,35 @@ export function useGameCreationForm(
     setProblemCountInput(String(defaultGameCreationForm.problemCount));
   };
 
+  // 다음 단계로 이동 (검증 포함)
+  const handleNextStep = () => {
+    // Step 2: 문제 출제 검증
+    if (currentStep === 2) {
+      if (formData.problemSource === 'WORKBOOK') {
+        if (!formData.selectedWorkbookId) {
+          import('sonner').then(({ toast }) => {
+            toast.error('문제집을 선택해주세요.');
+          });
+          return;
+        }
+
+        if (
+          formData.maxWorkbookProblems !== undefined &&
+          formData.problemCount > formData.maxWorkbookProblems
+        ) {
+          import('sonner').then(({ toast }) => {
+            toast.error(
+              `선택한 문제집의 문제 수(${formData.maxWorkbookProblems}개)보다 더 많이 선택할 수 없습니다.`,
+            );
+          });
+          return;
+        }
+      }
+    }
+
+    setCurrentStep((prev) => prev + 1);
+  };
+
   // 제출
   const handleSubmit = () => {
     // 제목 검증
@@ -134,6 +163,15 @@ export function useGameCreationForm(
       setTimeout(() => {
         titleInputRef.current?.focus();
       }, 100);
+      return;
+    }
+
+    // 최종 안전장치: 워크북 모드인데 ID가 없으면 차단
+    if (formData.problemSource === 'WORKBOOK' && !formData.selectedWorkbookId) {
+      import('sonner').then(({ toast }) => {
+        toast.error('문제집이 선택되지 않았습니다.');
+      });
+      setCurrentStep(2); // 문제 탭으로 이동
       return;
     }
 
@@ -171,6 +209,7 @@ export function useGameCreationForm(
     handleTagToggle,
     handleStepChange,
     handleSubmit,
+    handleNextStep, // Export new handler
     handleClose,
     setCurrentStep,
     setTitleError,

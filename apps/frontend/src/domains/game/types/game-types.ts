@@ -144,4 +144,5 @@ export interface GameCreationFormData {
     tierMax: string;
     selectedTags: string[];
     selectedWorkbookId: string | null;
+    maxWorkbookProblems?: number;
 }

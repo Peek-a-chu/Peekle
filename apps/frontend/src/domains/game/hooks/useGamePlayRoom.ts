@@ -198,7 +198,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             }
             break;
           case 'SOLVED':
-            toast.success(`${data.nickname}님이 문제를 해결했습니다!`);
+            toast.success(`${data.nickname}님이 ${data.problemTitle || '문제'}를 풀었습니다!`);
             // [Fix] data.team -> data.teamColor (Backend sends teamColor)
             updateProblemStatus(Number(data.problemId), 'SOLVED', Number(data.userId), data.teamColor);
             break;

@@ -69,10 +69,10 @@ export function CCTeamResultSection({ participants, mode }: CCTeamResultSectionP
           </span>
           <h2
             className={`text-3xl font-black italic tracking-tighter uppercase ${winningTeam === 'RED'
-                ? 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]'
-                : winningTeam === 'BLUE'
-                  ? 'text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]'
-                  : 'text-gray-400'
+              ? 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+              : winningTeam === 'BLUE'
+                ? 'text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+                : 'text-gray-400'
               }`}
           >
             {winningTeam}
@@ -80,13 +80,11 @@ export function CCTeamResultSection({ participants, mode }: CCTeamResultSectionP
         </div>
 
         {/* Score Board */}
-        {mode !== 'SPEED_RACE' && (
-          <div className="mt-5 mb-2 flex items-center justify-center gap-4 bg-muted/20 px-4 py-2 rounded-2xl border border-border/40 backdrop-blur-sm">
-            <span className="text-3xl font-black text-red-500 drop-shadow-sm">{redScore}</span>
-            <span className="text-xl font-black text-muted-foreground/30">:</span>
-            <span className="text-3xl font-black text-blue-500 drop-shadow-sm">{blueScore}</span>
-          </div>
-        )}
+        <div className="mt-5 mb-2 flex items-center justify-center gap-4 bg-muted/20 px-4 py-2 rounded-2xl border border-border/40 backdrop-blur-sm">
+          <span className="text-3xl font-black text-red-500 drop-shadow-sm">{redScore}</span>
+          <span className="text-xl font-black text-muted-foreground/30">:</span>
+          <span className="text-3xl font-black text-blue-500 drop-shadow-sm">{blueScore}</span>
+        </div>
 
         {/* VS Badge */}
         <div className="mt-2 relative">

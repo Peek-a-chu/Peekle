@@ -154,6 +154,27 @@ export function GameCreationStepProblem({
     fetchWorkbooks();
   }, []);
 
+  // Conflict Auto-Detection & Scroll
+  useEffect(() => {
+    if (workbooks.length > 0 && formData.selectedWorkbookId && formData.problemSource === 'WORKBOOK') {
+      const selectedWorkbook = workbooks.find((w) => String(w.id) === formData.selectedWorkbookId);
+      if (selectedWorkbook) {
+        if (formData.problemCount > selectedWorkbook.problemCount) {
+          // Conflict Detected!
+          setConflictWorkbookId(formData.selectedWorkbookId);
+
+          // Scroll into view
+          setTimeout(() => {
+            const el = document.getElementById(`workbook-item-${formData.selectedWorkbookId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 300); // Delay to ensure render and expansion
+        }
+      }
+    }
+  }, [formData.selectedWorkbookId, formData.problemCount, formData.problemSource, workbooks]);
+
   // 검색어에 따른 문제집 필터링
   const filteredWorkbooks = workbooks.filter((workbook) => {
     if (!searchQuery.trim()) return true;
@@ -171,6 +192,7 @@ export function GameCreationStepProblem({
       setConflictWorkbookId(workbookId);
     } else {
       // 충돌 없음: 바로 선택
+      onUpdateForm('maxWorkbookProblems', problemCount); // Add this
       onUpdateForm('selectedWorkbookId', workbookId);
       setConflictWorkbookId(null);
     }
@@ -178,6 +200,7 @@ export function GameCreationStepProblem({
 
   // 문제 수 자동 조정 + 선택
   const handleAutoAdjust = (workbookId: string, problemCount: number) => {
+    onUpdateForm('maxWorkbookProblems', problemCount); // Add this
     onUpdateForm('problemCount', problemCount);
     onUpdateForm('selectedWorkbookId', workbookId);
     setConflictWorkbookId(null);
@@ -382,7 +405,7 @@ export function GameCreationStepProblem({
                 const isSelected = formData.selectedWorkbookId === String(workbook.id);
 
                 return (
-                  <div key={workbook.id} className="space-y-2">
+                  <div key={workbook.id} className="space-y-2" id={`workbook-item-${workbook.id}`}>
                     <button
                       type="button"
                       onClick={() => handleWorkbookSelect(String(workbook.id), workbook.problemCount)}

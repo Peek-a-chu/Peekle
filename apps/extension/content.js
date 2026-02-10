@@ -76,6 +76,7 @@ function scanForSuccess() {
             if (!pendingSubmissions.has(submitId)) {
                 // console.log(`[Peekle] Now watching submission: ${submitId} (${resultColor})`);
                 pendingSubmissions.add(submitId);
+                showProcessingToast(submitId); // Show feedback
             }
             return; // It's still pending, nothing to do yet
         }
@@ -269,6 +270,80 @@ function injectFillerScript(code, language) {
 // Run the check
 checkForPendingSubmission();
 
+function showProcessingToast(submitId) {
+    const toastId = `peekle-processing-${submitId}`;
+    if (document.getElementById(toastId)) return; // Already showing
+
+    const container = document.createElement('div');
+    container.id = toastId;
+
+    const procColor = '#3B82F6'; // Blue
+
+    Object.assign(container.style, {
+        position: 'fixed',
+        top: '80px',
+        right: '25px',
+        width: '380px',
+        background: 'white',
+        color: '#171717',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+        border: '1px solid #E4E4E7',
+        zIndex: '2147483647',
+        borderRadius: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0',
+        overflow: 'hidden',
+        fontFamily: "'Pretendard', sans-serif",
+        animation: 'peekleSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+    });
+
+    // SVG Spinner
+    const spinnerSvg = `
+        <svg class="peekle-spinner" width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                .peekle-spinner { animation: peekleSpin 1s linear infinite; }
+                @keyframes peekleSpin { 100% { transform: rotate(360deg); } }
+            </style>
+            <circle cx="12" cy="12" r="10" stroke="#DBEAFE" stroke-width="3"/>
+            <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="${procColor}" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+    `;
+
+    container.innerHTML = `
+        <div style="position: absolute; top:0; left:0; width:100%; height:4px; background-color:${procColor};"></div>
+        <div style="display:flex; align-items:center; gap:16px; padding:20px 24px;">
+            <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                ${spinnerSvg}
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-size:16px; font-weight:800; color:${procColor}; font-style:italic;">Processing...</span>
+                <span style="font-size:13px; color:#71717A; font-weight:600;">채점 진행 중입니다</span>
+            </div>
+        </div>
+    `;
+
+    // Inject Keyframes if needed
+    if (!document.getElementById('peekle-keyframes')) {
+        const styleSheet = document.createElement("style");
+        styleSheet.id = 'peekle-keyframes';
+        styleSheet.innerText = `
+            @keyframes peekleSlideIn {
+                from { transform: translateX(120%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes peekleSlideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(120%); opacity: 0; }
+            }
+             @keyframes peekleSpin { 100% { transform: rotate(360deg); } }
+        `;
+        document.head.appendChild(styleSheet);
+    }
+
+    document.body.appendChild(container);
+}
+
 // --- Feedback Toast Logic ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'SHOW_FEEDBACK') {
@@ -401,6 +476,12 @@ function renderPointGap(status, pointsToPromotion, pointsToMaintenance) {
 }
 
 async function showSuccessToast(data) {
+    // Remove processing toast immediately to prevent gap/overlap
+    if (data.submitId) {
+        const procToast = document.getElementById(`peekle-processing-${data.submitId}`);
+        if (procToast) procToast.remove();
+    }
+
     const toastId = 'peekle-success-toast-' + Date.now();
     const container = document.createElement('div');
     container.id = toastId;
@@ -572,6 +653,21 @@ async function showSuccessToast(data) {
                 margin-left: 4px;
             }
 
+            .peekle-timer-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                background-color: #FFF1F2; /* Red-50 */
+                color: #BE123C; /* Red-700 */
+                padding: 4px 10px;
+                border-radius: 999px;
+                font-size: 11px;
+                font-weight: 700;
+                margin-top: 8px;
+                align-self: flex-start;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            }
+
             .peekle-rank-badge {
                 background-color: rgba(226, 78, 160, 0.05);
                 color: ${primaryColor};
@@ -611,6 +707,14 @@ async function showSuccessToast(data) {
             ? `<span class="peekle-points">+${data.earnedPoints || 0}</span> <span class="peekle-points-label">Points</span>`
             : `<span style="font-size:12px; color:#A1A1AA; font-weight:700;">이미 푼 문제입니다</span>`
         }
+                </div>
+                
+                <div class="peekle-timer-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span id="${toastId}-timer-text">계산 중...</span>
                 </div>
             </div>
         </div>
@@ -657,11 +761,48 @@ async function showSuccessToast(data) {
         if (confettiContainer) confettiContainer.remove();
     }, 2000);
 
-    // Auto-Close after 6s (bit longer to admire)
-    const closeTimer = setTimeout(closeToast, 6000);
+    // Auto-Close Logic
+    const autoCloseDelay = data.autoCloseDelay || 0;
+    const willCloseTab = autoCloseDelay > 0;
+
+    // If tab will close, use that delay. Else default to 6s for toast.
+    // Note: Background delay is in ms (e.g., 3000). Convert to seconds.
+    let initialSeconds = willCloseTab ? Math.ceil(autoCloseDelay / 1000) : 6;
+    let timeLeft = initialSeconds;
+
+    // Set close timeout
+    // If tab closes (3s), this timeout acts as a fallback or sync. 
+    // If only toast closes, it's 6s.
+    const closeTimeoutDelay = willCloseTab ? autoCloseDelay + 500 : 6000;
+    // +500ms safety buffer if tab is closing (let the tab close itself, or force remove toast just before)
+
+    const closeTimer = setTimeout(closeToast, closeTimeoutDelay);
+
+    // Timer Interval
+    // Timer Interval
+    const updateTimerText = () => {
+        const timerTextEl = document.getElementById(`${toastId}-timer-text`);
+        if (timerTextEl) {
+            if (willCloseTab) {
+                timerTextEl.innerText = `${timeLeft}초 후 탭이 닫힙니다`;
+            } else {
+                timerTextEl.innerText = `${timeLeft}초 후 알림이 닫힙니다`;
+            }
+        }
+    };
+
+    // Initial Update
+    updateTimerText();
+
+    const timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerText();
+        if (timeLeft <= 0) clearInterval(timerInterval);
+    }, 1000);
 
     // Manual Close
     function closeToast() {
+        clearInterval(timerInterval); // Clear interval
         container.classList.add('exiting');
         setTimeout(() => {
             if (container && container.parentNode) {
@@ -674,9 +815,17 @@ async function showSuccessToast(data) {
         clearTimeout(closeTimer);
         closeToast();
     };
+
+    // (Old footer injection logic removed)
 }
 
 function showFailedToast(data) {
+    // Remove processing toast immediately to prevent gap/overlap
+    if (data.submitId) {
+        const procToast = document.getElementById(`peekle-processing-${data.submitId}`);
+        if (procToast) procToast.remove();
+    }
+
     const toastId = 'peekle-failed-toast-' + Date.now();
     const container = document.createElement('div');
     container.id = toastId;
@@ -790,6 +939,21 @@ function showFailedToast(data) {
                 margin-left: 4px;
             }
 
+            .peekle-timer-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                background-color: #FFF1F2; /* Red-50 */
+                color: #BE123C; /* Red-700 */
+                padding: 4px 10px;
+                border-radius: 999px;
+                font-size: 11px;
+                font-weight: 700;
+                margin-top: 8px;
+                align-self: flex-start;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            }
+
             .peekle-rank-badge {
                 background-color: rgba(239, 68, 68, 0.05);
                 padding: 2px 8px;
@@ -825,6 +989,14 @@ function showFailedToast(data) {
                 <div style="margin-top: 4px;">
                     <span style="font-size:14px; color:#71717A; font-weight:600;">${data.message || '틀렸습니다'}</span>
                 </div>
+                
+                <div class="peekle-timer-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span id="${toastId}-timer-text">5초 후 닫힙니다</span>
+                </div>
             </div>
         </div>
 
@@ -842,10 +1014,27 @@ function showFailedToast(data) {
     document.body.appendChild(container);
 
     // Auto-Close after 5s
+    let timeLeft = 5;
     const closeTimer = setTimeout(closeToast, 5000);
+
+    // Timer Interval
+    // Timer Interval
+    const updateTimer = () => {
+        const timerEl = document.getElementById(`${toastId}-timer-text`);
+        if (timerEl) {
+            timerEl.innerText = `${timeLeft}초 후 닫힙니다`;
+        }
+    };
+
+    const timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimer();
+        if (timeLeft <= 0) clearInterval(timerInterval);
+    }, 1000);
 
     // Manual Close
     function closeToast() {
+        clearInterval(timerInterval);
         container.classList.add('exiting');
         setTimeout(() => {
             if (container && container.parentNode) {
@@ -858,6 +1047,8 @@ function showFailedToast(data) {
         clearTimeout(closeTimer);
         closeToast();
     };
+
+    // (Old footer injection logic removed)
 }
 
 

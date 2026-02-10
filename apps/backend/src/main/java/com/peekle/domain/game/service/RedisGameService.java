@@ -1028,15 +1028,19 @@ public class RedisGameService {
         }
 
         // 1. 문제 유효성 검증 (현재 게임에 출제된 문제인지 확인)
+        // 1. 문제 유효성 검증 (현재 게임에 출제된 문제인지 확인)
         String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, gameId);
         List<Object> problemList = redisTemplate.opsForList().range(problemsKey, 0, -1);
         boolean isValidProblem = false;
+        String problemTitle = "문제"; // Default title
+
         if (problemList != null) {
             for (Object pObj : problemList) {
                 if (pObj instanceof Map) {
                     Map<String, String> pInfo = (Map<String, String>) pObj;
                     if (String.valueOf(problemId).equals(pInfo.get("id"))) {
                         isValidProblem = true;
+                        problemTitle = pInfo.getOrDefault("title", "문제");
                         break;
                     }
                 }
@@ -1120,6 +1124,7 @@ public class RedisGameService {
         solvedData.put("teamColor", teamColor);
         solvedData.put("score", score);
         solvedData.put("solvedCount", solvedCount);
+        solvedData.put("problemTitle", problemTitle);
 
         // 닉네임 조회 및 추가
         try {
@@ -1399,6 +1404,15 @@ public class RedisGameService {
         endData.put("status", "END");
         endData.put("ranking", rankingList);
         endData.put("teamRanking", teamRankingMap);
+
+        // [Fix] Explicitly send solved counts for teams to avoid "Time" display
+        // confusion
+        Map<String, Integer> teamSolvedCounts = new HashMap<>();
+        for (Map.Entry<String, Double> entry : teamRankingMap.entrySet()) {
+            teamSolvedCounts.put(entry.getKey(), entry.getValue().intValue());
+        }
+        endData.put("teamSolvedCounts", teamSolvedCounts);
+
         endData.put("winner", winner);
         endData.put("teamType", teamType);
 
