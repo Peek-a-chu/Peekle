@@ -119,7 +119,7 @@ export function useStudyRoomLogic() {
     unfoldRightPanel,
     foldRightPanel,
     handleBack,
-    handleAddProblem,
+    onAddProblemHandler: handleAddProblem,
     handleInvite,
     handleSettings,
     handleSelectProblem,
