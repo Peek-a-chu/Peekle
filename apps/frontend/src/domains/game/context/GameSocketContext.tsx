@@ -62,31 +62,6 @@ export function GameSocketProvider({ children }: { children: React.ReactNode }) 
         newClient.onConnect = (frame) => {
             console.log('[GlobalSocket] Connected');
             setConnected(true);
-
-            // [Anti-Cheat] 유저별 경고 알림 구독
-            // pathname에서 gameId 추출 (/game/123 -> 123)
-            const gameIdMatch = window.location.pathname.match(/\/game\/(\d+)/);
-            if (gameIdMatch && userId) {
-                const gameId = gameIdMatch[1];
-                const alertTopic = `/topic/games/${gameId}/alert/${userId}`;
-                console.log(`[GlobalSocket] Subscribing to alerts: ${alertTopic}`);
-
-                newClient.subscribe(alertTopic, (message) => {
-                    try {
-                        const payload = JSON.parse(message.body);
-                        if (payload.type === 'CHEATING_DETECTED') {
-                            import('sonner').then(({ toast }) => {
-                                toast.error(payload.data || "부정행위가 감지되었습니다!", {
-                                    duration: 5000,
-                                    position: 'top-center',
-                                });
-                            });
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse alert message", e);
-                    }
-                });
-            }
         };
 
         newClient.onStompError = (frame) => {
@@ -141,6 +116,67 @@ export function GameSocketProvider({ children }: { children: React.ReactNode }) 
         }
         prevPathRef.current = pathname;
     }, [pathname, client, connected]);
+
+    // [Anti-Cheat] 유저별 경고 알림 구독 (Path 변경 감지)
+    const alertSubscriptionRef = useRef<StompJs.StompSubscription | null>(null);
+
+    useEffect(() => {
+        if (!client || !connected || !userId) return;
+
+        const gameIdMatch = pathname?.match(/\/game\/(\d+)/);
+        const gameId = gameIdMatch ? gameIdMatch[1] : null;
+
+        // 이미 구독 중인 게임 ID와 다르면 구독 해제
+        if (alertSubscriptionRef.current) {
+            // 새 게임 ID가 없거나(퇴장), 다른 게임 ID면 해제
+            // 여기서는 간단히 항상 해제하고 다시 구독 (pathname이 game이 아니면 그냥 해제)
+
+            // 최적화: gameId가 같으면 유지하고 싶지만, pathname 변경 시마다 실행되므로
+            // gameId가 변했을 때만 로직 수행하는 것이 좋음.
+            // 하지만 useEffect 의존성에 pathname이 있으므로 매번 실행됨.
+        }
+
+        if (gameId) {
+            const topic = `/topic/games/${gameId}/alert/${userId}`;
+
+            // 중복 구독 방지 (이미 구독 중인 ID와 같다면 스킵 로직 필요하지만, 단순화를 위해 매번 갱신)
+            if (alertSubscriptionRef.current) {
+                alertSubscriptionRef.current.unsubscribe();
+                alertSubscriptionRef.current = null;
+            }
+
+            console.log(`[GlobalSocket] Subscribing to alerts: ${topic}`);
+            const sub = client.subscribe(topic, (message) => {
+                try {
+                    const payload = JSON.parse(message.body);
+                    if (payload.type === 'CHEATING_DETECTED') {
+                        import('sonner').then(({ toast }) => {
+                            toast.error(payload.data || "부정행위가 감지되었습니다!", {
+                                duration: 5000,
+                                position: 'top-center',
+                            });
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to parse alert message", e);
+                }
+            });
+            alertSubscriptionRef.current = sub;
+        } else {
+            // 게임 페이지가 아니면 구독 해제
+            if (alertSubscriptionRef.current) {
+                alertSubscriptionRef.current.unsubscribe();
+                alertSubscriptionRef.current = null;
+            }
+        }
+
+        return () => {
+            if (alertSubscriptionRef.current) {
+                alertSubscriptionRef.current.unsubscribe();
+                alertSubscriptionRef.current = null;
+            }
+        };
+    }, [pathname, client, connected, userId]);
 
     // 마운트 시 자동 연결 (로그인 상태라면)
     useEffect(() => {

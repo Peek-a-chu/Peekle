@@ -31,7 +31,7 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
       };
 
   const formatTime = (seconds?: number) => {
-    if (seconds === undefined) return '-';
+    if (seconds === undefined || seconds === null) return 'FAILED';
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
@@ -67,68 +67,75 @@ export function CCTeamCard({ team, teamColor, isWinner, mvpId, score, mode }: CC
         <h3 className={`text-2xl font-black italic tracking-tighter uppercase ${theme.text}`}>
           {teamColor} TEAM
         </h3>
-        <div className="text-right">
-          <span className="text-xs font-bold text-muted-foreground block uppercase">
-            Total Solved
-          </span>
-          <span className={`text-3xl font-black ${theme.text} leading-none`}>{score}</span>
-        </div>
+        {mode !== 'SPEED_RACE' && (
+          <div className="text-right">
+            <span className="text-xs font-bold text-muted-foreground block uppercase">
+              Total Solved
+            </span>
+            <span className={`text-3xl font-black ${theme.text} leading-none`}>{score}</span>
+          </div>
+        )}
       </div>
 
       {/* Participants */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4">
-        {team.map((p) => (
-          <div
-            key={p.userId}
-            className={`group relative flex items-center p-3 rounded-xl border transition-all ${p.isMe
-              ? `bg-background ${p.teamId === 'RED' ? 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`
-              : 'bg-background/50 border-border/50 hover:bg-background'
-              } ${p.userId === mvpId ? 'z-20' : 'z-0'}`}
-          >
-            {/* MVP/ACE Badge */}
-            {p.userId === mvpId && (
-              <div className="absolute -top-3 -left-3 z-30">
-                {isWinner ? (
-                  <div className="bg-yellow-400 text-yellow-950 text-[10px] font-black px-2 py-1 rounded-sm shadow-lg flex items-center gap-1 transform -rotate-12 border border-yellow-200">
-                    <Crown size={12} strokeWidth={3} /> MVP
-                  </div>
-                ) : (
-                  <div className="bg-purple-600 text-white text-[10px] font-black px-2 py-1 rounded-sm shadow-lg flex items-center gap-1 transform -rotate-12 border border-purple-400">
-                    <Sparkles size={12} strokeWidth={3} /> ACE
+        {team.map((p) => {
+          const isFailed = mode === 'SPEED_RACE' && (p.clearTime === undefined || p.clearTime === null);
+          return (
+            <div
+              key={p.userId}
+              className={`group relative flex items-center p-3 rounded-xl border transition-all ${p.isMe
+                ? `bg-background ${p.teamId === 'RED' ? 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`
+                : 'bg-background/50 border-border/50 hover:bg-background'
+                } ${p.userId === mvpId ? 'z-20' : 'z-0'}`}
+            >
+              {/* MVP/ACE Badge */}
+              {p.userId === mvpId && (
+                <div className="absolute -top-3 -left-3 z-30">
+                  {isWinner ? (
+                    <div className="bg-yellow-400 text-yellow-950 text-[10px] font-black px-2 py-1 rounded-sm shadow-lg flex items-center gap-1 transform -rotate-12 border border-yellow-200">
+                      <Crown size={12} strokeWidth={3} /> MVP
+                    </div>
+                  ) : (
+                    <div className="bg-purple-600 text-white text-[10px] font-black px-2 py-1 rounded-sm shadow-lg flex items-center gap-1 transform -rotate-12 border border-purple-400">
+                      <Sparkles size={12} strokeWidth={3} /> ACE
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rank Info (Team Internal Rank) */}
+              <div className="w-8 flex justify-center shrink-0 font-bold text-muted-foreground/70">
+                {team.indexOf(p) + 1}
+              </div>
+
+              {/* Profile & Name */}
+              <div className="flex-1 flex items-center gap-3 overflow-hidden">
+                {/* Profile Image Removed */}
+                <div className="flex flex-col min-w-0">
+                  <span
+                    className={`text-sm font-bold truncate ${p.isMe ? theme.text : 'text-foreground'}`}
+                  >
+                    {p.nickname}
+                    {p.isMe && <span className="ml-1 text-[10px] opacity-70">(Me)</span>}
+                  </span>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-4 text-sm">
+                <div className={`w-16 text-right font-medium tabular-nums ${isFailed ? 'text-red-500 font-bold text-xs' : 'text-muted-foreground/80'}`}>
+                  {mode === 'SPEED_RACE' ? formatTime(p.clearTime) : `${p.solvedCount || 0} Solved`}
+                </div>
+                {mode !== 'SPEED_RACE' && (
+                  <div className={`w-16 text-right font-black tabular-nums ${theme.text}`}>
+                    {p.score.toLocaleString()}
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Rank Info (Team Internal Rank) */}
-            <div className="w-8 flex justify-center shrink-0 font-bold text-muted-foreground/70">
-              {team.indexOf(p) + 1}
             </div>
-
-            {/* Profile & Name */}
-            <div className="flex-1 flex items-center gap-3 overflow-hidden">
-              {/* Profile Image Removed */}
-              <div className="flex flex-col min-w-0">
-                <span
-                  className={`text-sm font-bold truncate ${p.isMe ? theme.text : 'text-foreground'}`}
-                >
-                  {p.nickname}
-                  {p.isMe && <span className="ml-1 text-[10px] opacity-70">(Me)</span>}
-                </span>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="flex items-center gap-4 text-sm">
-              <div className="w-16 text-right font-medium text-muted-foreground/80 tabular-nums">
-                {mode === 'SPEED_RACE' ? formatTime(p.clearTime) : `${p.solvedCount || 0} Solved`}
-              </div>
-              <div className={`w-16 text-right font-black tabular-nums ${theme.text}`}>
-                {p.score.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

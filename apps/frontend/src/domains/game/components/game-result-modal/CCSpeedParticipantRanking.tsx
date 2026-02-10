@@ -21,7 +21,7 @@ export function CCSpeedParticipantRanking({ participants }: CCSpeedParticipantRa
     };
 
     const formatTime = (seconds?: number) => {
-        if (seconds === undefined || seconds === null) return '-';
+        if (seconds === undefined || seconds === null) return 'FAILED';
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m}:${s.toString().padStart(2, '0')}`;
@@ -40,6 +40,7 @@ export function CCSpeedParticipantRanking({ participants }: CCSpeedParticipantRa
                 {sortedParticipants.map((p) => {
                     let borderColor = 'border-gray-500';
                     let glowColor = 'bg-gray-500';
+                    const isFailed = p.clearTime === undefined || p.clearTime === null;
 
                     if (p.rank === 1) {
                         borderColor = 'border-yellow-400';
@@ -80,7 +81,9 @@ export function CCSpeedParticipantRanking({ participants }: CCSpeedParticipantRa
                                 </div>
 
                                 <div
-                                    className={`w-32 text-center font-bold text-xl flex items-center justify-center ${p.isMe ? 'text-yellow-400' : 'text-primary'
+                                    className={`w-32 text-center font-bold text-xl flex items-center justify-center ${isFailed
+                                        ? 'text-red-500 text-base'
+                                        : (p.isMe ? 'text-yellow-400' : 'text-primary')
                                         }`}
                                 >
                                     {formatTime(p.clearTime)}

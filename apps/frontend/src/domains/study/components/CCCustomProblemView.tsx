@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { fetchProblemDescription, saveProblemDescription } from '@/domains/study/api/studyApi';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface CCCustomProblemViewProps {
     studyId: number;
@@ -176,6 +177,7 @@ export function CCCustomProblemView({
                             {description ? (
                                 <div className="text-sm leading-relaxed text-foreground">
                                     <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
                                         components={{
                                             h1: ({ ...props }) => <h1 className="text-2xl font-bold mt-6 mb-4" {...props} />,
                                             h2: ({ ...props }) => <h2 className="text-xl font-bold mt-5 mb-3" {...props} />,
