@@ -15,8 +15,8 @@ const FRONTEND_BASE_URL = BASE_URL; // Alias for compatibility
 // --- Baekjoon Solver Logic ---
 
 const PROCESSED_SUBMISSIONS_KEY = 'processed_submissions';
-const PEEKLE_TOKEN_KEY = IS_LOCAL ? 'peekle_token_local' : 'peekle_token_prod';
-const PEEKLE_USER_DATA_KEY = IS_LOCAL ? 'userData_local' : 'userData_prod';
+const PEEKLE_TOKEN_KEY = 'peekle_token';
+const PEEKLE_USER_DATA_KEY = 'userData';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'CHECK_ENV') {
@@ -30,14 +30,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.type === 'SOLVED') {
         handleSolvedSubmission(request.payload, sender);
         return true;
-    } else if (request.type === 'GET_POPUP_DATA') {
-        chrome.storage.local.get([PEEKLE_TOKEN_KEY, PEEKLE_USER_DATA_KEY], (items) => {
-            sendResponse({
-                token: items[PEEKLE_TOKEN_KEY],
-                userData: items[PEEKLE_USER_DATA_KEY]
-            });
-        });
-        return true;
     } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
         console.log('[Background] Received SAVE_PENDING_SUBMISSION:', request.payload);
 
@@ -46,8 +38,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 ...request.payload,
                 // Ensure sourceType is preserved or default to EXTENSION
                 sourceType: request.payload.sourceType || 'EXTENSION',
-                timestamp: Date.now(),
-                openerTabId: sender.tab ? sender.tab.id : null // Save the tab that initiated this
+                timestamp: Date.now()
             }
         }, () => {
             console.log('[Background] pending_submission saved to storage.');
@@ -67,6 +58,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     } else if (request.type === 'GET_TOKEN') {
         getPeekleToken().then(token => sendResponse({ token }));
+        return true;
+    } else if (request.type === 'GET_POPUP_DATA') {
+        chrome.storage.local.get([PEEKLE_TOKEN_KEY, PEEKLE_USER_DATA_KEY], (res) => {
+            sendResponse({
+                token: res[PEEKLE_TOKEN_KEY],
+                userData: res[PEEKLE_USER_DATA_KEY]
+            });
+        });
         return true;
     } else if (request.type === 'SET_TOKEN') {
         const { token, userData } = request.payload;
