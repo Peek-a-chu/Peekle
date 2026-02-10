@@ -118,8 +118,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
   const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const [compactTab, setCompactTab] = useState<'problems' | 'ide'>('problems');
 
   // Global state for selected problem
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
@@ -330,15 +328,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     window.postMessage({ type: 'PEEKLE_CLEAR_PENDING' }, '*');
   }, []);
 
-  useEffect(() => {
-    const syncViewport = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-    };
-    syncViewport();
-    window.addEventListener('resize', syncViewport);
-    return () => window.removeEventListener('resize', syncViewport);
-  }, []);
-
   const handleSelectProblem = (problem: Problem): void => {
     console.log('[StudyRoomClient] Selecting problem:', problem);
     // Extract studyProblemId from the problem (added by API)
@@ -376,9 +365,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     setIsLeftPanelFolded(!isLeftPanelFolded);
   };
 
-  const isCompactLayout = viewport.width > 0 && (viewport.width < 1000 || viewport.height < 768);
-  const hideCurrentProblemLabel = viewport.width >= 1000 && viewport.width < 1100;
-
   const problemList = (
     <ProblemListPanel
       problems={problems.map((p: any) => ({
@@ -396,7 +382,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       isFolded={isLeftPanelFolded}
       submissions={submissions}
       onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
-      showFoldButton={!isCompactLayout}
+      showFoldButton={true}
     />
   );
 
@@ -423,72 +409,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     }
   }, [selectedStudyProblemId, problems, lastSelectedProblemStorageKey]);
 
-  if (isCompactLayout) {
-    return (
-      <>
-        <SettingsModal />
-        <div className="flex h-screen flex-col bg-background text-foreground">
-          <header className="shrink-0 border-b border-border">
-            <StudyHeader
-              onBack={handleBack}
-              onAddProblem={handleAddProblem}
-              onInvite={handleInvite}
-              onSettings={handleSettings}
-              selectedDate={selectedDate}
-              onDateChange={handleDateChange}
-            />
-          </header>
 
-          <div className="shrink-0 border-b border-border bg-card px-3 py-2">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${compactTab === 'problems'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                onClick={() => setCompactTab('problems')}
-              >
-                문제선택
-              </button>
-              <button
-                type="button"
-                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${compactTab === 'ide'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                onClick={() => setCompactTab('ide')}
-              >
-                IDE
-              </button>
-            </div>
-          </div>
-
-          <VideoGrid
-            onWhiteboardClick={handleWhiteboardClick}
-            className="shrink-0 bg-card"
-          />
-
-          <div className="min-h-0 flex-1">
-            {compactTab === 'problems' ? (
-              problemList
-            ) : (
-              <CenterPanel
-                compactMode
-                onWhiteboardClick={handleWhiteboardClick}
-                onMicToggle={handleMicToggle}
-                onVideoToggle={handleVideoToggle}
-                onWhiteboardToggle={handleWhiteboardToggle}
-                onSettingsClick={handleSettings}
-                hideCurrentProblemLabel={hideCurrentProblemLabel}
-                className="h-full"
-              />
-            )}
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -512,7 +433,6 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
             onVideoToggle={handleVideoToggle}
             onWhiteboardToggle={handleWhiteboardToggle}
             onSettingsClick={handleSettings}
-            hideCurrentProblemLabel={hideCurrentProblemLabel}
           />
         }
         rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}

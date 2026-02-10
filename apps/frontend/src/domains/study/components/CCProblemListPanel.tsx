@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, FileText, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,12 +62,30 @@ export function CCProblemListPanel({
   );
   // State for Flip/Custom View
   const [isFlipped, setIsFlipped] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(300);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const setViewMode = useRoomStore((state) => state.setViewMode);
   const setTargetSubmission = useRoomStore((state) => state.setTargetSubmission);
 
   // Get roomId from store
   const roomId = useRoomStore((state) => state.roomId);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setPanelWidth(entry.contentRect.width);
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const isCompact = panelWidth < 260;
+
 
   const handleDateSelect = (date: Date) => {
     onDateChange(date);
@@ -158,23 +176,32 @@ export function CCProblemListPanel({
   }
 
   return (
-    <div className={cn('flex h-full flex-col relative bg-card', className)} data-tour="problem-list">
+    <div 
+      ref={containerRef}
+      className={cn('flex h-full flex-col relative bg-card', className)} 
+      data-tour="problem-list"
+    >
       {/* Top Row: Date, Add Button & Fold Button */}
       <div className="flex items-center justify-between px-3 h-14 shrink-0 border-b border-border">
         <CCCalendarWidget
           selectedDate={selectedDate}
           isOpen={isCalendarOpen}
           onToggle={() => setIsCalendarOpen(!isCalendarOpen)}
+          compact={isCompact}
         />
         <div className="flex items-center gap-2">
 
 
           <Button
             onClick={() => setAddProblemModalOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-white h-8 text-xs px-3 shadow-sm"
+            className={cn(
+              "bg-primary hover:bg-primary/90 text-white h-8 text-xs shadow-sm",
+              isCompact ? "px-2" : "px-3"
+            )}
+            title={isCompact ? "문제 추가" : undefined}
           >
-            <Plus className="mr-1 h-3 w-3" />
-            문제 추가
+            <Plus className={cn("h-3 w-3", !isCompact && "mr-1")} />
+            {!isCompact && "문제 추가"}
           </Button>
           {showFoldButton && (
             <Button
@@ -230,6 +257,7 @@ export function CCProblemListPanel({
                       onRemoveProblem ? () => handleRemoveProblem(problem.problemId, studyProblemId) : undefined
                     }
                     onOpenDescription={() => handleOpenDescription(problem)}
+                    isCompact={isCompact}
                   />
                 </li>
               );

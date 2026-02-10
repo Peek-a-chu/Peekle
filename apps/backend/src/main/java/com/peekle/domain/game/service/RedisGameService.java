@@ -1286,6 +1286,16 @@ public class RedisGameService {
         int timeLimit = (timeLimitObj != null) ? Integer.parseInt(String.valueOf(timeLimitObj)) : 0;
         Object problemCountObj = redisTemplate.opsForHash().get(infoKey, "problemCount");
         int problemCount = (problemCountObj != null) ? Integer.parseInt(String.valueOf(problemCountObj)) : 0;
+
+        // problemCount가 0이면 문제 리스트 사이즈로 fallback
+        if (problemCount == 0) {
+            String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
+            Long size = redisTemplate.opsForList().size(problemsKey);
+            if (size != null) {
+                problemCount = size.intValue();
+            }
+        }
+
         Map<String, Double> teamRankingMap = new HashMap<>();
         String winner = null;
 
@@ -1349,7 +1359,7 @@ public class RedisGameService {
 
                 Object lastSolvedObj = redisTemplate.opsForHash().get(scoreKey, "lastSolvedSeconds");
                 long lastSolvedSec = (lastSolvedObj != null) ? Long.parseLong(String.valueOf(lastSolvedObj)) : 0;
-                long clearTime = lastSolvedSec;
+                Long clearTime = lastSolvedSec;
 
                 // [NEW] Calculate Total Game Duration
                 String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, roomId);
@@ -1360,8 +1370,8 @@ public class RedisGameService {
                 if ("TIME_ATTACK".equals(mode) && solvedCount < problemCount) {
                     clearTime = (long) timeLimit;
                 } else if ("SPEED_RACE".equals(mode) && solvedCount < problemCount) {
-                    // [New] Speed Race: If not finished, show total elapsed time
-                    clearTime = totalDuration;
+                    // [New] Speed Race: If not finished, set to null (FAILED)
+                    clearTime = null;
                 }
 
                 Map<String, Object> userRank = new HashMap<>();

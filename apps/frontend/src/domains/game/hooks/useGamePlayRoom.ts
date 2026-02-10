@@ -136,6 +136,13 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
     if (roomIdString) init();
   }, [roomIdString]);
 
+  // Ref for GameState to avoid stale closures in socket callbacks
+  const gameStateRef = useRef<GamePlayState | null>(null);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
   // 소켓 구독 및 이벤트 핸들링
   useEffect(() => {
     if (!client || !connected) return;
@@ -255,9 +262,9 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
           // Toast for verification (Validation Step 13)
           const toastNickname = data.nickname || `${data.userId}번 유저`;
-          if (gameState?.mode === 'SPEED_RACE') {
-            toast.info(`[기록 갱신] ${toastNickname}님이 문제를 해결했습니다!`);
-          } else {
+
+          // Use Ref to get the latest mode state
+          if (gameStateRef.current?.mode !== 'SPEED_RACE') {
             toast.info(`[점수 갱신] ${toastNickname}: ${data.score}점 (${data.solvedCount}문제)`);
           }
 

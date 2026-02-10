@@ -139,10 +139,10 @@ export function WaitingRoomMediaPanel({
                 <ChevronUp className="h-5 w-5 text-muted-foreground" />
             </button>
 
-            <div className="flex flex-col gap-4 md:flex-row">
+            <div className="flex gap-4 flex-row">
                 {/* Left: Video Preview (Fixed Width) */}
                 <div className="flex flex-col gap-2">
-                    <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-lg bg-black/90 shadow-sm ring-1 ring-border dark:ring-white/10 md:w-[260px]">
+                    <div className="relative aspect-video shrink-0 overflow-hidden rounded-lg bg-black/90 shadow-sm ring-1 ring-border dark:ring-white/10 w-[260px]">
                         {isCamOn && localStream ? (
                             <video
                                 ref={(node) => {
@@ -210,7 +210,7 @@ export function WaitingRoomMediaPanel({
                     </div>
 
                     {/* 2. Device Selection */}
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2 grid-cols-2">
                         <Select value={selectedMicId} onValueChange={setMic} disabled={!isMicOn}>
                             <SelectTrigger className="h-8 text-xs">
                                 <div className="flex items-center gap-2 overflow-hidden">

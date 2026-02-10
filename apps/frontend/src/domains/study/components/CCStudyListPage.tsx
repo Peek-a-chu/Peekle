@@ -100,7 +100,7 @@ export function CCStudyListPage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-3">
             {studies.map((study, index) => (
               <CCStudyCard
                 key={study.id}

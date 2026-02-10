@@ -152,7 +152,7 @@ export function ParticipantGrid({
 
   // 개인전: 기존 로직
   const emptySlots = maxPlayers - sortedParticipants.length;
-  const gridCols = maxPlayers <= 8 ? 'grid-cols-4' : 'grid-cols-4 lg:grid-cols-6';
+  const gridCols = maxPlayers <= 8 ? 'grid-cols-4' : 'grid-cols-6';
 
   return (
     <>

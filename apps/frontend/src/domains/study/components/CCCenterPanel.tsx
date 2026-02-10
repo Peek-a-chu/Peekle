@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { type ReactNode } from 'react';
 import { useCenterPanel } from '@/domains/study/hooks/useCenterPanel';
 import { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid';
@@ -23,8 +23,6 @@ interface CCCenterPanelProps {
   onVideoToggle?: () => void;
   onWhiteboardToggle?: () => void;
   onSettingsClick?: () => void;
-  compactMode?: boolean;
-  hideCurrentProblemLabel?: boolean;
   className?: string;
 }
 
@@ -35,8 +33,6 @@ export function CCCenterPanel({
   onVideoToggle,
   onWhiteboardToggle,
   onSettingsClick,
-  compactMode = false,
-  hideCurrentProblemLabel = false,
   className,
 }: CCCenterPanelProps) {
   const getDraftStorageKey = (
@@ -78,11 +74,54 @@ export function CCCenterPanel({
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
 
+  // Video Grid Resize State
+  const [videoGridHeight, setVideoGridHeight] = useState(240);
+  const [isResizingVideo, setIsResizingVideo] = useState(false);
+  const resizeStartY = useRef<number>(0);
+  const resizeStartHeight = useRef<number>(0);
+
+  const startResizingVideo = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizingVideo(true);
+      resizeStartY.current = e.clientY;
+      resizeStartHeight.current = videoGridHeight;
+    },
+    [videoGridHeight],
+  );
+
+  useEffect(() => {
+    if (!isResizingVideo) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - resizeStartY.current;
+      setVideoGridHeight(Math.max(100, Math.min(600, resizeStartHeight.current + deltaY)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingVideo(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingVideo]);
+
+
   // [Fix] Whiteboard is only visible when a problem is selected
   const isWhiteboardVisible = isWhiteboardOverlayOpen && !!selectedProblemTitle;
 
   // Show right panel when viewing other's code OR whiteboard is open
-  const showRightPanel = !compactMode && (isViewingOther || isWhiteboardVisible);
+  const showRightPanel = isViewingOther || isWhiteboardVisible;
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -141,27 +180,36 @@ export function CCCenterPanel({
   return (
     <div className={cn('flex h-full flex-col min-w-0 min-h-0', className)}>
       {/* Video Grid Header */}
-      {!compactMode && (
-        <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
-          <span className="text-sm font-medium">화상 타일</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={toggleVideoGrid}
-            title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
-          >
-            {isVideoGridFolded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronUp className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      )}
+      <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
+        <span className="text-sm font-medium">화상 타일</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={toggleVideoGrid}
+          title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
+        >
+          {isVideoGridFolded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronUp className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
 
       {/* Video Grid */}
-      {!compactMode && !isVideoGridFolded && <VideoGrid onWhiteboardClick={onWhiteboardClick} />}
+      {!isVideoGridFolded && (
+        <>
+          <div style={{ height: videoGridHeight }} className="shrink-0 relative transition-none">
+            <VideoGrid onWhiteboardClick={onWhiteboardClick} className="h-full" />
+          </div>
+          {/* Resize Handle */}
+          <div
+            className="h-1 cursor-row-resize bg-border/50 hover:bg-primary/50 active:bg-primary transition-colors shrink-0 z-10"
+            onMouseDown={startResizingVideo}
+          />
+        </>
+      )}
 
       {/* IDE Area */}
       <div
@@ -182,7 +230,7 @@ export function CCCenterPanel({
               onResetView={resetToOnlyMine}
               disabled={!selectedProblemTitle && !isViewingOther}
               problemExternalId={selectedProblemExternalId}
-              currentProblemLabel={hideCurrentProblemLabel ? null : selectedProblemTitle}
+              currentProblemLabel={selectedProblemTitle}
               // Standard Handlers
               onLanguageChange={(lang) => leftPanelRef.current?.setLanguage(lang)}
               onThemeToggle={handleThemeToggle}
@@ -263,8 +311,8 @@ export function CCCenterPanel({
               }}
               // Toggles
               showSubmit={!isViewingOther}
-              showChatRef={!compactMode}
-              showThemeToggle={!compactMode}
+              showChatRef={true}
+              showThemeToggle={true}
             />
           </div>
         </div>
@@ -326,14 +374,12 @@ export function CCCenterPanel({
       </div>
 
       {/* Control Bar */}
-      {!compactMode && (
-        <ControlBar
-          onMicToggle={onMicToggle}
-          onVideoToggle={onVideoToggle}
-          onWhiteboardToggle={handleWhiteboardToggleWrapper}
-          onSettingsClick={onSettingsClick}
-        />
-      )}
+      <ControlBar
+        onMicToggle={onMicToggle}
+        onVideoToggle={onVideoToggle}
+        onWhiteboardToggle={handleWhiteboardToggleWrapper}
+        onSettingsClick={onSettingsClick}
+      />
     </div>
   );
 }

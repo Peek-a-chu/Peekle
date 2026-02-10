@@ -27,7 +27,7 @@ export function GameInviteModal({ open, onOpenChange, roomId }: GameInviteModalP
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[360px] p-5 gap-5 rounded-xl">
+            <DialogContent className="max-w-[360px] p-5 gap-5 rounded-xl">
                 {/* Header */}
                 <DialogHeader className="flex flex-row items-center space-y-0 pt-1">
                     <DialogTitle className="flex items-center gap-2 text-base font-bold">

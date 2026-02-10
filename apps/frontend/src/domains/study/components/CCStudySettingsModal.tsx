@@ -104,7 +104,7 @@ export function CCStudySettingsModal({ isOpen, onClose }: CCStudySettingsModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{isOwner ? '스터디 설정' : '스터디 정보'}</DialogTitle>
           <DialogDescription>
@@ -139,7 +139,7 @@ export function CCStudySettingsModal({ isOpen, onClose }: CCStudySettingsModalPr
             />
           </div>
         </div>
-        <DialogFooter className="flex-col sm:justify-between sm:flex-row gap-2">
+        <DialogFooter className="flex-col justify-between flex-row gap-2">
           {isOwner ? (
             <>
               <AlertDialog>
