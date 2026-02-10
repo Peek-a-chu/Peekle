@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PanelLeftOpen, PanelRightOpen } from 'lucide-react';
@@ -29,6 +29,50 @@ export function StudyLayoutContent({
   className,
 }: StudyLayoutContentProps) {
   const hasRightPanel = Boolean(rightPanel);
+  const [leftWidth, setLeftWidth] = useState(288); // Default 288px (w-72)
+  const [rightWidth, setRightWidth] = useState(320); // Default 320px (w-80)
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
+
+  const startResizingLeft = useCallback(() => setIsResizingLeft(true), []);
+  const startResizingRight = useCallback(() => setIsResizingRight(true), []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizingLeft(false);
+    setIsResizingRight(false);
+  }, []);
+
+  const resize = useCallback(
+    (e: MouseEvent) => {
+      if (isResizingLeft) {
+        setLeftWidth(Math.max(200, Math.min(600, e.clientX)));
+      }
+      if (isResizingRight) {
+        setRightWidth(Math.max(250, Math.min(600, window.innerWidth - e.clientX)));
+      }
+    },
+    [isResizingLeft, isResizingRight],
+  );
+
+  useEffect(() => {
+    if (isResizingLeft || isResizingRight) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizingLeft, isResizingRight, resize, stopResizing]);
 
   return (
     <div className={cn('flex h-screen flex-col bg-background text-foreground', className)}>
@@ -39,16 +83,26 @@ export function StudyLayoutContent({
       <div className="relative flex min-h-0 flex-1">
         {/* Left Panel - Animation handled by width */}
         <aside
+          style={{ width: isLeftPanelFolded ? 0 : leftWidth }}
           className={cn(
-            'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card transition-all duration-300 ease-in-out',
-            isLeftPanelFolded ? 'w-0 border-r-0 overflow-hidden' : 'w-72',
+            'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card',
+            !isResizingLeft && 'transition-all duration-300 ease-in-out',
+            isLeftPanelFolded && 'border-r-0',
           )}
         >
-          <div className="w-72 h-full">
+          <div style={{ width: leftWidth }} className="h-full">
             {/* Inner container to maintain width during transition */}
             {leftPanel}
           </div>
         </aside>
+
+        {/* Left Resize Handle */}
+        {!isLeftPanelFolded && (
+          <div
+            className="w-1 hover:w-1.5 -ml-0.5 z-20 cursor-col-resize bg-transparent hover:bg-primary/50 active:bg-primary transition-colors shrink-0"
+            onMouseDown={startResizingLeft}
+          />
+        )}
 
         {/* Center Panel */}
         <main
@@ -91,14 +145,24 @@ export function StudyLayoutContent({
           {centerPanel}
         </main>
 
+        {/* Right Resize Handle */}
+        {hasRightPanel && !isRightPanelFolded && (
+          <div
+            className="w-1 hover:w-1.5 -mr-0.5 z-20 cursor-col-resize bg-transparent hover:bg-primary/50 active:bg-primary transition-colors shrink-0"
+            onMouseDown={startResizingRight}
+          />
+        )}
+
         {hasRightPanel && (
           <aside
+            style={{ width: isRightPanelFolded ? 0 : rightWidth }}
             className={cn(
-              'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card transition-all duration-300 ease-in-out',
-              isRightPanelFolded ? 'w-0 border-l-0 overflow-hidden' : 'w-80',
+              'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card',
+              !isResizingRight && 'transition-all duration-300 ease-in-out',
+              isRightPanelFolded && 'border-l-0',
             )}
           >
-            <div className="w-80 h-full">{rightPanel}</div>
+            <div style={{ width: rightWidth }} className="h-full">{rightPanel}</div>
           </aside>
         )}
       </div>

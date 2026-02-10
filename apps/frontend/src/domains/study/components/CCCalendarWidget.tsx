@@ -19,6 +19,7 @@ interface CCCalendarWidgetProps {
   isOpen: boolean;
   onToggle: () => void;
   className?: string;
+  compact?: boolean;
 }
 
 export function CCCalendarWidget({
@@ -26,6 +27,7 @@ export function CCCalendarWidget({
   isOpen,
   onToggle,
   className,
+  compact = false,
 }: CCCalendarWidgetProps) {
   return (
     <Button
@@ -34,17 +36,23 @@ export function CCCalendarWidget({
       className={cn(
         'flex items-center gap-2 pl-2 pr-2 font-normal hover:bg-accent w-fit',
         isOpen && 'bg-accent',
+        compact && 'px-2 gap-0',
         className,
       )}
       onClick={onToggle}
       aria-label="날짜 선택"
+      title={compact ? format(selectedDate, 'yy/MM/dd') : undefined}
     >
       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-      <span>{format(selectedDate, 'yy/MM/dd')}</span>
-      {isOpen ? (
-        <ChevronUp className="h-3 w-3 text-muted-foreground" />
-      ) : (
-        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+      {!compact && (
+        <>
+          <span>{format(selectedDate, 'yy/MM/dd')}</span>
+          {isOpen ? (
+            <ChevronUp className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          )}
+        </>
       )}
     </Button>
   );

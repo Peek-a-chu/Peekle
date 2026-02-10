@@ -38,7 +38,7 @@ export function CCSpeedGameResultModal({ isOpen, onClose, data }: CCSpeedGameRes
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[1200px] bg-background/95 backdrop-blur-xl border-border/50 p-0 overflow-hidden gap-0 shadow-2xl [&>button]:hidden">
+            <DialogContent className="max-w-[1200px] bg-background/95 backdrop-blur-xl border-border/50 p-0 overflow-hidden gap-0 shadow-2xl [&>button]:hidden">
                 {/* 배경 장식 */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
                 {/* 배경 강조 효과 (승리 시) */}

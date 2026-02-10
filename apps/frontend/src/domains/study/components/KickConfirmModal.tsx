@@ -20,7 +20,7 @@ interface KickConfirmModalProps {
 export function KickConfirmModal({ isOpen, onClose, onConfirm, userName }: KickConfirmModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>강퇴 확인</DialogTitle>
           <DialogDescription className="pt-2">
@@ -30,7 +30,7 @@ export function KickConfirmModal({ isOpen, onClose, onConfirm, userName }: KickC
             강퇴된 유저는 다시 초대 코드로 참여할 수 있습니다.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="sm:justify-end gap-2">
+        <DialogFooter className="justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             취소
           </Button>

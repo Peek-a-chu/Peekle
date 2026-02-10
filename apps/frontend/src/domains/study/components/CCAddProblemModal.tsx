@@ -11,6 +11,7 @@ import { DailyProblem } from '@/domains/study/types';
 import {
   getWorkbooks,
   getWorkbook,
+  getWorkbookCounts,
   WorkbookListResponse,
   WorkbookResponse,
 } from '@/domains/workbook/api/workbookApi';
@@ -96,7 +97,86 @@ export function CCAddProblemModal({
     }
   }, [isOpen]);
 
-  // ... (existing useEffects for search and workbook) ...
+  const isProblemAlreadyAdded = (problemId?: number, externalId?: string | number) => {
+    return currentProblems.some(
+      (p) =>
+        (problemId && p.problemId === problemId) ||
+        (externalId && p.externalId === String(externalId)),
+    );
+  };
+
+  // Search External Problems
+  useEffect(() => {
+    const search = async () => {
+      if (!debouncedQuery.trim()) {
+        setResults([]);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const data = await searchExternalProblems(debouncedQuery);
+        
+        const mappedResults: SearchResult[] = data.map((p) => {
+          const isRegistered = isProblemAlreadyAdded(p.problemId, p.number);
+          
+          let registeredId: number | undefined;
+          if (isRegistered) {
+             const found = currentProblems.find(
+               (cp) => cp.problemId === p.problemId || cp.externalId === String(p.number)
+             );
+             registeredId = found?.problemId;
+          }
+
+          return {
+            ...p,
+            isRegistered,
+            registeredId,
+            hasSubmissions: false,
+          };
+        });
+        setResults(mappedResults);
+      } catch (error) {
+        console.error(error);
+        toast.error('문제 검색에 실패했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (activeTab === 'problem') {
+      void search();
+    }
+  }, [debouncedQuery, activeTab, currentProblems]); // isProblemAlreadyAdded is stable wrapper around currentProblems
+
+  // Search Workbooks
+  useEffect(() => {
+    const fetchWorkbooks = async () => {
+      if (activeTab !== 'workbook') return;
+
+      setIsWorkbookLoading(true);
+      try {
+        const [books, counts] = await Promise.all([
+          getWorkbooks(workbookTab, debouncedWorkbookQuery, 'LATEST', 0, 100),
+          getWorkbookCounts(),
+        ]);
+        
+        setWorkbooks(books.content);
+        setWorkbookCounts({
+          MY: counts.my,
+          BOOKMARKED: counts.bookmarked,
+          ALL: counts.all,
+        });
+      } catch (error) {
+        console.error(error);
+        // toast.error('문제집 목록을 불러오지 못했습니다.'); // Optional: reduce noise
+      } finally {
+        setIsWorkbookLoading(false);
+      }
+    };
+
+    void fetchWorkbooks();
+  }, [debouncedWorkbookQuery, activeTab, workbookTab]);
 
   if (!isOpen) return null;
 
@@ -161,14 +241,6 @@ export function CCAddProblemModal({
       // Don't close to allow adding more? Or close?
       // onClose(); -> Spec says we might search again.
     }
-  };
-
-  const isProblemAlreadyAdded = (problemId?: number, externalId?: string | number) => {
-    return currentProblems.some(
-      (p) =>
-        (problemId && p.problemId === problemId) ||
-        (externalId && p.externalId === String(externalId)),
-    );
   };
 
   // ... (existing workbook handlers) ...

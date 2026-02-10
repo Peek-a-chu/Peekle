@@ -14,7 +14,8 @@ interface CCProblemCardProps {
   onOpenSubmission?: (problemId: number) => void;
   onRemove?: () => void;
   onOpenDescription?: () => void;
-  className?: string; // Added className prop
+  className?: string;
+  isCompact?: boolean;
 }
 
 export function CCProblemCard({
@@ -25,6 +26,7 @@ export function CCProblemCard({
   onRemove,
   onOpenDescription,
   className,
+  isCompact = false,
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
 
@@ -123,43 +125,47 @@ export function CCProblemCard({
 
       {/* Action Row */}
       <div className="flex items-center justify-between mt-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!isCustom) {
-              onOpenSubmission?.(problem.problemId!); // Assuming non-custom has ID
-            } else {
-              // Custom problem might not have BOJ submissions
-            }
-          }}
-          disabled={isCustom}
-          aria-label="view submissions"
-          title="제출 내역 보기"
-        >
-          <Box className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isCustom) {
+                onOpenSubmission?.(problem.problemId!); // Assuming non-custom has ID
+              } else {
+                // Custom problem might not have BOJ submissions
+              }
+            }}
+            disabled={isCustom}
+            aria-label="view submissions"
+            title="제출 내역 보기"
+          >
+            <Box className="h-4 w-4" />
+          </Button>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenDescription?.();
-          }}
-          title="문제 설명/메모 보기"
-        >
-          <FileText className="h-4 w-4" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDescription?.();
+            }}
+            title="문제 설명/메모 보기"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
+        </div>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
             <span>
-              {problem.solvedMemberCount ?? 0}명 / 전체 {problem.totalMemberCount ?? 0}명 해결
+              {isCompact
+                ? `${problem.solvedMemberCount ?? 0}/${problem.totalMemberCount ?? 0}`
+                : `${problem.solvedMemberCount ?? 0}명 / 전체 ${problem.totalMemberCount ?? 0}명 해결`}
             </span>
           </div>
         </div>

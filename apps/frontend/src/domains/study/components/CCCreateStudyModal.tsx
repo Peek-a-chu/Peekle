@@ -79,7 +79,7 @@ export function CCCreateStudyModal({ open, onOpenChange, onSuccess }: CCCreateSt
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="max-w-[400px]">
         <DialogHeader>
           <DialogTitle>스터디 방 만들기</DialogTitle>
           <DialogDescription>새로운 스터디 방을 생성하세요.</DialogDescription>

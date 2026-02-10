@@ -183,7 +183,7 @@ function CCOfflineTile({
   return (
     <div
       className={cn(
-        'relative h-40 w-52 shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+        'relative h-full w-auto aspect-[4/3] shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
         'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all',
         isCurrentUser && 'ring-2 ring-primary',
         className,

@@ -24,7 +24,7 @@ export function GameLayoutContent({
   return (
     <section>
       {rooms.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-2">
           {rooms.map((room) => (
             <GameRoomCard key={room.id} room={room} onClick={() => onRoomClick(room)} />
           ))}
