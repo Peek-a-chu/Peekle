@@ -53,15 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function initPopupData() {
-        // 1. 초기 연동 여부 확인 (Background에 위임하여 환경에 맞는 키 데이터 가져옴)
-        chrome.runtime.sendMessage({ type: 'GET_POPUP_DATA' }, (result) => {
-            if (result && result.token) {
+        // 1. 초기 연동 여부 확인
+        chrome.storage.local.get(['peekle_token', 'userData'], (result) => {
+            if (result.peekle_token) {
                 // [연동 상태]
                 loggedInBtns.style.display = 'flex';
                 loggedOutBtns.style.display = 'none';
 
                 if (result.userData) updateUI(result.userData);
-                fetchFreshData(result.token);
+                fetchFreshData(result.peekle_token);
                 checkContextStatus(); // Check for pending context
             } else {
                 // [미연동 상태]
