@@ -12,5 +12,7 @@ import java.time.LocalDate;
 @Builder
 public class StudyProblemAddRequest {
     private Long problemId;
+    private String customTitle;
+    private String customLink;
     private LocalDate problemDate; // Optional (default: Today)
 }

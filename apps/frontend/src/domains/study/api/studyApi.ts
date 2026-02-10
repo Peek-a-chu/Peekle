@@ -134,3 +134,32 @@ export async function generateInviteCode(studyId: number): Promise<{ inviteCode:
   }
   return res.data;
 }
+
+// 7. Custom Problem Description
+export async function fetchProblemDescription(
+  studyId: number,
+  problemId: number,
+): Promise<string> {
+  const res = await apiFetch<string>(
+    `/api/studies/${studyId}/problems/${problemId}/description`,
+  );
+  if (!res.success) {
+    // It's possible description is empty or 404, just return empty string
+    return '';
+  }
+  return res.data || '';
+}
+
+export async function saveProblemDescription(
+  studyId: number,
+  problemId: number,
+  description: string,
+): Promise<void> {
+  await apiFetch<void>(
+    `/api/studies/${studyId}/problems/${problemId}/description`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    },
+  );
+}

@@ -68,15 +68,23 @@ export const useStudySocketActions = () => {
   );
 
   const addProblem = useCallback(
-    (problemId: number, date?: string) => {
-      if (roomId) publish('/pub/studies/problems', { action: 'ADD', problemId, problemDate: date });
+    (problemId: number | null, date?: string, customTitle?: string, customLink?: string) => {
+      if (roomId)
+        publish('/pub/studies/problems', {
+          action: 'ADD',
+          problemId,
+          problemDate: date,
+          customTitle,
+          customLink,
+        });
     },
     [roomId, publish],
   );
 
   const removeProblem = useCallback(
-    (problemId: number) => {
-      if (roomId) publish('/pub/studies/problems', { action: 'REMOVE', problemId });
+    (problemId: number, studyProblemId?: number) => {
+      if (roomId)
+        publish('/pub/studies/problems', { action: 'REMOVE', problemId, studyProblemId });
     },
     [roomId, publish],
   );

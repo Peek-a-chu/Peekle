@@ -26,8 +26,14 @@ public class StudyProblem {
     @JoinColumn(name = "study_room_id", nullable = false)
     private StudyRoom study;
 
-    @Column(name = "problem_id", nullable = false)
+    @Column(name = "problem_id")
     private Long problemId;
+
+    @Column(name = "custom_title")
+    private String customTitle;
+
+    @Column(name = "custom_link")
+    private String customLink;
 
     @Column(name = "problem_date", nullable = false)
     private LocalDate problemDate;

@@ -42,6 +42,16 @@
                 "content.js"
             ],
             "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://school.programmers.co.kr/*",
+                "https://programmers.co.kr/*"
+            ],
+            "js": [
+                "programmers.js"
+            ],
+            "run_at": "document_idle"
         }
     ],
     "web_accessible_resources": [

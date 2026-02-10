@@ -332,19 +332,21 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   const handleSelectProblem = (problem: Problem): void => {
     console.log('[StudyRoomClient] Selecting problem:', problem);
-    // Ensure ID is a valid number
-    const pId = Number(problem.problemId);
-    if (!pId) {
-      console.warn('[StudyRoomClient] Invalid problem ID:', problem.problemId);
-      return;
-    }
     // Extract studyProblemId from the problem (added by API)
     const studyProblemId = (problem as any).studyProblemId || (problem as any).id || null;
+    // Ensure ID is a valid number
+    const pId = Number(problem.problemId);
+
+    if (!pId && !studyProblemId) {
+      console.warn('[StudyRoomClient] Invalid problem ID (No pId or studyId):', problem);
+      return;
+    }
+
     setSelectedProblem(
       studyProblemId,
-      pId,
+      pId || 0, // Use 0 for custom problems
       problem.title,
-      problem.externalId || String((problem as any).number),
+      problem.externalId || String((problem as any).number || 'Custom'),
     );
 
     if (studyProblemId) {
@@ -432,22 +434,20 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
             <div className="flex gap-2">
               <button
                 type="button"
-                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${
-                  compactTab === 'problems'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
+                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${compactTab === 'problems'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
                 onClick={() => setCompactTab('problems')}
               >
                 문제선택
               </button>
               <button
                 type="button"
-                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${
-                  compactTab === 'ide'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
+                className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${compactTab === 'ide'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
                 onClick={() => setCompactTab('ide')}
               >
                 IDE

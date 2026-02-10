@@ -21,6 +21,10 @@ public class ProblemStatusResponse {
 
     private String title;
 
+    private String customTitle;
+
+    private String customLink;
+
     private String tier;
 
     private LocalDate assignedDate;
@@ -37,13 +41,16 @@ public class ProblemStatusResponse {
     // private List<String> solvedMembers;
 
     @Builder
-    public ProblemStatusResponse(Long studyProblemId, Long problemId, String externalId, String title, String tier,
+    public ProblemStatusResponse(Long studyProblemId, Long problemId, String externalId, String title,
+            String customTitle, String customLink, String tier,
             LocalDate assignedDate,
             int solvedMemberCount, int totalMemberCount, boolean isSolvedByMe, List<String> tags) {
         this.studyProblemId = studyProblemId;
         this.problemId = problemId;
         this.externalId = externalId;
         this.title = title;
+        this.customTitle = customTitle;
+        this.customLink = customLink;
         this.tier = tier;
         this.assignedDate = assignedDate;
         this.solvedMemberCount = solvedMemberCount;

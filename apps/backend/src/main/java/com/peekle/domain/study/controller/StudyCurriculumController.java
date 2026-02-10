@@ -17,6 +17,28 @@ import java.util.List;
 public class StudyCurriculumController {
 
     private final StudyCurriculumService studyCurriculumService;
+    private final com.peekle.domain.study.service.RedisStudyProblemService redisStudyProblemService;
+
+    /**
+     * 커스텀 문제 설명 저장
+     */
+    @PostMapping("/problems/{studyProblemId}/description")
+    public ApiResponse<Void> saveDescription(
+            @PathVariable Long studyProblemId,
+            @RequestBody java.util.Map<String, String> request) {
+        String description = request.get("description");
+        redisStudyProblemService.saveDescription(studyProblemId, description);
+        return ApiResponse.success();
+    }
+
+    /**
+     * 커스텀 문제 설명 조회
+     */
+    @GetMapping("/problems/{studyProblemId}/description")
+    public ApiResponse<String> getDescription(@PathVariable Long studyProblemId) {
+        String description = redisStudyProblemService.getDescription(studyProblemId);
+        return ApiResponse.success(description);
+    }
 
     /**
      * 일별 문제 및 풀이 현황 조회

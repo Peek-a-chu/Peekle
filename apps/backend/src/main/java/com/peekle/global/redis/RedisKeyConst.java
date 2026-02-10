@@ -155,4 +155,8 @@ public class RedisKeyConst {
     public static final String LOCK_GAME_RESERVE = "lock:game:reserve:%d";
     public static final String LOCK_GAME_CONFIRM = "lock:game:confirm:%d";
 
+    // Custom Problem Description (Value) -> study:problem:{studyProblemId}:desc ->
+    // description
+    public static final String STUDY_PROBLEM_DESC = "study:problem:%d:desc";
+
 }
