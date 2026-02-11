@@ -185,6 +185,15 @@ async function handleSolvedSubmission(payload, sender) {
             chrome.storage.local.remove('pending_submission');
         }
 
+        // [New Feature] Fallback for Failed Submissions in Game/Study
+        // If the user fails (WA/TLE/etc), we treat it as a regular problem submission (EXTENSION type).
+        // This prevents failed attempts from being sent to Game/Study logic which might expect success.
+        if (!isSuccess && (targetSourceType === 'GAME' || targetSourceType === 'STUDY')) {
+            console.log(`[Background] Submission failed for ${targetSourceType}. Fallback to EXTENSION type.`);
+            targetSourceType = 'EXTENSION';
+            targetStudyId = null;
+        }
+
         // --- Send to Backend (Peekle) ---
         // Clean up memory/time strings (e.g. "123 KB" -> 123)
         const memoryInt = parseInt(String(memory).replace(/[^0-9]/g, '')) || 0;
