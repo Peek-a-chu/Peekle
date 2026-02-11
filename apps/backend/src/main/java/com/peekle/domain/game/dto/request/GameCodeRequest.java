@@ -12,4 +12,5 @@ public class GameCodeRequest {
     private Long problemId;
     private String language;
     private String code; // 코드 저장 시에만 사용
+    private boolean isChangingLanguage; // 언어 변경 여부 (Anti-Cheat 예외 처리용)
 }

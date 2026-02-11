@@ -487,6 +487,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             problemId: selectedProblemId,
             code,
             language: targetLanguage,
+            isChangingLanguage: !!languageOverride, // 언어 변경 시에만 true
           }),
         });
       }

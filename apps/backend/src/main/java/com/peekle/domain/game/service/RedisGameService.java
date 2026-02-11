@@ -694,8 +694,13 @@ public class RedisGameService {
 
         // [Anti-Cheat] 이전 길이와 비교하여 급등(붙여넣기 의심) 체크
         try {
+            // 0. 언어 변경 신호 명시적 확인
+            if (request.isChangingLanguage()) {
+                log.info("[Anti-Cheat] Language change signal detected, skipping check: Game {}, User {}",
+                        request.getGameId(), userId);
+            }
             // 1. 템플릿 코드인지 확인 (화이트리스트)
-            if (isDefaultTemplate(request.getCode(), request.getLanguage())) {
+            else if (isDefaultTemplate(request.getCode(), request.getLanguage())) {
                 log.info("[Anti-Cheat] Default template detected, skipping check: Game {}, User {}",
                         request.getGameId(), userId);
             } else {
@@ -704,7 +709,7 @@ public class RedisGameService {
                 int newLen = normalizeCodeLength(request.getCode());
                 int delta = newLen - oldLen;
 
-                if (delta > 100) {
+                if (delta > 300) {
                     log.warn("[Anti-Cheat] Suspicious code growth detected: Game {}, User {}, Delta {}",
                             request.getGameId(), userId, delta);
 
@@ -734,20 +739,22 @@ public class RedisGameService {
         redisTemplate.expire(key, 1, TimeUnit.HOURS); // 제출 검증용이므로 1시간이면 충분
     }
 
-    // 템플릿 코드 확인 (공백 제거 후 비교)
+    // 템플릿 코드 확인 (공백 제거 및 ASCII만 비교, 모든 언어 템플릿 허용)
     private boolean isDefaultTemplate(String code, String language) {
-        if (code == null || language == null)
+        if (code == null)
             return false;
 
-        String template = DEFAULT_TEMPLATES.get(language.toLowerCase());
-        if (template == null)
-            return false;
+        // 공백 제거 및 Non-ASCII 제거 (한글 코멘트 등 인코딩 이슈 방지)
+        String normalizedCode = code.replaceAll("\\s+", "").replaceAll("[^\\x00-\\x7F]", "");
 
-        // 공백, 줄바꿈 모두 제거하고 비교
-        String normalizedCode = code.replaceAll("\\s+", "");
-        String normalizedTemplate = template.replaceAll("\\s+", "");
+        for (String template : DEFAULT_TEMPLATES.values()) {
+            String normalizedTemplate = template.replaceAll("\\s+", "").replaceAll("[^\\x00-\\x7F]", "");
+            if (normalizedCode.equals(normalizedTemplate)) {
+                return true;
+            }
+        }
 
-        return normalizedCode.equals(normalizedTemplate);
+        return false;
     }
 
     // 코드 길이 정규화 (공백 제거, 개행 문자 통일)
