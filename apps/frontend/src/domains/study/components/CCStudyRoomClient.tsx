@@ -483,6 +483,17 @@ export function CCStudyRoomClient(): React.ReactNode {
       });
   }, [studyId, setRoomInfo, router]);
 
+  // [Fix] Reset Store on Unmount
+  // This ensures that when the user leaves the page or navigates away,
+  // the stale videoToken and participants data are cleared.
+  // This prevents immediate connection attempts with invalid tokens upon re-entry.
+  useEffect(() => {
+    return () => {
+      console.log('[CCStudyRoomClient] Unmounting - Resetting Room Store');
+      useRoomStore.getState().reset();
+    };
+  }, []);
+
   // State for Pre-Join
   // Check if we came from list page with pre-selections
   const preJoined = searchParams.get('prejoined') === 'true';

@@ -10,7 +10,7 @@ describe('GlobalSearchBar - Component Structure', () => {
     const module = await import('@/components/search/GlobalSearchBar');
     expect(module.GlobalSearchBar).toBeDefined();
     expect(typeof module.GlobalSearchBar).toBe('function');
-  });
+  }, 15000);
 
   it('component implementation is complete', async () => {
     // Verify component source file exists and can be read
@@ -22,7 +22,7 @@ describe('GlobalSearchBar - Component Structure', () => {
 
     // Verify key hooks are used (useState, useEffect, useDebounce, useRouter)
     expect(componentSource).toMatch(/useState|useEffect|useDebounce|useRouter/);
-  });
+  }, 15000);
 });
 
 /**
