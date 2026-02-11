@@ -6,6 +6,8 @@ import '@livekit/components-styles';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { Loader2 } from 'lucide-react';
 
+import { MediaDeviceSynchronizer } from '@/components/common/MediaDeviceSynchronizer';
+
 interface CCLiveKitWrapperProps {
   studyId: number;
   children: React.ReactNode;
@@ -29,18 +31,6 @@ export function CCLiveKitWrapper({
     console.log('[CCLiveKitWrapper] Mounted. StudyId:', studyId, 'Token:', token ? 'Present' : 'Missing');
   }, [studyId, token]);
 
-  // if (!token) {
-  //   console.log('[CCLiveKitWrapper] Token missing, showing loader...');
-  //   return (
-  //     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-  //       <Loader2 className="animate-spin text-primary h-8 w-8" />
-  //       <span className="ml-2 text-lg font-medium text-foreground">미디어 서버 연결 중...</span>
-  //     </div>
-  //   );
-  // }
-
-  // token = undefined;
-
   return (
     <LiveKitRoom
       video={initialCamEnabled}
@@ -52,6 +42,7 @@ export function CCLiveKitWrapper({
     >
       {children}
       <RoomAudioRenderer />
+      <MediaDeviceSynchronizer />
     </LiveKitRoom>
   );
 }
