@@ -32,8 +32,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. 로그인된 상태에서 로그인/회원가입 페이지 접근 시 홈으로 리다이렉트
-  if (isAuthRoute && (accessToken || isAuthenticated)) {
+  // 2. 로그인된 상태에서 로그인/회원가입/랜딩 페이지 접근 시 홈으로 리다이렉트
+  const isLandingPage = pathname === '/';
+  if ((isAuthRoute || isLandingPage) && (accessToken || isAuthenticated)) {
     const homeUrl = new URL('/home', request.url);
     return NextResponse.redirect(homeUrl);
   }
@@ -43,6 +44,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/profile/:path*',
     '/study/:path*',
     '/home/:path*',
@@ -51,7 +53,7 @@ export const config = {
     '/ranking/:path*',
     '/search/:path*',
     '/settings/:path*',
-    '/api/:path*',
+    // '/api/:path*', API 라우트는 미들웨어 제외 (필요시)
     '/login',
     '/signup',
   ],
