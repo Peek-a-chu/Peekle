@@ -43,11 +43,11 @@ public class RedisGameService {
     private static final Map<String, String> DEFAULT_TEMPLATES = new HashMap<>();
 
     static {
-        DEFAULT_TEMPLATES.put("python", "import sys\n\n# 코드를 작성해주세요\nprint(\"Hello World\")");
+        DEFAULT_TEMPLATES.put("python", "import sys\n\n# 코드를 작성해주세요\nprint(\"Hello World!\")");
         DEFAULT_TEMPLATES.put("java",
-                "import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println(\"Hello World\");\n    }\n}");
+                "import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println(\"Hello World!\");\n    }\n}");
         DEFAULT_TEMPLATES.put("cpp",
-                "#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << \"Hello World\" << endl;\n    return 0;\n}");
+                "#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << \"Hello World!\" << endl;\n    return 0;\n}");
     }
 
     private final RedisTemplate<String, Object> redisTemplate;
