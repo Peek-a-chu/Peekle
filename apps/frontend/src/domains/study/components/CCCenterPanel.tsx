@@ -148,9 +148,10 @@ export function CCCenterPanel({
   const previousProblemIdRef = useRef<number | null>(null);
 
   // [Problem Selection] Save current code before switching, then request new problem's code
-  const handleCodeChange = (code: string): void => {
+  const handleCodeChange = (code: string, languageOverride?: string): void => {
     myLatestCodeRef.current = code;
-    const draftKey = getDraftStorageKey(roomId, selectedStudyProblemId, language);
+    const targetLanguage = languageOverride || language;
+    const draftKey = getDraftStorageKey(roomId, selectedStudyProblemId, targetLanguage);
     if (draftKey) {
       try {
         sessionStorage.setItem(draftKey, code);
@@ -162,7 +163,7 @@ export function CCCenterPanel({
     if (socket && roomId && selectedStudyProblemId) {
       socket.publish({
         destination: '/pub/ide/update',
-        body: JSON.stringify({ problemId: selectedStudyProblemId, code }),
+        body: JSON.stringify({ problemId: selectedStudyProblemId, code, language: targetLanguage }),
       });
     }
   };

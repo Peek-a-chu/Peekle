@@ -6,6 +6,8 @@ import '@livekit/components-styles';
 import { useGameLiveKitStore } from '@/domains/game/hooks/useGameLiveKitStore';
 import { Loader2 } from 'lucide-react';
 
+import { MediaDeviceSynchronizer } from '@/components/common/MediaDeviceSynchronizer';
+
 interface GameLiveKitWrapperProps {
     roomId: number;
     children: React.ReactNode;
@@ -77,6 +79,7 @@ export function GameLiveKitWrapper({
         >
             {children}
             <RoomAudioRenderer />
+            <MediaDeviceSynchronizer />
         </LiveKitRoom>
     );
 }

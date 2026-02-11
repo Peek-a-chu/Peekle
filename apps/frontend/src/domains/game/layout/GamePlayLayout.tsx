@@ -35,7 +35,7 @@ interface GamePlayLayoutProps {
   formattedTime: string;
   code: string;
   language: string;
-  onCodeChange: (code: string) => void;
+  onCodeChange: (code: string, language?: string) => void;
   onLanguageChange: (language: string) => void;
   onSubmit: () => void;
   messages: ChatMessage[];
