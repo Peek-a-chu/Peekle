@@ -159,4 +159,7 @@ public class RedisKeyConst {
     // description
     public static final String STUDY_PROBLEM_DESC = "study:problem:%d:desc";
 
+    // Custom Problem Description Topic (Pub/Sub)
+    // /topic/studies/rooms/{studyId}/problems/{problemId}/description
+    public static final String TOPIC_STUDY_PROBLEM_DESC = "topic/studies/rooms/%d/problems/%d/description";
 }

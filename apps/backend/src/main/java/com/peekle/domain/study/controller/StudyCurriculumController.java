@@ -18,24 +18,35 @@ public class StudyCurriculumController {
 
     private final StudyCurriculumService studyCurriculumService;
     private final com.peekle.domain.study.service.RedisStudyProblemService redisStudyProblemService;
+    private final com.peekle.global.redis.RedisPublisher redisPublisher;
 
     /**
      * 커스텀 문제 설명 저장
      */
-    @PostMapping("/problems/{studyProblemId}/description")
+    @PostMapping("/{studyId}/problems/{studyProblemId}/description")
     public ApiResponse<Void> saveDescription(
+            @PathVariable Long studyId,
             @PathVariable Long studyProblemId,
             @RequestBody java.util.Map<String, String> request) {
         String description = request.get("description");
         redisStudyProblemService.saveDescription(studyProblemId, description);
+
+        // 실시간 동기화 알림 발송
+        String topic = String.format(com.peekle.global.redis.RedisKeyConst.TOPIC_STUDY_PROBLEM_DESC, studyId,
+                studyProblemId);
+        redisPublisher.publish(new org.springframework.data.redis.listener.ChannelTopic(topic),
+                com.peekle.global.socket.SocketResponse.of("UPDATE", description));
+
         return ApiResponse.success();
     }
 
     /**
      * 커스텀 문제 설명 조회
      */
-    @GetMapping("/problems/{studyProblemId}/description")
-    public ApiResponse<String> getDescription(@PathVariable Long studyProblemId) {
+    @GetMapping("/{studyId}/problems/{studyProblemId}/description")
+    public ApiResponse<String> getDescription(
+            @PathVariable Long studyId,
+            @PathVariable Long studyProblemId) {
         String description = redisStudyProblemService.getDescription(studyProblemId);
         return ApiResponse.success(description);
     }

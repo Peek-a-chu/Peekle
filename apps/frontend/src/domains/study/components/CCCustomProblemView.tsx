@@ -10,6 +10,8 @@ import { fetchProblemDescription, saveProblemDescription } from '@/domains/study
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useSocket } from '@/domains/study/hooks/useSocket';
+import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 
 interface CCCustomProblemViewProps {
     studyId: number;
@@ -33,9 +35,31 @@ export function CCCustomProblemView({
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    const roomId = useRoomStore((state) => state.roomId);
+    const currentUserId = useRoomStore((state) => state.currentUserId);
+    const socket = useSocket(roomId, currentUserId);
+
     useEffect(() => {
         loadDescription();
-    }, [studyId, problemId]);
+
+        if (socket && studyId && problemId) {
+            const topic = `/topic/studies/rooms/${studyId}/problems/${problemId}/description`;
+            const subscription = socket.subscribe(topic, (msg) => {
+                try {
+                    const response = JSON.parse(msg.body); // SocketResponse
+                    if (response.type === 'UPDATE' && response.data) {
+                        setDescription(response.data);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse description update:', e);
+                }
+            });
+
+            return () => {
+                subscription.unsubscribe();
+            };
+        }
+    }, [studyId, problemId, socket]);
 
     const loadDescription = async () => {
         setIsLoading(true);
