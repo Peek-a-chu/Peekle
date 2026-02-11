@@ -23,9 +23,7 @@ public class LeagueController {
 
     @GetMapping("/my-status")
     public ApiResponse<LeagueStatusResponse> getMyLeagueStatus(@AuthenticationPrincipal Long userId) {
-        if (userId == null) {
-            throw new IllegalArgumentException("User ID from token is null");
-        }
+
         return ApiResponse.success(leagueService.getMyLeagueStatus(userId));
     }
 
@@ -45,26 +43,20 @@ public class LeagueController {
     public ApiResponse<WeeklyPointSummaryResponse> getWeeklyPointSummary(
             @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        if (userId == null) {
-            throw new IllegalArgumentException("User ID from token is null");
-        }
+
         return ApiResponse.success(leagueService.getWeeklyPointSummary(userId, date));
     }
 
     @GetMapping("/progress")
     public ApiResponse<List<LeagueProgressResponse>> getLeagueProgress(
             @AuthenticationPrincipal Long userId) {
-        if (userId == null) {
-            throw new IllegalArgumentException("User ID from token is null");
-        }
+
         return ApiResponse.success(leagueService.getLeagueProgress(userId));
     }
 
     @GetMapping("/history/unviewed")
     public ApiResponse<LeagueHistoryResponse> getUnviewedHistory(
             @AuthenticationPrincipal Long userId) {
-        if (userId == null)
-            throw new IllegalArgumentException("User ID from token is null");
 
         return ApiResponse.success(leagueService.getUnviewedHistory(userId));
     }
@@ -72,8 +64,6 @@ public class LeagueController {
     @PostMapping("/history/{historyId}/view")
     public ApiResponse<Void> markHistoryAsViewed(@AuthenticationPrincipal Long userId,
             @PathVariable Long historyId) {
-        if (userId == null)
-            throw new IllegalArgumentException("User ID from token is null");
 
         leagueService.markHistoryAsViewed(historyId, userId);
         return ApiResponse.success(null);
@@ -83,8 +73,6 @@ public class LeagueController {
     public ApiResponse<List<LeagueRankingMemberDto>> getHistoryRanking(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long historyId) {
-        if (userId == null)
-            throw new IllegalArgumentException("User ID from token is null");
 
         return ApiResponse.success(leagueService.getLeagueHistoryRanking(historyId, userId));
     }
