@@ -40,6 +40,16 @@ import com.peekle.global.util.SolvedAcLevelUtil;
 @RequiredArgsConstructor
 public class RedisGameService {
 
+    private static final Map<String, String> DEFAULT_TEMPLATES = new HashMap<>();
+
+    static {
+        DEFAULT_TEMPLATES.put("python", "import sys\n\n# 코드를 작성해주세요\nprint(\"Hello World\")");
+        DEFAULT_TEMPLATES.put("java",
+                "import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println(\"Hello World\");\n    }\n}");
+        DEFAULT_TEMPLATES.put("cpp",
+                "#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << \"Hello World\" << endl;\n    return 0;\n}");
+    }
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
@@ -684,18 +694,24 @@ public class RedisGameService {
 
         // [Anti-Cheat] 이전 길이와 비교하여 급등(붙여넣기 의심) 체크
         try {
-            String oldCode = (String) redisTemplate.opsForValue().get(codeKey);
-            int oldLen = normalizeCodeLength(oldCode);
-            int newLen = normalizeCodeLength(request.getCode());
-            int delta = newLen - oldLen;
+            // 1. 템플릿 코드인지 확인 (화이트리스트)
+            if (isDefaultTemplate(request.getCode(), request.getLanguage())) {
+                log.info("[Anti-Cheat] Default template detected, skipping check: Game {}, User {}",
+                        request.getGameId(), userId);
+            } else {
+                String oldCode = (String) redisTemplate.opsForValue().get(codeKey);
+                int oldLen = normalizeCodeLength(oldCode);
+                int newLen = normalizeCodeLength(request.getCode());
+                int delta = newLen - oldLen;
 
-            if (delta > 100) {
-                log.warn("[Anti-Cheat] Suspicious code growth detected: Game {}, User {}, Delta {}",
-                        request.getGameId(), userId, delta);
+                if (delta > 100) {
+                    log.warn("[Anti-Cheat] Suspicious code growth detected: Game {}, User {}, Delta {}",
+                            request.getGameId(), userId, delta);
 
-                String alertTopic = String.format(RedisKeyConst.TOPIC_GAME_ALERT, request.getGameId(), userId);
-                SocketResponse<String> alert = SocketResponse.of("CHEATING_DETECTED", "붙여넣기 또는 대량 코드 유입이 감지되었습니다!");
-                redisPublisher.publish(new ChannelTopic(alertTopic), alert);
+                    String alertTopic = String.format(RedisKeyConst.TOPIC_GAME_ALERT, request.getGameId(), userId);
+                    SocketResponse<String> alert = SocketResponse.of("CHEATING_DETECTED", "붙여넣기 또는 대량 코드 유입이 감지되었습니다!");
+                    redisPublisher.publish(new ChannelTopic(alertTopic), alert);
+                }
             }
         } catch (Exception e) {
             log.error("[Anti-Cheat] Error during delta check", e);
@@ -716,6 +732,22 @@ public class RedisGameService {
 
         redisTemplate.opsForValue().set(key, String.valueOf(normalizedLength));
         redisTemplate.expire(key, 1, TimeUnit.HOURS); // 제출 검증용이므로 1시간이면 충분
+    }
+
+    // 템플릿 코드 확인 (공백 제거 후 비교)
+    private boolean isDefaultTemplate(String code, String language) {
+        if (code == null || language == null)
+            return false;
+
+        String template = DEFAULT_TEMPLATES.get(language.toLowerCase());
+        if (template == null)
+            return false;
+
+        // 공백, 줄바꿈 모두 제거하고 비교
+        String normalizedCode = code.replaceAll("\\s+", "");
+        String normalizedTemplate = template.replaceAll("\\s+", "");
+
+        return normalizedCode.equals(normalizedTemplate);
     }
 
     // 코드 길이 정규화 (공백 제거, 개행 문자 통일)

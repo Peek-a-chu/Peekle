@@ -16,7 +16,7 @@ interface GamePlayCenterPanelProps {
   currentUserId: number;
   selectedProblemUrl?: string;
   externalId?: string; // Add externalId prop
-  onCodeChange: (code: string) => void;
+  onCodeChange: (code: string, language?: string) => void;
   onLanguageChange: (language: string) => void;
   onSubmit: () => void;
   className?: string;

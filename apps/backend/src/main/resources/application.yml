@@ -70,7 +70,7 @@ spring:
 # JWT 설정
 jwt:
   secret: ${JWT_SECRET}
-  access-token-expiry: 1800000
+  access-token-expiry: 180000000
   refresh-token-expiry: 1209600000
 
 # Frontend URL

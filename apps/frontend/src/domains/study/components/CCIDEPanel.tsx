@@ -52,7 +52,7 @@ export interface CCIDEPanelRef {
   setValue: (code: string) => void; // Added for restoration
 }
 
-interface CCIDEPanelProps {
+export interface CCIDEPanelProps {
   initialCode?: string;
   readOnly?: boolean;
   hideToolbar?: boolean;
@@ -64,7 +64,7 @@ interface CCIDEPanelProps {
   onLanguageChange?: (lang: string) => void;
   onThemeChange?: (theme: 'light' | 'vs-dark') => void;
   onFontSizeChange?: (size: number) => void;
-  onCodeChange?: (code: string) => void;
+  onCodeChange?: (code: string, language?: string) => void; // Updated signature
   editorId?: string;
   restoredCode?: string | null;
   restoreVersion?: number;
@@ -232,7 +232,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       setCode(newCode);
 
       if (onCodeChange) {
-        onCodeChange(newCode);
+        onCodeChange(newCode, newLang);
       }
 
       // 3. 원본 기준점 리셋
