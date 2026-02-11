@@ -39,7 +39,7 @@ interface UseGamePlayRoomReturn {
   // 코드 상태
   currentCode: string;
   currentLanguage: string;
-  setCode: (code: string) => void;
+  setCode: (code: string, languageOverride?: string) => void;
   setLanguage: (language: string) => void;
 
   // 타이머
@@ -456,21 +456,23 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
 
   // 코드 설정
   const setCode = useCallback(
-    (code: string) => {
+    (code: string, languageOverride?: string) => {
       if (!selectedProblemId) return;
+      const targetLanguage = languageOverride || currentLanguage;
+
       setProblemCodes((prev) => {
         const problemState = prev[selectedProblemId] || {
-          lastLanguage: currentLanguage,
+          lastLanguage: targetLanguage,
           codes: {},
         };
         return {
           ...prev,
           [selectedProblemId]: {
             ...problemState,
-            lastLanguage: currentLanguage,
+            lastLanguage: targetLanguage,
             codes: {
               ...problemState.codes,
-              [currentLanguage]: code,
+              [targetLanguage]: code,
             },
           },
         };
@@ -484,7 +486,7 @@ export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
             gameId: roomId,
             problemId: selectedProblemId,
             code,
-            language: currentLanguage,
+            language: targetLanguage,
           }),
         });
       }
