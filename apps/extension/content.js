@@ -89,13 +89,16 @@ function scanForSuccess() {
             pendingSubmissions.delete(submitId);
         }
 
-        // 3. Filter: Only process finished states (exclude 'ce' - compile error)
-        // Send: ac, wa, rte, tle, mle, ole (맞았습니다, 틀렸습니다, 런타임 에러, 시간 초과, 메모리 초과, 출력 초과)
+        // 3. Filter: Only process finished states
+        // [Fix] Removed strict filtering. If we were monitoring this (wasPending), we process it regardless of state name.
+        // This ensures we catch 'ce' (Compile Error) or custom states.
+        /*
         const finishedStates = ['ac', 'wa', 'rte', 'tle', 'mle', 'ole'];
         if (!finishedStates.includes(resultColor)) {
             // Unknown, partial state, or compile error - skip it
             return;
         }
+        */
 
         // Additional Check: If text contains "%", it is likely still processing (e.g. "맞았습니다 (99%)")
         // Wait for final state without parens/percentage
@@ -318,7 +321,7 @@ function showProcessingToast(submitId) {
             </div>
             <div style="display:flex; flex-direction:column; gap:2px;">
                 <span style="font-size:16px; font-weight:800; color:${procColor}; font-style:italic;">Processing...</span>
-                <span style="font-size:13px; color:#71717A; font-weight:600;">채점 진행 중입니다</span>
+                <span style="font-size:13px; color:#71717A; font-weight:600;">채점 진행 중입니다. 탭을 닫지 말아주세요!</span>
             </div>
         </div>
     `;
@@ -362,6 +365,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function showToast(data) {
     // data structure: { success, isFirstSolve, earnedPoints, totalPoints, currentRank, message }
+
+    // [Fix] Remove processing toast immediately (Cleanup for ALL feedback types)
+    // This ensures loading screen disappears even for errors/failures
+    if (data.submitId) {
+        const procToast = document.getElementById(`peekle-processing-${data.submitId}`);
+        if (procToast) procToast.remove();
+    }
 
     // If it's a success, show the Premium Toast (The "Wow" factor)
     if (data.success) {
@@ -476,11 +486,7 @@ function renderPointGap(status, pointsToPromotion, pointsToMaintenance) {
 }
 
 async function showSuccessToast(data) {
-    // Remove processing toast immediately to prevent gap/overlap
-    if (data.submitId) {
-        const procToast = document.getElementById(`peekle-processing-${data.submitId}`);
-        if (procToast) procToast.remove();
-    }
+    // Redundant cleanup removed (handled in showToast)
 
     const toastId = 'peekle-success-toast-' + Date.now();
     const container = document.createElement('div');
@@ -820,11 +826,7 @@ async function showSuccessToast(data) {
 }
 
 function showFailedToast(data) {
-    // Remove processing toast immediately to prevent gap/overlap
-    if (data.submitId) {
-        const procToast = document.getElementById(`peekle-processing-${data.submitId}`);
-        if (procToast) procToast.remove();
-    }
+    // Redundant cleanup removed (handled in showToast)
 
     const toastId = 'peekle-failed-toast-' + Date.now();
     const container = document.createElement('div');

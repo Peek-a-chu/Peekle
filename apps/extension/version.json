@@ -1,5 +1,5 @@
 {
-    "latestVersion": "0.1.0",
+    "latestVersion": "0.1.1",
     "minVersion": "0.1.0",
     "downloadUrl": "https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip",
     "releaseNotes": "제출 감시 로직 개선: 새로고침 시 오래된 제출 중복 전송 문제 해결"

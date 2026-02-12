@@ -64,9 +64,9 @@ interface UseGamePlayRoomReturn {
 }
 
 const DEFAULT_CODE: Record<string, string> = {
-  python: `import sys\n\n# 코드를 작성해주세요\nprint("Hello World")`,
-  java: `import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println("Hello World");\n    }\n}`,
-  cpp: `#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << "Hello World" << endl;\n    return 0;\n}`,
+  python: `import sys\n\n# 코드를 작성해주세요\nprint("Hello World!")`,
+  java: `import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println("Hello World!");\n    }\n}`,
+  cpp: `#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << "Hello World!" << endl;\n    return 0;\n}`,
 };
 
 export function useGamePlayRoom(roomIdString: string): UseGamePlayRoomReturn {
