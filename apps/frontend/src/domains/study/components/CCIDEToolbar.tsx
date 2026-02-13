@@ -136,7 +136,7 @@ export function CCIDEToolbar({
           </select>
 
           {currentProblemLabel && (
-            <div className="flex min-w-0 shrink items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground/90 max-w-[240px]">
+            <div className="flex min-w-0 shrink items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground/90 max-w-[500px]">
               <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground hidden lg:inline-block">
                 풀고있는문제
               </span>

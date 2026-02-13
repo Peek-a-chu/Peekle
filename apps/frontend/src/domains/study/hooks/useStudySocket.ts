@@ -68,7 +68,7 @@ export const useStudySocketActions = () => {
   );
 
   const addProblem = useCallback(
-    (problemId: number | null, date?: string, customTitle?: string, customLink?: string) => {
+    (problemId: number | null, date?: string, customTitle?: string, customLink?: string, problemType?: string) => {
       if (roomId)
         publish('/pub/studies/problems', {
           action: 'ADD',
@@ -76,6 +76,7 @@ export const useStudySocketActions = () => {
           problemDate: date,
           customTitle,
           customLink,
+          problemType,
         });
     },
     [roomId, publish],
@@ -473,7 +474,8 @@ export const useStudySocketSubscription = (studyId: number) => {
               console.warn('[StudySocket] REMOVE event received but data is null/undefined');
               break;
             }
-            const removedProblemId = data.problemId;
+            // Use problemId or studyProblemId (for custom problems)
+            const removedProblemId = Number(data.problemId) || Number(data.studyProblemId);
             const externalId = data.externalId || String(removedProblemId);
             const dedupeKey = `REMOVE:${studyId}:${removedProblemId}:${externalId}`;
             const now = Date.now();
