@@ -204,7 +204,10 @@ async function retryOriginalRequest<T>(url: string, fetchOptions: RequestInit): 
 
 function handleAuthFailure<T>(): ApiResponse<T> {
   if (typeof window !== 'undefined') {
-    window.location.href = '/login';
+    // Call logout API to clear cookies before redirecting
+    fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+      window.location.href = '/login';
+    });
   }
   return {
     success: false,

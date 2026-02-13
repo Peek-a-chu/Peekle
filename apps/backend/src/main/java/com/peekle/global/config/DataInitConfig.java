@@ -6,6 +6,7 @@ import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.study.entity.StudyMember;
 import com.peekle.domain.study.entity.StudyRoom;
+import com.peekle.domain.study.enums.ProblemType;
 import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
 import com.peekle.domain.study.entity.StudyChatLog;
@@ -187,254 +188,65 @@ public class DataInitConfig {
                                 problemRepository.saveAll(List.of(p1, p2, p3, p4));
                         }
 
-                        // 3. StudyRoom Mock Data (10 rooms with varying points)
-                        if (studyRoomRepository.count() == 0) {
-                                List<User> users = userRepository.findAll();
 
-                                StudyRoom room1 = StudyRoom.builder().title("Morning Algorithm")
-                                                .description("Study algorithms every morning")
-                                                .owner(users.get(0)).isActive(true).rankingPoint(1500).build();
-                                StudyRoom room2 = StudyRoom.builder().title("Job Prep Squad")
-                                                .description("Preparing for coding interviews")
-                                                .owner(users.get(1)).isActive(true).rankingPoint(1200).build();
-                                StudyRoom room3 = StudyRoom.builder().title("Coffee & Code")
-                                                .description("Casual coding with coffee")
-                                                .owner(users.get(2)).isActive(true).rankingPoint(900).build();
-                                StudyRoom room4 = StudyRoom.builder().title("Late Night Java")
-                                                .description("Java deep dive")
-                                                .owner(users.get(3)).isActive(true).rankingPoint(800).build();
-                                StudyRoom room5 = StudyRoom.builder().title("Python Masters")
-                                                .description("Advanced Python techniques")
-                                                .owner(users.get(4)).isActive(true).rankingPoint(750).build();
-                                StudyRoom room6 = StudyRoom.builder().title("C++ Legends")
-                                                .description("Low level programming")
-                                                .owner(users.get(5)).isActive(true).rankingPoint(600).build();
-                                StudyRoom room7 = StudyRoom.builder().title("Data Structure Study")
-                                                .description("CS Fundamentals")
-                                                .owner(users.get(6)).isActive(true).rankingPoint(500).build();
-                                StudyRoom room8 = StudyRoom.builder().title("System Design")
-                                                .description("Scalable systems study")
-                                                .owner(users.get(7)).isActive(true).rankingPoint(300).build();
-                                StudyRoom room9 = StudyRoom.builder().title("Zero Score Study A")
-                                                .description("Just started, no points yet")
-                                                .owner(users.get(8)).isActive(true).rankingPoint(0).build();
-                                StudyRoom room10 = StudyRoom.builder().title("Zero Score Study B")
-                                                .description("New study group")
-                                                .owner(users.get(9)).isActive(true).rankingPoint(0).build();
 
-                                List<StudyRoom> rooms = studyRoomRepository
-                                                .saveAll(List.of(room1, room2, room3, room4, room5,
-                                                                room6, room7, room8, room9, room10));
 
-                                // Study 1 members (owner + 2 members)
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(0)).user(users.get(0))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(0)).user(users.get(10))
-                                                                .role(StudyMember.StudyRole.MEMBER).build(),
-                                                StudyMember.builder().study(rooms.get(0)).user(users.get(11))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
+        // 6. Submission Logs
+        if(submissionLogRepository.count()==0){
+        // Fallback to AlgorithmKing if TestUser100 is not found
+        User targetUser = userRepository.findByNickname("TestUser100")
+                        .or(() -> userRepository.findByNickname("AlgorithmKing"))
+                        .orElse(null);
 
-                                // Study 2 members (owner + 1 member)
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(1)).user(users.get(1))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(1)).user(users.get(12))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
+        if(targetUser!=null)
+        {
+                List<Problem> problems = problemRepository.findAll();
+                if (problems.isEmpty())
+                        return; // Prevent crash if no problems
 
-                                // Study 3 members (owner + 2 members)
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(2)).user(users.get(2))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(2)).user(users.get(13))
-                                                                .role(StudyMember.StudyRole.MEMBER).build(),
-                                                StudyMember.builder().study(rooms.get(2)).user(users.get(14))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
+                Problem p1000 = problems.stream().filter(p -> p.getExternalId().equals("1000"))
+                                .findFirst().orElse(problems.get(0));
+                Problem p2557 = problems.stream().filter(p -> p.getExternalId().equals("2557"))
+                                .findFirst().orElse(problems.get(0));
+                Problem p1920 = problems.stream().filter(p -> p.getExternalId().equals("1920"))
+                                .findFirst().orElse(problems.get(0));
+                Problem p1149 = problems.stream().filter(p -> p.getExternalId().equals("1149"))
+                                .findFirst().orElse(problems.get(0));
 
-                                // Study 4 members (owner only)
-                                studyMemberRepository.save(
-                                                StudyMember.builder().study(rooms.get(3)).user(users.get(3))
-                                                                .role(StudyMember.StudyRole.OWNER).build());
+                SubmissionLog l1 = SubmissionLog.create(
+                                targetUser, p1000, SourceType.EXTENSION, "A+B", "Bronze V",
+                                "1000", null, "맞았습니다", true,
+                                "a, b = map(int, input().split())\\nprint(a+b)", 31120, 40,
+                                "Python", LocalDateTime.now().minusDays(5));
 
-                                // Study 5 members (owner + 1 member)
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(4)).user(users.get(4))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(4)).user(users.get(15))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
+                SubmissionLog l2 = SubmissionLog.create(
+                                targetUser, p2557, SourceType.STUDY, "Hello World", "Bronze V",
+                                "2557", "알고리즘 스터디", "맞았습니다", true,
+                                "#include <iostream>\\nusing namespace std;\\nint main() { cout << \"Hello World!\"; return 0; }",
+                                2020, 0, "C++", LocalDateTime.now().minusDays(3));
+                l2.setRoomId(101L);
 
-                                // Study 6 (Owner: 6)
-                                studyMemberRepository.save(
-                                                StudyMember.builder().study(rooms.get(5)).user(users.get(5))
-                                                                .role(StudyMember.StudyRole.OWNER).build());
+                SubmissionLog l3 = SubmissionLog.create(
+                                targetUser, p1920, SourceType.GAME, "수 찾기", "Silver IV", "1920",
+                                "개인전", "맞았습니다", true,
+                                "import java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        // Solution...\\n    }\\n}",
+                                128000, 1200, "Java", LocalDateTime.now().minusDays(1));
+                l3.setRoomId(201L);
 
-                                // Study 7 (Owner: 7)
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(6)).user(users.get(6))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(6)).user(users.get(16))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
+                SubmissionLog l4 = SubmissionLog.create(
+                                targetUser, p1149, SourceType.GAME, "RGB거리", "Silver I", "1149",
+                                "팀전", "틀렸습니다", false,
+                                "import java.io.*;\\n// Wrong Solution...", 14536, 120, "Java",
+                                LocalDateTime.now().minusHours(1));
+                l4.setRoomId(202L);
 
-                                // Study 8 (Owner: 8)
-                                studyMemberRepository.save(
-                                                StudyMember.builder().study(rooms.get(7)).user(users.get(7))
-                                                                .role(StudyMember.StudyRole.OWNER).build());
+                // Case 5: 개인 풀이 (EXTENSION)
+                SubmissionLog l5 = SubmissionLog.create(
+                                targetUser, p1920, SourceType.EXTENSION, "수 찾기", "Silver IV",
+                                "1920", null, "맞았습니다", true,
+                                "// Personal Solution\\nimport java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        // ...\\n    }\\n}",
+                                130000, 500, "Java", LocalDateTime.now().minusDays(2));
 
-                                // Study 9 (Owner: 9) - 0 Points
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(8)).user(users.get(8))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(8)).user(users.get(17))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
-
-                                if (!rooms.isEmpty() && users.size() >= 11) {
-                                        StudyRoom room = rooms.stream()
-                                                        .filter(r -> r.getTitle().equals("Morning Algorithm"))
-                                                        .findFirst()
-                                                        .orElse(rooms.get(0));
-
-                                        StudyChatLog c1 = StudyChatLog.builder()
-                                                        .study(room)
-                                                        .user(users.get(0))
-                                                        .message("반갑습니다! 오늘부터 열심히 해봐요.")
-                                                        .type(StudyChatLog.ChatType.TALK)
-                                                        .build();
-
-                                        StudyChatLog c2 = StudyChatLog.builder()
-                                                        .study(room)
-                                                        .user(users.get(10))
-                                                        .message("네! 열심히 하겠습니다.")
-                                                        .type(StudyChatLog.ChatType.TALK)
-                                                        .build();
-
-                                        studyChatLogRepository.saveAll(List.of(c1, c2));
-                                }
-
-                                // Study 10 members (owner + 2 members) - 0 Points
-                                studyMemberRepository.saveAll(List.of(
-                                                StudyMember.builder().study(rooms.get(9)).user(users.get(9))
-                                                                .role(StudyMember.StudyRole.OWNER).build(),
-                                                StudyMember.builder().study(rooms.get(9)).user(users.get(18))
-                                                                .role(StudyMember.StudyRole.MEMBER).build(),
-                                                StudyMember.builder().study(rooms.get(9)).user(users.get(19))
-                                                                .role(StudyMember.StudyRole.MEMBER).build()));
-                        }
-
-                        // 4. StudyProblem Mock Data
-                        if (studyProblemRepository.count() == 0) {
-                                StudyRoom room = studyRoomRepository.findAll().stream()
-                                                .filter(r -> r.getTitle().equals("Morning Algorithm"))
-                                                .findFirst()
-                                                .orElseThrow();
-                                User owner = userRepository.findByNickname("AlgorithmKing").orElseThrow();
-                                List<Problem> problems = problemRepository.findAll();
-
-                                if (!problems.isEmpty()) {
-                                        StudyProblem sp1 = StudyProblem.builder()
-                                                        .study(room)
-                                                        .problemId(problems.get(0).getId())
-                                                        .problemDate(LocalDate.now())
-                                                        .createdBy(owner)
-                                                        .build();
-
-                                        studyProblemRepository.save(sp1);
-
-                                        if (problems.size() > 1) {
-                                                StudyProblem sp2 = StudyProblem.builder()
-                                                                .study(room)
-                                                                .problemId(problems.get(1).getId())
-                                                                .problemDate(LocalDate.now().plusDays(1))
-                                                                .createdBy(owner)
-                                                                .build();
-                                                studyProblemRepository.save(sp2);
-                                        }
-                                }
-                        }
-
-                        // 5. StudyChatLog Mock Data
-                        if (studyChatLogRepository.count() == 0) {
-                                StudyRoom room = studyRoomRepository.findAll().stream()
-                                                .filter(r -> r.getTitle().equals("Morning Algorithm"))
-                                                .findFirst()
-                                                .orElseThrow();
-                                User owner = userRepository.findByNickname("AlgorithmKing").orElseThrow();
-                                User member1 = userRepository.findByNickname("NewbieCoder").orElseThrow();
-
-                                StudyChatLog c1 = StudyChatLog.builder()
-                                                .study(room)
-                                                .user(owner)
-                                                .message("반갑습니다! 오늘부터 열심히 해봐요.")
-                                                .type(StudyChatLog.ChatType.TALK)
-                                                .build();
-
-                                StudyChatLog c2 = StudyChatLog.builder()
-                                                .study(room)
-                                                .user(member1)
-                                                .message("네! 열심히 하겠습니다.")
-                                                .type(StudyChatLog.ChatType.TALK)
-                                                .build();
-
-                                studyChatLogRepository.saveAll(List.of(c1, c2));
-                        }
-
-                        // 6. Submission Logs
-                        if (submissionLogRepository.count() == 0) {
-                                // Fallback to AlgorithmKing if TestUser100 is not found
-                                User targetUser = userRepository.findByNickname("TestUser100")
-                                                .or(() -> userRepository.findByNickname("AlgorithmKing"))
-                                                .orElse(null);
-
-                                if (targetUser != null) {
-                                        List<Problem> problems = problemRepository.findAll();
-                                        if (problems.isEmpty())
-                                                return; // Prevent crash if no problems
-
-                                        Problem p1000 = problems.stream().filter(p -> p.getExternalId().equals("1000"))
-                                                        .findFirst().orElse(problems.get(0));
-                                        Problem p2557 = problems.stream().filter(p -> p.getExternalId().equals("2557"))
-                                                        .findFirst().orElse(problems.get(0));
-                                        Problem p1920 = problems.stream().filter(p -> p.getExternalId().equals("1920"))
-                                                        .findFirst().orElse(problems.get(0));
-                                        Problem p1149 = problems.stream().filter(p -> p.getExternalId().equals("1149"))
-                                                        .findFirst().orElse(problems.get(0));
-
-                                        SubmissionLog l1 = SubmissionLog.create(
-                                                        targetUser, p1000, SourceType.EXTENSION, "A+B", "Bronze V",
-                                                        "1000", null, "맞았습니다", true,
-                                                        "a, b = map(int, input().split())\\nprint(a+b)", 31120, 40,
-                                                        "Python", LocalDateTime.now().minusDays(5));
-
-                                        SubmissionLog l2 = SubmissionLog.create(
-                                                        targetUser, p2557, SourceType.STUDY, "Hello World", "Bronze V",
-                                                        "2557", "알고리즘 스터디", "맞았습니다", true,
-                                                        "#include <iostream>\\nusing namespace std;\\nint main() { cout << \"Hello World!\"; return 0; }",
-                                                        2020, 0, "C++", LocalDateTime.now().minusDays(3));
-                                        l2.setRoomId(101L);
-
-                                        SubmissionLog l3 = SubmissionLog.create(
-                                                        targetUser, p1920, SourceType.GAME, "수 찾기", "Silver IV", "1920",
-                                                        "개인전", "맞았습니다", true,
-                                                        "import java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        // Solution...\\n    }\\n}",
-                                                        128000, 1200, "Java", LocalDateTime.now().minusDays(1));
-                                        l3.setRoomId(201L);
-
-                                        SubmissionLog l4 = SubmissionLog.create(
-                                                        targetUser, p1149, SourceType.GAME, "RGB거리", "Silver I", "1149",
-                                                        "팀전", "틀렸습니다", false,
-                                                        "import java.io.*;\\n// Wrong Solution...", 14536, 120, "Java",
-                                                        LocalDateTime.now().minusHours(1));
-                                        l4.setRoomId(202L);
-
-                                        // Case 5: 개인 풀이 (EXTENSION)
-                                        SubmissionLog l5 = SubmissionLog.create(
-                                                        targetUser, p1920, SourceType.EXTENSION, "수 찾기", "Silver IV",
-                                                        "1920", null, "맞았습니다", true,
-                                                        "// Personal Solution\\nimport java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        // ...\\n    }\\n}",
-                                                        130000, 500, "Java", LocalDateTime.now().minusDays(2));
-
-                                        submissionLogRepository.saveAll(List.of(l1, l2, l3, l4, l5));
-                                }
-                        }
-                };
+                submissionLogRepository.saveAll(List.of(l1, l2, l3, l4, l5));
         }
-}
+}};}}
