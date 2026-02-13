@@ -419,6 +419,7 @@ public class StudySocketController {
                                                 .customTitle(request.getCustomTitle())
                                                 .customLink(request.getCustomLink())
                                                 .problemDate(request.getProblemDate())
+                                                .problemType(request.getProblemType())
                                                 .build();
 
                                 ProblemStatusResponse addedProblem = studyCurriculumService.addProblem(userId, studyId,

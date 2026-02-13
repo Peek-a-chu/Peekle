@@ -29,6 +29,8 @@ public class ProblemStatusResponse {
 
     private LocalDate assignedDate;
 
+    private String type; // BOJ, CUSTOM
+
     private int solvedMemberCount;
 
     private int totalMemberCount;
@@ -43,7 +45,7 @@ public class ProblemStatusResponse {
     @Builder
     public ProblemStatusResponse(Long studyProblemId, Long problemId, String externalId, String title,
             String customTitle, String customLink, String tier,
-            LocalDate assignedDate,
+            LocalDate assignedDate, String type,
             int solvedMemberCount, int totalMemberCount, boolean isSolvedByMe, List<String> tags) {
         this.studyProblemId = studyProblemId;
         this.problemId = problemId;
@@ -53,6 +55,7 @@ public class ProblemStatusResponse {
         this.customLink = customLink;
         this.tier = tier;
         this.assignedDate = assignedDate;
+        this.type = type;
         this.solvedMemberCount = solvedMemberCount;
         this.totalMemberCount = totalMemberCount;
         this.isSolvedByMe = isSolvedByMe;

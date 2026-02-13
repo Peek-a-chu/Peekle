@@ -1,5 +1,6 @@
 package com.peekle.domain.study.entity;
 
+import com.peekle.domain.study.enums.ProblemType;
 import com.peekle.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -21,6 +22,11 @@ public class StudyProblem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "problem_type", nullable = false)
+    @Builder.Default
+    private ProblemType type = ProblemType.BOJ;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "study_room_id", nullable = false)
