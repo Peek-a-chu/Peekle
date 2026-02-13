@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
@@ -13,7 +13,7 @@ import { CCRightPanel as RightPanel } from './CCRightPanel';
 import { StudyLayoutContent } from './StudyLayoutContent';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
-import type { DailyProblem as Problem } from '@/domains/study/types';
+import type { StudyProblem as Problem } from '@/domains/study/types';
 import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { format } from 'date-fns';
 import { formatDate } from '@/lib/utils';
@@ -116,8 +116,129 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   // Local state for layout
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [isLeftPanelFolded, setIsLeftPanelFolded] = useState(false);
-  const [isRightPanelFolded, setIsRightPanelFolded] = useState(false);
+  // Removed local state for sidebars -> Moved to useRoomStore
+  const isLeftPanelFolded = useRoomStore((state) => state.isLeftPanelFolded);
+  const isRightPanelFolded = useRoomStore((state) => state.isRightPanelFolded);
+  const setIsLeftPanelFolded = useRoomStore((state) => state.setIsLeftPanelFolded);
+  const setIsRightPanelFolded = useRoomStore((state) => state.setIsRightPanelFolded);
+
+  // Auto-close sidebars if window is on the right half of the screen on load
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkWindowPosition = () => {
+      const screenWidth = window.screen.availWidth;
+      const screenLeft = (window.screen as any).availLeft || 0;
+      const windowLeft = window.screenX || window.screenLeft;
+
+      // Calculate relative position on the current monitor
+      const relativeLeft = windowLeft - screenLeft;
+
+      // If the window is positioned on the right half (allowing for some buffer, e.g. > 40%)
+      if (relativeLeft > screenWidth * 0.45) {
+        setIsLeftPanelFolded(true);
+        setIsRightPanelFolded(true);
+      }
+    };
+
+    checkWindowPosition();
+  }, [setIsLeftPanelFolded, setIsRightPanelFolded]);
+
+  // [New] Compact Mode: Mutual exclusion for sidebars
+  // If window width is small (e.g. < 1200px), allow only one sidebar to be open at a time.
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setIsCompact(window.innerWidth < 1200);
+    };
+
+    // Initial check
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Enforce mutual exclusion when isCompact is true
+  useEffect(() => {
+    if (!isCompact) return;
+
+    // If both are open (e.g. from resize), close right panel by default
+    if (!isLeftPanelFolded && !isRightPanelFolded) {
+      setIsRightPanelFolded(true);
+    }
+  }, [isCompact, isLeftPanelFolded, isRightPanelFolded, setIsRightPanelFolded]);
+
+  // Listener for Left Panel opening
+  useEffect(() => {
+    if (isCompact && !isLeftPanelFolded && !isRightPanelFolded) {
+      // logic already handled by above effect
+    }
+    // But we need to respond to user action of "Opening Left" -> "Close Right"
+    // The state change happens before effect.
+    // If Left became Open (false), and Right was Open (false) -> the above logic catches it.
+
+    // What if Left becomes Open, and Right IS Open? -> Both Open -> Above catches it.
+    // What if Right becomes Open, and Left IS Open? -> Both Open -> Above catches it.
+
+    // The issue with the previous code was:
+    // useEffect 1: if (!isLeftPanelFolded) setRight(true)
+    // useEffect 2: if (!isRightPanelFolded) setLeft(true)
+
+    // Example: User opens Left. isLeft=false. Effect 1 runs -> setRight(true).
+    // isRight becomes true. Effect 2 checks !isRight (false), does nothing. Safe.
+
+    // Example: User opens Right. isRight=false. Effect 2 runs -> setLeft(true).
+    // isLeft becomes true. Effect 1 checks !isLeft (false), does nothing. Safe.
+
+    // So actually the previous logic was mostly fine, BUT it didn't distinguish *which one* triggered it.
+    // It's better to keep it simple. As long as "Both Open" -> "Close One", we are safe.
+    // BUT user wants "Open Left -> Close Right" AND "Open Right -> Close Left".
+    // "Both Open" state only happens for a split second or on resize.
+
+    // Let's stick to the simple "Both Open" check.
+    // However, we want to know *which one* was specifically opened to close the *other*.
+    // Zustand setters don't tell us who called them.
+    // If we rely on "Both Open", we need a default victim (e.g. Right).
+    // But if user explicitly opens Right, validly dragging it out, we don't want it to immediately close because Left was open.
+    // We want Left to close.
+
+    // To do this reactively without action hooks is hard.
+    // We'd need previous state to know which one changed.
+    // Let's use a ref to track previous values.
+  }, []);
+
+  // Use refs to track previous state for directionality
+  const prevLeftFolded = useRef(isLeftPanelFolded);
+  const prevRightFolded = useRef(isRightPanelFolded);
+
+  useEffect(() => {
+    if (!isCompact) {
+      prevLeftFolded.current = isLeftPanelFolded;
+      prevRightFolded.current = isRightPanelFolded;
+      return;
+    }
+
+    const leftOpened = prevLeftFolded.current && !isLeftPanelFolded;
+    const rightOpened = prevRightFolded.current && !isRightPanelFolded;
+
+    if (leftOpened && !isRightPanelFolded) {
+      setIsRightPanelFolded(true);
+    } else if (rightOpened && !isLeftPanelFolded) {
+      setIsLeftPanelFolded(true);
+    }
+
+    // Just in case both are somehow open (resize), fallback to closing right
+    if (!isLeftPanelFolded && !isRightPanelFolded && !leftOpened && !rightOpened) {
+      setIsRightPanelFolded(true);
+    }
+
+    prevLeftFolded.current = isLeftPanelFolded;
+    prevRightFolded.current = isRightPanelFolded;
+  }, [isCompact, isLeftPanelFolded, isRightPanelFolded, setIsLeftPanelFolded, setIsRightPanelFolded]);
 
   // Global state for selected problem
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
@@ -330,19 +451,31 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   const handleSelectProblem = (problem: Problem): void => {
     console.log('[StudyRoomClient] Selecting problem:', problem);
-    // Extract studyProblemId from the problem (added by API)
-    const studyProblemId = (problem as any).studyProblemId || (problem as any).id || null;
-    // Ensure ID is a valid number
-    const pId = Number(problem.problemId);
 
-    if (!pId && !studyProblemId) {
-      console.warn('[StudyRoomClient] Invalid problem ID (No pId or studyId):', problem);
+    // [Refactor] Prioritize studyProblemId
+    // The problem object structure might vary, so we check multiple potential fields.
+    const studyProblemId =
+      (problem as any).studyProblemId || (problem as any).id || (problem as any).problemId || null;
+
+    // Ensure pId (externalId/BOJ ID) is a valid number, or 0 if it's a custom problem
+    // Note: The 'problemId' field in 'Problem' type is sometimes treated as 'id' or 'externalId' depending on context.
+    // Based on useProblems hook, 'problemId' seems to be the DB ID usually, and 'externalId' is the BOJ number.
+    // However, for safety, we try to extract a numeric ID that represents the BOJ problem number if possible
+    // or just use 0 if it's purely custom.
+    const pId = Number(problem.problemId) || 0;
+
+    // Valid if we have EITHER a studyProblemId OR a real problemId (pId)
+    // Failing only if both are missing.
+    if (!studyProblemId && !pId) {
+      console.warn('[StudyRoomClient] Invalid problem ID (No studyProblemId and no pId):', problem);
       return;
     }
 
+    console.log('[StudyRoomClient] Resolved IDs:', { studyProblemId, pId });
+
     setSelectedProblem(
       studyProblemId,
-      pId || 0, // Use 0 for custom problems
+      pId || 0, // Use 0 for custom problems if pId is missing
       problem.title,
       problem.externalId || String((problem as any).number || 'Custom'),
     );
@@ -363,6 +496,14 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
 
   const handleToggleLeftPanel = (): void => {
     setIsLeftPanelFolded(!isLeftPanelFolded);
+  };
+
+  const handleToggleRightPanel = (): void => {
+    // Close left panel when opening right panel (symmetric to handleToggleLeftPanel behavior)
+    if (isRightPanelFolded && !isLeftPanelFolded) {
+      setIsLeftPanelFolded(true);
+    }
+    setIsRightPanelFolded(!isRightPanelFolded);
   };
 
   const problemList = (
@@ -439,7 +580,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
         isLeftPanelFolded={isLeftPanelFolded}
         onUnfoldLeftPanel={handleToggleLeftPanel}
         isRightPanelFolded={isRightPanelFolded}
-        onUnfoldRightPanel={() => setIsRightPanelFolded(false)}
+        onUnfoldRightPanel={handleToggleRightPanel}
       />
     </>
   );
