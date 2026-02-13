@@ -26,7 +26,7 @@ describe('CCProblemCard', () => {
   it('renders problem title and type badge', () => {
     render(<CCProblemCard {...defaultProps} />);
     expect(screen.getByText(/Test Problem/)).toBeInTheDocument();
-    expect(screen.getByText('BOJ')).toBeInTheDocument();
+    expect(screen.getByText('[BOJ]')).toBeInTheDocument();
   });
 
   it('toggles hint visibility when hint button is clicked', () => {
