@@ -85,6 +85,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true });
         });
         return true;
+    } else if (request.type === 'PEEKLE_WINDOW_SPLIT') {
+        const { url, leftWindow, rightWindow } = request.payload;
+
+        // 1. Resize/Move current window (Frontend) to RIGHT
+        if (sender.tab && rightWindow) {
+            chrome.windows.update(sender.tab.windowId, {
+                left: rightWindow.left,
+                top: rightWindow.top,
+                width: rightWindow.width,
+                height: rightWindow.height,
+                state: 'normal'
+            });
+        }
+
+        // 2. Create new window (Problem) on LEFT
+        if (leftWindow) {
+            chrome.windows.create({
+                url: url,
+                type: 'popup',
+                left: leftWindow.left,
+                top: leftWindow.top,
+                width: leftWindow.width,
+                height: leftWindow.height
+            });
+        }
+        sendResponse({ success: true });
+        return true;
     }
     return true; // Keep channel open
 });
@@ -183,6 +210,15 @@ async function handleSolvedSubmission(payload, sender) {
         if (isMatch) {
             console.log(`[Debug] Clearing matching pending submission for problem ${problemId}`);
             chrome.storage.local.remove('pending_submission');
+        }
+
+        // [New Feature] Fallback for Failed Submissions in Game/Study
+        // If the user fails (WA/TLE/etc), we treat it as a regular problem submission (EXTENSION type).
+        // This prevents failed attempts from being sent to Game/Study logic which might expect success.
+        if (!isSuccess && (targetSourceType === 'GAME' || targetSourceType === 'STUDY')) {
+            console.log(`[Background] Submission failed for ${targetSourceType}. Fallback to EXTENSION type.`);
+            targetSourceType = 'EXTENSION';
+            targetStudyId = null;
         }
 
         // --- Send to Backend (Peekle) ---
@@ -298,6 +334,12 @@ async function handleSolvedSubmission(payload, sender) {
         chrome.storage.local.set({ [PROCESSED_SUBMISSIONS_KEY]: processed }, () => {
             // Send Feedback to Content Script (Show Toast on Page)
             if (backendResponse) {
+                // [Fix] Check if we should mute feedback (because it was shown locally)
+                if (payload.muteFeedback) {
+                    console.log(`[Background] Muting feedback for ${submitId} as requested.`);
+                    return;
+                }
+
                 // If it's a tab context, send to that tab
                 if (sender && sender.tab) {
                     const shouldAutoClose = isSuccess && (targetSourceType === 'STUDY' || targetSourceType === 'GAME');

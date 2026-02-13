@@ -7,6 +7,7 @@ import com.peekle.domain.study.dto.curriculum.ProblemStatusResponse;
 import com.peekle.domain.study.dto.curriculum.StudyProblemAddRequest;
 import com.peekle.domain.study.entity.StudyProblem;
 import com.peekle.domain.study.entity.StudyRoom;
+import com.peekle.domain.study.enums.ProblemType;
 import com.peekle.domain.study.repository.StudyMemberRepository;
 import com.peekle.domain.study.repository.StudyProblemRepository;
 import com.peekle.domain.study.repository.StudyRoomRepository;
@@ -87,9 +88,16 @@ public class StudyCurriculumService {
                                 .study(study)
                                 .problemId(problem != null ? actualProblemId : null)
                                 .customTitle(problem == null ? request.getCustomTitle() : null)
-                                .customLink(problem == null ? request.getCustomLink() : null)
+                                .customLink(request.getCustomLink() != null ? request.getCustomLink()
+                                                : (problem != null
+                                                                ? "https://www.acmicpc.net/problem/"
+                                                                                + problem.getExternalId()
+                                                                : null))
                                 .problemDate(targetDate)
                                 .createdBy(user)
+                                .type(request.getProblemType() != null
+                                                ? request.getProblemType()
+                                                : (problem != null ? ProblemType.BOJ : ProblemType.CUSTOM))
                                 .build();
 
                 studyProblemRepository.save(studyProblem);
@@ -98,6 +106,7 @@ public class StudyCurriculumService {
                 String tier = (problem != null) ? problem.getTier() : "Custom";
                 String externalId = (problem != null) ? problem.getExternalId() : "Custom";
                 String customLink = studyProblem.getCustomLink();
+                String type = studyProblem.getType().name();
                 List<String> tags = (problem != null)
                                 ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
                                 : List.of();
@@ -110,6 +119,7 @@ public class StudyCurriculumService {
                                 .customTitle(studyProblem.getCustomTitle())
                                 .customLink(customLink)
                                 .tier(tier)
+                                .type(type)
                                 .tags(tags)
                                 .assignedDate(targetDate)
                                 .solvedMemberCount(0)
@@ -182,6 +192,7 @@ public class StudyCurriculumService {
                 String tier = (problem != null) ? problem.getTier() : "Custom";
                 String externalId = (problem != null) ? problem.getExternalId() : "Custom";
                 String customLink = target.getCustomLink();
+                String type = target.getType().name();
                 List<String> tags = (problem != null)
                                 ? problem.getTags().stream().map(Tag::getName).collect(Collectors.toList())
                                 : List.of();
@@ -197,6 +208,7 @@ public class StudyCurriculumService {
                                 .customTitle(target.getCustomTitle())
                                 .customLink(customLink)
                                 .tier(tier)
+                                .type(type)
                                 .tags(tags)
                                 .assignedDate(target.getProblemDate())
                                 .solvedMemberCount(0)
@@ -249,6 +261,7 @@ public class StudyCurriculumService {
                         String title = (problem != null) ? problem.getTitle() : sp.getCustomTitle();
                         String tier = (problem != null) ? problem.getTier() : "Custom";
                         String externalId = (problem != null) ? problem.getExternalId() : "Custom";
+                        String type = sp.getType().name();
 
                         // Use builder with all fields
                         List<String> tags = (problem != null)
@@ -269,6 +282,7 @@ public class StudyCurriculumService {
                                         .customTitle(sp.getCustomTitle())
                                         .customLink(sp.getCustomLink())
                                         .tier(tier)
+                                        .type(type)
                                         .tags(tags)
                                         .assignedDate(sp.getProblemDate())
                                         .solvedMemberCount(solvedCount)

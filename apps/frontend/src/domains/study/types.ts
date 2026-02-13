@@ -23,7 +23,7 @@ export interface SubmissionSuccessUser {
   executionTime: number;
 }
 
-export interface DailyProblem {
+export interface StudyProblem {
   problemId: number;
   studyProblemId?: number;
   externalId?: string; // BOJ problem number (e.g. "1000")
@@ -31,6 +31,7 @@ export interface DailyProblem {
   customTitle?: string;
   customLink?: string;
   tier: string;
+  type?: 'BOJ' | 'PGS' | 'CUSTOM'; // Added type field
   tags?: string[];
   solvedMemberCount: number;
   totalMemberCount: number;

@@ -60,32 +60,46 @@ export function useProblems(studyId: number, dateString?: string) {
       const { studyId: eventStudyId, problem } = event.detail;
       if (eventStudyId === studyId && problem) {
         console.log('[useProblems] Problem added, updating state:', problem);
-        const newProblemId = Number(problem.problemId || problem.id);
+
+        // Extract IDs correctly from ProblemStatusResponse
+        // problem.studyProblemId should be available from backend DTO
+        const studyProblemId = Number(problem.studyProblemId);
+
+        // For BOJ problems, problemId is valid. For Custom, it might be null.
+        // Use studyProblemId as fallback for internal ID if problemId is missing (custom problem)
+        const newProblemId = Number(problem.problemId) || studyProblemId;
 
         // Optimistically add the problem if it's not already there
         setProblems((prev) => {
-          // Check if problem already exists
-          if (prev.some((p) => Number(p.problemId) === newProblemId)) {
+          // Check if problem already exists (by studyProblemId or problemId)
+          if (prev.some((p) => {
+            const pStudyProblemId = (p as any).studyProblemId;
+            const pProblemId = p.problemId;
+            return (pStudyProblemId && pStudyProblemId === studyProblemId) || (pProblemId && pProblemId === newProblemId);
+          })) {
             console.log('[useProblems] Problem already exists, skipping optimistic add');
             return prev;
           }
-          // Add the new problem with default values
+
+          // Add the new problem with correct fields
           return [
             ...prev,
             {
               id: newProblemId,
               problemId: newProblemId,
-              externalId: problem.externalId || String(problem.number),
-              title: problem.title || `문제 ${newProblemId}`,
+              studyProblemId: studyProblemId, // Important: Add this field
+              externalId: problem.externalId || String(problem.number || ''),
+              title: problem.title || problem.customTitle || `문제 ${newProblemId}`,
               tier: problem.tier || 'Unrated',
+              type: problem.type || (problem.externalId ? 'BOJ' : 'CUSTOM'),
               number: problem.externalId ? parseInt(problem.externalId, 10) : newProblemId,
               tags: problem.tags || [],
               status: 'not_started' as const,
               participantCount: 0,
               totalParticipants: problem.totalMemberCount || 0,
-              url: problem.externalId
+              url: problem.customLink || (problem.externalId
                 ? `https://www.acmicpc.net/problem/${problem.externalId}`
-                : '',
+                : ''),
               solvedMemberCount: problem.solvedMemberCount || 0,
               totalMemberCount: problem.totalMemberCount || 0,
             },
@@ -162,7 +176,7 @@ export function useProblems(studyId: number, dateString?: string) {
     useStudySocketActions();
 
   const addProblem = useCallback(
-    async (title: string, number: number | null, tags?: string[], problemId?: number, date?: string, customLink?: string) => {
+    async (title: string, number: number | null, tags?: string[], problemId?: number, date?: string, customLink?: string, problemType?: 'BOJ' | 'PGS' | 'CUSTOM') => {
       try {
         let actualProblemId = problemId;
 
@@ -178,11 +192,11 @@ export function useProblems(studyId: number, dateString?: string) {
         // If not, and we have custom title/link, treat as custom.
 
         if (actualProblemId) {
-          socketAddProblem(actualProblemId, date);
+          socketAddProblem(actualProblemId, date, undefined, undefined, problemType);
         } else {
           // Custom Problem
           if (title && customLink) {
-            socketAddProblem(null, date, title, customLink);
+            socketAddProblem(null, date, title, customLink, problemType);
           } else if (customLink) {
             // Fallback if title is missing but link is there? Logic depends on requirements.
             // Assuming title is required for custom problems.

@@ -6,19 +6,19 @@ import { ChevronLeft, FileText, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CCCalendarWidget, CCInlineCalendar } from './CCCalendarWidget';
 import { CCProblemCard } from './CCProblemCard';
-import { DailyProblem, Submission } from '@/domains/study/types';
+import { StudyProblem, Submission } from '@/domains/study/types';
 import { CCSubmissionViewerModal } from './CCSubmissionViewerModal';
 import { CCAddProblemModal } from './CCAddProblemModal';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { CCCustomProblemView } from './CCCustomProblemView';
 
 // Re-export Problem type from types.ts to maintain potential compatibility if imported elsewhere
-export type { DailyProblem as Problem } from '@/domains/study/types';
+export type { StudyProblem as Problem } from '@/domains/study/types';
 
 export interface CCProblemListPanelProps {
-  problems?: DailyProblem[];
+  problems?: StudyProblem[];
   selectedStudyProblemId?: number;
-  onSelectProblem?: (problem: DailyProblem) => void;
+  onSelectProblem?: (problem: StudyProblem) => void;
   className?: string;
   onToggleFold: () => void;
   isFolded: boolean;
@@ -151,7 +151,7 @@ export function CCProblemListPanel({
 
   const selectedProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
 
-  const handleOpenDescription = (problem: DailyProblem) => {
+  const handleOpenDescription = (problem: StudyProblem) => {
     onSelectProblem?.(problem);
     setIsFlipped(true);
   };
@@ -164,10 +164,9 @@ export function CCProblemListPanel({
         problemId={selectedStudyProblemId}
         problemTitle={currentSelectedProblem.title}
         externalLink={
-          (currentSelectedProblem as any).customLink ||
-          (currentSelectedProblem.externalId && currentSelectedProblem.externalId !== 'Custom'
-            ? `https://www.acmicpc.net/problem/${currentSelectedProblem.externalId}`
-            : undefined)
+          currentSelectedProblem.type === 'CUSTOM'
+            ? (currentSelectedProblem as any).customLink
+            : `https://www.acmicpc.net/problem/${currentSelectedProblem.externalId}`
         }
         onBack={() => setIsFlipped(false)}
         className={className}
@@ -176,9 +175,9 @@ export function CCProblemListPanel({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className={cn('flex h-full flex-col relative bg-card', className)} 
+      className={cn('flex h-full flex-col relative bg-card', className)}
       data-tour="problem-list"
     >
       {/* Top Row: Date, Add Button & Fold Button */}

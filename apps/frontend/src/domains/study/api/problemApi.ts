@@ -1,5 +1,5 @@
 import {
-  DailyProblem,
+  StudyProblem,
   Submission,
   SubmissionResult,
   SubmissionSuccessUser,
@@ -28,10 +28,10 @@ export async function fetchSubmissions(
 }
 
 // 2. Daily Problems
-export async function fetchProblems(studyId: number, date: string): Promise<DailyProblem[]> {
+export async function fetchProblems(studyId: number, date: string): Promise<StudyProblem[]> {
   // Add timestamp to prevent caching
   const timestamp = new Date().getTime();
-  const res = await apiFetch<DailyProblem[]>(
+  const res = await apiFetch<StudyProblem[]>(
     `/api/studies/${studyId}/curriculum/daily?date=${date}&_t=${timestamp}`,
     {
       headers: {

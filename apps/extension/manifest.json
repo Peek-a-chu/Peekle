@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Peekle: Baekjoon Track Submission",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "힐끔힐끔코딩 - 백준 문제 풀이 자동 기록 및 알림",
     "permissions": [
         "storage",
@@ -40,16 +40,6 @@
             ],
             "js": [
                 "content.js"
-            ],
-            "run_at": "document_idle"
-        },
-        {
-            "matches": [
-                "https://school.programmers.co.kr/*",
-                "https://programmers.co.kr/*"
-            ],
-            "js": [
-                "programmers.js"
             ],
             "run_at": "document_idle"
         }

@@ -57,6 +57,10 @@ export interface RoomState {
   whiteboardMessage: string | null;
   isWhiteboardOverlayOpen: boolean;
 
+  // Sidebar State
+  isLeftPanelFolded: boolean;
+  isRightPanelFolded: boolean;
+
   // Problem State
   selectedStudyProblemId: number | null; // Renamed from selectedProblemId (StudyProblem PK)
   selectedProblemId: number | null;      // Added: Actual problemId (e.g. 1000)
@@ -127,6 +131,9 @@ export interface RoomActions {
   setWhiteboardMessage: (message: string | null) => void;
   setWhiteboardOverlayOpen: (isOpen: boolean) => void;
 
+  setIsLeftPanelFolded: (isFolded: boolean) => void;
+  setIsRightPanelFolded: (isFolded: boolean) => void;
+
   // Problem Actions
   setSelectedStudyProblemId: (id: number | null) => void;
   setSelectedProblemTitle: (title: string | null) => void;
@@ -191,6 +198,9 @@ const initialState: RoomState = {
   whiteboardMessage: null,
   isWhiteboardOverlayOpen: false,
 
+  isLeftPanelFolded: false,
+  isRightPanelFolded: false,
+
   selectedStudyProblemId: null,
   selectedProblemId: null,
   selectedProblemTitle: null,
@@ -251,9 +261,12 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
 
   setRightPanelActiveTab: (tab): void => set({ rightPanelActiveTab: tab }),
   setIsWhiteboardActive: (isActive): void => set({ isWhiteboardActive: isActive }),
-  setWhiteboardOpenedBy: (user): void => set({ whiteboardOpenedBy: user }),
-  setWhiteboardMessage: (message): void => set({ whiteboardMessage: message }),
+  setWhiteboardOpenedBy: (user: string | null): void => set({ whiteboardOpenedBy: user }),
+  setWhiteboardMessage: (message: string | null): void => set({ whiteboardMessage: message }),
   setWhiteboardOverlayOpen: (isOpen): void => set({ isWhiteboardOverlayOpen: isOpen }),
+
+  setIsLeftPanelFolded: (isFolded): void => set({ isLeftPanelFolded: isFolded }),
+  setIsRightPanelFolded: (isFolded): void => set({ isRightPanelFolded: isFolded }),
 
   setSelectedStudyProblemId: (id): void => set({ selectedStudyProblemId: id }),
   setSelectedProblemTitle: (title): void => set({ selectedProblemTitle: title }),
