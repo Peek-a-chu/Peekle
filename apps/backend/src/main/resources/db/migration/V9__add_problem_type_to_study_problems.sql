@@ -1,0 +1,1 @@
+ALTER TABLE study_problems ADD COLUMN problem_type VARCHAR(20) NOT NULL DEFAULT 'BOJ';
