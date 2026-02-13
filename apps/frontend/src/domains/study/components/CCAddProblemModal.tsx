@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { searchExternalProblems, ExternalProblem } from '../api/problemApi';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from 'sonner';
-import { DailyProblem } from '@/domains/study/types';
+import { StudyProblem } from '@/domains/study/types';
 import {
   getWorkbooks,
   getWorkbook,
@@ -32,9 +32,10 @@ interface CCAddProblemModalProps {
     problemId?: number,
     date?: string,
     customLink?: string,
+    problemType?: 'BOJ' | 'PGS' | 'CUSTOM',
   ) => Promise<void>;
   onRemove: (problemId: number, studyProblemId?: number) => Promise<void>;
-  currentProblems?: DailyProblem[]; // 현재 스터디에 추가된 문제 목록
+  currentProblems?: StudyProblem[]; // 현재 스터디에 추가된 문제 목록
 }
 
 export function CCAddProblemModal({
@@ -54,6 +55,7 @@ export function CCAddProblemModal({
   // Custom Problem State
   const [customTitle, setCustomTitle] = useState('');
   const [customLink, setCustomLink] = useState('');
+  const [customType, setCustomType] = useState<'BOJ' | 'PGS' | 'CUSTOM'>('PGS');
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -94,6 +96,7 @@ export function CCAddProblemModal({
       setSelectedWorkbookProblemIds(new Set());
       setCustomTitle('');
       setCustomLink('');
+      setCustomType('PGS');
     }
   }, [isOpen]);
 
@@ -116,16 +119,16 @@ export function CCAddProblemModal({
       setIsLoading(true);
       try {
         const data = await searchExternalProblems(debouncedQuery);
-        
+
         const mappedResults: SearchResult[] = data.map((p) => {
           const isRegistered = isProblemAlreadyAdded(p.problemId, p.number);
-          
+
           let registeredId: number | undefined;
           if (isRegistered) {
-             const found = currentProblems.find(
-               (cp) => cp.problemId === p.problemId || cp.externalId === String(p.number)
-             );
-             registeredId = found?.problemId;
+            const found = currentProblems.find(
+              (cp) => cp.problemId === p.problemId || cp.externalId === String(p.number)
+            );
+            registeredId = found?.problemId;
           }
 
           return {
@@ -160,7 +163,7 @@ export function CCAddProblemModal({
           getWorkbooks(workbookTab, debouncedWorkbookQuery, 'LATEST', 0, 100),
           getWorkbookCounts(),
         ]);
-        
+
         setWorkbooks(books.content);
         setWorkbookCounts({
           MY: counts.my,
@@ -191,10 +194,11 @@ export function CCAddProblemModal({
 
       setIsSubmitting(true);
       try {
-        console.log(`[Adding Custom Problem] ${customTitle}`);
-        await onAdd(customTitle, null, [], undefined, undefined, customLink); // Pass customLink
+        console.log(`[Adding Custom Problem] ${customTitle} (Type: ${customType})`);
+        await onAdd(customTitle, null, [], undefined, undefined, customLink, customType); // Pass customType
         setCustomTitle('');
         setCustomLink('');
+        setCustomType('PGS');
         onClose();
       } catch (error) {
         console.error(error);
@@ -581,6 +585,21 @@ export function CCAddProblemModal({
                   placeholder="예: 프로그래머스 - 신고 결과 받기"
                   className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">문제 출처</label>
+                <select
+                  value={customType}
+                  onChange={(e) => setCustomType(e.target.value as 'BOJ' | 'PGS' | 'CUSTOM')}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="PGS">프로그래머스</option>
+                  <option value="BOJ">백준</option>
+                  <option value="CUSTOM">기타</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  문제의 출처를 선택해주세요.
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">문제 링크</label>
