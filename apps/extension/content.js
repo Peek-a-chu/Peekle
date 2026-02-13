@@ -101,8 +101,12 @@ function scanForSuccess() {
         */
 
         // Additional Check: If text contains "%", it is likely still processing (e.g. "맞았습니다 (99%)")
-        // Wait for final state without parens/percentage
-        if (resultText.includes('%')) {
+        // However, if the data-color is explicitly a final state (like 'wa'), we should process it even if it has percentage (partial score or test case info)
+        const knownFinalStates = ['ac', 'wa', 'tle', 'mle', 'ole', 'rte', 'ce', 'pe'];
+        const isFinalState = knownFinalStates.includes(resultColor);
+
+        // Only block if it has % AND it's not a known final state (or if we are unsure)
+        if (resultText.includes('%') && !isFinalState) {
             // console.log(`[Peekle] Result contains %, waiting... (${resultText})`);
             return;
         }
@@ -113,6 +117,10 @@ function scanForSuccess() {
         // Only process submissions that we were actively monitoring
         if (wasPending) {
 
+            // [Fix] Immediately remove processing toast regardless of result
+            const procToast = document.getElementById(`peekle-processing-${submitId}`);
+            if (procToast) procToast.remove();
+
             // Mark as sent IMMEDIATELY to prevent dupes
             sentSubmissions.add(submitId);
 
@@ -122,6 +130,17 @@ function scanForSuccess() {
             const language = row.querySelector('td:nth-child(7)')?.innerText?.trim() || '-';
 
             // console.log(`[Peekle] Detected Result! ID: ${submitId}, Success: ${isSuccess}`);
+
+            // [Fix] If failed, show toast IMMEDIATELY (Local Feedback)
+            // This ensures instant response without waiting for backend round-trip
+            if (!isSuccess) {
+                showFailedToast({
+                    message: resultText,
+                    // Minimal data sufficient for failed toast
+                    totalPoints: 0,
+                    leagueStatus: null
+                });
+            }
 
             // Fetch source code directly from content script (same origin, valid session)
             fetch(`https://www.acmicpc.net/source/${submitId}`)
@@ -146,7 +165,9 @@ function scanForSuccess() {
                                 memory,
                                 time,
                                 language,
-                                code
+                                code,
+                                // [Fix] Mute backend feedback if we already showed it locally (for failures)
+                                muteFeedback: !isSuccess
                             }
                         });
                     } catch (e) {
@@ -160,10 +181,20 @@ function scanForSuccess() {
                         chrome.runtime.sendMessage({
                             type: 'SOLVED',
                             payload: {
-                                ...submissionData,
-                                // If this is from a pending task, confirm context
-                                studyId: task ? task.studyId : null,
-                                sourceType: task ? task.sourceType : 'EXTENSION'
+                                // ...submissionData, // invalid reference 'submissionData' was here in original code? No, let's fix it properly.
+                                // Re-construct payload since we are inside catch block and don't have access to full scope variables easily if not careful, 
+                                // but we do have them in closure.
+                                problemId,
+                                submitId,
+                                username,
+                                timestamp: new Date().toISOString(),
+                                result: resultText,
+                                isSuccess,
+                                memory,
+                                time,
+                                language,
+                                code: null, // No code
+                                muteFeedback: !isSuccess
                             }
                         });
                     } catch (e) { }
@@ -982,7 +1013,7 @@ function showFailedToast(data) {
             </svg>
         </button>
 
-        <div class="peekle-content">
+    <div class="peekle-content" style="padding-bottom: 24px;">
             <div class="peekle-icon-box">
                 <img src="${chrome.runtime.getURL('icons/wrong.svg')}" alt="Wrong" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
@@ -1002,14 +1033,6 @@ function showFailedToast(data) {
             </div>
         </div>
 
-        <div class="peekle-footer">
-            <div class="peekle-footer-total">
-                현재 총점: <span>${data.totalPoints || 0}점</span>
-            </div>
-            <div class="peekle-rank-badge" style="color: ${failColor};">
-                ${data.currentLeague || ''} ${renderStatusBadge(data.leagueStatus)} · 그룹 ${data.currentRank || '-'}위
-                ${renderPointGap(data.leagueStatus, data.pointsToPromotion, data.pointsToMaintenance)}
-            </div>
         </div>
     `;
 
@@ -1159,5 +1182,13 @@ window.addEventListener('message', async (event) => {
     if (event.data?.type === 'PEEKLE_CLEAR_PENDING') {
         console.log('[Peekle Content] Received PEEKLE_CLEAR_PENDING. Notifying background.');
         chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_SUBMISSION' });
+    }
+
+    if (event.data?.type === 'PEEKLE_WINDOW_SPLIT') {
+        console.log('[Peekle Content] Received PEEKLE_WINDOW_SPLIT. Forwarding to background.');
+        chrome.runtime.sendMessage({
+            type: 'PEEKLE_WINDOW_SPLIT',
+            payload: event.data.payload
+        });
     }
 });
