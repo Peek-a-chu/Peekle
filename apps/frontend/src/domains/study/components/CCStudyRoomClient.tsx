@@ -646,7 +646,7 @@ export function CCStudyRoomClient(): React.ReactNode {
   // If prejoined, use params. Else default (mic off, cam on).
   const [initialMediaState, setInitialMediaState] = useState({
     mic: preJoined ? paramMic : false,
-    cam: preJoined ? paramCam : true,
+    cam: preJoined ? paramCam : false,
   });
 
   const handleJoin = (mic: boolean, cam: boolean) => {
