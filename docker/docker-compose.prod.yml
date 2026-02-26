@@ -56,7 +56,7 @@ services:
         - NEXT_PUBLIC_API_URL=https://peekle.today
         - NEXT_PUBLIC_SOCKET_URL=https://peekle.today
         - NEXT_PUBLIC_BACKEND_URL=https://peekle.today
-        - NEXT_PUBLIC_LIVEKIT_URL=wss://peekle.today
+        - NEXT_PUBLIC_LIVEKIT_URL=wss://peekle.today:8880
       cache_from:
         - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
     container_name: peekle-frontend
