@@ -1,0 +1,254 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Trophy, Clock } from 'lucide-react';
+import LeagueIcon, { LEAGUE_NAMES } from '@/components/LeagueIcon';
+import { useLeagueRanking, useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
+import LeagueRuleModal from './LeagueRuleModal';
+import { LeagueRankingData, WeeklyPointSummary } from '@/domains/league/types';
+
+// UTC 기준 매주 화요일 21:00 (한국시간 수요일 06:00) 계산
+const getNextTuesday2100UTC = () => {
+  const now = new Date();
+  // 0(일)~6(토). 화요일은 2
+  const day = now.getUTCDay();
+  const hour = now.getUTCHours();
+
+  let daysUntilTue = (2 - day + 7) % 7;
+
+  // 화요일인 경우 시간 체크
+  if (day === 2) {
+    if (hour < 21) {
+      // 화요일 21시 전이면 오늘 21시가 타겟
+      daysUntilTue = 0;
+    } else {
+      // 화요일 21시 이후면 다음주 화요일 21시가 타겟
+      daysUntilTue = 7;
+    }
+  } else if (daysUntilTue === 0) {
+    // (2 - day + 7) % 7 이 0이 되는 건 day=2, 화요일
+    daysUntilTue = 7;
+  }
+
+  const target = new Date();
+  target.setUTCDate(now.getUTCDate() + daysUntilTue);
+  target.setUTCHours(21, 0, 0, 0); // UTC 21:00 설정
+
+  return target;
+};
+
+// 타이머 컴포넌트
+const LeagueTimer = ({ targetDate }: { targetDate: Date }) => {
+  const [mounted, setMounted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+
+    const updateTimer = () => {
+      const now = new Date();
+      setTimeLeft(targetDate.getTime() - now.getTime());
+    };
+
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  if (!mounted || timeLeft === null) return null;
+
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  // 24시간 미만 (긴박함)
+  if (timeLeft < oneDayMs && timeLeft > 0) {
+    const h = Math.floor(timeLeft / (1000 * 60 * 60));
+    const m = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    const s = Math.floor((timeLeft % (1000 * 60)) / 1000);
+    return (
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-500 animate-pulse tabular-nums">
+        <Clock className="w-3.5 h-3.5" />
+        <span>
+          {h.toString().padStart(2, '0')}:{m.toString().padStart(2, '0')}:
+          {s.toString().padStart(2, '0')} 남음
+        </span>
+      </div>
+    );
+  }
+
+  // 종료됨
+  if (timeLeft <= 0) {
+    return (
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium text-muted-foreground">
+        <span>정산 중</span>
+      </div>
+    );
+  }
+
+  // 기본 (날짜 여유 있음)
+  const displayDays = Math.ceil(timeLeft / oneDayMs);
+
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border/50 text-xs font-medium text-muted-foreground">
+      <Clock className="w-3.5 h-3.5" />
+      <span>{displayDays}일 남음</span>
+    </div>
+  );
+};
+
+interface CCLeagueMyStatusProps {
+  initialLeagueRanking?: LeagueRankingData;
+  initialWeeklyScore?: WeeklyPointSummary | null;
+}
+
+const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeagueMyStatusProps) => {
+  const { data: fetchedRanking } = useLeagueRanking(30000, { skip: !!initialLeagueRanking });
+  const { data: fetchedWeekly } = useWeeklyScore(undefined, { skip: !!initialWeeklyScore });
+
+  const rankingData = initialLeagueRanking || fetchedRanking;
+  const weeklyData = initialWeeklyScore || fetchedWeekly;
+
+  // 실제 데이터 사용
+  const myRank = rankingData.myRank;
+  const myScore = weeklyData?.totalScore ?? 0;
+
+  // 타겟 날짜 결정 (UTC 화요일 21:00)
+  const targetDate = getNextTuesday2100UTC();
+
+  // 계산 로직 (Backend Status 기반)
+  // 전체 인원
+  const totalMembers = rankingData.members.length;
+
+  // 1. 상태별 멤버 그룹핑
+  const promoMembers = rankingData.members.filter((m) => m.status === 'PROMOTE');
+  const stayMembers = rankingData.members.filter((m) => m.status === 'STAY');
+  // const demoteMembers = rankingData.members.filter(m => m.status === 'DEMOTE');
+
+  // 승급/강등 상태 메시지
+  let statusMessage = '';
+  let statusDetail = '';
+
+  // 내 상태 파악
+  const myStatusMember = rankingData.members.find((m) => m.me);
+  const myCurrentStatus = myStatusMember?.status || 'STAY'; // Default fallback
+
+  if (myCurrentStatus === 'PROMOTE') {
+    statusMessage = '승급 안정권';
+    statusDetail = '승급 구간에 속해있습니다!';
+  } else if (myCurrentStatus === 'DEMOTE') {
+    statusMessage = '강등 위험';
+    // 유지하기 위해 필요한 점수 = (유지권 꼴등 점수) - 내점수 + 1
+    // 유지권 꼴등 = stayMembers의 마지막. 만약 stay가 없다면? (전원 강등/승급?) -> promote의 꼴등?
+    // 보통 demote에 있다는 건 위쪽에 stay나 promote가 있다는 뜻.
+    // 가장 낮은 점수의 '생존자'를 찾음.
+    const lowestSurvivor = [...promoMembers, ...stayMembers].sort((a, b) => a.score - b.score)[0];
+
+    if (lowestSurvivor) {
+      const gap = lowestSurvivor.score - myScore + 1;
+      statusDetail = `유지 구간까지 ${gap}점`;
+    } else {
+      statusDetail = '강등 확정적'; // 생존자가 없음 (드문 케이스)
+    }
+  } else {
+    // STAY
+    statusMessage = '리그 유지 중';
+    // 승급하기 위해 필요한 점수 = (승급권 꼴등 점수) - 내점수 + 1
+    // 승급권 꼴등 = promoMembers의 마지막.
+    // promoMembers는 보통 score 내림차순 정렬되어 있음.
+    const lowestPromoter = promoMembers[promoMembers.length - 1]; // 꼴등
+
+    if (lowestPromoter) {
+      const gap = lowestPromoter.score - myScore + 1;
+      statusDetail = `승급 구간까지 ${gap}점`;
+    } else {
+      // 승급자는 없는데 나는 유지중 -> 1등이거나, 승급 T/O가 없음(Ruby?)
+      // 일단 '승급 도전' 등으로 표시
+      statusDetail = '상위권 도약 도전!';
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 mb-2">
+          <Trophy className="w-5 h-5 text-yellow-500" />
+          <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-600 to-yellow-400">
+            리그
+          </h2>
+          <LeagueRuleModal
+            myLeague={rankingData.myLeague}
+            myPercentile={rankingData.myPercentile}
+            leagueStats={rankingData.leagueStats}
+          />
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground -mt-4 mb-4">
+        매주 점수를 쌓아 상위 리그로 승급하세요
+      </p>
+
+      {/* 카드 */}
+      <div className="relative bg-card rounded-3xl p-6 border border-border/50 shadow-sm overflow-hidden">
+        {/* 배경 효과 */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+
+        {/* 상단: 타이머 (우측 상단 이동) */}
+        <div className="absolute top-6 right-6">
+          <LeagueTimer targetDate={targetDate} />
+        </div>
+
+        {/* 현재 리그 정보 */}
+        <div className="flex items-center gap-3 mb-8">
+          <LeagueIcon league={rankingData.myLeague} size={42} />
+          <div className="flex flex-col">
+            <span className="font-bold text-lg text-foreground leading-none">
+              {LEAGUE_NAMES[rankingData.myLeague]}
+            </span>
+            <span className="text-xs text-muted-foreground mt-1 font-medium">{statusMessage}</span>
+          </div>
+        </div>
+
+        {/* 정보 그리드 */}
+        <div className="space-y-4">
+          {/* 내 순위 & 점수 한 줄로 */}
+          <div className="flex items-end justify-between">
+            <div>
+              <span className="text-sm text-muted-foreground font-medium block mb-1">내 순위</span>
+              <span className="text-3xl font-black text-foreground">
+                {myRank}
+                <span className="text-sm font-medium text-muted-foreground ml-1">
+                  / {totalMembers}
+                </span>
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-sm text-muted-foreground font-medium block mb-1">점수</span>
+              <span className="text-2xl font-bold text-foreground tabular-nums">{myScore}</span>
+            </div>
+          </div>
+
+          {/* 상세 정보 (게이지 제거, 텍스트 강조) */}
+          <div className="pt-2">
+            <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-center">
+              <span className="text-sm font-bold text-primary">{statusDetail}</span>
+            </div>
+          </div>
+
+          {/* 최대 리그 기록 */}
+          <div className="flex items-center justify-between pt-4 border-t border-border/50 mt-2">
+            <span className="text-xs text-muted-foreground font-medium text-nowrap mr-4">
+              최대달성
+            </span>
+            <div className="flex items-center gap-2 text-right">
+              <span className="font-bold text-sm text-foreground">
+                {rankingData.maxLeague ? LEAGUE_NAMES[rankingData.maxLeague] : '-'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CCLeagueMyStatus;

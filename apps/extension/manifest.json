@@ -1,0 +1,59 @@
+{
+    "manifest_version": 3,
+    "name": "Peekle: Baekjoon Track Submission",
+    "version": "0.2.0",
+    "description": "힐끔힐끔코딩 - 백준 문제 풀이 자동 기록 및 알림",
+    "permissions": [
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://www.acmicpc.net/*",
+        "https://solved.ac/*",
+        "http://localhost:8080/*",
+        "http://localhost:3000/*",
+        "https://i14a408.p.ssafy.io/*",
+        "https://*.r2.dev/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.acmicpc.net/*",
+                "http://localhost:3000/*",
+                "https://i14a408.p.ssafy.io/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icons/cute.svg",
+                "icons/wrong.svg",
+                "inject_script.js"
+            ],
+            "matches": [
+                "https://www.acmicpc.net/*"
+            ]
+        }
+    ]
+}

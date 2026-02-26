@@ -1,0 +1,11 @@
+# 1. 서버 실행을 위한 핵심 패키지
+fastapi      # 웹 프레임워크
+uvicorn      # FastAPI 서버를 구동하는 엔진
+
+# 2. AI 기능을 위한 패키지
+openai       # Gemini API 호출용 (OpenAI 호환)
+chromadb     # 벡터 데이터베이스(Vector DB) 연동용
+
+# 3. 유틸리티
+python-dotenv # .env 파일에서 API 키 등 환경변수 로드용
+pandas       # CSV 인덱싱용

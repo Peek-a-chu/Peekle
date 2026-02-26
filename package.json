@@ -1,0 +1,25 @@
+{
+  "name": "peekle-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.0.0",
+    "turbo": "^2.3.3"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "lint-staged": {
+    "apps/frontend/**/*.{ts,tsx}": [
+      "pnpm --filter frontend exec eslint --fix",
+      "pnpm --filter frontend exec prettier --write"
+    ]
+  }
+}

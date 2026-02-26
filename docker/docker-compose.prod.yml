@@ -1,0 +1,232 @@
+# x-logging: 공통 로그 설정 (Disk Full 방지)
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: peekle-nginx
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-i14a408.p.ssafy.io}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8880:8880" # LiveKit WSS Direct Port
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      # - "livekit:host-gateway"
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # Certbot (SSL Renewal)
+  certbot:
+    image: certbot/certbot
+    container_name: peekle-certbot
+    volumes:
+      - nginx-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # Frontend (Next.js)
+  frontend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/frontend:${CI_COMMIT_SHORT_SHA:-latest}
+    build:
+      context: ../
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_LIVEKIT_URL=wss://i14a408.p.ssafy.io
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
+    container_name: peekle-frontend
+    env_file:
+      - ../apps/frontend/.env
+    environment:
+      - NODE_ENV=production
+      - BACKEND_API_URL=http://backend:8080
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # Backend (Spring Boot)
+  backend:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/backend:${CI_COMMIT_SHORT_SHA:-latest}
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/backend:latest
+    container_name: peekle-backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ../apps/backend/.env
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8080
+      - REDIS_HOST=redis
+      - SPRING_DATA_REDIS_HOST=redis
+      - LIVEKIT_URL=http://localhost:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - AI_SERVER_URL=http://ai-server:8000
+    expose:
+      - "8080" # 외부 직접 접근 차단, 내부망 전용
+    depends_on:
+      redis:
+        condition: service_healthy
+      ai-server:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: peekle-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-peekle-redis-password}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:6379:6379" # localhost에서만 접근 가능 (Host Network인 LiveKit 연동용)
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-peekle-redis-password}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: peekle-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    env_file:
+      - ../apps/backend/.env
+    environment:
+      - MYSQL_DATABASE=${DB_NAME:-peekle}
+      - MYSQL_USER=${DB_USERNAME:-peekle_user}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-peekle_password}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-root_password}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306" # Only accessible from localhost for security
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # AI Server (FastAPI)
+  ai-server:
+    image: ${CI_REGISTRY_IMAGE:-peekle}/ai-server:${CI_COMMIT_SHORT_SHA:-latest}
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+      cache_from:
+        - ${CI_REGISTRY_IMAGE:-peekle}/ai-server:latest
+    container_name: peekle-ai-server
+    env_file:
+      - ../apps/ai-server/.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+      - chroma
+    restart: unless-stopped
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # ChromaDB
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: peekle-chroma
+    volumes:
+      - chroma-data:/chroma/chroma
+    expose:
+      - "8000"
+    restart: unless-stopped
+    networks:
+      - peekle-network
+    logging: *default-logging
+
+  # ============================================
+  # LiveKit Server (SFU - WebRTC Media Server)
+  # ============================================
+  # IMPORTANT: Uses host network mode for optimal performance
+  # - Eliminates Docker NAT layer for WebRTC
+  # - Auto-discovers public IP via STUN
+  # - Connects to Redis on localhost:6379
+  # ============================================
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: peekle-livekit
+    command: --config /livekit.yaml
+    restart: unless-stopped
+    network_mode: "host" # Required for WebRTC performance
+    volumes:
+      - ./livekit/livekit.yaml:/livekit.yaml
+      - nginx-certs:/etc/letsencrypt:ro
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    user: root # Required to read SSL certificates
+    logging: *default-logging
+
+networks:
+  peekle-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  nginx-certs:
+    driver: local
+  certbot-www:
+    driver: local
+  chroma-data:
+    driver: local
+  mysql-data:
+    driver: local

@@ -1,0 +1,12 @@
+.git
+.gitignore
+.turbo
+node_modules
+apps/backend/build
+apps/backend/.gradle
+apps/frontend/.next
+apps/frontend/node_modules
+docker
+docs
+.DS_Store
+*.md

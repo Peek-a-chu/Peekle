@@ -1,0 +1,45 @@
+# Backend Data (H2 Database)
+data/
+apps/backend/data/*.db
+apps/backend/data/*.lock
+apps/backend/data/*.trace
+
+# Extension Testers
+apps/extension/tester.html
+apps/extension/tester.js
+
+# Local Environment Settings
+_bmad
+_bmad-output
+.agent
+.claude
+.cursor
+.gemini
+.github/agents
+.serena
+.vscode
+
+# Dependency Directories
+.turbo
+node_modules
+
+# Build Outputs
+dist/
+.next/
+*.tsbuildinfo
+peekle.sqlite
+.idea
+apps/frontend/build.log
+
+.env
+
+test-chat
+test-ide
+
+test-results
+
+# AI Server (Python)
+apps/ai-server/venv/
+apps/ai-server/__pycache__/
+apps/ai-server/*.pyc
+apps/ai-server/chroma_db/
