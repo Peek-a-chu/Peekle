@@ -167,5 +167,8 @@ jobs:
             # 5. Restart containers
             docker compose -f docker-compose.prod.yml up -d
             
+            # 5.1 Reload Nginx to clear upstream IP cache (prevents 502 Bad Gateway)
+            docker exec peekle-nginx nginx -s reload || true
+            
             # 6. Clean up unused loose images
             docker image prune -f
