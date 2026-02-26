@@ -1,0 +1,162 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Frontend
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://${{ secrets.DOMAIN_NAME }}
+            NEXT_PUBLIC_SOCKET_URL=https://${{ secrets.DOMAIN_NAME }}
+            NEXT_PUBLIC_BACKEND_URL=https://${{ secrets.DOMAIN_NAME }}
+            NEXT_PUBLIC_LIVEKIT_URL=wss://${{ secrets.DOMAIN_NAME }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:buildcache,mode=max
+
+  build-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/backend
+          file: apps/backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:buildcache,mode=max
+
+  build-ai-server:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for AI Server
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ai-server
+
+      - name: Build and push AI Server image
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/ai-server
+          file: apps/ai-server/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ai-server:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ai-server:buildcache,mode=max
+
+  deploy:
+    needs: [build-frontend, build-backend, build-ai-server]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Login to GitHub Container Registry
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # 2. Go to project directory (Assuming repository is cloned in ~/peekle)
+            if [ ! -d ~/peekle ]; then
+              git clone https://github.com/${{ github.repository }}.git ~/peekle
+            fi
+            
+            cd ~/peekle
+            
+            # Pull latest changes for docker-compose.prod.yml
+            git pull origin main || git pull origin master
+            cd docker
+            
+            # 3. Export environment variables used in docker-compose
+            export CI_REGISTRY_IMAGE=ghcr.io/${{ github.repository }}
+            # For simplicity, we just use 'main' or 'master' tag. In a real scenario, you can pass SHA.
+            export CI_COMMIT_SHORT_SHA=main
+            export DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+            
+            # (Create dummy .env if doesn't exist to avoid compose errors)
+            if [ ! -f .env ]; then
+              touch .env
+            fi
+            
+            # 4. Pull new images
+            docker compose -f docker-compose.prod.yml pull frontend backend ai-server
+            
+            # 5. Restart containers
+            docker compose -f docker-compose.prod.yml up -d
+            
+            # 6. Clean up unused loose images
+            docker image prune -f
