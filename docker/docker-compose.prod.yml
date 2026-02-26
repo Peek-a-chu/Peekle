@@ -53,10 +53,10 @@ services:
       context: ../
       dockerfile: apps/frontend/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://i14a408.p.ssafy.io
-        - NEXT_PUBLIC_SOCKET_URL=https://i14a408.p.ssafy.io
-        - NEXT_PUBLIC_BACKEND_URL=https://i14a408.p.ssafy.io
-        - NEXT_PUBLIC_LIVEKIT_URL=wss://i14a408.p.ssafy.io
+        - NEXT_PUBLIC_API_URL=https://peekle.today
+        - NEXT_PUBLIC_SOCKET_URL=https://peekle.today
+        - NEXT_PUBLIC_BACKEND_URL=https://peekle.today
+        - NEXT_PUBLIC_LIVEKIT_URL=wss://peekle.today
       cache_from:
         - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
     container_name: peekle-frontend
