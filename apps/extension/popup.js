@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // [Check Env]
-    let frontendBaseUrl = 'https://i14a408.p.ssafy.io'; // Default to prod
-    let apiBaseUrl = 'https://i14a408.p.ssafy.io';     // Default to prod
+    let frontendBaseUrl = 'https://peekle.today'; // Default to prod
+    let apiBaseUrl = 'https://peekle.today';     // Default to prod
 
     chrome.runtime.sendMessage({ type: 'CHECK_ENV' }, (response) => {
         if (response) {

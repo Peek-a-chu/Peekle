@@ -5,7 +5,7 @@ const IS_LOCAL = false; // false = 배포(Production), true = 로컬(Local)
 // Prod: Nginx가 요청을 분기함 (443 -> Frontend / Backend)
 const BASE_URL = IS_LOCAL
     ? 'http://localhost:3000'
-    : 'https://i14a408.p.ssafy.io';
+    : 'https://peekle.today';
 
 const API_BASE_URL = IS_LOCAL
     ? 'http://localhost:8080'  // 확장 프로그램은 백엔드 직접 연결
@@ -433,7 +433,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
     // 타겟 URL 패턴 (프론트엔드 도메인)
     // manifest.json의 host_permissions에 해당 도메인이 있어야 함
-    const targetPattern = IS_LOCAL ? 'http://localhost:3000/*' : 'https://i14a408.p.ssafy.io/*';
+    const targetPattern = IS_LOCAL ? 'http://localhost:3000/*' : 'https://peekle.today/*';
 
     try {
         // 프론트엔드 탭 찾기
