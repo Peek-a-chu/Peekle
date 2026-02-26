@@ -101,8 +101,6 @@ services:
         condition: service_healthy
       ai-server:
         condition: service_started
-      mysql:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - peekle-network
@@ -120,35 +118,6 @@ services:
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-peekle-redis-password}", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - peekle-network
-    logging: *default-logging
-
-  # MySQL Database
-  mysql:
-    image: mysql:8.0
-    container_name: peekle-mysql
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --default-authentication-plugin=mysql_native_password
-    restart: unless-stopped
-    env_file:
-      - ../apps/backend/.env
-    environment:
-      - MYSQL_DATABASE=${DB_NAME:-peekle}
-      - MYSQL_USER=${DB_USERNAME:-peekle_user}
-      - MYSQL_PASSWORD=${DB_PASSWORD:-peekle_password}
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-root_password}
-    volumes:
-      - mysql-data:/var/lib/mysql
-    ports:
-      - "127.0.0.1:3306:3306" # Only accessible from localhost for security
-    healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -227,6 +196,4 @@ volumes:
   certbot-www:
     driver: local
   chroma-data:
-    driver: local
-  mysql-data:
     driver: local
