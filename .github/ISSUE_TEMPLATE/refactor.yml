@@ -1,0 +1,85 @@
+name: Refactor 작업
+description: 동작 변화 없이 구조/가독성/유지보수성을 개선합니다.
+title: "[Refactor] "
+labels:
+  - refactor
+body:
+  - type: markdown
+    attributes:
+      value: |
+        리팩터링 이슈는 "왜 바꿔야 하는지"와 "변경 범위"가 핵심입니다.
+        기능 변경이 포함되면 별도 Feature/Fix 이슈로 분리해주세요.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 우선순위
+      options:
+        - P0 (긴급)
+        - P1 (높음)
+        - P2 (보통)
+        - P3 (낮음)
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 리팩터링 배경
+      description: 현재 코드의 어떤 문제가 있는지 작성해주세요.
+      placeholder: 중복 코드, 복잡도 증가, 테스트 어려움, 유지보수 비용 증가 등
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 작업 범위
+      description: 포함/제외 범위를 명확히 작성해주세요.
+      placeholder: |
+        포함:
+        - 
+        제외:
+        - 
+    validations:
+      required: true
+
+  - type: textarea
+    id: strategy
+    attributes:
+      label: 변경 전략
+      description: 어떤 방식으로 리팩터링할지 작성해주세요.
+      placeholder: 단계별 접근, 파일/모듈 단위 계획, 리스크 대응
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: 리스크/영향도
+      description: 기능 회귀, 성능 영향, 의존성 영향 등을 작성해주세요.
+      placeholder: 잠재 위험과 완화 방안
+    validations:
+      required: false
+
+  - type: input
+    id: closes_issue_number
+    attributes:
+      label: Closes 이슈 번호 (선택)
+      description: "연결/종료할 이슈 번호가 있으면 입력해주세요. (예: #123)"
+      placeholder: "#123"
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: 완료 조건 (Acceptance Criteria)
+      description: 완료 여부를 판단할 수 있게 체크리스트로 작성해주세요.
+      placeholder: |
+        - [ ] 기존 동작 회귀 없음
+        - [ ] 테스트/정적 검사 통과
+        - [ ] 코드 가독성/구조 개선 확인
+    validations:
+      required: true
+

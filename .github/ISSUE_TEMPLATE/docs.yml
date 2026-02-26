@@ -1,0 +1,83 @@
+name: Docs 작업
+description: 문서 추가/수정/정리를 요청합니다.
+title: "[Docs] "
+labels:
+  - docs
+body:
+  - type: markdown
+    attributes:
+      value: |
+        문서 이슈는 대상 독자와 기대 결과를 명확히 작성하면 품질이 올라갑니다.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 우선순위
+      options:
+        - P0 (긴급)
+        - P1 (높음)
+        - P2 (보통)
+        - P3 (낮음)
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 문서 작업 목적
+      description: 왜 문서 업데이트가 필요한지 작성해주세요.
+      placeholder: 온보딩 개선, 사용성 향상, 운영 가이드 정합성 등
+    validations:
+      required: true
+
+  - type: textarea
+    id: target_audience
+    attributes:
+      label: 대상 독자
+      description: 이 문서를 주로 읽는 대상은 누구인가요?
+      placeholder: 예) 신규 개발자, 운영자, PM, QA
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 수정 범위
+      description: 어떤 문서를 어떻게 변경할지 작성해주세요.
+      placeholder: |
+        대상 파일:
+        - 
+        변경 내용:
+        - 
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: 참고 자료 (선택)
+      description: 관련 PR, 설계 문서, 링크를 남겨주세요.
+    validations:
+      required: false
+
+  - type: input
+    id: closes_issue_number
+    attributes:
+      label: Closes 이슈 번호 (선택)
+      description: "연결/종료할 이슈 번호가 있으면 입력해주세요. (예: #123)"
+      placeholder: "#123"
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: 완료 조건 (Acceptance Criteria)
+      description: 문서 완료 여부를 판단할 기준을 작성해주세요.
+      placeholder: |
+        - [ ] 문서가 최신 동작과 일치함
+        - [ ] 예시/명령어가 실제로 동작함
+        - [ ] 대상 독자 관점에서 이해 가능함
+    validations:
+      required: true
+

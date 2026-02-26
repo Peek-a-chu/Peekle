@@ -1,0 +1,91 @@
+name: Feature 요청
+description: 새로운 기능, 개선 아이디어, 요구사항을 등록합니다.
+title: "[Feature] "
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        기능 이슈는 "문제"와 "완료 기준"이 명확할수록 빠르게 진행됩니다.
+        한 이슈에는 하나의 사용자 가치에 집중해주세요.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 우선순위
+      options:
+        - P0 (긴급)
+        - P1 (높음)
+        - P2 (보통)
+        - P3 (낮음)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제/배경
+      description: 지금 어떤 문제가 있고 왜 필요한지 작성해주세요.
+      placeholder: 현재 불편, 비즈니스 영향, 사용자 영향
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표/기대 효과
+      description: 이 기능으로 무엇이 개선되는지 작성해주세요.
+      placeholder: 성공 기준, 기대 지표
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안 내용
+      description: 구현 방향 또는 요구사항을 작성해주세요.
+      placeholder: 핵심 동작, 정책, 예외 처리
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 작업 범위
+      description: 포함/제외 범위를 분리해서 작성해주세요.
+      placeholder: |
+        포함:
+        - 
+        제외:
+        - 
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 의존성/선행 작업 (선택)
+      description: 관련 팀, 선행 이슈, 차단 요인이 있으면 작성해주세요.
+    validations:
+      required: false
+
+  - type: input
+    id: closes_issue_number
+    attributes:
+      label: Closes 이슈 번호 (선택)
+      description: "연결/종료할 이슈 번호가 있으면 입력해주세요. (예: #123)"
+      placeholder: "#123"
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: 완료 조건 (Acceptance Criteria)
+      description: 완료 여부를 판단할 수 있게 체크리스트로 작성해주세요.
+      placeholder: |
+        - [ ] 조건 1
+        - [ ] 조건 2
+    validations:
+      required: true

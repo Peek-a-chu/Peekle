@@ -1,0 +1,87 @@
+name: 버그 리포트
+description: 오류, 결함, 비정상 동작을 제보합니다.
+title: "[Fix] "
+labels:
+  - fix
+body:
+  - type: markdown
+    attributes:
+      value: |
+        재현 가능한 정보가 많을수록 해결 속도가 빨라집니다.
+        가능한 한 최소 재현 절차를 포함해주세요.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 심각도
+      options:
+        - S1 (치명적)
+        - S2 (높음)
+        - S3 (보통)
+        - S4 (낮음)
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 버그 요약
+      description: 무엇이 문제인지 한두 문장으로 작성해주세요.
+      placeholder: 예) 송금 승인 후 화면이 멈추고 완료 상태로 전환되지 않음
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: 재현 절차
+      description: 순서대로 작성해주세요.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: 기대 동작
+      placeholder: 정상적으로 기대한 결과
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: 실제 동작
+      placeholder: 현재 실제로 발생한 결과
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 환경 정보
+      description: 브라우저/OS/앱 버전 등
+      placeholder: 예) Chrome 124, macOS 14.5, FE v1.2.3
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs_and_screenshots
+    attributes:
+      label: 로그/스크린샷 (선택)
+      description: 오류 로그, 콘솔 로그, 캡처 파일 링크를 남겨주세요.
+    validations:
+      required: false
+
+  - type: input
+    id: closes_issue_number
+    attributes:
+      label: Closes 이슈 번호 (선택)
+      description: "연결/종료할 이슈 번호가 있으면 입력해주세요. (예: #123)"
+      placeholder: "#123"
+    validations:
+      required: false
+
