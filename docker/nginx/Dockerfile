@@ -7,7 +7,7 @@ RUN apk add --no-cache certbot certbot-nginx openssl curl socat
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Create directories for certificates and certbot
-RUN mkdir -p /etc/letsencrypt/live/i14a408.p.ssafy.io
+RUN mkdir -p /etc/letsencrypt/live/peekle.today
 RUN mkdir -p /var/www/certbot
 
 # Script to handle certificate setup

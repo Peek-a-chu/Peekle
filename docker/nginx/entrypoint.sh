@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DOMAIN="${DOMAIN_NAME:-i14a408.p.ssafy.io}"
+DOMAIN="${DOMAIN_NAME:-peekle.today}"
 EMAIL="${SSL_EMAIL:-admin@$DOMAIN}"
 CERT_DIR="/etc/letsencrypt/live/$DOMAIN"
 WEBROOT="/var/www/certbot"
