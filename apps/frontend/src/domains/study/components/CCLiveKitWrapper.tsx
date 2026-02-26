@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react';
+import { VideoPresets } from 'livekit-client';
 import '@livekit/components-styles';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { Loader2 } from 'lucide-react';
@@ -19,7 +20,7 @@ export function CCLiveKitWrapper({
   studyId,
   children,
   initialMicEnabled = false,
-  initialCamEnabled = true,
+  initialCamEnabled = false,
 }: CCLiveKitWrapperProps) {
   const token = useRoomStore((state) => state.videoToken);
 
@@ -39,6 +40,14 @@ export function CCLiveKitWrapper({
       serverUrl={serverUrl}
       data-lk-theme="default"
       style={{ height: '100%', width: '100%' }}
+      options={{
+        videoCaptureDefaults: {
+          resolution: VideoPresets.h360.resolution,
+        },
+        publishDefaults: {
+          videoEncoding: VideoPresets.h360.encoding,
+        },
+      }}
     >
       {children}
       <RoomAudioRenderer />

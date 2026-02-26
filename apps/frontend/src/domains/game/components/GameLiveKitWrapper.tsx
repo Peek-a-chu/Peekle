@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react';
+import { VideoPresets } from 'livekit-client';
 import '@livekit/components-styles';
 import { useGameLiveKitStore } from '@/domains/game/hooks/useGameLiveKitStore';
 import { Loader2 } from 'lucide-react';
@@ -19,7 +20,7 @@ export function GameLiveKitWrapper({
     roomId,
     children,
     initialMicEnabled = false,
-    initialCamEnabled = true,
+    initialCamEnabled = false,
 }: GameLiveKitWrapperProps) {
     const token = useGameLiveKitStore((state) => state.videoToken);
     const [permissionsGranted, setPermissionsGranted] = useState(false);
@@ -76,6 +77,14 @@ export function GameLiveKitWrapper({
             serverUrl={serverUrl}
             data-lk-theme="default"
             style={{ height: '100%', width: '100%' }}
+            options={{
+                videoCaptureDefaults: {
+                    resolution: VideoPresets.h360.resolution,
+                },
+                publishDefaults: {
+                    videoEncoding: VideoPresets.h360.encoding,
+                },
+            }}
         >
             {children}
             <RoomAudioRenderer />
