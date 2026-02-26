@@ -181,9 +181,7 @@ services:
       - nginx-certs:/etc/letsencrypt:ro
     environment:
       - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
-      - METERED_DOMAIN=${METERED_DOMAIN}
-      - METERED_USERNAME=${METERED_USERNAME}
-      - METERED_PASSWORD=${METERED_PASSWORD}
+      - LIVEKIT_RTC_TURN_SERVERS=[{"host":"${METERED_DOMAIN}","port":443,"protocol":"tls","username":"${METERED_USERNAME}","credential":"${METERED_PASSWORD}"},{"host":"${METERED_DOMAIN}","port":80,"protocol":"tcp","username":"${METERED_USERNAME}","credential":"${METERED_PASSWORD}"}]
     user: root # Required to read SSL certificates
     logging: *default-logging
 

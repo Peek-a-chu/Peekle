@@ -10,17 +10,7 @@ rtc:
   stun_servers:
     - stun.l.google.com:19302
     - stun1.l.google.com:19302
-  turn_servers:
-    - host: "${METERED_DOMAIN}"
-      port: 443
-      protocol: tls
-      username: "${METERED_USERNAME}"
-      credential: "${METERED_PASSWORD}"
-    - host: "${METERED_DOMAIN}"
-      port: 80
-      protocol: tcp
-      username: "${METERED_USERNAME}"
-      credential: "${METERED_PASSWORD}"
+
 
 redis:
   address: 127.0.0.1:6379
