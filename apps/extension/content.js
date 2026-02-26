@@ -1081,7 +1081,7 @@ function showFailedToast(data) {
 // Auto-notify frontend on load (for detecting fresh installations without refresh)
 (async function autoNotifyFrontend() {
     // Only notify if we're on the frontend domain
-    const isFrontend = window.location.hostname === 'localhost' || window.location.hostname.includes('i14a408.p.ssafy.io');
+    const isFrontend = window.location.hostname === 'localhost' || window.location.hostname.includes('peekle.today');
     if (!isFrontend) return;
 
     let token = null;

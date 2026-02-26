@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Peekle: Baekjoon Track Submission",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "힐끔힐끔코딩 - 백준 문제 풀이 자동 기록 및 알림",
     "permissions": [
         "storage",
@@ -12,7 +12,7 @@
         "https://solved.ac/*",
         "http://localhost:8080/*",
         "http://localhost:3000/*",
-        "https://i14a408.p.ssafy.io/*",
+        "https://peekle.today/*",
         "https://*.r2.dev/*"
     ],
     "background": {
@@ -36,7 +36,7 @@
             "matches": [
                 "https://www.acmicpc.net/*",
                 "http://localhost:3000/*",
-                "https://i14a408.p.ssafy.io/*"
+                "https://peekle.today/*"
             ],
             "js": [
                 "content.js"
