@@ -52,7 +52,7 @@ export const useSettingsStore = create<SettingsState>()(
       isMicTestRunning: false,
       isSpeakerTestRunning: false,
       isMicOn: false, // Default initial state
-      isCamOn: true,  // Default initial state
+      isCamOn: false,  // Default initial state
 
       openModal: (tab = 'theme') => set({ isOpen: true, activeTab: tab }),
       closeModal: () => set({ isOpen: false }),

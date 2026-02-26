@@ -10,6 +10,17 @@ rtc:
   stun_servers:
     - stun.l.google.com:19302
     - stun1.l.google.com:19302
+  turn_servers:
+    - host: "${METERED_DOMAIN}.metered.ca"
+      port: 443
+      protocol: tls
+      username: "${METERED_USERNAME}"
+      credential: "${METERED_PASSWORD}"
+    - host: "${METERED_DOMAIN}.metered.ca"
+      port: 80
+      protocol: tcp
+      username: "${METERED_USERNAME}"
+      credential: "${METERED_PASSWORD}"
 
 redis:
   address: 127.0.0.1:6379
@@ -22,8 +33,8 @@ keys:
   livekit_api_key: "peekle_livekit_secret_at_least_32_chars_long"
 
 turn:
-  enabled: true
-  domain: i14a408.p.ssafy.io
+  enabled: false
+  domain: peekle.today
   # cert_file: "/etc/letsencrypt/live/i14a408.p.ssafy.io/fullchain.pem"
   # key_file: "/etc/letsencrypt/live/i14a408.p.ssafy.io/privkey.pem"
   # tls_port: 5349
