@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: peek-a-chu/peekle
 
 jobs:
   build-frontend:
@@ -151,7 +151,7 @@ jobs:
             cd docker
             
             # 3. Export environment variables used in docker-compose
-            export CI_REGISTRY_IMAGE=ghcr.io/${{ github.repository }}
+            export CI_REGISTRY_IMAGE=ghcr.io/peek-a-chu/peekle
             # For simplicity, we just use 'main' or 'master' tag. In a real scenario, you can pass SHA.
             export CI_COMMIT_SHORT_SHA=main
             export DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
