@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText, Minus, Plus } from 'lucide-react';
+import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText, Minus, Plus, Play, TerminalSquare, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -20,6 +20,8 @@ export interface CCIDEToolbarProps {
   theme?: 'light' | 'vs-dark';
   fontSize?: number;
   showSubmit?: boolean;
+  showExecute?: boolean;
+  isExecuting?: boolean;
   showChatRef?: boolean;
   showThemeToggle?: boolean;
   currentProblemLabel?: string | null;
@@ -29,6 +31,8 @@ export interface CCIDEToolbarProps {
   onCopy?: () => void;
   onRefChat?: () => void;
   onSubmit?: () => void;
+  onExecute?: () => void;
+  onToggleConsole?: () => void;
   disabled?: boolean;
 
   // View Mode Props
@@ -44,6 +48,8 @@ export function CCIDEToolbar({
   theme = 'light',
   fontSize = 14,
   showSubmit = true,
+  showExecute = false,
+  isExecuting = false,
   showChatRef = true,
   showThemeToggle = true,
   currentProblemLabel,
@@ -53,6 +59,8 @@ export function CCIDEToolbar({
   onCopy,
   onRefChat,
   onSubmit,
+  onExecute,
+  onToggleConsole,
   viewingUser,
   viewMode,
   targetSubmission,
@@ -134,18 +142,6 @@ export function CCIDEToolbar({
               </option>
             ))}
           </select>
-
-          {currentProblemLabel && (
-            <div className="flex min-w-0 shrink items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground/90 max-w-[500px]">
-              <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground hidden lg:inline-block">
-                풀고있는문제
-              </span>
-              <span className="lg:hidden mr-2 shrink-0 text-muted-foreground">
-                <FileText className="h-3.5 w-3.5" />
-              </span>
-              <span className="truncate font-medium">{currentProblemLabel}</span>
-            </div>
-          )}
 
           {/* View Mode Banner - Conditional (Next to Select) */}
           {isViewingOther && (
@@ -280,16 +276,54 @@ export function CCIDEToolbar({
                   disabled={disabled}
                   className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
                 >
-                  <MessageSquare className="h-[22px] w-[22px] stroke-[2px]" />
+                  <Share2 className="h-[20px] w-[20px] stroke-[2.5px]" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>코드 참조 (채팅)</TooltipContent>
+              <TooltipContent>내 풀이 채팅에 공유</TooltipContent>
             </Tooltip>
           )}
 
           {/* Standard Tools (Hidden when Viewing Other) */}
           {!isViewingOther && (
             <>
+              {/* Console Toggle */}
+              {showExecute && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onToggleConsole}
+                      disabled={disabled}
+                      className="ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 px-3 h-10 text-muted-foreground hover:text-foreground"
+                    >
+                      <TerminalSquare className="h-[18px] w-[18px]" />
+                      <span className="font-semibold text-sm">테스트 케이스</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>테스트 케이스 편집</TooltipContent>
+                </Tooltip>
+              )}
+
+              {/* Execute */}
+              {showExecute && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={onExecute}
+                      disabled={disabled || isExecuting}
+                      className="ml-1 gap-1.5 focus:ring-0 shadow-sm transition-all active:scale-95 px-4 h-10 border border-border"
+                    >
+                      <Play className={cn("h-4 w-4 stroke-[2.5px]", isExecuting && "animate-pulse")} />
+                      <span className="font-bold text-sm">{isExecuting ? '실행중' : '실행'}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>테스트 케이스 실행 <span className="ml-1 opacity-60 text-xs">Ctrl+Enter</span></TooltipContent>
+                </Tooltip>
+              )}
+
               {/* Submit */}
               {showSubmit && (
                 <Tooltip>
@@ -297,7 +331,7 @@ export function CCIDEToolbar({
                     <Button
                       size="sm"
                       onClick={onSubmit}
-                      disabled={disabled}
+                      disabled={disabled || isExecuting}
                       className="ml-1 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-95 px-4 h-10 border border-primary-foreground/10"
                     >
                       <Send className="h-4 w-4 stroke-[2.5px]" />

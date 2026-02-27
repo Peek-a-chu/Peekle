@@ -50,6 +50,7 @@ export interface CCIDEPanelRef {
   toggleTheme: () => void;
   setLanguage: (lang: string) => void;
   setValue: (code: string) => void; // Added for restoration
+  getValue: () => string; // To read current code actively
 }
 
 export interface CCIDEPanelProps {
@@ -65,6 +66,7 @@ export interface CCIDEPanelProps {
   onThemeChange?: (theme: 'light' | 'vs-dark') => void;
   onFontSizeChange?: (size: number) => void;
   onCodeChange?: (code: string, language?: string) => void; // Updated signature
+  onExecuteRequest?: () => void;
   editorId?: string;
   restoredCode?: string | null;
   restoreVersion?: number;
@@ -86,6 +88,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       onThemeChange: propOnThemeChange,
       onFontSizeChange: propOnFontSizeChange,
       onCodeChange,
+      onExecuteRequest,
       editorId = 'default',
       restoredCode,
       restoreVersion,
@@ -439,6 +442,14 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       };
 
       const handleKeyDown = (e: KeyboardEvent): void => {
+        // Code Execution Shortcut (Ctrl + Enter)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          window.dispatchEvent(new CustomEvent('study-ide-execute-trigger'));
+          return;
+        }
+
         // Font Size Shorcuts (Ctrl + Up/Down)
         if (e.ctrlKey || e.metaKey) {
           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -460,6 +471,12 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
               }
               return;
             }
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onExecuteRequest) onExecuteRequest();
+            return;
           }
         }
 
@@ -524,6 +541,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         if (editorRef.current) {
           editorRef.current.setValue(newCode);
         }
+      },
+      getValue: () => {
+        if (editorRef.current) return editorRef.current.getValue();
+        return code;
       },
     }));
 
