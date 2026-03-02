@@ -28,10 +28,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   checkAuth: async () => {
-    if (typeof document !== 'undefined' && !document.cookie.includes('is_authenticated=true')) {
-      set({ isAuthenticated: false, user: null, accessToken: null, isLoading: false });
-      return;
-    }
+    // if (typeof document !== 'undefined' && !document.cookie.includes('is_authenticated=true')) {
+    //   set({ isAuthenticated: false, user: null, accessToken: null, isLoading: false });
+    //   return;
+    // }
 
     set({ isLoading: true });
     try {
