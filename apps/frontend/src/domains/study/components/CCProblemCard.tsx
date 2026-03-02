@@ -251,7 +251,7 @@ export function CCProblemCard({
       {/* Testcase Runner Modal */}
       <CCTestcaseRunnerModal
         roomId={useRoomStore.getState().roomId}
-        problemId={problem.problemId || null}
+        studyProblemId={(problem as any).studyProblemId || (problem as any).id || null}
         problemTitle={displayTitle}
         isOpen={isTestcaseModalOpen}
         onClose={() => setIsTestcaseModalOpen(false)}
