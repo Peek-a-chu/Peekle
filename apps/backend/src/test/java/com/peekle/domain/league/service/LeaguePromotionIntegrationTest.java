@@ -104,6 +104,8 @@ public class LeaguePromotionIntegrationTest {
                         .league(tier)
                         .leagueGroupId(group.getId())
                         .leaguePoint(0)
+                        .profileImg("default.png")
+                        .profileImgThumb("default_thumb.png")
                         .build();
                 userRepository.save(user);
             }

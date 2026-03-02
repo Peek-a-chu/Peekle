@@ -132,6 +132,8 @@ public class LeagueSmallGroupTest {
                     .league(LeagueTier.SILVER)
                     .leagueGroupId(null)
                     .leaguePoint(0)
+                    .profileImg("default.png")
+                    .profileImgThumb("default_thumb.png")
                     .build();
             userRepository.save(user);
         }
@@ -170,6 +172,8 @@ public class LeagueSmallGroupTest {
                     .league(tier)
                     .leagueGroupId(group.getId())
                     .leaguePoint(0)
+                    .profileImg("default.png")
+                    .profileImgThumb("default_thumb.png")
                     .build();
             userRepository.save(user);
         }
