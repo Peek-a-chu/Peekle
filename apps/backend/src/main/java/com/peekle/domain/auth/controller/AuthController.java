@@ -56,9 +56,9 @@ public class AuthController {
         int accessExpiry = (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000);
         int refreshExpiry = (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000);
 
-        addCookie(response, "access_token", newAccessToken, accessExpiry, "/");
-        addCookie(response, "refresh_token", newRefreshToken, refreshExpiry, "/api/auth/refresh");
-        addCookie(response, "is_authenticated", "true", refreshExpiry, "/"); // Middleware check용
+        addCookie(response, "access_token", newAccessToken, accessExpiry, "/", true);
+        addCookie(response, "refresh_token", newRefreshToken, refreshExpiry, "/api/auth/refresh", true);
+        addCookie(response, "is_authenticated", "true", refreshExpiry, "/", false); // Middleware check용
 
         return ApiResponse.success(null);
     }
@@ -105,9 +105,9 @@ public class AuthController {
         int accessExpiry = (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000);
         int refreshExpiry = (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000);
 
-        addCookie(response, "access_token", accessToken, accessExpiry, "/");
-        addCookie(response, "refresh_token", refreshToken, refreshExpiry, "/api/auth/refresh");
-        addCookie(response, "is_authenticated", "true", refreshExpiry, "/");
+        addCookie(response, "access_token", accessToken, accessExpiry, "/", true);
+        addCookie(response, "refresh_token", refreshToken, refreshExpiry, "/api/auth/refresh", true);
+        addCookie(response, "is_authenticated", "true", refreshExpiry, "/", false);
 
         return ApiResponse.success(null);
     }
@@ -123,9 +123,10 @@ public class AuthController {
         return null;
     }
 
-    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path) {
+    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path,
+            boolean httpOnly) {
         Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(true);
+        cookie.setHttpOnly(httpOnly);
         cookie.setSecure(false); // 개발환경 감안, Production이면 true 권장
         cookie.setPath(path);
         cookie.setMaxAge(maxAge);
