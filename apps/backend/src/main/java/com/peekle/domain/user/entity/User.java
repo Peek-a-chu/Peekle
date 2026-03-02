@@ -1,6 +1,7 @@
 package com.peekle.domain.user.entity;
 
 import com.peekle.domain.league.enums.LeagueTier;
+import com.peekle.domain.user.enums.ProfileImgType;
 import com.peekle.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -31,8 +32,6 @@ public class User extends BaseTimeEntity {
     @Column(unique = true)
     private String nickname;
 
-    // ... fields ...
-
     @Column
     private String bojId; // 백준 아이디
 
@@ -52,12 +51,34 @@ public class User extends BaseTimeEntity {
         this.isDeleted = false;
         this.extensionToken = java.util.UUID.randomUUID().toString();
         this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
-        this.streakCurrent = 0;
         this.streakMax = 0;
+        String defaultImg = generateDefaultProfileImg(nickname);
+        this.profileImg = defaultImg;
+        this.profileImgThumb = defaultImg;
+        this.profileImgType = ProfileImgType.DEFAULT;
     }
 
+    private String generateDefaultProfileImg(String nickname) {
+        if (nickname == null)
+            return null;
+        try {
+            return "https://api.dicebear.com/9.x/bottts-neutral/svg?seed=" +
+                    java.net.URLEncoder.encode(nickname, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "https://api.dicebear.com/9.x/bottts-neutral/svg?seed=" + nickname;
+        }
+    }
+
+    @Column(nullable = false)
     private String profileImg;
+
+    @Column(nullable = false)
     private String profileImgThumb;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ProfileImgType profileImgType = ProfileImgType.DEFAULT;
 
     @Builder.Default
     @Column(name = "league")
@@ -116,19 +137,33 @@ public class User extends BaseTimeEntity {
     }
 
     public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
-        if (nickname != null)
+        boolean nicknameChanged = false;
+        if (nickname != null && !nickname.equals(this.nickname)) {
             this.nickname = nickname;
-        if (bojId != null)
+            nicknameChanged = true;
+        }
+        if (bojId != null) {
             this.bojId = bojId;
-        if (profileImg != null)
+        }
+        if (profileImg != null) {
             this.profileImg = profileImg;
-        if (profileImgThumb != null)
+            this.profileImgType = ProfileImgType.CUSTOM;
+        } else if (nicknameChanged && this.profileImgType == ProfileImgType.DEFAULT) {
+            String defaultImg = generateDefaultProfileImg(this.nickname);
+            this.profileImg = defaultImg;
+            this.profileImgThumb = defaultImg;
+        }
+
+        if (profileImgThumb != null) {
             this.profileImgThumb = profileImgThumb;
+        }
     }
 
     public void deleteProfileImage() {
-        this.profileImg = null;
-        this.profileImgThumb = null;
+        String defaultImg = generateDefaultProfileImg(this.nickname);
+        this.profileImg = defaultImg;
+        this.profileImgThumb = defaultImg;
+        this.profileImgType = ProfileImgType.DEFAULT;
     }
 
     /**

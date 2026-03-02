@@ -57,9 +57,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             int accessExpiry = (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000);
             int refreshExpiry = (int) (jwtTokenProvider.getRefreshTokenExpiry() / 1000);
 
-            addCookie(response, "access_token", accessToken, accessExpiry, "/");
-            addCookie(response, "refresh_token", refreshToken, refreshExpiry, "/api/auth/refresh");
-            addCookie(response, "is_authenticated", "true", refreshExpiry, "/");
+            addCookie(response, "access_token", accessToken, accessExpiry, "/", true);
+            addCookie(response, "refresh_token", refreshToken, refreshExpiry, "/api/auth/refresh", true);
+            addCookie(response, "is_authenticated", "true", refreshExpiry, "/", false);
 
             response.sendRedirect(frontendUrl + "/home");
         } else {
@@ -68,9 +68,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         }
     }
 
-    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path) {
+    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path,
+            boolean httpOnly) {
         Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(true);
+        cookie.setHttpOnly(httpOnly);
         cookie.setSecure(false); // AuthController와 일관성 유지 (개발환경)
         cookie.setPath(path);
         cookie.setMaxAge(maxAge);
