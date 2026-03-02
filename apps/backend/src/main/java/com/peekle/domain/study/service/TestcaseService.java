@@ -26,23 +26,24 @@ public class TestcaseService {
         private final StudyRoomRepository studyRoomRepository;
         private final StudyProblemRepository studyProblemRepository;
 
-        public List<TestcaseResponse> getTestcases(Long roomId, Long problemId) {
-                List<Testcase> testcases = testcaseRepository.findAllByStudyRoomIdAndStudyProblemId(roomId, problemId);
+        public List<TestcaseResponse> getTestcases(Long roomId, Long studyProblemId) {
+                List<Testcase> testcases = testcaseRepository.findAllByStudyRoomIdAndStudyProblemId(roomId,
+                                studyProblemId);
                 return testcases.stream()
                                 .map(TestcaseResponse::from)
                                 .collect(Collectors.toList());
         }
 
         @Transactional
-        public void saveTestcases(Long roomId, Long problemId, List<TestcaseSaveRequest> requests) {
+        public void saveTestcases(Long roomId, Long studyProblemId, List<TestcaseSaveRequest> requests) {
                 StudyRoom studyRoom = studyRoomRepository.findById(roomId)
                                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
 
-                StudyProblem studyProblem = studyProblemRepository.findById(problemId)
+                StudyProblem studyProblem = studyProblemRepository.findById(studyProblemId)
                                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
 
                 // Delete existing testcases for this problem in this room
-                testcaseRepository.deleteAllByStudyRoomIdAndStudyProblemId(roomId, problemId);
+                testcaseRepository.deleteAllByStudyRoomIdAndStudyProblemId(roomId, studyProblemId);
 
                 // Save new testcases
                 if (requests != null && !requests.isEmpty()) {

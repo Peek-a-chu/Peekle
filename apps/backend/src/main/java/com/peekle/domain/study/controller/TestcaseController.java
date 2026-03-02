@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/studies/{roomId}/problems/{problemId}/testcases")
+@RequestMapping("/api/studies/{roomId}/problems/{studyProblemId}/testcases")
 public class TestcaseController {
 
     private final TestcaseService testcaseService;
@@ -22,17 +22,17 @@ public class TestcaseController {
     @GetMapping
     public ApiResponse<List<TestcaseResponse>> getTestcases(
             @PathVariable Long roomId,
-            @PathVariable Long problemId) {
-        List<TestcaseResponse> responses = testcaseService.getTestcases(roomId, problemId);
+            @PathVariable Long studyProblemId) {
+        List<TestcaseResponse> responses = testcaseService.getTestcases(roomId, studyProblemId);
         return ApiResponse.success(responses);
     }
 
     @PostMapping
     public ApiResponse<Void> saveTestcases(
             @PathVariable Long roomId,
-            @PathVariable Long problemId,
+            @PathVariable Long studyProblemId,
             @RequestBody List<TestcaseSaveRequest> requests) {
-        testcaseService.saveTestcases(roomId, problemId, requests);
+        testcaseService.saveTestcases(roomId, studyProblemId, requests);
 
         // Broadcast testcase update to other participants in the room
         messagingTemplate.convertAndSend("/topic/studies/" + roomId + "/testcases", "UPDATED");
