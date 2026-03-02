@@ -1,6 +1,7 @@
 package com.peekle.domain.user.entity;
 
 import com.peekle.domain.league.enums.LeagueTier;
+import com.peekle.domain.user.enums.ProfileImgType;
 import com.peekle.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -54,6 +55,7 @@ public class User extends BaseTimeEntity {
         String defaultImg = generateDefaultProfileImg(nickname);
         this.profileImg = defaultImg;
         this.profileImgThumb = defaultImg;
+        this.profileImgType = ProfileImgType.DEFAULT;
     }
 
     private String generateDefaultProfileImg(String nickname) {
@@ -72,6 +74,11 @@ public class User extends BaseTimeEntity {
 
     @Column(nullable = false)
     private String profileImgThumb;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ProfileImgType profileImgType = ProfileImgType.DEFAULT;
 
     @Builder.Default
     @Column(name = "league")
@@ -130,20 +137,33 @@ public class User extends BaseTimeEntity {
     }
 
     public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
-        if (nickname != null)
+        boolean nicknameChanged = false;
+        if (nickname != null && !nickname.equals(this.nickname)) {
             this.nickname = nickname;
-        if (bojId != null)
+            nicknameChanged = true;
+        }
+        if (bojId != null) {
             this.bojId = bojId;
-        if (profileImg != null)
+        }
+        if (profileImg != null) {
             this.profileImg = profileImg;
-        if (profileImgThumb != null)
+            this.profileImgType = ProfileImgType.CUSTOM;
+        } else if (nicknameChanged && this.profileImgType == ProfileImgType.DEFAULT) {
+            String defaultImg = generateDefaultProfileImg(this.nickname);
+            this.profileImg = defaultImg;
+            this.profileImgThumb = defaultImg;
+        }
+
+        if (profileImgThumb != null) {
             this.profileImgThumb = profileImgThumb;
+        }
     }
 
     public void deleteProfileImage() {
         String defaultImg = generateDefaultProfileImg(this.nickname);
         this.profileImg = defaultImg;
         this.profileImgThumb = defaultImg;
+        this.profileImgType = ProfileImgType.DEFAULT;
     }
 
     /**
