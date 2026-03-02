@@ -31,8 +31,6 @@ public class User extends BaseTimeEntity {
     @Column(unique = true)
     private String nickname;
 
-    // ... fields ...
-
     @Column
     private String bojId; // 백준 아이디
 
@@ -52,11 +50,27 @@ public class User extends BaseTimeEntity {
         this.isDeleted = false;
         this.extensionToken = java.util.UUID.randomUUID().toString();
         this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
-        this.streakCurrent = 0;
         this.streakMax = 0;
+        String defaultImg = generateDefaultProfileImg(nickname);
+        this.profileImg = defaultImg;
+        this.profileImgThumb = defaultImg;
     }
 
+    private String generateDefaultProfileImg(String nickname) {
+        if (nickname == null)
+            return null;
+        try {
+            return "https://api.dicebear.com/9.x/bottts-neutral/svg?seed=" +
+                    java.net.URLEncoder.encode(nickname, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "https://api.dicebear.com/9.x/bottts-neutral/svg?seed=" + nickname;
+        }
+    }
+
+    @Column(nullable = false)
     private String profileImg;
+
+    @Column(nullable = false)
     private String profileImgThumb;
 
     @Builder.Default
@@ -127,8 +141,9 @@ public class User extends BaseTimeEntity {
     }
 
     public void deleteProfileImage() {
-        this.profileImg = null;
-        this.profileImgThumb = null;
+        String defaultImg = generateDefaultProfileImg(this.nickname);
+        this.profileImg = defaultImg;
+        this.profileImgThumb = defaultImg;
     }
 
     /**
