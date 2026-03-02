@@ -41,7 +41,7 @@ interface ExecutionResponse {
 
 interface CCTestcaseRunnerModalProps {
     roomId: number | null;
-    problemId: number | null;
+    studyProblemId: number | null;
     problemTitle: string;
     isOpen: boolean;
     onClose: () => void;
@@ -49,7 +49,7 @@ interface CCTestcaseRunnerModalProps {
 
 export function CCTestcaseRunnerModal({
     roomId,
-    problemId,
+    studyProblemId,
     problemTitle,
     isOpen,
     onClose,
@@ -63,9 +63,9 @@ export function CCTestcaseRunnerModal({
 
     // Memoized function to fetch testcases
     const fetchTestcases = useCallback(async () => {
-        if (!roomId || !problemId) return;
+        if (!roomId || !studyProblemId) return;
         try {
-            const response = await apiFetch<TestCase[]>(`/api/studies/${roomId}/problems/${problemId}/testcases`);
+            const response = await apiFetch<TestCase[]>(`/api/studies/${roomId}/problems/${studyProblemId}/testcases`);
             if (response.success && response.data && response.data.length > 0) {
                 setTestcases(response.data);
             } else {
@@ -75,7 +75,7 @@ export function CCTestcaseRunnerModal({
         } catch (error) {
             console.error('Failed to load testcases:', error);
             // Fallback attempt to localstorage just in case
-            const key = `peekle:study:${roomId}:problem:${problemId}:runner_testcases`;
+            const key = `peekle:study:${roomId}:problem:${studyProblemId}:runner_testcases`;
             try {
                 const saved = localStorage.getItem(key);
                 if (saved) {
@@ -88,11 +88,11 @@ export function CCTestcaseRunnerModal({
                 // ignore
             }
         }
-    }, [roomId, problemId]);
+    }, [roomId, studyProblemId]);
 
     // Load from DB when modal opens
     useEffect(() => {
-        if (!isOpen || !roomId || !problemId) return;
+        if (!isOpen || !roomId || !studyProblemId) return;
 
         fetchTestcases();
         // Clear previous results on open
@@ -113,7 +113,7 @@ export function CCTestcaseRunnerModal({
         return () => {
             window.removeEventListener('study-testcases-updated', handleTestcasesUpdated);
         };
-    }, [isOpen, roomId, problemId, fetchTestcases]);
+    }, [isOpen, roomId, studyProblemId, fetchTestcases]);
 
     if (!isOpen) return null;
 
@@ -123,9 +123,9 @@ export function CCTestcaseRunnerModal({
     };
 
     const handleSaveTestcase = async () => {
-        if (!roomId || !problemId || testcases.length === 0) return;
+        if (!roomId || !studyProblemId || testcases.length === 0) return;
         try {
-            const response = await apiFetch(`/api/studies/${roomId}/problems/${problemId}/testcases`, {
+            const response = await apiFetch(`/api/studies/${roomId}/problems/${studyProblemId}/testcases`, {
                 method: 'POST',
                 body: JSON.stringify(testcases)
             });
