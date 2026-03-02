@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { X, Plus, Trash2, CheckCircle2, XCircle, Play, CheckSquare } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle2, XCircle, Play, CheckSquare, Save } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface ApiResponse<T> {
     success: boolean;
@@ -60,42 +61,83 @@ export function CCTestcaseRunnerModal({
     const [isExecuting, setIsExecuting] = useState(false);
     const [executingId, setExecutingId] = useState<string | null>(null);
 
-    // Load from LocalStorage specific to this problem's runner
+    // Memoized function to fetch testcases
+    const fetchTestcases = useCallback(async () => {
+        if (!roomId || !problemId) return;
+        try {
+            const response = await apiFetch<TestCase[]>(`/api/studies/${roomId}/problems/${problemId}/testcases`);
+            if (response.success && response.data && response.data.length > 0) {
+                setTestcases(response.data);
+            } else {
+                // Default empty case if none exist
+                setTestcases([{ id: '1', input: '', expectedOutput: '' }]);
+            }
+        } catch (error) {
+            console.error('Failed to load testcases:', error);
+            // Fallback attempt to localstorage just in case
+            const key = `peekle:study:${roomId}:problem:${problemId}:runner_testcases`;
+            try {
+                const saved = localStorage.getItem(key);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.length > 0) {
+                        setTestcases(parsed);
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        }
+    }, [roomId, problemId]);
+
+    // Load from DB when modal opens
     useEffect(() => {
         if (!isOpen || !roomId || !problemId) return;
-        const key = `peekle:study:${roomId}:problem:${problemId}:runner_testcases`;
-        try {
-            const saved = localStorage.getItem(key);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (parsed && parsed.length > 0) {
-                    setTestcases(parsed);
-                }
-            }
-        } catch {
-            // ignore
-        }
 
+        fetchTestcases();
         // Clear previous results on open
         setResults({});
-    }, [isOpen, roomId, problemId]);
 
-    // Save to LocalStorage
-    useEffect(() => {
-        if (!roomId || !problemId || testcases.length === 0) return;
-        const key = `peekle:study:${roomId}:problem:${problemId}:runner_testcases`;
-        try {
-            localStorage.setItem(key, JSON.stringify(testcases));
-        } catch {
-            // ignore
-        }
-    }, [testcases, roomId, problemId]);
+        // Listen for WebSocket updates from other users
+        const handleTestcasesUpdated = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            // Only update if it's for the current room
+            if (customEvent.detail.studyId === roomId) {
+                // Optionally check if user is not the one who saved, but re-fetching is fine.
+                fetchTestcases();
+            }
+        };
+
+        window.addEventListener('study-testcases-updated', handleTestcasesUpdated);
+
+        return () => {
+            window.removeEventListener('study-testcases-updated', handleTestcasesUpdated);
+        };
+    }, [isOpen, roomId, problemId, fetchTestcases]);
 
     if (!isOpen) return null;
 
     const handleAddTestcase = () => {
         const newId = Date.now().toString();
         setTestcases(prev => [...prev, { id: newId, input: '', expectedOutput: '' }]);
+    };
+
+    const handleSaveTestcase = async () => {
+        if (!roomId || !problemId || testcases.length === 0) return;
+        try {
+            const response = await apiFetch(`/api/studies/${roomId}/problems/${problemId}/testcases`, {
+                method: 'POST',
+                body: JSON.stringify(testcases)
+            });
+
+            if (response.success) {
+                toast.success('테스트 케이스가 저장되었습니다.');
+            } else {
+                toast.error(response.error?.message || '테스트 케이스 저장에 실패했습니다.');
+            }
+        } catch (error) {
+            toast.error('테스트 케이스 저장 중 오류가 발생했습니다.');
+        }
     };
 
     const handleDeleteTestcase = (id: string) => {
@@ -191,8 +233,8 @@ export function CCTestcaseRunnerModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-            <div className="bg-card w-full max-w-4xl h-[85vh] rounded-xl shadow-xl flex flex-col border border-border overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 sm:p-6 cursor-auto" onClick={onClose}>
+            <div className="bg-card w-full max-w-4xl h-[85vh] rounded-xl shadow-xl flex flex-col border border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
                     <div className="flex items-center gap-3">
@@ -240,9 +282,14 @@ export function CCTestcaseRunnerModal({
                                             </div>
                                         )}
                                     </div>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-1" onClick={() => handleDeleteTestcase(tc.id)} disabled={isExecuting || testcases.length <= 1}>
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={handleSaveTestcase} disabled={isExecuting} title="저장">
+                                            <Save className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-1" onClick={() => handleDeleteTestcase(tc.id)} disabled={isExecuting || testcases.length <= 1} title="삭제">
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {/* I/O Fields */}
@@ -252,7 +299,7 @@ export function CCTestcaseRunnerModal({
                                         <textarea
                                             value={tc.input}
                                             onChange={(e) => handleUpdateTestcase(tc.id, 'input', e.target.value)}
-                                            className="w-full h-24 bg-muted/10 border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-md p-2 text-sm font-mono resize-y transition-colors"
+                                            className="w-full h-24 bg-muted/10 border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-md p-2 text-sm font-mono resize-y"
                                             placeholder="예: 1 2"
                                             disabled={isExecuting}
                                         />
@@ -262,7 +309,7 @@ export function CCTestcaseRunnerModal({
                                         <textarea
                                             value={tc.expectedOutput}
                                             onChange={(e) => handleUpdateTestcase(tc.id, 'expectedOutput', e.target.value)}
-                                            className="w-full h-24 bg-muted/10 border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-md p-2 text-sm font-mono resize-y transition-colors"
+                                            className="w-full h-24 bg-muted/10 border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-md p-2 text-sm font-mono resize-y"
                                             placeholder="예: 3"
                                             disabled={isExecuting}
                                         />
@@ -305,7 +352,6 @@ export function CCTestcaseRunnerModal({
                 {/* Footer Controls */}
                 <div className="px-6 py-4 border-t border-border bg-card flex justify-between items-center shrink-0">
                     <p className="text-xs text-muted-foreground">
-                        작성한 테스트 케이스는 브라우저에 자동 저장됩니다.
                     </p>
                     <div className="flex gap-3">
                         <Button variant="ghost" onClick={onClose} disabled={isExecuting}>닫기</Button>
