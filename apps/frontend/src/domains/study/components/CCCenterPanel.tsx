@@ -7,6 +7,8 @@ import { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid
 import { CCControlBar as ControlBar } from '@/domains/study/components/CCControlBar';
 import { CCIDEPanel as IDEPanel } from '@/domains/study/components/CCIDEPanel';
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
+import { CCConsolePanel } from '@/domains/study/components/CCConsolePanel';
+import { useExecution } from '@/domains/study/hooks/useExecution';
 import { WhiteboardPanel } from '@/domains/study/components/whiteboard/WhiteboardOverlay';
 import { useRealtimeCode } from '@/domains/study/hooks/useRealtimeCode';
 import { useSocket } from '@/domains/study/hooks/useSocket';
@@ -62,6 +64,8 @@ export function CCCenterPanel({
     handleRefChat,
   } = useCenterPanel();
 
+  const { isExecuting, executionResult, executeCode } = useExecution();
+
   const { code: realtimeCode, language: realtimeLanguage } = useRealtimeCode(
     viewMode === 'SPLIT_REALTIME' ? viewingUser : null,
   );
@@ -79,6 +83,13 @@ export function CCCenterPanel({
   const [isResizingVideo, setIsResizingVideo] = useState(false);
   const resizeStartY = useRef<number>(0);
   const resizeStartHeight = useRef<number>(0);
+
+  // Console Panel State
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [consoleHeight, setConsoleHeight] = useState(250);
+  const [isResizingConsole, setIsResizingConsole] = useState(false);
+  const consoleResizeStartY = useRef<number>(0);
+  const consoleResizeStartHeight = useRef<number>(0);
 
   // Font Size State
   const [fontSize, setFontSize] = useState<number>(14);
@@ -134,6 +145,42 @@ export function CCCenterPanel({
     };
   }, [isResizingVideo]);
 
+  const startResizingConsole = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizingConsole(true);
+      consoleResizeStartY.current = e.clientY;
+      consoleResizeStartHeight.current = consoleHeight;
+    },
+    [consoleHeight],
+  );
+
+  useEffect(() => {
+    if (!isResizingConsole) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = consoleResizeStartY.current - e.clientY;
+      setConsoleHeight(Math.max(100, Math.min(600, consoleResizeStartHeight.current + deltaY)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingConsole(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingConsole]);
+
 
   // [Fix] Whiteboard is only visible when a problem is selected
   const isWhiteboardVisible = isWhiteboardOverlayOpen && !!selectedProblemTitle;
@@ -168,9 +215,45 @@ export function CCCenterPanel({
     }
   };
 
+  // Provide IDE code to external components (like Testcase Runner Modal) via custom events
+  useEffect(() => {
+    const handleRequestCode = () => {
+      let currentCode = leftPanelRef.current?.getValue();
+      if (!currentCode) currentCode = myLatestCodeRef.current;
+
+      window.dispatchEvent(new CustomEvent('receive-ide-code', {
+        detail: {
+          code: currentCode || '',
+          language: language
+        }
+      }));
+    };
+
+    window.addEventListener('request-ide-code', handleRequestCode);
+    return () => window.removeEventListener('request-ide-code', handleRequestCode);
+  }, [language, leftPanelRef]);
+
   const handleLanguageChange = (lang: string): void => {
     setLanguage(lang);
   };
+
+  const handleExecuteWrapper = useCallback((input: string) => {
+    // 1. Try to get actively from Editor Ref (safest and most current)
+    // 2. Fallback to myLatestCodeRef
+    let currentCode = leftPanelRef.current?.getValue();
+    if (!currentCode) currentCode = myLatestCodeRef.current;
+
+    if (!currentCode || !currentCode.trim()) {
+      toast.error('실행할 코드가 없습니다. 코드를 먼저 작성해주세요.');
+      return;
+    }
+    executeCode({
+      language,
+      code: currentCode,
+      input
+    });
+    setIsConsoleOpen(true);
+  }, [language, executeCode, leftPanelRef]);
 
   const handleWhiteboardToggleWrapper = () => {
     if (!selectedProblemTitle) {
@@ -330,6 +413,15 @@ export function CCCenterPanel({
               onSubmit={() => {
                 void handleSubmit();
               }}
+              // New Props for Execute
+              showExecute={!isViewingOther}
+              isExecuting={isExecuting}
+              onToggleConsole={() => setIsConsoleOpen((prev) => !prev)}
+              onExecute={() => {
+                if (!isConsoleOpen) setIsConsoleOpen(true);
+                // Console is now always mounted, so we can dispatch immediately
+                window.dispatchEvent(new CustomEvent('study-ide-execute-trigger'));
+              }}
               // Toggles
               showSubmit={!isViewingOther}
               showChatRef={true}
@@ -339,60 +431,87 @@ export function CCCenterPanel({
         </div>
 
         {/* Editor Body Row */}
-        <div className="flex min-h-0 flex-1 min-w-0 relative">
-          {/* Left IDE Panel (My Code) */}
-          <div
-            className={cn('flex-1 min-w-0 relative', showRightPanel && 'border-r border-border')}
-          >
-            {ideContent ?? (
-              <IDEPanel
-                ref={leftPanelRef}
-                editorId="my-editor"
-                language={language}
-                onLanguageChange={handleLanguageChange}
-                theme={theme}
-                fontSize={fontSize}
-                hideToolbar // Pass this so it doesn't render double toolbar
-                onFontSizeChange={handleFontSizeChange}
-                onCodeChange={handleCodeChange}
-                restoredCode={restoredCode}
-                restoreVersion={restoreVersion}
-              />
-            )}
+        <div className="flex min-h-0 flex-1 min-w-0 relative flex-col">
+          <div className="flex min-h-0 flex-1 min-w-0 relative">
+            {/* Left IDE Panel (My Code) */}
+            <div
+              className={cn('flex-1 min-w-0 relative', showRightPanel && 'border-r border-border')}
+            >
+              {ideContent ?? (
+                <IDEPanel
+                  ref={leftPanelRef}
+                  editorId="my-editor"
+                  language={language}
+                  onLanguageChange={handleLanguageChange}
+                  theme={theme}
+                  fontSize={fontSize}
+                  hideToolbar // Pass this so it doesn't render double toolbar
+                  onFontSizeChange={handleFontSizeChange}
+                  onCodeChange={handleCodeChange}
+                  restoredCode={restoredCode}
+                  restoreVersion={restoreVersion}
+                />
+              )}
 
-            {/* [New] Overlay if no problem is selected and not viewing other */}
-            {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
-                <Lock className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm font-medium text-muted-foreground">
-                  좌측 목록에서 문제를 선택해주세요
-                </p>
+              {/* [New] Overlay if no problem is selected and not viewing other */}
+              {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
+                  <Lock className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    좌측 목록에서 문제를 선택해주세요
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* Right Panel: Whiteboard OR Other's Code */}
+            {showRightPanel && (
+              <div className="flex-1 min-w-0">
+                {isWhiteboardVisible ? (
+                  <WhiteboardPanel className="border-l-2 border-rose-400" />
+                ) : (
+                  <IDEPanel
+                    key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
+                    editorId="other-editor"
+                    readOnly
+                    hideToolbar
+                    initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
+                    language={
+                      viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
+                    }
+                    theme={theme} // Sync theme
+                    fontSize={fontSize}
+                    onFontSizeChange={handleFontSizeChange}
+                    borderColorClass={
+                      viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
+                    }
+                  />
+                )}
               </div>
             )}
           </div>
-          {/* Right Panel: Whiteboard OR Other's Code */}
-          {showRightPanel && (
-            <div className="flex-1 min-w-0">
-              {isWhiteboardVisible ? (
-                <WhiteboardPanel className="border-l-2 border-rose-400" />
-              ) : (
-                <IDEPanel
-                  key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
-                  editorId="other-editor"
-                  readOnly
-                  hideToolbar
-                  initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
-                  language={
-                    viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
-                  }
-                  theme={theme} // Sync theme
-                  fontSize={fontSize}
-                  onFontSizeChange={handleFontSizeChange}
-                  borderColorClass={
-                    viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
-                  }
-                />
+
+          {/* Console Overlay Drawer */}
+          {!isViewingOther && (
+            <div
+              style={{ height: isConsoleOpen ? consoleHeight : 0, opacity: isConsoleOpen ? 1 : 0 }}
+              className={cn(
+                "absolute bottom-0 left-0 right-0 z-30 transition-[height,opacity] duration-300 ease-in-out border-t border-border shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] bg-background flex flex-col items-stretch justify-start",
+                !isConsoleOpen && "pointer-events-none"
               )}
+            >
+              <div className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize bg-transparent hover:bg-primary/50 active:bg-primary z-40 transition-colors" onMouseDown={startResizingConsole} />
+
+              <div className="flex-1 w-full min-h-0 relative h-full">
+                <CCConsolePanel
+                  roomId={roomId}
+                  problemId={selectedStudyProblemId}
+                  isOpen={isConsoleOpen} // Keep mounted, just manage visibility
+                  onClose={() => setIsConsoleOpen(false)}
+                  onExecute={handleExecuteWrapper}
+                  isExecuting={isExecuting}
+                  executionResult={executionResult}
+                />
+              </div>
             </div>
           )}
         </div>

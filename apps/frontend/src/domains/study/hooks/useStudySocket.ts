@@ -169,6 +169,20 @@ export const useStudySocketSubscription = (studyId: number) => {
       handleSocketMessage(message);
     });
 
+    // 2-2. Subscribe Testcase Topic
+    const testcaseTopic = `/topic/studies/${studyId}/testcases`;
+    console.log('[StudySocket] Subscribing to Testcases:', testcaseTopic);
+
+    const testcaseSubscription = client.subscribe(testcaseTopic, (message) => {
+      // Just an event trigger to refetch testcases
+      console.log('[StudySocket] Testcases updated, dispatching event');
+      window.dispatchEvent(
+        new CustomEvent('study-testcases-updated', {
+          detail: { studyId },
+        }),
+      );
+    });
+
     // 3. Subscribe Private User Topic (For ROOM_INFO, ERROR etc)
     let privateSubscription: any = null;
     let videoTokenSubscription: any = null;
@@ -590,6 +604,7 @@ export const useStudySocketSubscription = (studyId: number) => {
       }
       publicSubscription.unsubscribe();
       curriculumSubscription.unsubscribe();
+      testcaseSubscription.unsubscribe();
       if (privateSubscription) privateSubscription.unsubscribe();
       if (videoTokenSubscription) videoTokenSubscription.unsubscribe();
       if (ideRestoreSubscription) ideRestoreSubscription.unsubscribe();
