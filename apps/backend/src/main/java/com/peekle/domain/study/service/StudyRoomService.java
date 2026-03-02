@@ -114,8 +114,10 @@ public class StudyRoomService {
                                                         Collections.emptyList());
                                         int memberCount = studyMembers.size();
 
-                                        // 프로필 이미지 (실제 데이터 사용) - 최대 3개
+                                        // 프로필 이미지 (실제 데이터 사용, 방장 제외) - 최대 3개
                                         List<String> profileImages = studyMembers.stream()
+                                                        .filter(m -> !m.getUser().getId()
+                                                                        .equals(studyRoom.getOwner().getId()))
                                                         .limit(3)
                                                         .map(m -> {
                                                                 String img = m.getUser().getProfileImgThumb();
