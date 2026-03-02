@@ -57,17 +57,17 @@ if [ -n "$FRONTEND_CHANGED" ]; then
     exit 1
   fi
 
-  echo "• Running E2E tests (playwright)..."
-  pnpm --filter frontend test:e2e
-  if [ $? -ne 0 ]; then
-    echo "❌ Frontend E2E tests failed"
-    exit 1
-  fi
-
   echo "• Building..."
   pnpm --filter frontend build
   if [ $? -ne 0 ]; then
     echo "❌ Frontend build failed"
+    exit 1
+  fi
+
+  echo "• Running E2E tests (playwright)..."
+  pnpm --filter frontend test:e2e
+  if [ $? -ne 0 ]; then
+    echo "❌ Frontend E2E tests failed"
     exit 1
   fi
 
