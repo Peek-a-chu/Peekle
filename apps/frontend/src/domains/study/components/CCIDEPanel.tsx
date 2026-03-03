@@ -407,6 +407,11 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
 
       if (onEditorMount) onEditorMount(editor);
 
+      // Shift + Enter로 IntelliJ/Eclipse처럼 바로 아랫 줄에 빈 줄 삽입 후 이동
+      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+        editor.trigger('keyboard', 'editor.action.insertLineAfter', null);
+      });
+
       // [핵심 해결책 2] 마운트 시점에 state에 있는 값을 강제로 주입
       // 위에서 setCode로 업데이트된 상태가 여기(value prop)에 반영되겠지만,
       // 확실한 동기화를 위해 한 번 더 설정합니다.
