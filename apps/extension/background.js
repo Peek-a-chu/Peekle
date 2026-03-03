@@ -433,11 +433,11 @@ chrome.runtime.onInstalled.addListener(async () => {
 
     // 타겟 URL 패턴 (프론트엔드 도메인)
     // manifest.json의 host_permissions에 해당 도메인이 있어야 함
-    const targetPattern = IS_LOCAL ? 'http://localhost:3000/*' : 'https://peekle.today/*';
+    const targetPatterns = ['http://localhost:3000/*', 'https://peekle.today/*'];
 
     try {
         // 프론트엔드 탭 찾기
-        const tabs = await chrome.tabs.query({ url: targetPattern });
+        const tabs = await chrome.tabs.query({ url: targetPatterns });
 
         for (const tab of tabs) {
             if (tab.id) {
