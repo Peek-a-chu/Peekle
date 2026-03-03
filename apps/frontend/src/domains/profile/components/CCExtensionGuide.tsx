@@ -281,10 +281,13 @@ export function CCExtensionGuide({
             </p>
           </div>
           <button
-            onClick={() => setShowManualModal(true)}
+            onClick={() => {
+              window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
+              handleInstallClick();
+            }}
             className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-bold hover:bg-red-700"
           >
-            업데이트 가이드
+            스토어에서 업데이트
           </button>
         </div>
       )}
@@ -379,15 +382,6 @@ export function CCExtensionGuide({
         {status === 'NOT_INSTALLED' && (
           <div className="flex flex-col gap-4 w-full items-center">
             <div className="flex gap-3">
-              {/* [Temp] Manual Installation Guide replacing directly store link */}
-              <button
-                onClick={() => setShowManualModal(true)}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-              >
-                📥 확장 프로그램 수동 설치 가이드
-              </button>
-
-              {/* Original code preserved for future restoration
               <button
                 onClick={() => {
                   window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
@@ -397,7 +391,6 @@ export function CCExtensionGuide({
               >
                 {isPolling ? '⏳ 확인 중...' : '📥 스토어에서 다운로드'}
               </button>
-              */}
             </div>
             {isPolling && (
               <p className="text-xs text-muted-foreground animate-pulse">

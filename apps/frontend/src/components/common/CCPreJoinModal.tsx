@@ -119,15 +119,10 @@ export const CCPreJoinModal = ({
     // Actually, if I click "Install", it opens window. If I come back and it's not detected, I click again.
     // Maybe I should separate "Check" from "Install"?
     // For now, simplicity: Clicking button opens window AND starts polling.
-    // [Temp] Manual installation guide instead of direct store link
-    setShowManualModal(true);
-
-    /* Original store link preserved
     window.open(
       'https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb',
       '_blank',
     );
-    */
 
     setIsPolling(true);
     checkInstallation(); // Immediate
@@ -869,11 +864,13 @@ export const CCPreJoinModal = ({
                 </div>
               ) : extensionStatus === 'VERSION_MISMATCH' ? (
                 <Button
-                  onClick={() => setShowManualModal(true)}
+                  onClick={() => {
+                    window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
+                  }}
                   className="bg-red-600 hover:bg-red-700 text-white font-bold h-11 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <AlertCircle size={18} className="mr-2" />
-                  업데이트 가이드 확인하기
+                  스토어에서 업데이트하기
                 </Button>
               ) : !isBojLinked ? (
                 <Button
