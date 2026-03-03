@@ -50,19 +50,6 @@ body:
       required: true
 
   - type: textarea
-    id: scope
-    attributes:
-      label: 작업 범위
-      description: 포함/제외 범위를 분리해서 작성해주세요.
-      placeholder: |
-        포함:
-        - 
-        제외:
-        - 
-    validations:
-      required: true
-
-  - type: textarea
     id: dependencies
     attributes:
       label: 의존성/선행 작업 (선택)
