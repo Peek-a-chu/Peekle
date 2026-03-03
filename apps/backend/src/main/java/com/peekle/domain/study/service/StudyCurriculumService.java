@@ -71,8 +71,9 @@ public class StudyCurriculumService {
                 }
 
                 // 제약사항 1: 문제 날짜는 오늘이어야 함
-                LocalDate targetDate = (request.getProblemDate() != null) ? request.getProblemDate() : LocalDate.now();
-                if (!targetDate.equals(LocalDate.now())) {
+                LocalDate targetDate = (request.getProblemDate() != null) ? request.getProblemDate()
+                                : LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+                if (!targetDate.equals(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")))) {
                         throw new BusinessException(ErrorCode.PROBLEM_DATE_MISMATCH);
                 }
 
@@ -163,7 +164,7 @@ public class StudyCurriculumService {
                 // 2. Fallback to problemId and Today (for backward compatibility or existing
                 // logic)
                 else if (problemId != null) {
-                        LocalDate targetDate = LocalDate.now();
+                        LocalDate targetDate = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
                         List<StudyProblem> candidates = studyProblemRepository.findByStudyIdAndProblemDate(studyId,
                                         targetDate);
                         target = candidates.stream()

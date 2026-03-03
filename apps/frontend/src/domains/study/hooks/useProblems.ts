@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiFetch } from '@/lib/api';
+import { format } from 'date-fns';
 import { useStudySocketActions } from '@/domains/study/hooks/useStudySocket';
 import { getProblemIdByExternalId } from '@/domains/study/api/problemApi';
 
@@ -27,7 +28,7 @@ export function useProblems(studyId: number, dateString?: string) {
     if (!studyId) return;
     setIsLoading(true);
     try {
-      const targetDate = dateString || new Date().toISOString().split('T')[0];
+      const targetDate = dateString || format(new Date(), 'yyyy-MM-dd');
       const res = await apiFetch<any[]>(
         `/api/studies/${studyId}/curriculum/daily?date=${targetDate}`,
       );
