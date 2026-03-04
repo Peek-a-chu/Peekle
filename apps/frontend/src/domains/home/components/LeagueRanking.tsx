@@ -22,7 +22,7 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
   const rules = data.rule;
 
   // 그룹 나누기 (배정된 경우에만 의미있음)
-  const isAssigned = data.isGroupAssigned;
+  const isAssigned = data.isGroupAssigned !== false;
   const promotionZone = isAssigned ? data.members.filter((m) => m.status === 'PROMOTE') : [];
   const maintenanceZone = isAssigned ? data.members.filter((m) => m.status === 'STAY') : data.members;
   const demotionZone = isAssigned ? data.members.filter((m) => m.status === 'DEMOTE') : [];
@@ -44,7 +44,7 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
           <div className="flex items-center gap-3 min-w-0">
             <LeagueIcon league={data.myLeague} size={40} />
             <div className="flex flex-col min-w-0">
-              {data.isGroupAssigned ? (
+              {data.isGroupAssigned !== false ? (
                 <>
                   <span className="text-[10px] font-semibold text-primary block mb-0">
                     나의 현재 순위
