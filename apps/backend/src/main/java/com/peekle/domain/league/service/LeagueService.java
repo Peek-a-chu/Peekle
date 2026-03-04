@@ -253,9 +253,9 @@ public class LeagueService {
                     .findTop100ByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(user.getLeagueGroupId());
             totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
         } else {
-            // 그룹이 없는 경우(배치고사 전 등) 임시로 같은 티어 전체 조회 (Top 10)
-            groupUsers = userRepository.findTop100ByLeagueOrderByLeaguePointDescUpdatedAtAsc(user.getLeague());
-            totalGroupMembers = (int) userRepository.countByLeague(user.getLeague());
+            // 그룹 없는 경우: 같은 티어의 미배정 유저(leagueGroupId == null)만 조회
+            groupUsers = userRepository.findByLeagueAndLeagueGroupIdIsNull(user.getLeague());
+            totalGroupMembers = groupUsers.size();
         }
 
         // 승급/강등 인원 계산
@@ -313,7 +313,8 @@ public class LeagueService {
                 myLeagueMembers,
                 myPercentile,
                 leagueStats,
-                members);
+                members,
+                user.getLeagueGroupId() != null);
     }
 
     private int getLeagueUserCount(LeagueTier tier) {

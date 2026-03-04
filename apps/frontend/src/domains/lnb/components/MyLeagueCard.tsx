@@ -75,10 +75,15 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
   const displayScore = showInitial ? initialScore || 0 : myMember?.score || 0;
 
   // Rank/Status info (only available when loaded)
+  const isGroupAssigned = !isLoading ? data.isGroupAssigned : true;
   const displayRank = !isLoading ? data.myRank : 0;
   const displayTotal = !isLoading ? data.members.length : 0;
-  const displayStatusKey = !isLoading ? getStatus(myMember?.status) : 'maintenance';
-  const displayStatus = statusMap[displayStatusKey];
+  const displayStatusKey = !isLoading && isGroupAssigned ? getStatus(myMember?.status) : 'maintenance';
+  const displayStatus = isLoading
+    ? statusMap.maintenance
+    : !isGroupAssigned
+      ? { label: data.myLeague === 'stone' ? '배치대기' : '휴식중', color: 'text-muted-foreground bg-muted' }
+      : statusMap[displayStatusKey];
 
   if (showSkeleton) return <div className="h-20 bg-muted/30 rounded-xl animate-pulse" />;
 
@@ -116,9 +121,11 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
               >
                 {displayStatus.label}
               </span>
-              <span className="text-[11px] text-muted-foreground/60 mt-0.5 font-medium">
-                {displayRank}/{displayTotal}위
-              </span>
+              {isGroupAssigned && (
+                <span className="text-[11px] text-muted-foreground/60 mt-0.5 font-medium">
+                  {displayRank}/{displayTotal}위
+                </span>
+              )}
             </>
           )}
         </div>

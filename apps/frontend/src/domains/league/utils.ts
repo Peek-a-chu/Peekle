@@ -8,4 +8,5 @@ export const DEFAULT_LEAGUE_RANKING: LeagueRankingData = {
   rule: { promotePercent: 0, demotePercent: 0 },
   myPercentile: 0,
   leagueStats: [],
+  isGroupAssigned: false,
 };

@@ -14,17 +14,20 @@ public class LeagueStatusResponse {
     private int myScore;
     private String maxLeague;
     private int totalMembers;
-    
+
     // Rule info
     private int promotePercent;
     private int demotePercent;
-    
+    private boolean isGroupAssigned;
+
     // Additional stat
     private Double myPercentile;
     private List<LeagueStatDto> leagueStats;
     private List<LeagueRankingMemberDto> members;
 
-    public static LeagueStatusResponse from(LeagueTier tier, int rank, int score, String maxLeague, int totalMembers, double percentile, List<LeagueStatDto> leagueStats, List<LeagueRankingMemberDto> members) {
+    public static LeagueStatusResponse from(LeagueTier tier, int rank, int score, String maxLeague, int totalMembers,
+            double percentile, List<LeagueStatDto> leagueStats, List<LeagueRankingMemberDto> members,
+            boolean isGroupAssigned) {
         return LeagueStatusResponse.builder()
                 .myLeague(tier.name().toLowerCase())
                 .myRank(rank)
@@ -33,6 +36,7 @@ public class LeagueStatusResponse {
                 .totalMembers(totalMembers)
                 .promotePercent(tier.getPromotePercent())
                 .demotePercent(tier.getDemotePercent())
+                .isGroupAssigned(isGroupAssigned)
                 .myPercentile(percentile)
                 .leagueStats(leagueStats)
                 .members(members)

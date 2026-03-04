@@ -131,7 +131,14 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
   const myStatusMember = rankingData.members.find((m) => m.me);
   const myCurrentStatus = myStatusMember?.status || 'STAY'; // Default fallback
 
-  if (myCurrentStatus === 'PROMOTE') {
+  const isStone = rankingData.myLeague === 'stone';
+
+  if (!rankingData.isGroupAssigned) {
+    statusMessage = isStone ? '배치 대기 중' : '이번 주는 쉬어가기';
+    statusDetail = isStone
+      ? '이번 주 해당 티어의 참가 인원이 부족해 리그 그룹이 배정되지 않았습니다.'
+      : '이번 주는 같은 티어 인원이 부족해 리그가 운영되지 않습니다. 다음 주를 기다려 주세요!';
+  } else if (myCurrentStatus === 'PROMOTE') {
     statusMessage = '승급 안정권';
     statusDetail = '승급 구간에 속해있습니다!';
   } else if (myCurrentStatus === 'DEMOTE') {
@@ -214,12 +221,17 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
           <div className="flex items-end justify-between">
             <div>
               <span className="text-sm text-muted-foreground font-medium block mb-1">내 순위</span>
-              <span className="text-3xl font-black text-foreground">
-                {myRank}
-                <span className="text-sm font-medium text-muted-foreground ml-1">
-                  / {totalMembers}
+              {/* 미배정 시 순위 대신 메시지 표시 */}
+              {rankingData.isGroupAssigned ? (
+                <span className="text-3xl font-black text-foreground">
+                  {myRank}
+                  <span className="text-sm font-medium text-muted-foreground ml-1">
+                    / {totalMembers}
+                  </span>
                 </span>
-              </span>
+              ) : (
+                <span className="text-xl font-bold text-muted-foreground">-</span>
+              )}
             </div>
             <div className="text-right">
               <span className="text-sm text-muted-foreground font-medium block mb-1">점수</span>
