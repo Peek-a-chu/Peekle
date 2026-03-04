@@ -56,6 +56,7 @@ public class User extends BaseTimeEntity {
         this.profileImg = defaultImg;
         this.profileImgThumb = defaultImg;
         this.profileImgType = ProfileImgType.DEFAULT;
+        this.maxLeague = LeagueTier.STONE;
     }
 
     private String generateDefaultProfileImg(String nickname) {
@@ -98,6 +99,7 @@ public class User extends BaseTimeEntity {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private LeagueTier maxLeague = LeagueTier.STONE;
 
     @Builder.Default
