@@ -21,10 +21,11 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
   // 현재 리그의 승급/강등 규칙 가져오기
   const rules = data.rule;
 
-  // 그룹 나누기
-  const promotionZone = data.members.filter((m) => m.status === 'PROMOTE');
-  const maintenanceZone = data.members.filter((m) => m.status === 'STAY');
-  const demotionZone = data.members.filter((m) => m.status === 'DEMOTE');
+  // 그룹 나누기 (배정된 경우에만 의미있음)
+  const isAssigned = data.isGroupAssigned;
+  const promotionZone = isAssigned ? data.members.filter((m) => m.status === 'PROMOTE') : [];
+  const maintenanceZone = isAssigned ? data.members.filter((m) => m.status === 'STAY') : data.members;
+  const demotionZone = isAssigned ? data.members.filter((m) => m.status === 'DEMOTE') : [];
 
   return (
     <div className="bg-card border border-border rounded-2xl p-3 shadow-sm h-full flex flex-col transition-colors duration-300">
@@ -36,24 +37,37 @@ const LeagueRanking = ({ initialData }: LeagueRankingProps) => {
         </div>
       </div>
 
-      {/* 내 순위 요약 카드 - Borderless, uses surface elevation only */}
+      {/* 내 순위 요약 카드 */}
       <div className="mb-4">
         <div className="flex flex-wrap items-start gap-2 p-3 bg-surface-2 rounded-xl shadow-sm">
-          {/* 왼쪽 내용: 아이콘 + 순위 */}
+          {/* 왼쪽 내용: 아이콘 + 순위 OR 대기 메시지 */}
           <div className="flex items-center gap-3 min-w-0">
             <LeagueIcon league={data.myLeague} size={40} />
             <div className="flex flex-col min-w-0">
-              <span className="text-[10px] font-semibold text-primary block mb-0">
-                나의 현재 순위
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black text-primary tracking-tight">
-                  {data.myRank}위
-                </span>
-                <span className="text-xs text-muted-foreground font-semibold">
-                  / {data.members.length}명
-                </span>
-              </div>
+              {data.isGroupAssigned ? (
+                <>
+                  <span className="text-[10px] font-semibold text-primary block mb-0">
+                    나의 현재 순위
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-black text-primary tracking-tight">
+                      {data.myRank}위
+                    </span>
+                    <span className="text-xs text-muted-foreground font-semibold">
+                      / {data.members.length}명
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] font-semibold text-muted-foreground block mb-0">
+                    이번 주 상태
+                  </span>
+                  <span className="text-sm font-bold text-muted-foreground">
+                    {data.myLeague === 'stone' ? '배치 대기 중' : '이번 주는 쉬어가기'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 

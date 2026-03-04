@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             userData.isSolvedToday = statusJson.data.isSolvedToday;
                             userData.groupRank = statusJson.data.groupRank;
                             userData.leagueStatus = statusJson.data.leagueStatus;
+                            userData.isGroupAssigned = statusJson.data.isGroupAssigned;
                         }
                     }
 
@@ -158,7 +159,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 순위와 상태 함께 표시
         const rankEl = document.getElementById('user-rank');
-        if (data.groupRank) {
+        if (!data.isGroupAssigned) {
+            // 그룹 미배정: 리그명이 stone이면 배치 대기, 아니면 쉬는 중
+            const leagueName = (data.leagueName || '').toLowerCase();
+            const waitMsg = leagueName === 'stone' ? '배치 대기' : '이번주 쉬는 중';
+            rankEl.innerHTML = `<span style="font-size: 12px; color: var(--muted-foreground);">${waitMsg}</span>`;
+        } else if (data.groupRank) {
             const statusText = getStatusText(data.leagueStatus);
             rankEl.innerHTML = `<span style="font-weight: 700;">${data.groupRank}위</span> <span style="font-size: 10px; color: ${getStatusColor(data.leagueStatus)};">${statusText}</span>`;
         } else if (data.rank) {

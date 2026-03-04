@@ -79,10 +79,11 @@ const CCLeagueRankingList = ({ initialData }: CCLeagueRankingListProps) => {
       </div>
     );
   }
-  // 그룹 나누기
-  const promotionZone = data.members.filter((m) => m.status === 'PROMOTE');
-  const maintenanceZone = data.members.filter((m) => m.status === 'STAY');
-  const demotionZone = data.members.filter((m) => m.status === 'DEMOTE');
+  // 그룹 나누기 (배정된 경우에만 의미있음)
+  const isAssigned = data.isGroupAssigned;
+  const promotionZone = isAssigned ? data.members.filter((m) => m.status === 'PROMOTE') : [];
+  const maintenanceZone = isAssigned ? data.members.filter((m) => m.status === 'STAY') : data.members;
+  const demotionZone = isAssigned ? data.members.filter((m) => m.status === 'DEMOTE') : [];
 
   return (
     <div className="h-full flex flex-col">
