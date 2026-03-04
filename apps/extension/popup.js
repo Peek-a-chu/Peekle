@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 순위와 상태 함께 표시
         const rankEl = document.getElementById('user-rank');
-        if (!data.isGroupAssigned) {
+        if (data.isGroupAssigned === false) {
             // 그룹 미배정: 리그명이 stone이면 배치 대기, 아니면 쉬는 중
             const leagueName = (data.leagueName || '').toLowerCase();
             const waitMsg = leagueName === 'stone' ? '배치 대기' : '이번주 쉬는 중';
