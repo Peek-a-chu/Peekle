@@ -133,7 +133,7 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
 
   const isStone = rankingData.myLeague === 'stone';
 
-  if (!rankingData.isGroupAssigned) {
+  if (rankingData.isGroupAssigned === false) {
     statusMessage = isStone ? '배치 대기 중' : '이번 주는 쉬어가기';
     statusDetail = isStone
       ? '이번 주 해당 티어의 참가 인원이 부족해 리그 그룹이 배정되지 않았습니다.'
@@ -222,7 +222,7 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
             <div>
               <span className="text-sm text-muted-foreground font-medium block mb-1">내 순위</span>
               {/* 미배정 시 순위 대신 메시지 표시 */}
-              {rankingData.isGroupAssigned ? (
+              {rankingData.isGroupAssigned !== false ? (
                 <span className="text-3xl font-black text-foreground">
                   {myRank}
                   <span className="text-sm font-medium text-muted-foreground ml-1">
