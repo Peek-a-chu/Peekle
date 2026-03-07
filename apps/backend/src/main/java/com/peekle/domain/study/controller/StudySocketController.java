@@ -40,6 +40,8 @@ public class StudySocketController {
         private final StudyMemberRepository studyMemberRepository;
         private final StudyCurriculumService studyCurriculumService;
         private final RedisIdeService redisIdeService;
+        private final StudyProblemDraftService studyProblemDraftService;
+        private final StudyMemberProgressService studyMemberProgressService;
         private final MediaService mediaService;
         private final SimpMessagingTemplate messagingTemplate;
         private final StudyChatService studyChatService; // Injected
@@ -91,6 +93,11 @@ public class StudySocketController {
 
                                 // 1. Remove from old study presence
                                 stringRedisTemplate.opsForSet().remove(oldOnlineKey, userId.toString());
+                                Long persistedProblemId = studyProblemDraftService
+                                                .persistActiveProblemFromRedis(oldStudyId, userId);
+                                studyMemberProgressService.updateLastStudyProblem(oldStudyId, userId,
+                                                persistedProblemId);
+                                redisIdeService.clearActiveProblem(oldStudyId, userId);
 
                                 // 2. Notify old study members
                                 redisPublisher.publish(
@@ -154,6 +161,17 @@ public class StudySocketController {
                         messagingTemplate.convertAndSend(
                                         "/topic/studies/" + studyId + "/info/" + userId,
                                         SocketResponse.of("ONLINE_USERS", onlineUserIds));
+                        studyMemberProgressService.getLastStudyProblem(studyId, userId).ifPresent(lastStudyProblem ->
+                                        messagingTemplate.convertAndSend(
+                                                        "/topic/studies/" + studyId + "/info/" + userId,
+                                                        SocketResponse.of("LAST_ACTIVE_PROBLEM",
+                                                                        java.util.Map.of(
+                                                                                        "studyProblemId",
+                                                                                        lastStudyProblem.getId(),
+                                                                                        "problemDate",
+                                                                                        lastStudyProblem
+                                                                                                        .getProblemDate()
+                                                                                                        .toString()))));
 
                         // 3. Curriculum
                         List<ProblemStatusResponse> curriculum = studyCurriculumService
@@ -247,6 +265,39 @@ public class StudySocketController {
                                 SocketResponse.of("ONLINE_USERS", onlineUserIds));
         }
 
+        @MessageMapping("/studies/video-token")
+        public void refreshVideoToken(@Payload StudyOnlineUsersRequest request,
+                        SimpMessageHeaderAccessor headerAccessor) {
+                Long userId = (Long) headerAccessor.getSessionAttributes().get("userId");
+                Long studyId = request.getStudyId();
+
+                if (userId == null || studyId == null) {
+                        return;
+                }
+
+                boolean isUserMember = studyMemberRepository.existsByStudyAndUser_Id(
+                                StudyRoom.builder().id(studyId).build(), userId);
+                if (!isUserMember) {
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR",
+                                                        "Access Denied: You are not a member of this study."));
+                        return;
+                }
+
+                try {
+                        String token = mediaService.createAccessToken(studyId, userId, getUserNickname(userId));
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("VIDEO_TOKEN", token));
+                } catch (Exception e) {
+                        log.error("LiveKit token refresh failed: {}", e.getMessage());
+                        messagingTemplate.convertAndSend(
+                                        "/topic/studies/" + studyId + "/video-token/" + userId,
+                                        SocketResponse.of("ERROR", "Video token refresh failed"));
+                }
+        }
+
         // 스터디 정보 수정
         @MessageMapping("/studies/info/update")
         public void updateInfo(@Payload StudyInfoUpdateRequest request, SimpMessageHeaderAccessor headerAccessor) {
@@ -272,6 +323,10 @@ public class StudySocketController {
                 String onlineKey = "study:" + request.getStudyId() + ":online_users";
                 stringRedisTemplate.opsForSet().remove(onlineKey, userId.toString());
                 stringRedisTemplate.delete("user:" + userId + ":active_study");
+                Long persistedProblemId = studyProblemDraftService
+                                .persistActiveProblemFromRedis(request.getStudyId(), userId);
+                studyMemberProgressService.updateLastStudyProblem(request.getStudyId(), userId, persistedProblemId);
+                redisIdeService.clearActiveProblem(request.getStudyId(), userId);
 
                 // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
                 Long remainingUsers = stringRedisTemplate.opsForSet().size(onlineKey);
@@ -317,12 +372,16 @@ public class StudySocketController {
                         /* 이미 삭제 등 에러 무시 */ }
 
                 // 1. DB 삭제
+                Long persistedProblemId = studyProblemDraftService
+                                .persistActiveProblemFromRedis(request.getStudyId(), userId);
+                studyMemberProgressService.updateLastStudyProblem(request.getStudyId(), userId, persistedProblemId);
                 studyRoomService.leaveStudyRoom(userId, request.getStudyId());
 
                 // 2. Redis Presence
                 String onlineKey = "study:" + request.getStudyId() + ":online_users";
                 stringRedisTemplate.opsForSet().remove(onlineKey, userId.toString());
                 stringRedisTemplate.delete("user:" + userId + ":active_study");
+                redisIdeService.clearActiveProblem(request.getStudyId(), userId);
 
                 // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
                 Long remainingUsers = stringRedisTemplate.opsForSet().size(onlineKey);
@@ -363,11 +422,16 @@ public class StudySocketController {
                                                 .type(StudyChatLog.ChatType.SYSTEM)
                                                 .build());
 
+                Long persistedProblemId = studyProblemDraftService
+                                .persistActiveProblemFromRedis(request.getStudyId(), request.getTargetUserId());
+                studyMemberProgressService.updateLastStudyProblem(request.getStudyId(), request.getTargetUserId(),
+                                persistedProblemId);
                 studyRoomService.kickMemberByUserId(userId, request.getStudyId(), request.getTargetUserId());
 
                 stringRedisTemplate.opsForSet().remove("study:" + request.getStudyId() + ":online_users",
                                 request.getTargetUserId().toString());
                 stringRedisTemplate.delete("user:" + request.getTargetUserId() + ":active_study");
+                redisIdeService.clearActiveProblem(request.getStudyId(), request.getTargetUserId());
 
                 redisPublisher.publish(
                                 new ChannelTopic("topic/studies/rooms/" + request.getStudyId()),

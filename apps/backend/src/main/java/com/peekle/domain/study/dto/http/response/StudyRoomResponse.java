@@ -4,6 +4,7 @@ import com.peekle.domain.study.entity.StudyRoom;
 import com.peekle.domain.user.entity.User;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -17,6 +18,8 @@ public class StudyRoomResponse {
     private final int rankingPoint;
     private final boolean isActive;
     private final LocalDateTime createdAt;
+    private final Long lastStudyProblemId;
+    private final LocalDate lastStudyProblemDate;
     private final List<StudyMemberResponse> members;
 
     // Old constructor removed
@@ -45,7 +48,12 @@ public class StudyRoomResponse {
 
     private final String role; // "OWNER" or "MEMBER"
 
-    private StudyRoomResponse(StudyRoom studyRoom, List<StudyMemberResponse> members, Long currentUserId) {
+    private StudyRoomResponse(
+            StudyRoom studyRoom,
+            List<StudyMemberResponse> members,
+            Long currentUserId,
+            Long lastStudyProblemId,
+            LocalDate lastStudyProblemDate) {
         this.id = studyRoom.getId();
         this.title = studyRoom.getTitle();
         this.description = studyRoom.getDescription();
@@ -53,6 +61,8 @@ public class StudyRoomResponse {
         this.rankingPoint = studyRoom.getRankingPoint();
         this.isActive = studyRoom.isActive();
         this.createdAt = studyRoom.getCreatedAt();
+        this.lastStudyProblemId = lastStudyProblemId;
+        this.lastStudyProblemDate = lastStudyProblemDate;
         this.members = members != null ? members : Collections.emptyList();
 
         // 권한 결정 로직
@@ -64,11 +74,20 @@ public class StudyRoomResponse {
     }
 
     public static StudyRoomResponse from(StudyRoom studyRoom, List<StudyMemberResponse> members, Long currentUserId) {
-        return new StudyRoomResponse(studyRoom, members, currentUserId);
+        return new StudyRoomResponse(studyRoom, members, currentUserId, null, null);
+    }
+
+    public static StudyRoomResponse from(
+            StudyRoom studyRoom,
+            List<StudyMemberResponse> members,
+            Long currentUserId,
+            Long lastStudyProblemId,
+            LocalDate lastStudyProblemDate) {
+        return new StudyRoomResponse(studyRoom, members, currentUserId, lastStudyProblemId, lastStudyProblemDate);
     }
 
     // For cases where members are not loaded yet or simplified view
     public static StudyRoomResponse from(StudyRoom studyRoom, Long currentUserId) {
-        return new StudyRoomResponse(studyRoom, Collections.emptyList(), currentUserId);
+        return new StudyRoomResponse(studyRoom, Collections.emptyList(), currentUserId, null, null);
     }
 }

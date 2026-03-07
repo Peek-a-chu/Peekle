@@ -14,6 +14,8 @@ public class IdeRequest {
     private String filename; // e.g. "Main.java"
     private String code; // Source code content
     private String lang; // e.g. "java", "python"
+    private String language; // Frontend alias for lang
+    private Long eventTs; // Monotonic client event timestamp
 
     public IdeRequest(String filename, String code, String lang) {
         this.filename = filename;

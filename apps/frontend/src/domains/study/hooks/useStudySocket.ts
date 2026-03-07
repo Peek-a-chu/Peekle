@@ -101,6 +101,10 @@ export const useStudySocketActions = () => {
     if (roomId) publish('/pub/studies/mute-all', { studyId: roomId });
   }, [roomId, publish]);
 
+  const requestVideoToken = useCallback(() => {
+    if (roomId) publish('/pub/studies/video-token', { studyId: roomId });
+  }, [roomId, publish]);
+
   return {
     enterStudy,
     exitStudy,
@@ -113,6 +117,7 @@ export const useStudySocketActions = () => {
     removeProblem,
     updateStatus,
     muteAll,
+    requestVideoToken,
   };
 };
 
@@ -133,6 +138,7 @@ export const useStudySocketSubscription = (studyId: number) => {
   // useRef는 컴포넌트 최상위 레벨에서만 호출 가능
   const currentUserIdRef = useRef(currentUserId);
   const recentProblemEventRef = useRef<Map<string, number>>(new Map());
+  const recentPresenceEventRef = useRef<Map<string, number>>(new Map());
   const onlineSyncTimerRef = useRef<number | null>(null);
   const onlineSyncSeenRef = useRef<boolean>(false);
   const onlineSyncAttemptsRef = useRef<number>(0);
@@ -297,22 +303,93 @@ export const useStudySocketSubscription = (studyId: number) => {
         console.log('[StudySocket] Received message:', { type, data, fullPayload: payload });
 
         const stateParticipants = useRoomStore.getState().participants;
+        const toUserId = (value: unknown): number | null => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const getNicknameByUserId = (targetUserId: number): string => {
+          const target = useRoomStore
+            .getState()
+            .participants.find((participant) => Number(participant.id) === Number(targetUserId));
+          return target?.nickname || `User ${targetUserId}`;
+        };
+
+        const shouldSkipPresenceToast = (eventType: 'ENTER' | 'LEAVE', targetUserId: number) => {
+          const dedupeKey = `${eventType}:${targetUserId}`;
+          const now = Date.now();
+          const lastTimestamp = recentPresenceEventRef.current.get(dedupeKey);
+          if (lastTimestamp && now - lastTimestamp < 1000) {
+            return true;
+          }
+
+          recentPresenceEventRef.current.set(dedupeKey, now);
+          for (const [key, timestamp] of recentPresenceEventRef.current.entries()) {
+            if (now - timestamp > 5000) {
+              recentPresenceEventRef.current.delete(key);
+            }
+          }
+          return false;
+        };
+
+        const resetRealtimeViewIfTargetLeft = (targetUserId: number) => {
+          const state = useRoomStore.getState();
+          if (state.viewMode !== 'SPLIT_REALTIME') return;
+          if (state.viewingUser?.id !== targetUserId) return;
+
+          state.resetToOnlyMine();
+          toast.info(
+            '\uC5F4\uB78C \uC911\uC774\uB358 \uC0AC\uC6A9\uC790\uAC00 \uD1F4\uC7A5\uD558\uC5EC \uB0B4 \uCF54\uB4DC \uBCF4\uAE30\uB85C \uC804\uD658\uD588\uC2B5\uB2C8\uB2E4.',
+          );
+        };
 
         switch (type) {
           case 'ENTER': {
-            const enteredUserId = data;
+            const enteredUserId = toUserId(data);
+            if (enteredUserId === null) break;
+
             // Optimistic update for immediate feedback
             updateParticipant(enteredUserId, { isOnline: true });
+
+            if (
+              enteredUserId !== currentUserIdRef.current &&
+              !shouldSkipPresenceToast('ENTER', enteredUserId)
+            ) {
+              const nickname = getNicknameByUserId(enteredUserId);
+              toast.info(`${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0 \uC785\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`);
+            }
             break;
           }
           case 'LEAVE': {
-            const leftUserId = data;
+            const leftUserId = toUserId(data);
+            if (leftUserId === null) break;
+
             updateParticipant(leftUserId, { isOnline: false });
+            resetRealtimeViewIfTargetLeft(leftUserId);
+
+            if (
+              leftUserId !== currentUserIdRef.current &&
+              !shouldSkipPresenceToast('LEAVE', leftUserId)
+            ) {
+              const nickname = getNicknameByUserId(leftUserId);
+              toast.info(`${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0\uC11C \uD1F4\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`);
+            }
             break;
           }
           case 'QUIT': {
-            const quitUserId = data;
+            const quitUserId = toUserId(data);
+            if (quitUserId === null) break;
+
+            resetRealtimeViewIfTargetLeft(quitUserId);
             removeParticipant(quitUserId);
+
+            if (
+              quitUserId !== currentUserIdRef.current &&
+              !shouldSkipPresenceToast('LEAVE', quitUserId)
+            ) {
+              const nickname = getNicknameByUserId(quitUserId);
+              toast.info(`${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0\uC11C \uD1F4\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`);
+            }
             break;
           }
           case 'DELEGATE': {
@@ -328,11 +405,14 @@ export const useStudySocketSubscription = (studyId: number) => {
             break;
           }
           case 'KICK': {
-            const kickedUserId = data;
+            const kickedUserId = toUserId(data);
+            if (kickedUserId === null) break;
+
             if (useRoomStore.getState().currentUserId === kickedUserId) {
               toast.error('스터디에서 강퇴되었습니다.');
               router.replace('/home');
             } else {
+              resetRealtimeViewIfTargetLeft(kickedUserId);
               removeParticipant(kickedUserId);
               const kickedMember = stateParticipants.find((p) => p.id === kickedUserId);
               if (kickedMember) toast.info(`${kickedMember.nickname}님이 강퇴되었습니다.`);
@@ -382,6 +462,12 @@ export const useStudySocketSubscription = (studyId: number) => {
             const onlineSet = new Set<number>(onlineIds);
 
             const state = useRoomStore.getState();
+            const viewingUserId =
+              state.viewMode === 'SPLIT_REALTIME' ? Number(state.viewingUser?.id) : null;
+            if (viewingUserId && !Number.isNaN(viewingUserId) && !onlineSet.has(viewingUserId)) {
+              resetRealtimeViewIfTargetLeft(viewingUserId);
+            }
+
             const missingOnline =
               onlineIds.length > 0 &&
               state.participants &&
@@ -411,6 +497,18 @@ export const useStudySocketSubscription = (studyId: number) => {
                 })),
               );
             }
+            break;
+          }
+          case 'LAST_ACTIVE_PROBLEM': {
+            const studyProblemId = toUserId(data?.studyProblemId ?? data);
+            if (!studyProblemId) break;
+            const problemDate = typeof data?.problemDate === 'string' ? data.problemDate : null;
+
+            window.dispatchEvent(
+              new CustomEvent('study-last-active-problem', {
+                detail: { studyId, studyProblemId, problemDate },
+              }),
+            );
             break;
           }
           case 'STATUS': {

@@ -10,10 +10,26 @@ services:
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: peekle-livekit-local
+    command: --dev --bind 0.0.0.0
+    env_file: .env
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
   redis-commander:
     image: rediscommander/redis-commander:latest

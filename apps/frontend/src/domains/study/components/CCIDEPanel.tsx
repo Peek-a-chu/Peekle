@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
@@ -107,7 +107,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const theme = propTheme || internalTheme;
 
     // 현재 화면에 보여지는 코드
-    const [code, setCode] = useState(initialCode || DEFAULT_CODE.python);
+    const [code, setCode] = useState(initialCode ?? DEFAULT_CODE.python);
 
     // [Realtime Fix] - 통합됨 (아래 useEffect에서 처리)
     // 기존에 있던 readOnly 전용 이펙트는 아래의 일반 initialCode 이펙트와 중복되므로 제거하거나 병합합니다.
@@ -130,10 +130,6 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       const newCode =
         restoredCode === '' ? DEFAULT_CODE[getSafeLanguageKey(language)] : restoredCode;
 
-      console.log(
-        '[CCIDEPanel] Restoring code, remounting editor...',
-        restoredCode === '' ? '(using default)' : '',
-      );
       setCode(newCode);
       originCodeRef.current = newCode;
       isDirtyRef.current = false;
@@ -141,22 +137,18 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       // 모델 ID를 변경하여 에디터를 강제로 다시 마운트합니다.
       // setValue만으로 해결되지 않는 렌더링 타이밍 이슈를 원천 차단합니다.
       setModelId((prev) => prev + 1);
+    }, [restoredCode, restoreVersion, language]);
 
       // 상위 컴포넌트(CCCenterPanel)에도 알림
-      if (onCodeChange) {
-        onCodeChange(newCode);
-      }
-    }, [restoredCode, restoreVersion, language, onCodeChange]);
-
-    // [핵심] Monaco Editor 경로 캐싱 방지용 ID
     const [modelId, setModelId] = useState(0);
+    const readOnlySnapshotKeyRef = useRef<string>('');
 
-    // 원본 코드 비교 및 변경 감지 Refs
-    const originCodeRef = useRef<string>(initialCode || DEFAULT_CODE.python);
+      // 원본 코드 비교 및 변경 감지 Refs
+    const originCodeRef = useRef<string>(initialCode ?? DEFAULT_CODE.python);
     const isDirtyRef = useRef(false);
 
-    // [핵심 해결책 1] 언어 변경 중임을 표시하는 플래그
-    // 이 플래그가 true일 때는 initialCode가 들어와도 무시합니다.
+      // [핵심 해결책 1] 언어 변경 중임을 표시하는 플래그
+      // 이 플래그가 true일 때는 initialCode가 들어와도 무시합니다.
     const isSwitchingLanguageRef = useRef(false);
 
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -182,6 +174,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       // [핵심 해결책 1 적용]
       // 언어 변경 중이거나, initialCode가 없는 경우 무시
       if (isSwitchingLanguageRef.current) return;
+      if (readOnly) return;
 
       if (initialCode !== undefined) {
         setCode(initialCode);
@@ -194,29 +187,45 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
           editorRef.current.setValue(initialCode);
         }
       }
-    }, [initialCode]);
+    }, [initialCode, readOnly]);
 
     useEffect(() => {
       readOnlyRef.current = readOnly;
     }, [readOnly]);
 
     useEffect(() => {
-      if (propLanguage) {
-        // If switching language from prop, only reset code if it was default
-        // But for simplicity, we respect internal logic unless it's a forced change
-        // For shared state, parent logic controls this best.
-        // Here we just ensure we display correct code for the language if logic requires.
-        // But if `code` state is local, we need to be careful.
-        // Assuming parent handles code syncing if `propLanguage` is used.
-        // Actually, let's keep the simple logic: if lang changes and code matches default of old lang, update to new default.
-        setCode((prev) =>
-          prev === DEFAULT_CODE[internalLanguage as keyof typeof DEFAULT_CODE]
-            ? DEFAULT_CODE[propLanguage as keyof typeof DEFAULT_CODE]
-            : prev,
-        );
-        setInternalLanguage(propLanguage);
+      if (!propLanguage) return;
+
+      if (readOnly) {
+        // Readonly state sync is handled by a dedicated snapshot effect below.
+        return;
       }
-    }, [propLanguage, internalLanguage, onCodeChange]);
+
+      const previousDefault = DEFAULT_CODE[getSafeLanguageKey(internalLanguage)];
+      const nextDefault = DEFAULT_CODE[getSafeLanguageKey(propLanguage)];
+
+      setCode((prev) => (prev === previousDefault ? nextDefault : prev));
+      setInternalLanguage(propLanguage);
+    }, [propLanguage, internalLanguage, readOnly]);
+
+    useEffect(() => {
+      if (!readOnly) return;
+
+      const incomingCode = initialCode ?? '';
+      const incomingLanguage = propLanguage ?? internalLanguage;
+      const snapshotKey = `${incomingLanguage}::${incomingCode}`;
+
+      if (readOnlySnapshotKeyRef.current === snapshotKey) return;
+      readOnlySnapshotKeyRef.current = snapshotKey;
+
+      setInternalLanguage(incomingLanguage);
+      setCode(incomingCode);
+      originCodeRef.current = incomingCode;
+      isDirtyRef.current = false;
+
+      // Force remount to avoid intermittent blank rendering on readonly stream updates.
+      setModelId((prev) => prev + 1);
+    }, [readOnly, initialCode, propLanguage, internalLanguage]);
 
     // ----------------------------------------------------------------------
     // 언어 변경 로직
@@ -225,6 +234,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const proceedLanguageChange = (newLang: string): void => {
       // 1. 플래그 설정: "지금부터 언어 바꿀 거니까 외부 prop 간섭하지 마라"
       isSwitchingLanguageRef.current = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
 
       const safeKey = getSafeLanguageKey(newLang);
       const newCode = DEFAULT_CODE[safeKey];
@@ -234,9 +247,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       // 2. State 업데이트: 새 언어의 스켈레톤 코드로 교체
       setCode(newCode);
 
-      if (onCodeChange) {
-        onCodeChange(newCode, newLang);
-      }
+      // Language switch sync is handled by a dedicated websocket event.
+      // Avoid sending a stale IDE/update packet during rapid language changes.
 
       // 3. 원본 기준점 리셋
       originCodeRef.current = newCode;
@@ -588,15 +600,16 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
             path={`${editorId}_file_${modelId}.${getFileExtension(language)}`}
             // [중요] Controlled Component 방식 사용 (value에 전적으로 의존)
             value={code}
-            onChange={(value) => {
+            onChange={(value, event) => {
               if (!readOnly) {
                 const newVal = value || '';
                 setCode(newVal);
+                const isProgrammaticChange = Boolean(event?.isFlush);
 
-                if (onCodeChange) {
+                if (onCodeChange && !isProgrammaticChange) {
                   if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
                   debounceTimerRef.current = setTimeout(() => {
-                    onCodeChange(newVal);
+                    onCodeChange(newVal, language);
                   }, 300);
                 }
 
@@ -649,3 +662,4 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
 );
 
 CCIDEPanel.displayName = 'CCIDEPanel';
+

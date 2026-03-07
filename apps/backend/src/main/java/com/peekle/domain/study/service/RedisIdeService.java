@@ -29,27 +29,134 @@ public class RedisIdeService {
     private final StudyMemberProgressService studyMemberProgressService;
 
     /**
-     * 사용자 코드를 Redis Hash에 저장
+     * Save IDE code to Redis hash.
      */
     public void saveCode(Long studyId, Long userId, IdeRequest request) {
-        // Safe check for problemId
-        Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L; // 0L for default or unknown
-        String key = String.format(RedisKeyConst.IDE_KEY, studyId, problemId, userId);
+        Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L;
+        String language = (request.getLang() != null && !request.getLang().isBlank())
+                ? request.getLang()
+                : request.getLanguage();
+        Long eventTs = request.getEventTs() != null ? request.getEventTs() : System.currentTimeMillis();
+        saveCode(
+                studyId,
+                userId,
+                problemId,
+                request.getProblemTitle(),
+                request.getExternalId(),
+                request.getFilename(),
+                request.getCode(),
+                language,
+                eventTs);
+    }
+
+    public void saveCode(
+            Long studyId,
+            Long userId,
+            Long problemId,
+            String problemTitle,
+            String externalId,
+            String filename,
+            String code,
+            String language,
+            Long eventTs) {
+        Long resolvedProblemId = (problemId != null) ? problemId : 0L;
+        String key = String.format(RedisKeyConst.IDE_KEY, studyId, resolvedProblemId, userId);
+        String normalizedLanguage = normalizeLanguage(language);
+        String resolvedFilename = (filename != null && !filename.isBlank())
+                ? filename
+                : getDefaultFilename(normalizedLanguage);
+        String resolvedCode = (code != null) ? code : "";
+        Long resolvedEventTs = (eventTs != null) ? eventTs : System.currentTimeMillis();
 
         Map<String, String> data = new HashMap<>();
-        data.put("problemId", problemId.toString());
-        data.put("filename", request.getFilename());
-        data.put("code", request.getCode());
-        data.put("lang", request.getLang());
+        data.put("problemId", resolvedProblemId.toString());
+        if (problemTitle != null && !problemTitle.isBlank()) {
+            data.put("problemTitle", problemTitle.trim());
+        }
+        String normalizedExternalId = (externalId != null && !externalId.isBlank()) ? externalId.trim() : null;
+        if (normalizedExternalId != null) {
+            data.put("externalId", normalizedExternalId);
+        }
+        data.put("filename", resolvedFilename);
+        data.put("code", resolvedCode);
+        data.put("lang", normalizedLanguage);
+        data.put("eventTs", resolvedEventTs.toString());
         data.put("updatedAt", LocalDateTime.now().toString());
 
         redisTemplate.opsForHash().putAll(key, data);
-        // 옵션: 필요한 경우 만료 시간 설정 (예: 24시간)
-        // redisTemplate.expire(key, 24, TimeUnit.HOURS);
+        if (normalizedExternalId == null) {
+            redisTemplate.opsForHash().delete(key, "externalId");
+        }
+
+        if (resolvedProblemId > 0) {
+            saveActiveProblem(
+                    studyId,
+                    userId,
+                    resolvedProblemId,
+                    problemTitle,
+                    normalizedExternalId,
+                    resolvedFilename,
+                    resolvedCode,
+                    normalizedLanguage,
+                    resolvedEventTs);
+        }
+    }
+
+    public String getTemplateCode(String language) {
+        String normalized = normalizeLanguage(language);
+        if ("java".equals(normalized)) {
+            return """
+                    import java.io.*;
+                    import java.util.*;
+
+                    public class Main {
+                        public static void main(String[] args) throws Exception {
+                            System.out.println("Hello World!");
+                        }
+                    }""";
+        }
+        if ("cpp".equals(normalized)) {
+            return """
+                    #include <iostream>
+
+                    using namespace std;
+
+                    int main() {
+                        cout << "Hello World!" << endl;
+                        return 0;
+                    }""";
+        }
+        return """
+                import sys
+
+                print("Hello World!")""";
+    }
+
+    public String getDefaultFilename(String language) {
+        String normalized = normalizeLanguage(language);
+        return switch (normalized) {
+            case "java" -> "Main.java";
+            case "cpp" -> "main.cpp";
+            default -> "main.py";
+        };
+    }
+
+    public String normalizeLanguage(String language) {
+        if (language == null || language.isBlank()) {
+            return "python";
+        }
+        String normalized = language.trim().toLowerCase();
+        if (normalized.contains("java") && !normalized.contains("script")) {
+            return "java";
+        }
+        if (normalized.contains("cpp") || normalized.contains("c++")) {
+            return "cpp";
+        }
+        return "python";
     }
 
     /**
-     * Redis에서 사용자 코드 스냅샷 조회
+     * Load IDE code for a user and problem.
      */
     public IdeResponse getCode(Long studyId, Long problemId, Long userId) {
         String key = String.format(RedisKeyConst.IDE_KEY, studyId, problemId, userId);
@@ -59,7 +166,6 @@ public class RedisIdeService {
             return null;
         }
 
-        // 사용자 정보 별도 조회 (또는 캐시)
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -67,28 +173,39 @@ public class RedisIdeService {
                 .senderId(userId)
                 .senderName(user.getNickname())
                 .problemId(problemId)
+                .problemTitle((String) entries.getOrDefault("problemTitle", null))
+                .externalId((String) entries.getOrDefault("externalId", null))
                 .filename((String) entries.getOrDefault("filename", "Untitled"))
                 .code((String) entries.getOrDefault("code", ""))
                 .lang((String) entries.getOrDefault("lang", "text"))
+                .eventTs(parseEventTs(entries.get("eventTs")))
                 .build();
     }
 
+    private Long parseEventTs(Object rawEventTs) {
+        if (rawEventTs == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(rawEventTs.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /**
-     * 대상 사용자의 감시자 목록에 추가
+     * Add a watcher for a target user's IDE.
      */
     public void addWatcher(Long studyId, Long targetUserId, Long viewerId) {
         String key = String.format(RedisKeyConst.IDE_WATCHERS, studyId, targetUserId);
         redisTemplate.opsForSet().add(key, viewerId.toString());
 
-        // 시청자가 무엇을 보고 있는지 추적 (깔끔한 연결 종료를 위해)
-        // Key: user:{viewerId}:watching:{studyId} -> targetUserId
-        // 시청자가 연결을 끊을 때 어떤 대상의 Set에서 제거해야 하는지 알 수 있음.
         String viewerKey = "user:" + viewerId + ":watching:" + studyId;
         redisTemplate.opsForSet().add(viewerKey, targetUserId.toString());
     }
 
     /**
-     * 대상 사용자의 감시자 목록에서 제거
+     * Remove a watcher from a target user's IDE.
      */
     public void removeWatcher(Long studyId, Long targetUserId, Long viewerId) {
         String key = String.format(RedisKeyConst.IDE_WATCHERS, studyId, targetUserId);
@@ -99,7 +216,7 @@ public class RedisIdeService {
     }
 
     /**
-     * 대상 사용자의 모든 감시자 조회
+     * Get all watcher IDs for target user.
      */
     public Set<String> getWatchers(Long studyId, Long targetUserId) {
         String key = String.format(RedisKeyConst.IDE_WATCHERS, studyId, targetUserId);
@@ -109,22 +226,19 @@ public class RedisIdeService {
             return Collections.emptySet();
         }
 
-        // Set<Object> (Redis 기본) -> Set<String> 변환
-        return members.stream()
-                .map(Object::toString)
-                .collect(Collectors.toSet());
+        return members.stream().map(Object::toString).collect(Collectors.toSet());
     }
 
     /**
-     * 사용자가 현재 감시 중인 모든 대상 조회 (정리용)
+     * Get all targets currently watched by viewer.
      */
     public Set<String> getWatchingTargets(Long studyId, Long viewerId) {
         String viewerKey = "user:" + viewerId + ":watching:" + studyId;
         Set<Object> targets = redisTemplate.opsForSet().members(viewerKey);
-        if (targets == null)
+        if (targets == null) {
             return Collections.emptySet();
+        }
 
-        // Convert Object -> String
         return targets.stream().map(Object::toString).collect(Collectors.toSet());
     }
 
@@ -304,5 +418,64 @@ public class RedisIdeService {
             result.put("updatedAt", rawUpdatedAt.toString());
         }
         return result;
+    }
+
+    public IdeResponse getActiveIdeSnapshot(Long studyId, Long userId) {
+        String key = String.format(RedisKeyConst.STUDY_USER_ACTIVE_IDE, studyId, userId);
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
+        if (entries == null || entries.isEmpty()) {
+            return null;
+        }
+
+        Object rawProblemId = entries.get("studyProblemId");
+        if (rawProblemId == null) {
+            return null;
+        }
+        Long problemId;
+        try {
+            problemId = Long.valueOf(rawProblemId.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        String lang = entries.get("lang") != null ? entries.get("lang").toString() : "python";
+        String filename = entries.get("filename") != null
+                ? entries.get("filename").toString()
+                : getDefaultFilename(lang);
+
+        return IdeResponse.builder()
+                .senderId(userId)
+                .senderName(user.getNickname())
+                .problemId(problemId)
+                .problemTitle((String) entries.getOrDefault("problemTitle", null))
+                .externalId((String) entries.getOrDefault("externalId", null))
+                .filename(filename)
+                .code((String) entries.getOrDefault("code", ""))
+                .lang(lang)
+                .eventTs(parseEventTs(entries.get("eventTs")))
+                .build();
+    }
+
+    public Long getActiveProblemId(Long studyId, Long userId) {
+        Map<String, Object> activeProblem = getActiveProblem(studyId, userId);
+        Object rawStudyProblemId = activeProblem.get("studyProblemId");
+        if (rawStudyProblemId == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(rawStudyProblemId.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    public void clearActiveProblem(Long studyId, Long userId) {
+        String key = String.format(RedisKeyConst.STUDY_USER_ACTIVE_PROBLEM, studyId, userId);
+        String activeIdeKey = String.format(RedisKeyConst.STUDY_USER_ACTIVE_IDE, studyId, userId);
+        redisTemplate.delete(key);
+        redisTemplate.delete(activeIdeKey);
     }
 }

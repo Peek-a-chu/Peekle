@@ -17,6 +17,7 @@ import type { StudyProblem as Problem } from '@/domains/study/types';
 import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
 import { format } from 'date-fns';
 import { formatDate } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
 import { useAuthStore } from '@/store/auth-store';
@@ -53,7 +54,15 @@ function StudySocketInitiator({ studyId }: { studyId: number }) {
 }
 
 // Inner component with main logic
-function StudyRoomContent({ studyId }: { studyId: number }) {
+function StudyRoomContent({
+  studyId,
+  initialLastStudyProblemId,
+  initialLastProblemDate,
+}: {
+  studyId: number;
+  initialLastStudyProblemId: number | null;
+  initialLastProblemDate: string | null;
+}) {
   const router = useRouter();
   const { user } = useAuthStore();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
@@ -116,7 +125,12 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   });
 
   // Local state for layout
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    if (initialLastProblemDate && /^\d{4}-\d{2}-\d{2}$/.test(initialLastProblemDate)) {
+      return new Date(`${initialLastProblemDate}T00:00:00`);
+    }
+    return new Date();
+  });
   // Removed local state for sidebars -> Moved to useRoomStore
   const isLeftPanelFolded = useRoomStore((state) => state.isLeftPanelFolded);
   const isRightPanelFolded = useRoomStore((state) => state.isRightPanelFolded);
@@ -245,7 +259,9 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
-  const lastSelectedProblemStorageKey = `peekle:study:${studyId}:last-selected-problem`;
+  const [hintedStudyProblemId, setHintedStudyProblemId] = useState<number | null>(null);
+  const lastProblemFallbackRequestedRef = useRef(false);
+  const initialHintAppliedRef = useRef(false);
 
   useEffect(() => {
     // Reset selected problem and view mode when mounting study room
@@ -253,6 +269,60 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
     // setSelectedProblem(null, null);
     resetToOnlyMine();
   }, [setSelectedProblem, resetToOnlyMine]);
+
+  useEffect(() => {
+    const handleLastActiveProblem = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        studyId?: number;
+        studyProblemId?: number;
+        problemDate?: string;
+      }>;
+      if (Number(customEvent.detail?.studyId) !== studyId) return;
+
+      const hintedStudyProblemId = Number(customEvent.detail?.studyProblemId);
+      if (!Number.isFinite(hintedStudyProblemId) || hintedStudyProblemId <= 0) return;
+
+      setHintedStudyProblemId(hintedStudyProblemId);
+
+      const hintedProblemDate = customEvent.detail?.problemDate;
+      if (hintedProblemDate && /^\d{4}-\d{2}-\d{2}$/.test(hintedProblemDate)) {
+        setSelectedDate((prev) => {
+          const prevDate = format(prev, 'yyyy-MM-dd');
+          if (prevDate === hintedProblemDate) return prev;
+          return new Date(`${hintedProblemDate}T00:00:00`);
+        });
+      }
+    };
+
+    window.addEventListener('study-last-active-problem', handleLastActiveProblem);
+    return () => window.removeEventListener('study-last-active-problem', handleLastActiveProblem);
+  }, [studyId]);
+
+  useEffect(() => {
+    lastProblemFallbackRequestedRef.current = false;
+    initialHintAppliedRef.current = false;
+    setHintedStudyProblemId(null);
+  }, [studyId]);
+
+  useEffect(() => {
+    if (!initialLastProblemDate || !/^\d{4}-\d{2}-\d{2}$/.test(initialLastProblemDate)) return;
+
+    setSelectedDate((prev) => {
+      const prevDate = format(prev, 'yyyy-MM-dd');
+      if (prevDate === initialLastProblemDate) return prev;
+      return new Date(`${initialLastProblemDate}T00:00:00`);
+    });
+  }, [studyId, initialLastProblemDate]);
+
+  useEffect(() => {
+    if (initialHintAppliedRef.current) return;
+
+    const hintedStudyProblemId = Number(initialLastStudyProblemId);
+    if (!Number.isFinite(hintedStudyProblemId) || hintedStudyProblemId <= 0) return;
+
+    initialHintAppliedRef.current = true;
+    setHintedStudyProblemId(hintedStudyProblemId);
+  }, [studyId, initialLastStudyProblemId]);
 
   // [Fix] Sync Local Media State with Store (Address Entry Sync Issue)
   useEffect(() => {
@@ -481,14 +551,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       problem.title,
       problem.externalId || String((problem as any).number || 'Custom'),
     );
-
-    if (studyProblemId) {
-      try {
-        sessionStorage.setItem(lastSelectedProblemStorageKey, String(studyProblemId));
-      } catch {
-        // Ignore storage write failures
-      }
-    }
+    if (studyProblemId) setHintedStudyProblemId(Number(studyProblemId));
   };
 
   const handleDateChange = (date: Date): void => {
@@ -534,25 +597,60 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   useEffect(() => {
     if (selectedStudyProblemId || problems.length === 0) return;
 
-    let cachedStudyProblemId: number | null = null;
-    try {
-      const raw = sessionStorage.getItem(lastSelectedProblemStorageKey);
-      cachedStudyProblemId = raw ? Number(raw) : null;
-    } catch {
-      cachedStudyProblemId = null;
+    const trySelectByStudyProblemId = (targetStudyProblemId: number) => {
+      const matchedProblem = problems.find((p: any) => {
+        const problemId = Number((p as any).studyProblemId ?? (p as any).id);
+        return problemId === targetStudyProblemId;
+      });
+
+      if (matchedProblem) {
+        handleSelectProblem(matchedProblem);
+        return true;
+      }
+      return false;
+    };
+
+    if (hintedStudyProblemId && trySelectByStudyProblemId(hintedStudyProblemId)) {
+      return;
     }
 
-    if (!cachedStudyProblemId) return;
-
-    const matchedProblem = problems.find((p: any) => {
-      const studyProblemId = Number((p as any).studyProblemId ?? (p as any).id);
-      return studyProblemId === cachedStudyProblemId;
-    });
-
-    if (matchedProblem) {
-      handleSelectProblem(matchedProblem);
+    if (hintedStudyProblemId || lastProblemFallbackRequestedRef.current) {
+      return;
     }
-  }, [selectedStudyProblemId, problems, lastSelectedProblemStorageKey]);
+
+    lastProblemFallbackRequestedRef.current = true;
+    void (async () => {
+      try {
+        const response = await apiFetch<{ studyProblemId?: number; problemDate?: string }>(
+          `/api/studies/${studyId}/last-active-problem`,
+        );
+        const fallbackStudyProblemId = Number(response.data?.studyProblemId);
+        const fallbackProblemDate = response.data?.problemDate;
+        if (!response.success || !Number.isFinite(fallbackStudyProblemId) || fallbackStudyProblemId <= 0) {
+          return;
+        }
+
+        if (fallbackProblemDate && /^\d{4}-\d{2}-\d{2}$/.test(fallbackProblemDate)) {
+          setSelectedDate((prev) => {
+            const prevDate = format(prev, 'yyyy-MM-dd');
+            if (prevDate === fallbackProblemDate) return prev;
+            return new Date(`${fallbackProblemDate}T00:00:00`);
+          });
+        }
+
+        setHintedStudyProblemId(fallbackStudyProblemId);
+        trySelectByStudyProblemId(fallbackStudyProblemId);
+      } catch {
+        // Ignore fallback fetch failures
+      }
+    })();
+  }, [
+    selectedStudyProblemId,
+    problems,
+    hintedStudyProblemId,
+    studyId,
+    handleSelectProblem,
+  ]);
 
 
 
@@ -601,6 +699,8 @@ export function CCStudyRoomClient(): React.ReactNode {
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [initialLastStudyProblemId, setInitialLastStudyProblemId] = useState<number | null>(null);
+  const [initialLastProblemDate, setInitialLastProblemDate] = useState<string | null>(null);
 
   // Check access permission before mounting socket/LiveKit
   useEffect(() => {
@@ -611,11 +711,23 @@ export function CCStudyRoomClient(): React.ReactNode {
 
     fetchStudyRoom(studyId)
       .then((data) => {
+        const lastStudyProblemId = Number(data.lastStudyProblemId);
+        const lastStudyProblemDate =
+          typeof data.lastStudyProblemDate === 'string' ? data.lastStudyProblemDate : null;
+
         setRoomInfo({
           roomId: data.id,
           roomTitle: data.title,
           myRole: data.role,
         });
+        setInitialLastStudyProblemId(
+          Number.isFinite(lastStudyProblemId) && lastStudyProblemId > 0 ? lastStudyProblemId : null,
+        );
+        setInitialLastProblemDate(
+          lastStudyProblemDate && /^\d{4}-\d{2}-\d{2}$/.test(lastStudyProblemDate)
+            ? lastStudyProblemDate
+            : null,
+        );
         setIsAuthorized(true);
       })
       .catch((err) => {
@@ -685,7 +797,11 @@ export function CCStudyRoomClient(): React.ReactNode {
         initialMicEnabled={initialMediaState.mic}
         initialCamEnabled={initialMediaState.cam}
       >
-        <StudyRoomContent studyId={studyId} />
+        <StudyRoomContent
+          studyId={studyId}
+          initialLastStudyProblemId={initialLastStudyProblemId}
+          initialLastProblemDate={initialLastProblemDate}
+        />
       </CCLiveKitWrapper>
     </SocketProvider>
   );
