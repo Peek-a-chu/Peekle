@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 interface LeagueRuleModalProps {
   myLeague?: LeagueType;
   myPercentile?: number;
-  leagueStats?: { tier?: string; percentile?: number }[];
+  leagueStats?: { tier?: string; percentile?: number; count?: number }[];
 }
 
 const LeagueRuleModal = ({
@@ -42,8 +42,8 @@ const LeagueRuleModal = ({
     if (myLeague) setSelectedLeague(myLeague);
   }, [myLeague]);
 
-  // 리그별 누적 상위 백분위 (Standard Cumulative Distribution)
-  const CUMULATIVE_PERCENTILES: Record<LeagueType, number> = {
+  // 리그별 누적 상위 백분위 (Standard Cumulative Distribution Fallback)
+  const CUMULATIVE_PERCENTILES: Partial<Record<LeagueType, number>> = {
     ruby: 3,
     emerald: 5,
     diamond: 10,
@@ -51,10 +51,39 @@ const LeagueRuleModal = ({
     gold: 40,
     silver: 70,
     bronze: 90,
-    stone: 100,
   };
 
-  const displayPercentile = CUMULATIVE_PERCENTILES[selectedLeague];
+  const totalUsers = leagueStats?.reduce((sum, s) => sum + (s.count || 0), 0) || 0;
+
+  let displayPercentileText = '';
+  if (selectedLeague === 'stone') {
+    displayPercentileText = '100.00'; // 스톤은 명시적으로 상위 100%
+  } else if (leagueStats && totalUsers > 0) {
+    // 1. 선택된 티어의 실제 인원수 확인
+    const currentTierStat = leagueStats.find((s) => s.tier?.toLowerCase() === selectedLeague);
+
+    if (!currentTierStat || currentTierStat.count === 0) {
+      // 2. 인원이 아예 없는 빈 리그인 경우 배지를 아예 숨기기 위해 빈 문자열 유지
+      displayPercentileText = '';
+    } else {
+      // 3. 인원이 1명 이상 있는 경우: 높은 티어(루비)부터 누적하여 상위 % 계산
+      let accumulated = 0;
+      const reversedOrder = [...LEAGUE_ORDER].reverse();
+      for (const tier of reversedOrder) {
+        const stat = leagueStats.find((s) => s.tier?.toLowerCase() === tier);
+        accumulated += stat?.count || 0;
+        if (tier === selectedLeague) break;
+      }
+      const realPct = (accumulated / totalUsers) * 100;
+      displayPercentileText = realPct.toFixed(2);
+    }
+  } else {
+    // 백엔드 데이터가 아예 없을 때의 폴백
+    const fallback = CUMULATIVE_PERCENTILES[selectedLeague];
+    if (fallback !== undefined) {
+      displayPercentileText = fallback.toFixed(2);
+    }
+  }
 
   const rule = rules?.[selectedLeague] || { promotePercent: 0, demotePercent: 0 };
   const promotePercent = rule.promotePercent;
@@ -126,9 +155,9 @@ const LeagueRuleModal = ({
                 <div>
                   <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
                     <span>{LEAGUE_NAMES[selectedLeague]}</span>
-                    {displayPercentile !== undefined && (
+                    {displayPercentileText !== '' && (
                       <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 text-[10px] px-1.5 py-0 h-5 font-normal shadow-none">
-                        상위 {displayPercentile}%
+                        상위 {displayPercentileText}%
                       </Badge>
                     )}
                   </DialogTitle>
