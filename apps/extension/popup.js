@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         nicknameEl.innerText = data.nickname || "알 수 없음";
         document.getElementById('boj-id').innerText = data.bojId ? `boj: ${data.bojId}` : "";
-        document.getElementById('league-name').innerText = data.leagueName || "Unranked";
+        document.getElementById('league-name').innerText = getLeagueDisplayName(data.leagueName);
         document.getElementById('user-score').innerText = (data.score || 0) + "점";
 
         // 순위와 상태 함께 표시
@@ -224,6 +224,27 @@ document.addEventListener('DOMContentLoaded', () => {
             'DEMOTE': '#ef4444'
         };
         return colorMap[status] || 'var(--muted-foreground)';
+    }
+
+    // Helper: Convert league key/name to Korean display
+    function getLeagueDisplayName(leagueName) {
+        if (!leagueName) return '언랭크';
+
+        const normalized = String(leagueName).trim().toLowerCase();
+        const leagueMap = {
+            stone: '스톤',
+            bronze: '브론즈',
+            silver: '실버',
+            gold: '골드',
+            platinum: '플래티넘',
+            emerald: '에메랄드',
+            diamond: '다이아',
+            ruby: '루비',
+            unranked: '언랭크',
+            unknown: '언랭크'
+        };
+
+        return leagueMap[normalized] || String(leagueName);
     }
 
     // 테마 적용 헬퍼
