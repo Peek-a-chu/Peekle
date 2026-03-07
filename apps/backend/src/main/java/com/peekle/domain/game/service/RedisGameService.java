@@ -25,7 +25,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -401,7 +400,7 @@ public class RedisGameService {
                         workbookPreviewCacheService.selectProblemsForStart(roomId, problemCount);
                 selectedProblems = selection.problems();
                 cacheStatus = selection.cacheStatus();
-                log.info("📋 [Game Start] Selected {} problems from workbook {} (Room {})",
+                log.info("📋 [Game Start] Selected {} workbook problems (cache status: {}) (Room {})",
                         selectedProblems.size(), cacheStatus, roomId);
             } else {
                 selectedProblems = selectProblems(roomId);

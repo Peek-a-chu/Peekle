@@ -152,7 +152,9 @@ public class WorkbookPreviewCacheService {
         RLock lock = getWorkbookCacheLock(workbookId);
         try {
             if (!lock.tryLock(2, 10, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("문제집 캐시를 정리하는 중입니다. 잠시 후 다시 시도해주세요.");
+                log.warn("⚠️ [Workbook Cache] Could not acquire release lock for workbook {} via room {}. Skipping cache release.",
+                        workbookId, roomId);
+                return;
             }
 
             Long remainingRefs = redisTemplate.opsForValue()
@@ -164,7 +166,8 @@ public class WorkbookPreviewCacheService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Workbook cache release interrupted", e);
+            log.warn("⚠️ [Workbook Cache] Release interrupted for workbook {} via room {}. Skipping cache release.",
+                    workbookId, roomId, e);
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
