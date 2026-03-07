@@ -335,9 +335,10 @@ public class LeaguePromotionIntegrationTest {
                                 .collect(Collectors.groupingBy(User::getLeagueGroupId, Collectors.counting()));
 
                 // Should be 3 groups: size 10, 10, 3
-                assertThat(groupCounts.size()).isEqualTo(3);
                 List<Long> sizes = new java.util.ArrayList<>(groupCounts.values());
                 java.util.Collections.sort(sizes);
+
+                assertThat(groupCounts.size()).isEqualTo(3);
                 assertThat(sizes).containsExactly(3L, 10L, 10L);
         }
 
