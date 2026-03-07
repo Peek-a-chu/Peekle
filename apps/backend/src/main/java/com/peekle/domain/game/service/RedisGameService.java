@@ -8,9 +8,14 @@ import com.peekle.domain.game.enums.GameMode;
 import com.peekle.domain.game.enums.GameStatus;
 import com.peekle.domain.game.enums.GameType;
 import com.peekle.domain.problem.repository.TagRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.metrics.BenchmarkSqlStatisticsService;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -20,9 +25,11 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import com.peekle.domain.user.repository.UserRepository;
@@ -40,6 +47,18 @@ import com.peekle.global.util.SolvedAcLevelUtil;
 @RequiredArgsConstructor
 public class RedisGameService {
 
+    private static final String METRIC_GAME_START_DURATION = "game.start.duration";
+    private static final String METRIC_GAME_CREATE_DURATION = "game.create.duration";
+    private static final String METRIC_GAME_START_FAILURE = "game.start.failure";
+    private static final String METRIC_GAME_START_SQL_COUNT = "game.start.sql_count";
+    private static final String METRIC_GAME_CREATE_SQL_COUNT = "game.create.sql_count";
+    private static final String RESULT_SUCCESS = "success";
+    private static final String RESULT_FAILURE = "failure";
+    private static final String CACHE_STATUS_HIT = "hit";
+    private static final String CACHE_STATUS_FALLBACK = "fallback";
+    private static final String CACHE_STATUS_MISS = "miss";
+    private static final String CACHE_STATUS_DB = "db";
+    private static final String CACHE_STATUS_NA = "na";
     private static final Map<String, String> DEFAULT_TEMPLATES = new HashMap<>();
 
     static {
@@ -60,6 +79,9 @@ public class RedisGameService {
     private final WorkbookProblemRepository workbookProblemRepository;
     private final RedisGameWaitService waitService;
     private final RedisGameRoomManager roomManager;
+    private final WorkbookPreviewCacheService workbookPreviewCacheService;
+    private final MeterRegistry meterRegistry;
+    private final Optional<BenchmarkSqlStatisticsService> benchmarkSqlStatisticsService;
 
     /**
      * 게임 상태 변경 메서드
@@ -71,8 +93,7 @@ public class RedisGameService {
      */
     public void updateGameStatus(Long roomId, GameStatus nextStatus) {
         // 1. 락 키 생성: 방 단위로 잠금을 걸기 위해 키에 roomId를 포함합니다.
-        String lockKey = String.format(RedisKeyConst.LOCK_GAME_STATUS, roomId);
-        RLock lock = redissonClient.getLock(lockKey);
+        RLock lock = getGameStatusLock(roomId);
 
         try {
             // 2. 락 획득 시도 (tryLock)
@@ -82,35 +103,7 @@ public class RedisGameService {
                 throw new IllegalStateException("현재 다른 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.");
             }
 
-            // 3. 현재 상태 조회
-            String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
-            String currentStatusStr = (String) redisTemplate.opsForValue().get(statusKey);
-
-            // 상태가 Redis에 없으면 방금 생성된 방으로 간주하고 WAITING(대기) 상태로 초기화
-            GameStatus currentStatus = currentStatusStr == null ? GameStatus.WAITING
-                    : GameStatus.valueOf(currentStatusStr);
-
-            // 4. 상태 전이 유효성 검사 (State Machine 로직)
-            // 예: 게임 중(PLAYING)인데 갑자기 대기(WAITING)로 갈 수 없음.
-            validateStatusTransition(currentStatus, nextStatus);
-
-            // 5. 상태 업데이트 (Redis에 저장)
-            redisTemplate.opsForValue().set(statusKey, nextStatus.name());
-            log.info("Game Room {} Status Changed: {} -> {}", roomId, currentStatus, nextStatus);
-
-            // 6. 변경 사항 전파 (Pub/Sub)
-            // 클라이언트(프론트엔드)는 이 토픽을 구독하고 있다가, 메시지가 오면 화면을 갱신합니다.
-            String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("STATUS_CHANGE", nextStatus));
-
-            // 7. 로비 브로드캐스트: 방 상태 변경 알림
-            Map<String, Object> lobbyUpdateData = new HashMap<>();
-            lobbyUpdateData.put("roomId", roomId);
-            lobbyUpdateData.put("status", nextStatus.name());
-            redisPublisher.publish(
-                    new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
-                    SocketResponse.of("LOBBY_ROOM_UPDATED", lobbyUpdateData));
-            log.info("📢 [Lobby] Game Room {} Status Updated to {} - Broadcasting to lobby", roomId, nextStatus);
+            updateGameStatusInternal(roomId, nextStatus);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -123,6 +116,37 @@ public class RedisGameService {
                 lock.unlock();
             }
         }
+    }
+
+    private RLock getGameStatusLock(Long roomId) {
+        return redissonClient.getLock(String.format(RedisKeyConst.LOCK_GAME_STATUS, roomId));
+    }
+
+    private void updateGameStatusInternal(Long roomId, GameStatus nextStatus) {
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        GameStatus currentStatus = getCurrentGameStatus(roomId);
+
+        validateStatusTransition(currentStatus, nextStatus);
+
+        redisTemplate.opsForValue().set(statusKey, nextStatus.name());
+        log.info("Game Room {} Status Changed: {} -> {}", roomId, currentStatus, nextStatus);
+
+        String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
+        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("STATUS_CHANGE", nextStatus));
+
+        Map<String, Object> lobbyUpdateData = new HashMap<>();
+        lobbyUpdateData.put("roomId", roomId);
+        lobbyUpdateData.put("status", nextStatus.name());
+        redisPublisher.publish(
+                new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
+                SocketResponse.of("LOBBY_ROOM_UPDATED", lobbyUpdateData));
+        log.info("📢 [Lobby] Game Room {} Status Updated to {} - Broadcasting to lobby", roomId, nextStatus);
+    }
+
+    private GameStatus getCurrentGameStatus(Long roomId) {
+        String currentStatusStr = (String) redisTemplate.opsForValue()
+                .get(String.format(RedisKeyConst.GAME_STATUS, roomId));
+        return currentStatusStr == null ? GameStatus.WAITING : GameStatus.valueOf(currentStatusStr);
     }
 
     /**
@@ -153,6 +177,11 @@ public class RedisGameService {
 
     // 방 만들기
     public Long createGameRoom(GameCreateRequest request, Long hostId) {
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        long sqlSnapshot = snapshotSqlCount();
+        String problemSource = request.getProblemSource() != null ? request.getProblemSource() : "BOJ_RANDOM";
+        boolean success = false;
+
         // 1. 방 ID 생성 (Atomic Increment)
         Long roomId = redisTemplate.opsForValue().increment(RedisKeyConst.GAME_ROOM_ID_SEQ);
 
@@ -165,6 +194,7 @@ public class RedisGameService {
             // [Fix] Store timeLimit as Seconds (Input is Minutes)
             roomInfo.put("timeLimit", String.valueOf(request.getTimeLimit() * 60));
             roomInfo.put("problemCount", String.valueOf(request.getProblemCount()));
+            roomInfo.put("problemSource", problemSource);
 
             // Field Mapping
             roomInfo.put("teamType", request.getTeamType().name());
@@ -176,8 +206,6 @@ public class RedisGameService {
             }
 
             // 추가 옵션 저장
-            if (request.getProblemSource() != null)
-                roomInfo.put("problemSource", request.getProblemSource());
             if (request.getTierMin() != null)
                 roomInfo.put("tierMin", request.getTierMin());
             if (request.getTierMax() != null)
@@ -192,6 +220,11 @@ public class RedisGameService {
             // Tags 저장 (List -> String)
             if (request.getSelectedTags() != null && !request.getSelectedTags().isEmpty()) {
                 roomInfo.put("tags", String.join(",", request.getSelectedTags()));
+            }
+
+            if ("WORKBOOK".equals(problemSource)) {
+                roomInfo.put(WorkbookPreviewCacheService.PREVIEW_READY_FIELD, "false");
+                roomInfo.put(WorkbookPreviewCacheService.PREVIEW_COUNT_FIELD, "0");
             }
 
             // Host 정보 조회 및 저장 (DB 조회 -> Redis 캐싱)
@@ -210,47 +243,8 @@ public class RedisGameService {
 
             // 3.5 문제 전체 조회 및 캐싱 (WORKBOOK 모드일 때만)
             // [CRITICAL] enterGameRoom 이전에 실행하여 브로드캐스트 시 문제 목록이 포함되도록 함
-            String problemSource = (String) roomInfo.getOrDefault("problemSource", "BOJ_RANDOM");
             if ("WORKBOOK".equals(problemSource)) {
-                try {
-                    List<Problem> allProblems = getAllProblemsForPreview(roomId);
-
-                    // [Validation] 요청한 문제 갯수가 문제집의 실제 문제 갯수보다 많으면 오류 발생
-                    int requestedProblemCount = request.getProblemCount();
-                    int availableProblemCount = allProblems.size();
-
-                    if (requestedProblemCount > availableProblemCount) {
-                        throw new com.peekle.global.exception.BusinessException(
-                                com.peekle.global.exception.ErrorCode.GAME_PROBLEM_COUNT_EXCEEDED,
-                                String.format("문제집에 있는 문제(%d개)보다 더 많은 문제(%d개)를 요청할 수 없습니다.",
-                                        availableProblemCount, requestedProblemCount));
-                    }
-
-                    if (!allProblems.isEmpty()) {
-                        String previewKey = String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId);
-                        redisTemplate.delete(previewKey); // 초기화
-                        for (Problem p : allProblems) {
-                            Map<String, String> pInfo = new HashMap<>();
-                            pInfo.put("id", String.valueOf(p.getId()));
-                            pInfo.put("externalId", p.getExternalId());
-                            pInfo.put("title", p.getTitle());
-                            pInfo.put("tier", p.getTier());
-                            pInfo.put("url", p.getUrl());
-                            redisTemplate.opsForList().rightPush(previewKey, pInfo);
-                        }
-                        redisTemplate.expire(previewKey, 6, TimeUnit.HOURS);
-                        log.info("📋 [Room Creation] Cached {} problems for workbook preview (Room {})",
-                                allProblems.size(), roomId);
-                    }
-                } catch (com.peekle.global.exception.BusinessException e) {
-                    // 검증 실패 시 롤백하고 예외 전파 (프론트엔드에서 토스트로 표시)
-                    log.warn("❌ [Room Creation Validation Failed] {}", e.getMessage());
-                    deleteGameRoom(roomId);
-                    throw e;
-                } catch (Exception e) {
-                    log.warn("⚠️ Failed to cache problems during room creation: {}", e.getMessage());
-                    // 다른 예외는 방 생성을 계속 진행
-                }
+                workbookPreviewCacheService.prepareWorkbookPreview(roomId, request.getProblemCount());
             }
 
             // 4. 방정 참여 처리 & Ready (Host는 자동 Ready)
@@ -262,12 +256,15 @@ public class RedisGameService {
             // "ghost room" 방지 목적.
             log.info("🔨 [Create Room] Room {} Created in Redis. Broadcast delayed until Host enters.", roomId);
 
+            success = true;
             return roomId;
 
         } catch (Exception e) {
             log.error("Failed to create game room {}, rolling back...", roomId, e);
             deleteGameRoom(roomId);
             throw e;
+        } finally {
+            recordCreateRoomMetrics(timerSample, problemSource, success ? RESULT_SUCCESS : RESULT_FAILURE, sqlSnapshot);
         }
     }
 
@@ -336,150 +333,155 @@ public class RedisGameService {
 
     // 게임 시작
     public void startGame(Long roomId, Long userId) {
-        // 1. 방장 검증
-        String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
-        String hostIdStr = (String) redisTemplate.opsForHash().get(infoKey, "hostId");
-        if (hostIdStr == null || !hostIdStr.equals(String.valueOf(userId))) {
-            throw new IllegalStateException("방장만 게임을 시작할 수 있습니다.");
-        }
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        long sqlSnapshot = snapshotSqlCount();
+        String problemSource = CACHE_STATUS_NA;
+        String cacheStatus = CACHE_STATUS_NA;
+        boolean success = false;
+        RLock lock = getGameStatusLock(roomId);
 
-        // 방장이 시작을 눌렀다는 건 방장은 준비가 된 것임 (Auto Ready)
-        String readyKey = String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId);
-        redisTemplate.opsForHash().put(readyKey, String.valueOf(userId), "true");
+        try {
+            if (!lock.tryLock(2, 10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("현재 다른 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.");
+            }
 
-        // 2. 참여자 전원 Ready 검증
-        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
-        Set<Object> players = redisTemplate.opsForSet().members(playersKey);
+            String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+            problemSource = String.valueOf(redisTemplate.opsForHash().get(infoKey, "problemSource"));
+            if ("null".equals(problemSource) || problemSource == null || problemSource.isBlank()) {
+                problemSource = "BOJ_RANDOM";
+            }
 
-        // 모든 플레이어가 Ready인지 확인
-        if (players != null) {
-            for (Object player : players) {
-                String isReady = (String) redisTemplate.opsForHash().get(readyKey, player);
-                if (!"true".equals(isReady)) {
-                    throw new IllegalStateException("모든 플레이어가 준비해야 시작할 수 있습니다.");
+            if (getCurrentGameStatus(roomId) != GameStatus.WAITING) {
+                throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
+            }
+
+            String hostIdStr = (String) redisTemplate.opsForHash().get(infoKey, "hostId");
+            if (hostIdStr == null || !hostIdStr.equals(String.valueOf(userId))) {
+                throw new IllegalStateException("방장만 게임을 시작할 수 있습니다.");
+            }
+
+            String readyKey = String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId);
+            redisTemplate.opsForHash().put(readyKey, String.valueOf(userId), "true");
+
+            String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+            Set<Object> players = redisTemplate.opsForSet().members(playersKey);
+
+            if (players != null) {
+                for (Object player : players) {
+                    String isReady = (String) redisTemplate.opsForHash().get(readyKey, player);
+                    if (!"true".equals(isReady)) {
+                        throw new IllegalStateException("모든 플레이어가 준비해야 시작할 수 있습니다.");
+                    }
                 }
             }
-        }
 
-        // 3. 팀전일 경우팀 밸런스 검증
-        String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
-        if ("TEAM".equals(teamType)) {
-            String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
-            Map<Object, Object> teams = redisTemplate.opsForHash().entries(teamsKey);
+            String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
+            if ("TEAM".equals(teamType)) {
+                String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
+                Map<Object, Object> teams = redisTemplate.opsForHash().entries(teamsKey);
 
-            long redCount = teams.values().stream().filter("RED"::equals).count();
-            long blueCount = teams.values().stream().filter("BLUE"::equals).count();
+                long redCount = teams.values().stream().filter("RED"::equals).count();
+                long blueCount = teams.values().stream().filter("BLUE"::equals).count();
 
-            if (redCount != blueCount) {
-                throw new IllegalStateException(
-                        "팀 인원이 같아야 시작할 수 있습니다. (RED: " + redCount + ", BLUE: " + blueCount + ")");
-            }
-            if (redCount == 0) {
-                throw new IllegalStateException("각 팀에 최소 1명 이상이 필요합니다.");
-            }
-        }
-
-        // 게임 시작 시간 저장 (점수 계산용)
-        redisTemplate.opsForValue().set(
-                String.format(RedisKeyConst.GAME_START_TIME, roomId),
-                String.valueOf(System.currentTimeMillis()));
-
-        // 4. 문제 배정
-        String problemSource = (String) redisTemplate.opsForHash().get(infoKey, "problemSource");
-        List<Problem> selectedProblems;
-
-        if ("WORKBOOK".equals(problemSource)) {
-            // WORKBOOK: PREVIEW 캐시에서 랜덤 선택
-            String previewKey = String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId);
-            List<Object> previewProblems = redisTemplate.opsForList().range(previewKey, 0, -1);
-
-            if (previewProblems == null || previewProblems.isEmpty()) {
-                throw new IllegalStateException("문제집 캐시가 비어있습니다. 방을 다시 생성해주세요.");
+                if (redCount != blueCount) {
+                    throw new IllegalStateException(
+                            "팀 인원이 같아야 시작할 수 있습니다. (RED: " + redCount + ", BLUE: " + blueCount + ")");
+                }
+                if (redCount == 0) {
+                    throw new IllegalStateException("각 팀에 최소 1명 이상이 필요합니다.");
+                }
             }
 
-            // problemCount개만 랜덤 선택
             int problemCount = parseIntSafe((String) redisTemplate.opsForHash().get(infoKey, "problemCount"));
-            List<Object> shuffled = new ArrayList<>(previewProblems);
-            Collections.shuffle(shuffled);
-            List<Object> selectedCache = shuffled.stream().limit(problemCount).collect(Collectors.toList());
+            List<Problem> selectedProblems;
 
-            // Problem 객체로 변환 (START 이벤트용)
-            selectedProblems = new ArrayList<>();
-            for (Object item : selectedCache) {
-                if (item instanceof Map) {
-                    Map<String, String> pInfo = (Map<String, String>) item;
-                    Problem p = Problem.builder()
-                            .id(Long.parseLong(pInfo.get("id")))
-                            .externalId(pInfo.get("externalId"))
-                            .title(pInfo.get("title"))
-                            .tier(pInfo.get("tier"))
-                            .url(pInfo.get("url"))
-                            .build();
-                    selectedProblems.add(p);
+            if ("WORKBOOK".equals(problemSource)) {
+                cacheStatus = CACHE_STATUS_MISS;
+                WorkbookPreviewCacheService.WorkbookProblemSelection selection =
+                        workbookPreviewCacheService.selectProblemsForStart(roomId, problemCount);
+                selectedProblems = selection.problems();
+                cacheStatus = selection.cacheStatus();
+                log.info("📋 [Game Start] Selected {} problems from workbook {} (Room {})",
+                        selectedProblems.size(), cacheStatus, roomId);
+            } else {
+                selectedProblems = selectProblems(roomId);
+                cacheStatus = CACHE_STATUS_DB;
+                log.info("📋 [Game Start] Selected {} problems from DB query (Room {})", selectedProblems.size(), roomId);
+            }
+
+            if (selectedProblems.isEmpty()) {
+                throw new IllegalStateException("해당 조건에 맞는 문제가 충분하지 않습니다.");
+            }
+
+            String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
+            redisTemplate.delete(problemsKey);
+            for (Problem p : selectedProblems) {
+                Map<String, String> pInfo = new HashMap<>();
+                pInfo.put("id", String.valueOf(p.getId()));
+                pInfo.put("externalId", p.getExternalId());
+                pInfo.put("title", p.getTitle());
+                pInfo.put("tier", p.getTier());
+                pInfo.put("url", p.getUrl());
+                redisTemplate.opsForList().rightPush(problemsKey, pInfo);
+            }
+            redisTemplate.expire(problemsKey, 6, TimeUnit.HOURS);
+
+            String rankingKey = String.format(RedisKeyConst.GAME_RANKING, roomId);
+            if (players != null) {
+                for (Object player : players) {
+                    redisTemplate.opsForZSet().add(rankingKey, player, 0);
                 }
             }
-            log.info("📋 [Game Start] Selected {} problems from workbook cache (Room {})", selectedProblems.size(),
-                    roomId);
-        } else {
-            // BOJ_RANDOM: DB에서 직접 조회
-            selectedProblems = selectProblems(roomId);
-            log.info("📋 [Game Start] Selected {} problems from DB query (Room {})", selectedProblems.size(), roomId);
-        }
+            redisTemplate.expire(rankingKey, 6, TimeUnit.HOURS);
 
-        if (selectedProblems.isEmpty()) {
-            throw new IllegalStateException("해당 조건에 맞는 문제가 충분하지 않습니다.");
-        }
+            updateGameStatusInternal(roomId, GameStatus.PLAYING);
 
-        // Redis에 문제 목록 저장
-        String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
-        redisTemplate.delete(problemsKey); // 초기화
-        for (Problem p : selectedProblems) {
-            Map<String, String> pInfo = new HashMap<>();
-            pInfo.put("id", String.valueOf(p.getId()));
-            pInfo.put("externalId", p.getExternalId());
-            pInfo.put("title", p.getTitle());
-            pInfo.put("tier", p.getTier());
-            pInfo.put("url", p.getUrl());
-            redisTemplate.opsForList().rightPush(problemsKey, pInfo);
-        }
-        redisTemplate.expire(problemsKey, 6, TimeUnit.HOURS);
+            long startTime = System.currentTimeMillis();
+            redisTemplate.opsForValue().set(
+                    String.format(RedisKeyConst.GAME_START_TIME, roomId),
+                    String.valueOf(startTime));
 
-        // 4.5 랭킹 보드 초기화 (모두 0점으로 시작)
-        String rankingKey = String.format(RedisKeyConst.GAME_RANKING, roomId);
-        if (players != null) {
-            for (Object player : players) {
-                redisTemplate.opsForZSet().add(rankingKey, player, 0);
+            String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
+            Map<String, Object> startData = new HashMap<>();
+            List<Map<String, Object>> problemList = selectedProblems.stream()
+                    .map(p -> Map.of(
+                            "id", (Object) p.getId(),
+                            "externalId", (Object) p.getExternalId(),
+                            "title", (Object) p.getTitle(),
+                            "tier", (Object) p.getTier(),
+                            "url", (Object) p.getUrl()))
+                    .collect(Collectors.toList());
+
+            startData.put("gameId", roomId);
+            startData.put("problems", problemList);
+            startData.put("startTime", startTime);
+            startData.put("serverTime", System.currentTimeMillis());
+
+            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", startData));
+            scheduleGameTimeout(roomId);
+            success = true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            meterRegistry.counter(METRIC_GAME_START_FAILURE,
+                    "problem_source", normalizeProblemSource(problemSource),
+                    "cache", normalizeCacheStatus(cacheStatus)).increment();
+            throw new IllegalStateException("Lock interrupted", e);
+        } catch (Exception e) {
+            meterRegistry.counter(METRIC_GAME_START_FAILURE,
+                    "problem_source", normalizeProblemSource(problemSource),
+                    "cache", normalizeCacheStatus(cacheStatus)).increment();
+            throw e;
+        } finally {
+            recordStartGameMetrics(
+                    timerSample,
+                    problemSource,
+                    success ? RESULT_SUCCESS : RESULT_FAILURE,
+                    cacheStatus,
+                    sqlSnapshot);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
             }
         }
-        redisTemplate.expire(rankingKey, 6, TimeUnit.HOURS);
-
-        // 5. 상태 변경
-        updateGameStatus(roomId, GameStatus.PLAYING);
-
-        // START 이벤트 발행 (문제 목록 포함)
-        String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-        Map<String, Object> startData = new HashMap<>();
-
-        // 선택된 문제 목록을 이벤트로 발행
-        List<Map<String, Object>> problemList = selectedProblems.stream()
-                .map(p -> Map.of(
-                        "id", (Object) p.getId(),
-                        "externalId", (Object) p.getExternalId(),
-                        "title", (Object) p.getTitle(),
-                        "tier", (Object) p.getTier(),
-                        "url", (Object) p.getUrl()))
-                .collect(Collectors.toList());
-
-        startData.put("gameId", roomId);
-        startData.put("problems", problemList);
-        startData.put("startTime", Long.parseLong((String) redisTemplate.opsForValue()
-                .get(String.format(RedisKeyConst.GAME_START_TIME, roomId))));
-        startData.put("serverTime", System.currentTimeMillis());
-
-        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", startData));
-
-        // 6. 게임 종료 타이머 스케줄링 (비동기)
-        scheduleGameTimeout(roomId);
     }
 
     // 게임 타임아웃 스케줄링
@@ -518,29 +520,16 @@ public class RedisGameService {
 
         if ("WORKBOOK".equals(problemSource)) {
             String workbookIdStr = (String) roomInfo.get("selectedWorkbookId");
-            if (workbookIdStr != null) {
-                try {
-                    Long workbookId;
-                    if (workbookIdStr.startsWith("wb")) {
-                        workbookId = Long.parseLong(workbookIdStr.replace("wb", ""));
-                    } else {
-                        workbookId = Long.parseLong(workbookIdStr);
-                    }
-
-                    return workbookRepository.findById(workbookId)
-                            .map(workbook -> {
-                                List<WorkbookProblem> wpList = workbookProblemRepository
-                                        .findByWorkbookWithProblem(workbook);
-                                // 전체 문제 반환 (limit 없음)
-                                return wpList.stream()
-                                        .map(WorkbookProblem::getProblem)
-                                        .collect(Collectors.toList());
-                            }).orElse(Collections.emptyList());
-                } catch (Exception e) {
-                    log.error("Failed to load all workbook problems for ID: {}", workbookIdStr);
-                    return Collections.emptyList();
-                }
+            if (workbookIdStr == null || workbookIdStr.isBlank()) {
+                throw new BusinessException(ErrorCode.WORKBOOK_NOT_FOUND);
             }
+
+            Long workbookId = workbookPreviewCacheService.parseWorkbookId(workbookIdStr);
+            return workbookRepository.findById(workbookId)
+                    .map(workbook -> workbookProblemRepository.findByWorkbookWithProblem(workbook).stream()
+                            .map(WorkbookProblem::getProblem)
+                            .collect(Collectors.toList()))
+                    .orElseThrow(() -> new BusinessException(ErrorCode.WORKBOOK_NOT_FOUND));
         }
 
         // BOJ_RANDOM: 캐시하지 않음 (게임 시작 시 DB 직접 조회)
@@ -555,37 +544,7 @@ public class RedisGameService {
         int problemCount = parseIntSafe((String) roomInfo.getOrDefault("problemCount", "5"));
 
         if ("WORKBOOK".equals(problemSource)) {
-            String workbookIdStr = (String) roomInfo.get("selectedWorkbookId");
-            if (workbookIdStr != null) {
-                try {
-                    // Try to parse workbook ID (assuming Long for DB)
-                    // If frontend sends 'wb1' (mock), we handle it or catch exception
-                    Long workbookId;
-                    if (workbookIdStr.startsWith("wb")) {
-                        // Mock data compatibility: map 'wb1' -> 1L if needed, or just log warn
-                        // For this task, we assume backend DB has IDs 1, 2, ...
-                        // We'll strip 'wb' if present, or just try parse
-                        workbookId = Long.parseLong(workbookIdStr.replace("wb", ""));
-                    } else {
-                        workbookId = Long.parseLong(workbookIdStr);
-                    }
-
-                    return workbookRepository.findById(workbookId)
-                            .map(workbook -> {
-                                List<WorkbookProblem> wpList = workbookProblemRepository
-                                        .findByWorkbookWithProblem(workbook);
-                                List<Problem> problems = wpList.stream().map(WorkbookProblem::getProblem)
-                                        .collect(Collectors.toList());
-                                Collections.shuffle(problems);
-                                return problems.stream().limit(problemCount).collect(Collectors.toList());
-                            }).orElse(Collections.emptyList());
-                } catch (Exception e) {
-                    log.error("Failed to load workbook problems for ID: {}", workbookIdStr);
-                    // Fallback to BOJ Random if workbook fails? Or return empty?
-                    // Return empty to signal error
-                    return Collections.emptyList();
-                }
-            }
+            return sampleWithoutReplacement(getAllProblemsForPreview(roomId), problemCount);
         }
 
         // BOJ_RANDOM logic
@@ -656,6 +615,84 @@ public class RedisGameService {
         if (t.contains("ruby"))
             return 25;
         return 0; // Default
+    }
+
+    static <T> List<T> sampleWithoutReplacement(List<T> source, int sampleSize) {
+        int size = source.size();
+        if (sampleSize <= 0 || size == 0) {
+            return Collections.emptyList();
+        }
+        if (sampleSize >= size) {
+            return new ArrayList<>(source);
+        }
+
+        List<T> sampled = new ArrayList<>(source);
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        for (int i = 0; i < sampleSize; i++) {
+            int swapIndex = random.nextInt(i, size);
+            Collections.swap(sampled, i, swapIndex);
+        }
+        return new ArrayList<>(sampled.subList(0, sampleSize));
+    }
+
+    public void evictWorkbookPreview(Long roomId) {
+        workbookPreviewCacheService.evictWorkbookPreview(roomId);
+    }
+
+    private long snapshotSqlCount() {
+        return benchmarkSqlStatisticsService
+                .map(BenchmarkSqlStatisticsService::getPrepareStatementCount)
+                .orElse(-1L);
+    }
+
+    private void recordCreateRoomMetrics(Timer.Sample timerSample, String problemSource, String result, long sqlSnapshot) {
+        timerSample.stop(Timer.builder(METRIC_GAME_CREATE_DURATION)
+                .tag("problem_source", normalizeProblemSource(problemSource))
+                .tag("result", result)
+                .register(meterRegistry));
+        recordSqlCount(METRIC_GAME_CREATE_SQL_COUNT, problemSource, result, CACHE_STATUS_NA, sqlSnapshot);
+    }
+
+    private void recordStartGameMetrics(
+            Timer.Sample timerSample,
+            String problemSource,
+            String result,
+            String cacheStatus,
+            long sqlSnapshot) {
+        timerSample.stop(Timer.builder(METRIC_GAME_START_DURATION)
+                .tag("problem_source", normalizeProblemSource(problemSource))
+                .tag("result", result)
+                .tag("cache", normalizeCacheStatus(cacheStatus))
+                .register(meterRegistry));
+        recordSqlCount(METRIC_GAME_START_SQL_COUNT, problemSource, result, cacheStatus, sqlSnapshot);
+    }
+
+    private void recordSqlCount(
+            String metricName,
+            String problemSource,
+            String result,
+            String cacheStatus,
+            long sqlSnapshot) {
+        if (sqlSnapshot < 0) {
+            return;
+        }
+
+        long sqlDelta = Math.max(snapshotSqlCount() - sqlSnapshot, 0L);
+        meterRegistry.summary(metricName,
+                "problem_source", normalizeProblemSource(problemSource),
+                "result", result,
+                "cache", normalizeCacheStatus(cacheStatus))
+                .record(sqlDelta);
+    }
+
+    private String normalizeProblemSource(String problemSource) {
+        return problemSource == null || problemSource.isBlank() || "null".equals(problemSource)
+                ? "BOJ_RANDOM"
+                : problemSource;
+    }
+
+    private String normalizeCacheStatus(String cacheStatus) {
+        return cacheStatus == null || cacheStatus.isBlank() ? CACHE_STATUS_NA : cacheStatus;
     }
 
     // 채팅 보내기
@@ -936,24 +973,17 @@ public class RedisGameService {
                 }
             }
         } else if (gameStatus == GameStatus.WAITING) {
-            // WAITING: PREVIEW 캐시에서 조회
-            String previewKey = String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId);
-            List<Object> pList = redisTemplate.opsForList().range(previewKey, 0, -1);
-            if (pList != null) {
-                for (Object item : pList) {
-                    if (item instanceof Map) {
-                        Map<String, String> pInfo = (Map<String, String>) item;
-                        problems.add(GameRoomResponse.ProblemInfo.builder()
-                                .id(Long.parseLong(pInfo.get("id")))
-                                .externalId(pInfo.get("externalId"))
-                                .title(pInfo.get("title"))
-                                .tier(pInfo.get("tier"))
-                                .url(pInfo.get("url"))
-                                .build());
-                    }
-                }
-                log.info("📋 [Waiting Room] Loaded {} problems from preview cache (Room {})", problems.size(), roomId);
-            }
+            problems = workbookPreviewCacheService.loadPreviewProblems(roomId).stream()
+                    .map(problem -> GameRoomResponse.ProblemInfo.builder()
+                            .id(problem.getId())
+                            .externalId(problem.getExternalId())
+                            .title(problem.getTitle())
+                            .tier(problem.getTier())
+                            .url(problem.getUrl())
+                            .build())
+                    .collect(Collectors.toList());
+            log.info("📋 [Waiting Room] Loaded {} problems from shared workbook preview (Room {})",
+                    problems.size(), roomId);
         }
 
         // workbook 정보 조회 (문제집인 경우)
@@ -961,15 +991,7 @@ public class RedisGameService {
         String selectedWorkbookIdStr = (String) info.get("selectedWorkbookId");
         if (selectedWorkbookIdStr != null) {
             try {
-                Long workbookId;
-                if (selectedWorkbookIdStr.startsWith("wb")) {
-                    workbookId = Long.parseLong(selectedWorkbookIdStr.replace("wb", ""));
-                } else {
-                    workbookId = Long.parseLong(selectedWorkbookIdStr);
-                }
-                workbookTitle = workbookRepository.findById(workbookId)
-                        .map(wb -> wb.getTitle())
-                        .orElse(null);
+                workbookTitle = workbookPreviewCacheService.resolveWorkbookTitle(info);
             } catch (Exception e) {
                 log.warn("Failed to load workbook title for ID: {}", selectedWorkbookIdStr);
             }
@@ -1483,6 +1505,8 @@ public class RedisGameService {
 
         // 10. 게임 종료 후 모든 Redis 데이터 삭제 (깔끔하게 정리)
         log.info("🗑️ Cleaning up all Redis data for finished game {}", roomId);
+
+        workbookPreviewCacheService.releaseRoomWorkbookCache(roomId);
 
         // 게임 기본 정보
         redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
