@@ -23,6 +23,9 @@ public class RedisKeyConst {
     // Who is watching targetUserId? -> Set of viewerUserIds
     public static final String IDE_WATCHERS = "study:%d:ide:%d:watchers";
 
+    // Current Active Problem per User in Study (Hash)
+    // study:{studyId}:user:{userId}:active_problem -> studyProblemId, problemTitle, updatedAt
+    public static final String STUDY_USER_ACTIVE_PROBLEM = "study:%d:user:%d:active_problem";
     // Curriculum Topic (Pub/Sub)
     public static final String TOPIC_CURRICULUM = "topic/studies/rooms/%d/problems";
 

@@ -1,8 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CCVideoGrid } from '../components/CCVideoGrid';
 
-// Mock LiveKit components and hooks
 vi.mock('@livekit/components-react', () => ({
   useParticipants: () => [
     { identity: '1', name: 'Me', isLocal: true, isMicrophoneEnabled: false },
@@ -12,11 +11,13 @@ vi.mock('@livekit/components-react', () => ({
   VideoTrack: () => <div data-testid="video-track" />,
 }));
 
-// Use vi.hoisted() to define variables that can be accessed in vi.mock factory
-const { mockViewRealtimeCode, mockResetToOnlyMine, mockState } = vi.hoisted(() => {
+const { mockViewRealtimeCode, mockResetToOnlyMine, mockSetSelectedProblem, mockState } = vi.hoisted(() => {
   const mockViewRealtimeCode = vi.fn();
   const mockResetToOnlyMine = vi.fn();
+  const mockSetSelectedProblem = vi.fn();
+
   const mockState: any = {
+    roomId: 1,
     participants: [
       {
         id: 1,
@@ -38,15 +39,29 @@ const { mockViewRealtimeCode, mockResetToOnlyMine, mockState } = vi.hoisted(() =
       },
     ],
     currentUserId: 1,
-    selectedProblemId: null as number | null,
+    selectedStudyProblemId: null as number | null,
+    selectedProblemTitle: null as string | null,
     isWhiteboardActive: false,
     viewRealtimeCode: mockViewRealtimeCode,
     resetToOnlyMine: mockResetToOnlyMine,
+    setSelectedProblem: mockSetSelectedProblem,
     setWhiteboardOverlayOpen: vi.fn(),
     viewingUser: null,
   };
-  return { mockViewRealtimeCode, mockResetToOnlyMine, mockState };
+
+  return {
+    mockViewRealtimeCode,
+    mockResetToOnlyMine,
+    mockSetSelectedProblem,
+    mockState,
+  };
 });
+
+const mockApiFetch = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/api', () => ({
+  apiFetch: mockApiFetch,
+}));
 
 vi.mock('../hooks/useRoomStore', () => {
   const mockUseRoomStore = (selector: any) => {
@@ -64,17 +79,19 @@ vi.mock('../hooks/useRoomStore', () => {
 });
 
 describe('CCVideoGrid', () => {
-  it('allows selecting another participant when problem is selected (enters split view)', () => {
-    // Set selectedProblemId to allow split view
-    mockState.selectedProblemId = 1;
+  it('allows selecting another participant when study problem is selected', async () => {
+    mockState.selectedStudyProblemId = 1;
 
     render(<CCVideoGrid />);
 
     fireEvent.click(screen.getByText('Other'));
-    expect(mockViewRealtimeCode).toHaveBeenCalledTimes(1);
-    expect(mockViewRealtimeCode.mock.calls[0][0]).toMatchObject({ id: 2 });
 
-    // Reset for other tests
-    mockState.selectedProblemId = null;
+    await waitFor(() => {
+      expect(mockViewRealtimeCode).toHaveBeenCalledTimes(1);
+    });
+    expect(mockViewRealtimeCode.mock.calls[0][0]).toMatchObject({ id: 2 });
+    expect(mockApiFetch).not.toHaveBeenCalled();
+
+    mockState.selectedStudyProblemId = null;
   });
 });
