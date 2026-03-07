@@ -1,7 +1,8 @@
 package com.peekle.domain.study.socket;
 
-import com.peekle.domain.study.entity.StudyRoom;
-import com.peekle.domain.study.repository.StudyMemberRepository;
+import com.peekle.domain.study.service.RedisIdeService;
+import com.peekle.domain.study.service.StudyMemberProgressService;
+import com.peekle.domain.study.service.StudyProblemDraftService;
 import com.peekle.domain.study.service.WhiteboardService;
 import com.peekle.global.media.service.MediaService;
 import com.peekle.global.redis.RedisKeyConst;
@@ -15,17 +16,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
-import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -37,6 +34,9 @@ public class StudyWebSocketListener {
     private final RedisPublisher redisPublisher;
     private final WhiteboardService whiteboardService;
     private final MediaService mediaService;
+    private final RedisIdeService redisIdeService;
+    private final StudyProblemDraftService studyProblemDraftService;
+    private final StudyMemberProgressService studyMemberProgressService;
 
     // 연결 시 스터디 관련 처리
     @EventListener
@@ -117,6 +117,9 @@ public class StudyWebSocketListener {
             stringRedisTemplate.opsForSet().remove(onlineKey, userId.toString());
 
             stringRedisTemplate.delete("user:" + userId + ":active_study");
+            Long persistedProblemId = studyProblemDraftService.persistActiveProblemFromRedis(studyId, userId);
+            studyMemberProgressService.updateLastStudyProblem(studyId, userId, persistedProblemId);
+            redisIdeService.clearActiveProblem(studyId, userId);
 
             // [Auto-Clean] 마지막 사람이 나갔으면 화이트보드 데이터 정리
             Long remainingUsers = stringRedisTemplate.opsForSet().size(onlineKey);

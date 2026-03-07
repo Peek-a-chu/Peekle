@@ -26,6 +26,10 @@ public class RedisKeyConst {
     // Current Active Problem per User in Study (Hash)
     // study:{studyId}:user:{userId}:active_problem -> studyProblemId, problemTitle, updatedAt
     public static final String STUDY_USER_ACTIVE_PROBLEM = "study:%d:user:%d:active_problem";
+    // Current Active IDE Snapshot per User in Study (Hash)
+    // study:{studyId}:user:{userId}:active_ide -> studyProblemId, problemTitle, filename, code, lang, eventTs, updatedAt
+    public static final String STUDY_USER_ACTIVE_IDE = "study:%d:user:%d:active_ide";
+
     // Curriculum Topic (Pub/Sub)
     public static final String TOPIC_CURRICULUM = "topic/studies/rooms/%d/problems";
 

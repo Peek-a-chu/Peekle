@@ -305,7 +305,25 @@ public class StudyRoomService {
                                                 (String) connectionIds.get(String.valueOf(member.getUser().getId()))))
                                 .collect(Collectors.toList());
 
-                return StudyRoomResponse.from(studyRoom, memberResponses, currentUserId);
+                Long lastStudyProblemId = null;
+                java.time.LocalDate lastStudyProblemDate = null;
+                if (currentUserId != null) {
+                        StudyProblem lastStudyProblem = studyMemberRepository.findByStudyAndUser_Id(studyRoom, currentUserId)
+                                        .map(StudyMember::getLastStudyProblem)
+                                        .orElse(null);
+                        if (lastStudyProblem != null && lastStudyProblem.getStudy() != null
+                                        && studyRoom.getId().equals(lastStudyProblem.getStudy().getId())) {
+                                lastStudyProblemId = lastStudyProblem.getId();
+                                lastStudyProblemDate = lastStudyProblem.getProblemDate();
+                        }
+                }
+
+                return StudyRoomResponse.from(
+                                studyRoom,
+                                memberResponses,
+                                currentUserId,
+                                lastStudyProblemId,
+                                lastStudyProblemDate);
         }
 
         @Transactional

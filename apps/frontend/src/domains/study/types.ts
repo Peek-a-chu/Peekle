@@ -47,6 +47,8 @@ export interface StudyRoomDetail {
   title: string;
   role: 'OWNER' | 'MEMBER';
   members: StudyMember[];
+  lastStudyProblemId?: number | null;
+  lastStudyProblemDate?: string | null; // yyyy-MM-dd
 }
 
 export interface StudyListContent {
