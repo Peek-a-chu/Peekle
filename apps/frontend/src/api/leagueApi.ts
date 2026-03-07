@@ -30,7 +30,7 @@ export interface LeagueStatusResponse {
   myPercentile: number;
   leagueStats: LeagueStat[];
   members: BackendRankingMember[];
-  isGroupAssigned: boolean;
+  leagueGroupId: number | null;
 }
 
 export async function getLeagueStatus(): Promise<LeagueRankingData | null> {
@@ -63,7 +63,7 @@ export async function getLeagueStatus(): Promise<LeagueRankingData | null> {
       },
       myPercentile: data.myPercentile,
       leagueStats: data.leagueStats,
-      isGroupAssigned: data.isGroupAssigned,
+      leagueGroupId: data.leagueGroupId,
     };
   } catch (error) {
     console.error('Error fetching league status:', error);

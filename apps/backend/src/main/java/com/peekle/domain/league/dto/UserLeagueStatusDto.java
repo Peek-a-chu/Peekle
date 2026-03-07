@@ -11,4 +11,5 @@ public class UserLeagueStatusDto {
     private LeagueStatus leagueStatus;
     private Integer pointsToPromotion;
     private Integer pointsToMaintenance;
+    private Integer totalGroupMembers;
 }

@@ -53,43 +53,71 @@ public class LeagueService {
             return;
         }
 
-        RLock lock = redissonClient.getLock("league:assignment:lock");
-        try {
-            // Wait 5s, Lease 3s (짧게 치고 빠지기)
-            if (lock.tryLock(5, 3, java.util.concurrent.TimeUnit.SECONDS)) {
-                try {
-                    // 1. 현재 주차 계산
-                    int currentSeasonWeek = calculateCurrentSeasonWeek();
+        // 단일 인스턴스(테스트) 환경에서 Redisson 초기화 시 발생할 수 있는 race condition을 방지하기 위해 JVM
+        // synchronized 추가
+        synchronized (this) {
+            RLock lock = redissonClient.getLock("league:assignment:lock");
+            boolean isLockReleased = false;
+            try {
+                // Wait 15s, Lease -1 (Watchdog 활성화로 안전하게 점유 보장)
+                if (lock.tryLock(15, -1, java.util.concurrent.TimeUnit.SECONDS)) {
+                    try {
+                        // 트랜잭션 내에서 영속성 컨텍스트 초기화를 위해 User를 DB에서 다시 조회 (stale read 방지)
+                        User lockedUser = userRepository.findById(user.getId())
+                                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-                    // 2. STONE 티어의 가장 최근 그룹 조회
-                    LeagueGroup group = leagueGroupRepository
-                            .findTopByTierAndSeasonWeekOrderByIdDesc(LeagueTier.STONE, currentSeasonWeek)
-                            .orElse(null);
+                        if (lockedUser.getLeagueGroupId() != null) {
+                            return; // 락을 대기하는 동안 이미 배정되었을 수 있음
+                        }
 
-                    // 3. 그룹이 없거나 꽉 찼으면 새로 생성
-                    if (group == null || isGroupFull(group.getId())) {
-                        group = createNewGroup(LeagueTier.STONE, currentSeasonWeek);
+                        // 1. 현재 주차 계산
+                        int currentSeasonWeek = calculateCurrentSeasonWeek();
+
+                        // 2. 인원이 채워지지 않은 그룹 찾기 (10명 미만)
+                        java.util.List<LeagueGroup> availableGroups = leagueGroupRepository.findAvailableGroup(
+                                LeagueTier.STONE, currentSeasonWeek,
+                                org.springframework.data.domain.PageRequest.of(0, 1));
+
+                        LeagueGroup group;
+                        if (!availableGroups.isEmpty()) {
+                            group = availableGroups.get(0);
+                        } else {
+                            group = createNewGroup(LeagueTier.STONE, currentSeasonWeek);
+                        }
+
+                        // 4. 유저에게 그룹 할당 및 저장
+                        lockedUser.updateLeagueGroup(group.getId());
+                        userRepository.save(lockedUser); // 영속성 컨텍스트 반영
+
+                    } finally {
+                        // 트랜잭션이 커밋된 후에 락을 해제하도록 동기화 훅 등록
+                        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                                .isSynchronizationActive()) {
+                            org.springframework.transaction.support.TransactionSynchronizationManager
+                                    .registerSynchronization(
+                                            new org.springframework.transaction.support.TransactionSynchronization() {
+                                                @Override
+                                                public void afterCompletion(int status) {
+                                                    lock.unlock();
+                                                }
+                                            });
+                            isLockReleased = true; // 트랜잭션 종료 시 자동 해제 예정
+                        }
                     }
-
-                    // 4. 유저에게 그룹 할당 및 저장
-                    user.updateLeagueGroup(group.getId());
-                    userRepository.save(user); // 트랜잭션 내 변경 감지 or 명시적 저장
-
-                    // (옵션) Redis 랭킹 0점으로 초기화
-                    // redisTemplate.opsForZSet().add("league:" + currentSeasonWeek + ":" +
-                    // group.getId() + ":rank", user.getId().toString(), 0);
-
-                } finally {
+                } else {
+                    throw new BusinessException(
+                            ErrorCode.INTERNAL_SERVER_ERROR); // Lock 획득 실패
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new BusinessException(
+                        ErrorCode.INTERNAL_SERVER_ERROR);
+            } finally {
+                // 트랜잭션 동기화에 등록되지 않았다면 즉시 해제 (ex: 테스트 또는 트랜잭션 밖 호출)
+                if (!isLockReleased && lock.isHeldByCurrentThread()) {
                     lock.unlock();
                 }
-            } else {
-                throw new BusinessException(
-                        ErrorCode.INTERNAL_SERVER_ERROR); // Lock 획득 실패
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BusinessException(
-                    ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -102,18 +130,25 @@ public class LeagueService {
             return Integer.parseInt(value);
         }
 
-        // 초기값 설정 (최초 실행 시): 날짜 기반
+        // 초기값 설정 (최초 실행 시): 날짜 기반 (ISO week date)
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         WeekFields weekFields = WeekFields.ISO;
-        int initialWeek = now.getYear() * 100 + now.get(weekFields.weekOfWeekBasedYear());
+        int initialWeek = now.get(weekFields.weekBasedYear()) * 100 + now.get(weekFields.weekOfWeekBasedYear());
 
         redisTemplate.opsForValue().set(key, String.valueOf(initialWeek));
         return initialWeek;
     }
 
-    private boolean isGroupFull(Long groupId) {
-        long count = userRepository.countByLeagueGroupId(groupId);
-        return count >= 10;
+    private int getNextSeasonWeek(int currentSeasonWeek) {
+        int year = currentSeasonWeek / 100;
+        int week = currentSeasonWeek % 100;
+
+        // 날짜를 기준으로 다음 주차의 연도 및 주차를 정확히 계산
+        LocalDate date = LocalDate.of(year, 1, 4); // 1월 4일은 무조건 첫째 주에 포함됨 (ISO 규칙)
+        date = date.plusWeeks(week - 1).plusWeeks(1);
+
+        WeekFields weekFields = WeekFields.ISO;
+        return date.get(weekFields.weekBasedYear()) * 100 + date.get(weekFields.weekOfWeekBasedYear());
     }
 
     private LeagueGroup createNewGroup(LeagueTier tier, int seasonWeek) {
@@ -314,7 +349,7 @@ public class LeagueService {
                 myPercentile,
                 leagueStats,
                 members,
-                user.getLeagueGroupId() != null);
+                user.getLeagueGroupId());
     }
 
     private int getLeagueUserCount(LeagueTier tier) {
@@ -504,10 +539,8 @@ public class LeagueService {
     public void startNewSeason() {
         int previousSeasonWeek = calculateCurrentSeasonWeek();
 
-        // 시즌 증가 (Redis 갱신)
-        redisTemplate.opsForValue().increment("league:season:current");
-
-        int newSeasonWeek = previousSeasonWeek + 1; // 다음 주차
+        int newSeasonWeek = getNextSeasonWeek(previousSeasonWeek);
+        redisTemplate.opsForValue().set("league:season:current", String.valueOf(newSeasonWeek));
 
         // 1. 모든 유저의 지난 시즌 결과 조회 및 티어 조정
         List<LeagueHistory> histories = leagueHistoryRepository
@@ -530,38 +563,26 @@ public class LeagueService {
 
         // 2. 티어별로 유저를 그룹화하여 새 그룹 생성
         for (LeagueTier tier : LeagueTier.values()) {
-            // 해당 티어의 모든 유저 조회 (그룹 없는 유저만)
+            // 해당 티어의 모든 유저 조회 (이 시점엔 모두 그룹이 null이 됨)
             List<User> tierUsers = userRepository
-
                     .findByLeagueAndLeagueGroupIdIsNull(tier);
 
-            // 4명 미만이면 그룹 생성 안 함 (다음 주 대기)
-            if (tierUsers.size() < 4) {
+            if (tierUsers.isEmpty()) {
                 continue;
             }
 
-            // 10명씩 묶어서 그룹 생성, 마지막 그룹은 4-10명
+            // 10명씩 묶어서 그룹 생성
             for (int i = 0; i < tierUsers.size(); i += 10) {
                 int endIndex = Math.min(i + 10, tierUsers.size());
                 List<User> groupUsers = tierUsers.subList(i, endIndex);
 
-                // 마지막 조각이 4명 미만이면 이전 그룹에 합침
-                if (groupUsers.size() < 4 && i > 0) {
-                    // 이전 그룹의 ID를 가져와서 추가
-                    Long lastGroupId = tierUsers.get(i - 1).getLeagueGroupId();
-                    for (User user : groupUsers) {
-                        user.assignToLeagueGroup(lastGroupId);
-                        userRepository.save(user);
-                    }
-                } else if (groupUsers.size() >= 4) {
-                    // 새 그룹 생성
-                    LeagueGroup newGroup = createNewGroup(tier, newSeasonWeek);
+                // 새 그룹 생성 (인원수 상관없이 생성)
+                LeagueGroup newGroup = createNewGroup(tier, newSeasonWeek);
 
-                    // 유저들을 새 그룹에 배정
-                    for (User user : groupUsers) {
-                        user.assignToLeagueGroup(newGroup.getId());
-                        userRepository.save(user);
-                    }
+                // 유저들을 새 그룹에 배정
+                for (User user : groupUsers) {
+                    user.assignToLeagueGroup(newGroup.getId());
+                    userRepository.save(user);
                 }
             }
         }
@@ -688,6 +709,7 @@ public class LeagueService {
         LeagueStatus leagueStatus = LeagueStatus.STAY;
         Integer pointsToPromotion = null;
         Integer pointsToMaintenance = null;
+        int totalGroupMembers = 0;
 
         if (user.getLeagueGroupId() != null) {
             // 그룹 내 순위 계산
@@ -695,7 +717,7 @@ public class LeagueService {
                     user.getLeagueGroupId(), user.getLeaguePoint(), user.getUpdatedAt()) + 1;
 
             // 그룹 총 인원
-            int totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
+            totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
 
             // 승급/강등 인원 계산
             LeagueTier currentTier = user.getLeague();
@@ -760,6 +782,7 @@ public class LeagueService {
                 .leagueStatus(leagueStatus)
                 .pointsToPromotion(pointsToPromotion)
                 .pointsToMaintenance(pointsToMaintenance)
+                .totalGroupMembers(totalGroupMembers)
                 .build();
     }
 

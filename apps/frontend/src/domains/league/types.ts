@@ -92,7 +92,7 @@ export interface LeagueRankingData {
   rule: LeagueRule;
   myPercentile: number;
   leagueStats: LeagueStat[];
-  isGroupAssigned: boolean;
+  leagueGroupId: number | null;
 }
 
 export interface PointActivity {
@@ -128,7 +128,7 @@ export interface LeagueStatusResponse {
   demotePercent: number;
   myPercentile: number;
   leagueStats: LeagueStat[];
-  isGroupAssigned: boolean;
+  leagueGroupId: number | null;
 }
 
 export interface LeagueProgressData {

@@ -296,7 +296,8 @@ public class UserService {
                 .groupRank(statusDto.getGroupRank())
                 .leagueStatus(statusDto.getLeagueStatus())
                 .bojId(user.getBojId())
-                .isGroupAssigned(user.getLeagueGroupId() != null)
+                .leagueGroupId(user.getLeagueGroupId())
+                .totalGroupMembers(statusDto.getTotalGroupMembers())
                 .build();
     }
 

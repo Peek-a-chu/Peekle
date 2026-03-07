@@ -120,8 +120,8 @@ public class LeagueSmallGroupTest {
     }
 
     @Test
-    @DisplayName("startNewSeason: 4명 미만 티어는 그룹 생성 안 함")
-    void testStartNewSeason_LessThan4Users_NoGroupCreated() {
+    @DisplayName("startNewSeason: 4명 미만 티어도 최소 1개 그룹 생성")
+    void testStartNewSeason_LessThan4Users_GroupCreated() {
         // Given: 실버 3명 (그룹 없음)
         for (int i = 0; i < 3; i++) {
             User user = User.builder()
@@ -141,18 +141,18 @@ public class LeagueSmallGroupTest {
         // When: 새 시즌 시작
         leagueService.startNewSeason();
 
-        // Then: 실버 그룹이 생성되지 않음 (3명이므로)
+        // Then: 실버 그룹이 1개 생성됨
         int nextSeasonWeek = currentSeasonWeek + 1;
         List<LeagueGroup> allGroups = leagueGroupRepository.findBySeasonWeek(nextSeasonWeek);
         long silverGroupCount = allGroups.stream()
                 .filter(g -> g.getTier() == LeagueTier.SILVER)
                 .count();
-        assertThat(silverGroupCount).isZero();
+        assertThat(silverGroupCount).isEqualTo(1);
 
-        // Then: 유저들은 여전히 그룹 없음
+        // Then: 유저들이 모두 그룹에 배정됨
         List<User> users = userRepository.findAll();
         for (User user : users) {
-            assertThat(user.getLeagueGroupId()).isNull();
+            assertThat(user.getLeagueGroupId()).isNotNull();
         }
     }
 
