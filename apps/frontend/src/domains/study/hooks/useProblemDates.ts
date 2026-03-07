@@ -1,4 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { eachDayOfInterval, endOfMonth, format, startOfMonth } from 'date-fns';
+import { apiFetch } from '@/lib/api';
 
 interface UseProblemDatesResult {
   historyDates: Date[];
@@ -7,19 +9,75 @@ interface UseProblemDatesResult {
   refresh: () => Promise<void>;
 }
 
-export function useProblemDates(_studyId: number): UseProblemDatesResult {
+export function useProblemDates(studyId: number, baseDate: Date = new Date()): UseProblemDatesResult {
   const [historyDates, setHistoryDates] = useState<Date[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const cacheRef = useRef<Map<string, Date[]>>(new Map());
 
-  const loadDates = useCallback(async () => {
-    // API removed from spec
-    // Do nothing or return empty. UI using this might not show dots, which is acceptable per "ONLY spec" req.
-    await Promise.resolve();
-    setHistoryDates([]);
-  }, []);
+  const monthKey = format(baseDate, 'yyyy-MM');
+
+  const loadDates = useCallback(async (forceRefresh = false) => {
+    if (!studyId) {
+      setHistoryDates([]);
+      return;
+    }
+
+    const cacheKey = `${studyId}-${monthKey}`;
+    if (!forceRefresh) {
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached) {
+        setHistoryDates(cached);
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const monthStart = startOfMonth(baseDate);
+      const monthEnd = endOfMonth(baseDate);
+      const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+      const results = await Promise.allSettled(
+        daysInMonth.map(async (day) => {
+          const dateKey = format(day, 'yyyy-MM-dd');
+          const response = await apiFetch<any[]>(
+            `/api/studies/${studyId}/curriculum/daily?date=${dateKey}&_t=${Date.now()}`,
+          );
+          if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+            return day;
+          }
+          return null;
+        }),
+      );
+
+      const nextHistoryDates = results.reduce<Date[]>((acc, result) => {
+        if (result.status === 'fulfilled' && result.value instanceof Date) {
+          acc.push(result.value);
+        }
+        return acc;
+      }, []);
+
+      cacheRef.current.set(cacheKey, nextHistoryDates);
+      setHistoryDates(nextHistoryDates);
+    } catch (err) {
+      const nextError = err instanceof Error ? err : new Error('Failed to load problem dates');
+      setError(nextError);
+      setHistoryDates([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [studyId, monthKey, baseDate]);
 
   useEffect(() => {
-    void loadDates();
+    void loadDates(false);
   }, [loadDates]);
 
-  return { historyDates, isLoading: false, error: null, refresh: loadDates };
+  const refresh = useCallback(async () => {
+    await loadDates(true);
+  }, [loadDates]);
+
+  return { historyDates, isLoading, error, refresh };
 }
