@@ -126,6 +126,14 @@ public class RedisKeyConst {
     // 대기실용 문제 미리보기 (List) -> game:%d:problems:preview
     public static final String GAME_PROBLEMS_PREVIEW = "game:%d:problems:preview";
 
+    // Shared workbook cache
+    public static final String WORKBOOK_CACHE_INFO = "workbook:%d:cache:info";
+    public static final String WORKBOOK_CACHE_PROBLEM_IDS = "workbook:%d:problems:ids";
+    public static final String WORKBOOK_CACHE_PROBLEM_META = "workbook:%d:problems:meta";
+    public static final String WORKBOOK_CACHE_PREVIEW_IDS = "workbook:%d:problems:preview_ids";
+    public static final String WORKBOOK_CACHE_REF_COUNT = "workbook:%d:cache:refs";
+    public static final String LOCK_WORKBOOK_CACHE = "lock:workbook:%d:cache";
+
     // 게임 제출 예상 코드 길이 (Value) -> game:%d:problem:%d:user:%d:expected_length
     public static final String GAME_EXPECTED_LENGTH = "game:%d:problem:%d:user:%d:expected_length";
 
