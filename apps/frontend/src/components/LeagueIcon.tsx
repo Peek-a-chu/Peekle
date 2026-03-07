@@ -31,7 +31,7 @@ export const LEAGUE_NAMES: Record<LeagueType, string> = {
   bronze: '브론즈',
   silver: '실버',
   gold: '골드',
-  platinum: '플레티넘',
+  platinum: '플래티넘',
   emerald: '에메랄드',
   diamond: '다이아',
   ruby: '루비',

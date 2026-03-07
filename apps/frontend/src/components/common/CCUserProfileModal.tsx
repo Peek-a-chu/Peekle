@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trophy, Flame, CheckCircle, MapPin, User as UserIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { LEAGUE_NAMES, LeagueType } from '@/components/LeagueIcon';
 
 interface CCUserProfileModalProps {
   nickname: string | null;
@@ -50,6 +51,14 @@ export function CCUserProfileModal({ nickname, isOpen, onClose }: CCUserProfileM
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const normalizedLeague = profile?.league?.toLowerCase();
+  const displayLeagueName =
+    normalizedLeague && normalizedLeague in LEAGUE_NAMES
+      ? LEAGUE_NAMES[normalizedLeague as LeagueType]
+      : normalizedLeague === 'unranked' || normalizedLeague === 'unknown'
+        ? '언랭크'
+        : profile?.league || '언랭크';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -104,7 +113,7 @@ export function CCUserProfileModal({ nickname, isOpen, onClose }: CCUserProfileM
               <div className="flex flex-col items-center p-4 bg-muted/30 rounded-xl border border-border/50">
                 <Trophy className="h-6 w-6 text-yellow-500 mb-2" />
                 <span className="text-xs text-muted-foreground mb-0.5">현재 리그</span>
-                <span className="font-bold text-lg">{profile.league || 'Unranked'}</span>
+                <span className="font-bold text-lg">{displayLeagueName}</span>
                 <span className="text-xs text-muted-foreground">
                   {profile.leaguePoint.toLocaleString()} P
                 </span>

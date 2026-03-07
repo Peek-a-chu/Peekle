@@ -1,8 +1,7 @@
 import { cn } from '@/lib/utils';
 import { UserIcon } from '@/components/UserIcon';
 import type { User as SearchUser } from '@/api/searchApi';
-import { TIER_COLORS } from './search.constants';
-import { highlightMatch } from './search.constants';
+import { TIER_COLORS, getLeagueDisplayName, highlightMatch } from './search.constants';
 
 interface UserGridItemProps {
     result: SearchUser;
@@ -37,7 +36,7 @@ export function UserGridItem({ result, query, onClick }: UserGridItemProps) {
                 </div>
                 <div className="flex flex-col gap-0.5">
                     <p className="text-sm font-medium text-muted-foreground">
-                        {result.league}
+                        {getLeagueDisplayName(result.league)}
                     </p>
                 </div>
             </div>

@@ -33,15 +33,21 @@ export function CCExtensionGuide({
   onRegisterBojId,
 }: Props) {
   // Version Check from R2
-  const { versionInfo } = useExtensionVersionCheck();
-  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.8';
+  const { versionInfo, isLoading: isVersionLoading } = useExtensionVersionCheck();
+  const REQUIRED_VERSION = versionInfo?.latestVersion ?? null;
   const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
 
-  const isVersionMismatch = isInstalled && extensionVersion && extensionVersion !== REQUIRED_VERSION;
+  // Show/update mismatch only after latest version metadata is fully loaded.
+  const isVersionMismatch =
+    !isVersionLoading &&
+    isInstalled &&
+    !!extensionVersion &&
+    !!REQUIRED_VERSION &&
+    extensionVersion !== REQUIRED_VERSION;
 
   // Modal State
   const [modal, setModal] = useState<{
@@ -271,7 +277,7 @@ export function CCExtensionGuide({
       </div>
 
       {/* Version Mismatch Warning */}
-      {isVersionMismatch && (
+      {isVersionMismatch && REQUIRED_VERSION && (
         <div className="rounded-lg p-4 mb-8 bg-red-500/10 border border-red-500/20 flex items-center gap-3">
           <div className="text-lg">🚨</div>
           <div className="flex-1">

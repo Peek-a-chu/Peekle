@@ -502,6 +502,27 @@ function renderStatusBadge(status) {
     return statusMap[status] || '';
 }
 
+// Helper function to convert league key/name to Korean label
+function getLeagueDisplayName(leagueName) {
+    if (!leagueName) return '언랭크';
+
+    const normalized = String(leagueName).trim().toLowerCase();
+    const leagueMap = {
+        stone: '스톤',
+        bronze: '브론즈',
+        silver: '실버',
+        gold: '골드',
+        platinum: '플래티넘',
+        emerald: '에메랄드',
+        diamond: '다이아',
+        ruby: '루비',
+        unranked: '언랭크',
+        unknown: '언랭크'
+    };
+
+    return leagueMap[normalized] || String(leagueName);
+}
+
 // Helper function to render point gap text
 function renderPointGap(status, pointsToPromotion, pointsToMaintenance) {
     if (!status) return '';
@@ -761,7 +782,7 @@ async function showSuccessToast(data) {
                 현재 총점: <span>${data.totalPoints || 0}점</span>
             </div>
             <div class="peekle-rank-badge">
-                ${data.currentLeague || ''} ${renderStatusBadge(data.leagueStatus)} · 그룹 ${data.currentRank || '-'}위
+                ${getLeagueDisplayName(data.currentLeague)} ${renderStatusBadge(data.leagueStatus)} · 그룹 ${data.currentRank || '-'}위
                 ${renderPointGap(data.leagueStatus, data.pointsToPromotion, data.pointsToMaintenance)}
             </div>
         </div>

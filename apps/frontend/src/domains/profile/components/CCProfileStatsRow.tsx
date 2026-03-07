@@ -1,16 +1,21 @@
 import Image from 'next/image';
 import { UserProfile } from '../types';
 import { LEAGUE_ICONS } from '@/assets/icons/league';
+import { LEAGUE_NAMES, LeagueType } from '@/components/LeagueIcon';
 
 interface Props {
   user: UserProfile;
 }
 
 export function CCProfileStatsRow({ user }: Props) {
-
-  // 리그 이름을 소문자로 변환하여 아이콘 매칭
-  const leagueKey = (user.league?.toLowerCase() || 'stone') as keyof typeof LEAGUE_ICONS;
-  const iconAsset = LEAGUE_ICONS[leagueKey] || LEAGUE_ICONS.stone;
+  const normalizedLeague = user.league?.toLowerCase();
+  const hasKnownLeague = !!(normalizedLeague && normalizedLeague in LEAGUE_ICONS);
+  const leagueKey = (hasKnownLeague ? normalizedLeague : 'stone') as keyof typeof LEAGUE_ICONS;
+  const iconAsset = LEAGUE_ICONS[leagueKey];
+  const displayLeagueName =
+    normalizedLeague && normalizedLeague in LEAGUE_NAMES
+      ? LEAGUE_NAMES[normalizedLeague as LeagueType]
+      : '언랭크';
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
@@ -18,21 +23,21 @@ export function CCProfileStatsRow({ user }: Props) {
       <div className="p-4 rounded-lg bg-muted/30 text-center border border-border">
         <div className="flex justify-center mb-2">
           {/* 리그 아이콘 */}
-          {!user.league ? (
+          {!hasKnownLeague ? (
             <div className="w-6 h-6 bg-muted rounded-lg flex items-center justify-center text-[6px] text-muted-foreground font-bold leading-tight border border-dashed border-border">
               UR
             </div>
           ) : (
             <Image
               src={iconAsset}
-              alt={`${user.league} tier icon`}
+              alt={`${displayLeagueName} tier icon`}
               width={24}
               height={24}
               className="object-contain"
             />
           )}
         </div>
-        <p className="text-2xl font-bold text-foreground">{user.league || '언랭크'}</p>
+        <p className="text-2xl font-bold text-foreground">{displayLeagueName}</p>
         <p className="text-sm text-muted-foreground">현재 리그</p>
       </div>
 

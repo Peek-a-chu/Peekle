@@ -32,8 +32,31 @@ export const TIER_COLORS: Record<string, { bg: string; text: string }> = {
     MASTER: { bg: 'bg-[#B300E0]/10', text: 'text-[#B300E0]' },
 };
 
-export const getTierStyle = (tierStr?: string) => {
-    if (!tierStr) return { bg: 'bg-muted', text: 'text-muted-foreground' };
+const TIER_LABELS: Record<string, string> = {
+    BRONZE: '브론즈',
+    SILVER: '실버',
+    GOLD: '골드',
+    PLATINUM: '플래티넘',
+    DIAMOND: '다이아',
+    RUBY: '루비',
+    MASTER: '마스터',
+};
+
+const LEAGUE_LABELS: Record<string, string> = {
+    stone: '스톤',
+    bronze: '브론즈',
+    silver: '실버',
+    gold: '골드',
+    platinum: '플래티넘',
+    emerald: '에메랄드',
+    diamond: '다이아',
+    ruby: '루비',
+    unranked: '언랭크',
+    unknown: '언랭크',
+};
+
+export const normalizeTierKey = (tierStr?: string): string => {
+    if (!tierStr) return '';
 
     let tierKey = tierStr.toUpperCase();
     if (tierKey.includes(' ')) {
@@ -41,8 +64,29 @@ export const getTierStyle = (tierStr?: string) => {
     } else if (tierKey.includes('_')) {
         tierKey = tierKey.split('_')[0];
     }
+    return tierKey;
+};
+
+export const getTierStyle = (tierStr?: string) => {
+    if (!tierStr) return { bg: 'bg-muted', text: 'text-muted-foreground' };
+
+    const tierKey = normalizeTierKey(tierStr);
 
     return TIER_COLORS[tierKey] || { bg: 'bg-muted', text: 'text-muted-foreground' };
+};
+
+export const getTierDisplayName = (tierStr?: string): string => {
+    const tierKey = normalizeTierKey(tierStr);
+    if (!tierKey) return '미분류';
+
+    return TIER_LABELS[tierKey] || tierKey;
+};
+
+export const getLeagueDisplayName = (league?: string): string => {
+    if (!league) return '언랭크';
+
+    const normalizedLeague = league.toLowerCase().trim();
+    return LEAGUE_LABELS[normalizedLeague] || league;
 };
 
 export const highlightMatch = (text: string, searchQuery: string): React.JSX.Element => {

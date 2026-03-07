@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, GripHorizontal, Minus } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { UserIcon } from '@/components/UserIcon';
 import { useLeagueRanking } from '@/domains/home/hooks/useDashboardData';
 import { LeagueRankingMember } from '@/domains/league/types';
@@ -159,9 +160,11 @@ const RankingItem = ({ member }: { member: LeagueRankingMember }) => {
     : 'hover:bg-muted/30 border-transparent px-3';
 
   return (
-    <div
+    <Link
+      href={`/profile/${member.name}`}
       className={`
                 relative flex items-center py-2 transition-all border-b last:border-b-0
+                hover:no-underline
                 ${rowClass}
             `}
     >
@@ -201,7 +204,7 @@ const RankingItem = ({ member }: { member: LeagueRankingMember }) => {
           {member.score.toLocaleString()}
         </span>
       </div>
-    </div>
+    </Link>
   );
 };
 
