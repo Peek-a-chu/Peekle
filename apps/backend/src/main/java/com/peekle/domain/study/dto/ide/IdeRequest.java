@@ -9,6 +9,8 @@ import lombok.ToString;
 @ToString
 public class IdeRequest {
     private Long problemId; // Problem-specific code
+    private String problemTitle; // Current selected problem title
+    private String externalId; // BOJ external problem number (e.g. "1000")
     private String filename; // e.g. "Main.java"
     private String code; // Source code content
     private String lang; // e.g. "java", "python"

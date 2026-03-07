@@ -46,14 +46,21 @@ public class CollaborationSocketController {
 
         // Safe check for problemId
         Long problemId = (request.getProblemId() != null) ? request.getProblemId() : 0L;
+        String language = (request.getLang() != null && !request.getLang().isBlank())
+                ? request.getLang()
+                : request.getLanguage();
+        Long eventTs = request.getEventTs() != null ? request.getEventTs() : System.currentTimeMillis();
 
         IdeResponse response = IdeResponse.builder()
                 .senderId(userId)
                 .senderName("Unknown")
                 .problemId(problemId)
+                .problemTitle(request.getProblemTitle())
+                .externalId(request.getExternalId())
                 .filename(request.getFilename())
                 .code(request.getCode())
-                .lang(request.getLang())
+                .lang((language != null && !language.isBlank()) ? language : "text")
+                .eventTs(eventTs)
                 .build();
 
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("IDE", response));

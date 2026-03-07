@@ -8,24 +8,25 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.redis.RedisKeyConst;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RedisIdeService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final UserRepository userRepository;
+    private final StudyMemberProgressService studyMemberProgressService;
 
     /**
      * 사용자 코드를 Redis Hash에 저장
@@ -125,5 +126,183 @@ public class RedisIdeService {
 
         // Convert Object -> String
         return targets.stream().map(Object::toString).collect(Collectors.toSet());
+    }
+
+    /**
+     * Save which study problem this user is currently solving.
+     */
+    public void saveActiveProblem(Long studyId, Long userId, Long studyProblemId, String problemTitle) {
+        saveActiveProblem(studyId, userId, studyProblemId, problemTitle, null, null, null, null, null);
+    }
+
+    public void saveActiveProblem(
+            Long studyId,
+            Long userId,
+            Long studyProblemId,
+            String problemTitle,
+            String externalId,
+            String filename,
+            String code,
+            String language,
+            Long eventTs) {
+        if (studyProblemId == null || studyProblemId <= 0) {
+            return;
+        }
+
+        String key = String.format(RedisKeyConst.STUDY_USER_ACTIVE_PROBLEM, studyId, userId);
+        String activeIdeKey = String.format(RedisKeyConst.STUDY_USER_ACTIVE_IDE, studyId, userId);
+        String normalizedTitle = (problemTitle != null && !problemTitle.isBlank()) ? problemTitle.trim() : null;
+        String normalizedExternalId = (externalId != null && !externalId.isBlank()) ? externalId.trim() : null;
+
+        if (normalizedTitle == null) {
+            Object existingTitle = redisTemplate.opsForHash().get(key, "problemTitle");
+            if (existingTitle != null) {
+                normalizedTitle = existingTitle.toString();
+            }
+        }
+
+        String normalizedLanguage = normalizeLanguage(language);
+        Object existingLang = redisTemplate.opsForHash().get(activeIdeKey, "lang");
+        if ((language == null || language.isBlank()) && existingLang != null) {
+            normalizedLanguage = normalizeLanguage(existingLang.toString());
+        }
+        String resolvedFilename = (filename != null && !filename.isBlank())
+                ? filename
+                : (redisTemplate.opsForHash().get(activeIdeKey, "filename") != null
+                        ? redisTemplate.opsForHash().get(activeIdeKey, "filename").toString()
+                        : getDefaultFilename(normalizedLanguage));
+        String resolvedCode;
+        if (code != null) {
+            resolvedCode = code;
+        } else {
+            Object existingCode = redisTemplate.opsForHash().get(activeIdeKey, "code");
+            resolvedCode = existingCode != null ? existingCode.toString() : "";
+        }
+        Long resolvedEventTs = eventTs != null
+                ? eventTs
+                : parseEventTs(redisTemplate.opsForHash().get(activeIdeKey, "eventTs"));
+        if (resolvedEventTs == null) {
+            resolvedEventTs = System.currentTimeMillis();
+        }
+
+        Map<String, String> legacyData = new HashMap<>();
+        legacyData.put("studyProblemId", studyProblemId.toString());
+        if (normalizedTitle != null && !normalizedTitle.isBlank()) {
+            legacyData.put("problemTitle", normalizedTitle);
+        }
+        if (normalizedExternalId != null && !normalizedExternalId.isBlank()) {
+            legacyData.put("externalId", normalizedExternalId);
+        }
+        legacyData.put("updatedAt", LocalDateTime.now().toString());
+
+        redisTemplate.opsForHash().putAll(key, legacyData);
+        if (normalizedExternalId == null) {
+            redisTemplate.opsForHash().delete(key, "externalId");
+        }
+        redisTemplate.expire(key, 12, TimeUnit.HOURS);
+
+        Map<String, String> ideData = new HashMap<>();
+        ideData.put("studyProblemId", studyProblemId.toString());
+        if (normalizedTitle != null && !normalizedTitle.isBlank()) {
+            ideData.put("problemTitle", normalizedTitle);
+        }
+        if (normalizedExternalId != null && !normalizedExternalId.isBlank()) {
+            ideData.put("externalId", normalizedExternalId);
+        }
+        ideData.put("filename", resolvedFilename);
+        ideData.put("code", resolvedCode);
+        ideData.put("lang", normalizedLanguage);
+        ideData.put("eventTs", resolvedEventTs.toString());
+        ideData.put("updatedAt", LocalDateTime.now().toString());
+
+        redisTemplate.opsForHash().putAll(activeIdeKey, ideData);
+        if (normalizedExternalId == null) {
+            redisTemplate.opsForHash().delete(activeIdeKey, "externalId");
+        }
+        redisTemplate.expire(activeIdeKey, 12, TimeUnit.HOURS);
+        studyMemberProgressService.updateLastStudyProblem(studyId, userId, studyProblemId);
+    }
+
+    /**
+     * Read current active problem for a user in a study.
+     */
+    public Map<String, Object> getActiveProblem(Long studyId, Long userId) {
+        String activeIdeKey = String.format(RedisKeyConst.STUDY_USER_ACTIVE_IDE, studyId, userId);
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(activeIdeKey);
+
+        if (entries != null && !entries.isEmpty()) {
+            Object rawStudyProblemId = entries.get("studyProblemId");
+            if (rawStudyProblemId != null) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                try {
+                    result.put("studyProblemId", Long.valueOf(rawStudyProblemId.toString()));
+                } catch (NumberFormatException e) {
+                    return Collections.emptyMap();
+                }
+
+                Object rawTitle = entries.get("problemTitle");
+                if (rawTitle != null) {
+                    result.put("problemTitle", rawTitle.toString());
+                }
+                Object rawExternalId = entries.get("externalId");
+                if (rawExternalId != null) {
+                    result.put("externalId", rawExternalId.toString());
+                }
+                Object rawLang = entries.get("lang");
+                if (rawLang != null) {
+                    result.put("lang", rawLang.toString());
+                }
+                Object rawCode = entries.get("code");
+                if (rawCode != null) {
+                    result.put("code", rawCode.toString());
+                }
+                Object rawFilename = entries.get("filename");
+                if (rawFilename != null) {
+                    result.put("filename", rawFilename.toString());
+                }
+                Object rawEventTs = entries.get("eventTs");
+                if (rawEventTs != null) {
+                    result.put("eventTs", rawEventTs.toString());
+                }
+                Object rawUpdatedAt = entries.get("updatedAt");
+                if (rawUpdatedAt != null) {
+                    result.put("updatedAt", rawUpdatedAt.toString());
+                }
+                return result;
+            }
+        }
+
+        String key = String.format(RedisKeyConst.STUDY_USER_ACTIVE_PROBLEM, studyId, userId);
+        Map<Object, Object> legacyEntries = redisTemplate.opsForHash().entries(key);
+
+        if (legacyEntries == null || legacyEntries.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Object rawStudyProblemId = legacyEntries.get("studyProblemId");
+        if (rawStudyProblemId == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        try {
+            result.put("studyProblemId", Long.valueOf(rawStudyProblemId.toString()));
+        } catch (NumberFormatException e) {
+            return Collections.emptyMap();
+        }
+
+        Object rawTitle = legacyEntries.get("problemTitle");
+        if (rawTitle != null) {
+            result.put("problemTitle", rawTitle.toString());
+        }
+        Object rawExternalId = legacyEntries.get("externalId");
+        if (rawExternalId != null) {
+            result.put("externalId", rawExternalId.toString());
+        }
+        Object rawUpdatedAt = legacyEntries.get("updatedAt");
+        if (rawUpdatedAt != null) {
+            result.put("updatedAt", rawUpdatedAt.toString());
+        }
+        return result;
     }
 }

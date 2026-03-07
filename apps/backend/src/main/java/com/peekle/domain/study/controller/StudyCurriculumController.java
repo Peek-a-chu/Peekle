@@ -1,6 +1,12 @@
 package com.peekle.domain.study.controller;
 
 import com.peekle.domain.study.dto.curriculum.ProblemStatusResponse;
+import com.peekle.domain.study.dto.ide.StudyProblemDraftResponse;
+import com.peekle.domain.study.entity.StudyRoom;
+import com.peekle.domain.study.repository.StudyMemberRepository;
+import com.peekle.domain.study.service.RedisIdeService;
+import com.peekle.domain.study.service.StudyMemberProgressService;
+import com.peekle.domain.study.service.StudyProblemDraftService;
 import com.peekle.domain.study.service.StudyCurriculumService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -19,6 +26,10 @@ public class StudyCurriculumController {
     private final StudyCurriculumService studyCurriculumService;
     private final com.peekle.domain.study.service.RedisStudyProblemService redisStudyProblemService;
     private final com.peekle.global.redis.RedisPublisher redisPublisher;
+    private final RedisIdeService redisIdeService;
+    private final StudyProblemDraftService studyProblemDraftService;
+    private final StudyMemberProgressService studyMemberProgressService;
+    private final StudyMemberRepository studyMemberRepository;
 
     /**
      * 커스텀 문제 설명 저장
@@ -66,5 +77,25 @@ public class StudyCurriculumController {
 
         System.out.println("DEBUG DailyCurriculum: " + response.toString());
         return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{studyId}/ide/active-problem/{targetUserId}")
+    public ApiResponse<Map<String, Object>> getActiveProblem(
+            @PathVariable Long studyId,
+            @PathVariable Long targetUserId,
+            @AuthenticationPrincipal Long userId) {
+        if (userId == null) {
+            return ApiResponse.success(Map.of());
+        }
+
+        StudyRoom studyRef = StudyRoom.builder().id(studyId).build();
+        boolean requesterInStudy = studyMemberRepository.existsByStudyAndUser_Id(studyRef, userId);
+        boolean targetInStudy = studyMemberRepository.existsByStudyAndUser_Id(studyRef, targetUserId);
+
+        if (!requesterInStudy || !targetInStudy) {
+            return ApiResponse.success(Map.of());
+        }
+
+        return ApiResponse.success(redisIdeService.getActiveProblem(studyId, targetUserId));
     }
 }
