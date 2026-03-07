@@ -32,6 +32,10 @@ public class StudyMember {
     @Column(nullable = false)
     private StudyRole role;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "last_study_problem_id")
+    private StudyProblem lastStudyProblem;
+
     @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
 
@@ -42,6 +46,14 @@ public class StudyMember {
 
     public void updateRole(StudyRole role) {
         this.role = role;
+    }
+
+    public void updateLastStudyProblem(StudyProblem studyProblem) {
+        this.lastStudyProblem = studyProblem;
+    }
+
+    public void clearLastStudyProblem() {
+        this.lastStudyProblem = null;
     }
 
     public enum StudyRole {
