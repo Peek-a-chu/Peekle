@@ -1,4 +1,4 @@
-spring:
+﻿spring:
   config:
     activate:
       on-profile: dev
@@ -14,8 +14,8 @@ spring:
       ddl-auto: update # 개발용: 엔티티 기반 자동 생성
     properties:
       hibernate:
-        format_sql: true
-        show_sql: true
+        format_sql: false
+        show_sql: false
     database-platform: org.hibernate.dialect.H2Dialect
 
   h2:
@@ -47,3 +47,4 @@ springwolf:
       local-ws:
         protocol: ws
         host: localhost:8080
+
