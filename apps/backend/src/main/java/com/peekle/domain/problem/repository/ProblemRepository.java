@@ -13,6 +13,13 @@ import java.util.Optional;
 public interface ProblemRepository extends JpaRepository<Problem, Long>, ProblemRepositoryCustom {
        Optional<Problem> findByExternalIdAndSource(String externalId, String source);
 
+       Page<Problem> findBySource(String source, Pageable pageable);
+
+       long countBySource(String source);
+
+       @Query("SELECT p.externalId FROM Problem p WHERE p.source = :source ORDER BY p.id ASC")
+       List<String> findExternalIdsBySource(@Param("source") String source);
+
        /**
         * title 또는 externalId로 문제 검색
         * 
