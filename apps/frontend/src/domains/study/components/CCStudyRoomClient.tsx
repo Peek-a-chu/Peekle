@@ -30,6 +30,7 @@ import { useLocalParticipant } from '@livekit/components-react';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 import { useStudyPresenceSync } from '@/domains/study/hooks/useStudyPresenceSync';
+import { useProblemDates } from '@/domains/study/hooks/useProblemDates';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -288,10 +289,11 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
   ]);
 
   // API Hooks
-  const { problems, addProblem, deleteProblem } = useProblems(
+  const { problems, isLoading: isProblemsLoading, addProblem, deleteProblem } = useProblems(
     studyId,
     format(selectedDate, 'yyyy-MM-dd'),
   );
+  const { historyDates } = useProblemDates(studyId, selectedDate);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
   // Initialize room data (fetch participants only, room info fetched in wrapper)
@@ -515,6 +517,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       }))}
       selectedDate={selectedDate}
       onDateChange={handleDateChange}
+      isProblemsLoading={isProblemsLoading}
       onAddProblem={addProblem}
       onRemoveProblem={deleteProblem}
       onSelectProblem={handleSelectProblem}
@@ -523,6 +526,7 @@ function StudyRoomContent({ studyId }: { studyId: number }) {
       isFolded={isLeftPanelFolded}
       submissions={submissions}
       onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
+      historyDates={historyDates}
       showFoldButton={true}
     />
   );

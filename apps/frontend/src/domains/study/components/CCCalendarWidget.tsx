@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { ko } from 'date-fns/locale';
-import { format, isAfter, startOfToday } from 'date-fns';
+import { format, isAfter, isSameDay, startOfToday } from 'date-fns';
 import {
   Calendar as CalendarIcon,
   ChevronDown,
@@ -72,6 +72,10 @@ export function CCInlineCalendar({
   historyDates = [],
 }: CCInlineCalendarProps) {
   const today = startOfToday();
+  const isHistoryDate = React.useCallback(
+    (date: Date) => historyDates.some((historyDate) => isSameDay(historyDate, date)),
+    [historyDates],
+  );
 
   return (
     <div className={cn('border-b border-border bg-card px-3 py-3 shrink-0 relative', className)}>
@@ -90,7 +94,8 @@ export function CCInlineCalendar({
         locale={ko}
         disabled={(date) => isAfter(date, today)}
         modifiers={{
-          hasHistory: historyDates,
+          hasHistory: isHistoryDate,
+          hasHistorySelected: (date) => isHistoryDate(date) && isSameDay(date, selectedDate),
         }}
         showOutsideDays
         className="w-full"
@@ -112,7 +117,7 @@ export function CCInlineCalendar({
           day: 'h-8 w-8 text-center text-sm p-0',
           day_button:
             'h-8 w-8 p-0 font-normal rounded-md inline-flex items-center justify-center transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
-          selected: 'bg-primary text-whit rounded-md hover:bg-primary/90 focus:bg-primary/90',
+          selected: 'bg-primary text-white rounded-md hover:bg-primary/90 focus:bg-primary/90',
           today: 'bg-muted font-semibold',
           outside: 'text-muted-foreground/40',
           disabled: 'text-muted-foreground/30 cursor-not-allowed hover:bg-transparent',
@@ -120,7 +125,9 @@ export function CCInlineCalendar({
         }}
         modifiersClassNames={{
           hasHistory:
-            'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:bg-primary after:rounded-full',
+            '[&>button]:border [&>button]:border-primary/60 [&>button]:bg-transparent [&>button]:p-0',
+          hasHistorySelected:
+            '[&>button]:border [&>button]:border-white/80 [&>button]:p-0',
         }}
         components={{
           Chevron: ({ orientation }) =>

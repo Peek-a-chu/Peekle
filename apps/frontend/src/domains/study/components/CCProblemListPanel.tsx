@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, FileText, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ export interface CCProblemListPanelProps {
   isFolded: boolean;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  isProblemsLoading?: boolean;
   onAddProblem?: (
     title: string,
     number: number | null,
@@ -47,6 +49,7 @@ export function CCProblemListPanel({
   onToggleFold,
   selectedDate,
   onDateChange,
+  isProblemsLoading,
   onAddProblem,
   onRemoveProblem,
   submissions = [],
@@ -63,6 +66,8 @@ export function CCProblemListPanel({
   // State for Flip/Custom View
   const [isFlipped, setIsFlipped] = useState(false);
   const [panelWidth, setPanelWidth] = useState(300);
+  const [pendingCalendarCloseDate, setPendingCalendarCloseDate] = useState<Date | null>(null);
+  const [hasStartedDateChangeLoading, setHasStartedDateChangeLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const setViewMode = useRoomStore((state) => state.setViewMode);
@@ -88,9 +93,46 @@ export function CCProblemListPanel({
 
 
   const handleDateSelect = (date: Date) => {
+    if (isSameDay(date, selectedDate)) {
+      setIsCalendarOpen(false);
+      return;
+    }
+
     onDateChange(date);
-    setIsCalendarOpen(false);
+    setPendingCalendarCloseDate(date);
+    setHasStartedDateChangeLoading(false);
   };
+
+  useEffect(() => {
+    if (!pendingCalendarCloseDate || !isCalendarOpen) return;
+
+    if (typeof isProblemsLoading === 'undefined') {
+      if (isSameDay(selectedDate, pendingCalendarCloseDate)) {
+        setIsCalendarOpen(false);
+        setPendingCalendarCloseDate(null);
+      }
+      return;
+    }
+
+    if (isProblemsLoading) {
+      if (!hasStartedDateChangeLoading) {
+        setHasStartedDateChangeLoading(true);
+      }
+      return;
+    }
+
+    if (hasStartedDateChangeLoading && isSameDay(selectedDate, pendingCalendarCloseDate)) {
+      setIsCalendarOpen(false);
+      setPendingCalendarCloseDate(null);
+      setHasStartedDateChangeLoading(false);
+    }
+  }, [
+    pendingCalendarCloseDate,
+    isCalendarOpen,
+    isProblemsLoading,
+    hasStartedDateChangeLoading,
+    selectedDate,
+  ]);
 
   const handleOpenSubmission = (problemId: number) => {
     setSelectedSubmissionProblemId(problemId);
