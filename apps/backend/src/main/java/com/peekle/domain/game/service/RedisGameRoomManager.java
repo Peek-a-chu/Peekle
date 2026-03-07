@@ -29,7 +29,6 @@ public class RedisGameRoomManager {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final TagRepository tagRepository;
-    private final WorkbookPreviewCacheService workbookPreviewCacheService;
 
     /**
      * 방 삭제 (Clean Up)
@@ -43,8 +42,6 @@ public class RedisGameRoomManager {
                 new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
                 SocketResponse.of("LOBBY_ROOM_DELETED", lobbyDeleteData));
         log.info("📢 [Lobby] Game Room {} Deleted - Broadcasting to lobby", roomId);
-
-        workbookPreviewCacheService.releaseRoomWorkbookCache(roomId);
 
         // 1. Redis 데이터 삭제
         String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);

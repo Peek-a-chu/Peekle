@@ -15,7 +15,7 @@ public class UserTestController {
     @PostMapping
     public User createUser(@RequestParam String nickname) {
         User user = new User(
-                "dev_" + java.util.UUID.randomUUID(), // socialId
+                "dev_" + System.currentTimeMillis(), // socialId
                 "Google", // provider
                 nickname);
         return userRepository.save(user);

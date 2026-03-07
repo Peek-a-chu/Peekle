@@ -3,7 +3,8 @@ package com.peekle.domain.game.service;
 import com.peekle.domain.game.enums.GameStatus;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
-import com.peekle.domain.problem.entity.Problem;
+import com.peekle.domain.workbook.entity.Workbook;
+import com.peekle.domain.workbook.repository.WorkbookRepository;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
@@ -33,8 +34,8 @@ public class RedisGameWaitService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final UserRepository userRepository;
+    private final WorkbookRepository workbookRepository;
     private final RedisGameRoomManager roomManager;
-    private final WorkbookPreviewCacheService workbookPreviewCacheService;
 
     /**
      * 게임 방 입장
@@ -255,18 +256,27 @@ public class RedisGameWaitService {
         String selWbId = (String) roomInfo.get("selectedWorkbookId");
         if (selWbId != null) {
             try {
-                String wbTitle = workbookPreviewCacheService.resolveWorkbookTitle(roomInfo);
+                Long wbId = selWbId.startsWith("wb") ? Long.parseLong(selWbId.replace("wb", ""))
+                        : Long.parseLong(selWbId);
+                String wbTitle = workbookRepository.findById(wbId).map(Workbook::getTitle).orElse(null);
                 lobbyCreateData.put("workbookTitle", wbTitle);
+
+                String previewKey = String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId);
+                List<Object> pList = redisTemplate.opsForList().range(previewKey, 0, -1);
                 List<Map<String, Object>> problems = new ArrayList<>();
-                for (Problem problem : workbookPreviewCacheService.loadPreviewProblems(roomId)) {
-                    problems.add(Map.of(
-                            "id", problem.getId(),
-                            "externalId", problem.getExternalId(),
-                            "title", problem.getTitle(),
-                            "tier", problem.getTier(),
-                            "url", problem.getUrl()));
-                }
-                if (!problems.isEmpty()) {
+
+                if (pList != null) {
+                    for (Object item : pList) {
+                        if (item instanceof Map) {
+                            Map<String, String> pInfo = (Map<String, String>) item;
+                            problems.add(Map.of(
+                                    "id", Long.parseLong(pInfo.get("id")),
+                                    "externalId", pInfo.get("externalId"),
+                                    "title", pInfo.get("title"),
+                                    "tier", pInfo.get("tier"),
+                                    "url", pInfo.get("url")));
+                        }
+                    }
                     lobbyCreateData.put("problems", problems);
                 }
 

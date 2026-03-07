@@ -90,14 +90,6 @@ management:
   endpoint:
     health:
       show-details: when-authorized
-  metrics:
-    distribution:
-      percentiles-histogram:
-        game.start.duration: true
-        game.create.duration: true
-      percentiles:
-        game.start.duration: 0.5,0.95,0.99
-        game.create.duration: 0.95
 
 logging:
   level:
