@@ -12,6 +12,29 @@ interface SearchDropdownProps {
     onSelect: (suggestion: SearchSuggestion) => void;
 }
 
+function getTierDisplayName(tier?: string): string {
+    if (!tier) return '';
+
+    const tierMap: Record<string, string> = {
+        BRONZE: '브론즈',
+        SILVER: '실버',
+        GOLD: '골드',
+        PLATINUM: '플래티넘',
+        DIAMOND: '다이아',
+        RUBY: '루비',
+        MASTER: '마스터',
+    };
+
+    let tierKey = tier.toUpperCase();
+    if (tierKey.includes(' ')) {
+        tierKey = tierKey.split(' ')[0];
+    } else if (tierKey.includes('_')) {
+        tierKey = tierKey.split('_')[0];
+    }
+
+    return tierMap[tierKey] || tier;
+}
+
 export function SearchDropdown({
     suggestions,
     isLoading,
@@ -85,7 +108,7 @@ export function SearchDropdown({
                             </div>
                             <div className="text-xs text-muted-foreground">
                                 {getSuggestionTypeLabel(suggestion.type)}
-                                {suggestion.tier && ` · ${suggestion.tier}`}
+                                {suggestion.tier && ` · ${getTierDisplayName(suggestion.tier)}`}
                             </div>
                         </div>
                     </button>

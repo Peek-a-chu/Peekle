@@ -16,11 +16,8 @@ export interface LeagueRule {
 
 export interface LeagueStat {
   tier?: string; // e.g. "gold"
-  averageScore: number;
-  myScore: number;
-  topScore: number;
-  myPercentile: number;
-  percentile?: number; //
+  count?: number;
+  percentile?: number;
 }
 
 /*

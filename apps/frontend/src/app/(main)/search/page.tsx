@@ -14,7 +14,12 @@ import { SearchResultSection } from './components/SearchResultSection';
 import { SearchResultItem } from './components/SearchResultItem';
 import { UserGridItem } from './components/UserGridItem';
 import { WorkbookGridItem } from './components/WorkbookGridItem';
-import { TABS, TIER_COLORS, SUGGESTED_KEYWORDS } from './components/search.constants';
+import {
+  TABS,
+  TIER_COLORS,
+  SUGGESTED_KEYWORDS,
+  getTierDisplayName,
+} from './components/search.constants';
 import { isProblem, isUser, isWorkbook, type SearchType } from './components/search.types';
 
 function SearchPageContent() {
@@ -228,7 +233,7 @@ function SearchPageContent() {
                             : 'border-border text-muted-foreground hover:border-primary hover:text-primary bg-card',
                         )}
                       >
-                        {tier}
+                        {getTierDisplayName(tier)}
                       </button>
                     ))}
                   </div>

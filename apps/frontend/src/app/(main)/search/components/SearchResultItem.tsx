@@ -3,7 +3,12 @@ import { UserIcon } from '@/components/UserIcon';
 import BookIcon from '@/assets/icons/book.svg';
 import type { SearchResultItem as SearchResultItemType } from '@/api/searchApi';
 import { isProblem, isUser, isWorkbook } from './search.types';
-import { getTierStyle, highlightMatch } from './search.constants';
+import {
+    getTierStyle,
+    getTierDisplayName,
+    getLeagueDisplayName,
+    highlightMatch,
+} from './search.constants';
 
 interface SearchResultItemProps {
     result: SearchResultItemType;
@@ -26,7 +31,7 @@ export function SearchResultItem({ result, query, onClick }: SearchResultItemPro
     } else if (isUser(result)) {
         tierStyle = getTierStyle(result.tier);
         title = result.handle;
-        description = `${result.league}`;
+        description = getLeagueDisplayName(result.league);
         tier = result.tier;
     } else if (isWorkbook(result)) {
         title = result.title;
@@ -48,7 +53,7 @@ export function SearchResultItem({ result, query, onClick }: SearchResultItemPro
                             tierStyle.text,
                         )}
                     >
-                        {tier?.split('_')[0] || 'Unrated'}
+                        {getTierDisplayName(tier)}
                     </div>
                 ) : isUser(result) ? (
                     <UserIcon

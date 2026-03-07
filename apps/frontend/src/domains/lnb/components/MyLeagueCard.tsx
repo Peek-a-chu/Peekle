@@ -1,18 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Medal } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import LeagueIcon from '@/components/LeagueIcon';
-
-interface LeagueInfo {
-  tierName: string;
-  score: number;
-  rank: number;
-  totalPlayers: number;
-  status: 'promotion' | 'maintenance' | 'demotion';
-}
-
+import LeagueIcon, { LEAGUE_NAMES, LeagueType } from '@/components/LeagueIcon';
 import { useLeagueRanking } from '@/domains/home/hooks/useDashboardData';
 
 interface LeagueInfo {
@@ -65,10 +55,12 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
   // Values to display
   const displayLeague = showInitial ? (initialTier as any) : data.myLeague;
 
-  // Convert league to Uppercase (e.g. "bronze" -> "BRONZE")
+  // Convert league key to Korean label (same mapping used by LeagueIcon)
   const formatLeagueName = (league: string | undefined) => {
-    if (!league || league === 'Unknown') return 'UR';
-    return league.toUpperCase();
+    const normalizedLeague = league?.toLowerCase();
+
+    if (!normalizedLeague || normalizedLeague === 'unknown') return 'UR';
+    return LEAGUE_NAMES[normalizedLeague as LeagueType] || normalizedLeague.toUpperCase();
   };
 
   const displayTierName = formatLeagueName(displayLeague);

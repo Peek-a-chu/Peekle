@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import { UserProfile } from '../types';
 import { UserIcon } from '@/components/UserIcon';
+import { LEAGUE_NAMES, LeagueType } from '@/components/LeagueIcon';
 
 // import defaultProfileImg from '@/assets/icons/profile.png'; // Remove static import
 
@@ -44,6 +44,13 @@ export function CCProfileHeader({
   bojIdValidation,
 }: Props) {
   const isExtensionLinked = !!user.bojId;
+  const normalizedLeague = user.league?.toLowerCase();
+  const displayLeagueName =
+    normalizedLeague && normalizedLeague in LEAGUE_NAMES
+      ? LEAGUE_NAMES[normalizedLeague as LeagueType]
+      : user.league
+        ? '언랭크'
+        : '';
 
   // 기본 이미지 생성
 
@@ -194,9 +201,9 @@ export function CCProfileHeader({
           ) : (
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold text-foreground">{user.nickname}</h1>
-              {user.league && (
+              {displayLeagueName && (
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                  {user.league}
+                  {displayLeagueName}
                 </span>
               )}
             </div>
