@@ -3,6 +3,7 @@
 import { Trophy, Medal, Award, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RankResponse, StudyMemberResponse } from '@/api/rankingApi';
+import { UserIcon } from '@/components/UserIcon';
 
 interface TopThreePodiumProps {
   rankings: RankResponse[];
@@ -18,23 +19,15 @@ const MemberIcons = ({
 }): React.ReactNode => (
   <div className="flex items-center justify-center -space-x-2">
     {members.slice(0, limit).map((m) => {
-      const displayImg = m.profileImgThumb || m.profileImg;
-      return displayImg ? (
-        <img
+      const displayImg = m.profileImg || m.profileImgThumb;
+      return (
+        <UserIcon
           key={m.userId}
-          src={encodeURI(displayImg)}
-          alt={m.nickname}
-          className="h-6 w-6 rounded-full border-2 border-background bg-muted"
-          title={m.nickname}
+          src={displayImg}
+          nickname={m.nickname}
+          size={24}
+          className="border-2 border-background"
         />
-      ) : (
-        <div
-          key={m.userId}
-          className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold text-slate-500"
-          title={m.nickname}
-        >
-          {m.nickname.charAt(0)}
-        </div>
       );
     })}
     {members.length > limit && (

@@ -116,7 +116,7 @@ export function CCProfileHeader({
         {/* Profile Image (Placeholder based on nickname) */}
         <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full flex items-center justify-center shrink-0 overflow-hidden group">
           {/* 프로필 상세 페이지에서는 항상 고해상도 이미지(profileImg)를 우선 사용 */}
-          {/* profileImg가 없으면 썸네일(profileImgThumb) -> 둘 다 없으면 기본 이미지(DiceBear) */}
+          {/* profileImg가 없으면 썸네일(profileImgThumb)을 사용 */}
           <UserIcon
             src={user.profileImg || user.profileImgThumb}
             nickname={user.nickname}

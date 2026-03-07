@@ -1,7 +1,5 @@
 import Image from 'next/image';
-import { getDefaultProfileImgUrl } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 
 interface UserIconProps {
   src?: string | null;
@@ -25,15 +23,10 @@ export function UserIcon({
   className,
   unoptimized = false,
 }: UserIconProps) {
-  const [error, setError] = useState(false);
-
   // user 객체가 있으면 거기서 정보를 가져옴
   const finalNickname = nickname || user?.nickname;
   const userImage = user?.profileImg || user?.profileImage; // Handle both likely property names if types vary
-  const sourceUrl = src || userImage;
-
-  const fallbackUrl = getDefaultProfileImgUrl(finalNickname);
-  const finalSrc = error || !sourceUrl ? fallbackUrl : sourceUrl;
+  const finalSrc = (src || userImage) as string;
 
   return (
     <div
@@ -49,8 +42,7 @@ export function UserIcon({
         width={size}
         height={size}
         className="w-full h-full object-cover"
-        onError={() => setError(true)}
-        unoptimized={unoptimized || finalSrc.includes('dicebear.com')}
+        unoptimized={unoptimized}
       />
     </div>
   );
