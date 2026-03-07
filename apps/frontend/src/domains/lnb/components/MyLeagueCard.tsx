@@ -75,7 +75,7 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
   const displayScore = showInitial ? initialScore || 0 : myMember?.score || 0;
 
   // Rank/Status info (only available when loaded)
-  const isGroupAssigned = !isLoading ? data.isGroupAssigned : true;
+  const isGroupAssigned = !isLoading ? data.members.length >= 4 : true;
   const displayRank = !isLoading ? data.myRank : 0;
   const displayTotal = !isLoading ? data.members.length : 0;
   const displayStatusKey = !isLoading && isGroupAssigned ? getStatus(myMember?.status) : 'maintenance';

@@ -314,7 +314,7 @@ public class LeagueService {
                 myPercentile,
                 leagueStats,
                 members,
-                user.getLeagueGroupId() != null);
+                user.getLeagueGroupId());
     }
 
     private int getLeagueUserCount(LeagueTier tier) {
@@ -530,38 +530,26 @@ public class LeagueService {
 
         // 2. 티어별로 유저를 그룹화하여 새 그룹 생성
         for (LeagueTier tier : LeagueTier.values()) {
-            // 해당 티어의 모든 유저 조회 (그룹 없는 유저만)
+            // 해당 티어의 모든 유저 조회 (이 시점엔 모두 그룹이 null이 됨)
             List<User> tierUsers = userRepository
-
                     .findByLeagueAndLeagueGroupIdIsNull(tier);
 
-            // 4명 미만이면 그룹 생성 안 함 (다음 주 대기)
-            if (tierUsers.size() < 4) {
+            if (tierUsers.isEmpty()) {
                 continue;
             }
 
-            // 10명씩 묶어서 그룹 생성, 마지막 그룹은 4-10명
+            // 10명씩 묶어서 그룹 생성
             for (int i = 0; i < tierUsers.size(); i += 10) {
                 int endIndex = Math.min(i + 10, tierUsers.size());
                 List<User> groupUsers = tierUsers.subList(i, endIndex);
 
-                // 마지막 조각이 4명 미만이면 이전 그룹에 합침
-                if (groupUsers.size() < 4 && i > 0) {
-                    // 이전 그룹의 ID를 가져와서 추가
-                    Long lastGroupId = tierUsers.get(i - 1).getLeagueGroupId();
-                    for (User user : groupUsers) {
-                        user.assignToLeagueGroup(lastGroupId);
-                        userRepository.save(user);
-                    }
-                } else if (groupUsers.size() >= 4) {
-                    // 새 그룹 생성
-                    LeagueGroup newGroup = createNewGroup(tier, newSeasonWeek);
+                // 새 그룹 생성 (인원수 상관없이 생성)
+                LeagueGroup newGroup = createNewGroup(tier, newSeasonWeek);
 
-                    // 유저들을 새 그룹에 배정
-                    for (User user : groupUsers) {
-                        user.assignToLeagueGroup(newGroup.getId());
-                        userRepository.save(user);
-                    }
+                // 유저들을 새 그룹에 배정
+                for (User user : groupUsers) {
+                    user.assignToLeagueGroup(newGroup.getId());
+                    userRepository.save(user);
                 }
             }
         }
@@ -688,6 +676,7 @@ public class LeagueService {
         LeagueStatus leagueStatus = LeagueStatus.STAY;
         Integer pointsToPromotion = null;
         Integer pointsToMaintenance = null;
+        int totalGroupMembers = 0;
 
         if (user.getLeagueGroupId() != null) {
             // 그룹 내 순위 계산
@@ -695,7 +684,7 @@ public class LeagueService {
                     user.getLeagueGroupId(), user.getLeaguePoint(), user.getUpdatedAt()) + 1;
 
             // 그룹 총 인원
-            int totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
+            totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
 
             // 승급/강등 인원 계산
             LeagueTier currentTier = user.getLeague();
@@ -760,6 +749,7 @@ public class LeagueService {
                 .leagueStatus(leagueStatus)
                 .pointsToPromotion(pointsToPromotion)
                 .pointsToMaintenance(pointsToMaintenance)
+                .totalGroupMembers(totalGroupMembers)
                 .build();
     }
 

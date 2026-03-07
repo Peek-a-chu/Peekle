@@ -18,7 +18,7 @@ public class LeagueStatusResponse {
     // Rule info
     private int promotePercent;
     private int demotePercent;
-    private boolean isGroupAssigned;
+    private Long leagueGroupId;
 
     // Additional stat
     private Double myPercentile;
@@ -27,7 +27,7 @@ public class LeagueStatusResponse {
 
     public static LeagueStatusResponse from(LeagueTier tier, int rank, int score, String maxLeague, int totalMembers,
             double percentile, List<LeagueStatDto> leagueStats, List<LeagueRankingMemberDto> members,
-            boolean isGroupAssigned) {
+            Long leagueGroupId) {
         return LeagueStatusResponse.builder()
                 .myLeague(tier.name().toLowerCase())
                 .myRank(rank)
@@ -36,7 +36,7 @@ public class LeagueStatusResponse {
                 .totalMembers(totalMembers)
                 .promotePercent(tier.getPromotePercent())
                 .demotePercent(tier.getDemotePercent())
-                .isGroupAssigned(isGroupAssigned)
+                .leagueGroupId(leagueGroupId)
                 .myPercentile(percentile)
                 .leagueStats(leagueStats)
                 .members(members)

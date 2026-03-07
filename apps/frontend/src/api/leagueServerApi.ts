@@ -31,7 +31,7 @@ export async function getLeagueStatusServer(): Promise<LeagueRankingData | null>
     },
     myPercentile: data.myPercentile,
     leagueStats: data.leagueStats,
-    isGroupAssigned: data.isGroupAssigned,
+    leagueGroupId: data.leagueGroupId,
   };
 }
 
