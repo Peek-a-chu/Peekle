@@ -98,4 +98,55 @@ public class StudyCurriculumController {
 
         return ApiResponse.success(redisIdeService.getActiveProblem(studyId, targetUserId));
     }
+
+    @GetMapping("/{studyId}/problems/{studyProblemId}/draft")
+    public ApiResponse<StudyProblemDraftResponse> getProblemDraft(
+            @PathVariable Long studyId,
+            @PathVariable Long studyProblemId,
+            @AuthenticationPrincipal Long userId) {
+        if (userId == null) {
+            return ApiResponse.success(null);
+        }
+
+        return ApiResponse.success(
+                studyProblemDraftService.getDraft(studyId, userId, studyProblemId).orElse(null));
+    }
+
+    @PostMapping("/{studyId}/problems/{studyProblemId}/draft")
+    public ApiResponse<Void> saveProblemDraft(
+            @PathVariable Long studyId,
+            @PathVariable Long studyProblemId,
+            @AuthenticationPrincipal Long userId,
+            @RequestBody Map<String, String> request) {
+        if (userId == null) {
+            return ApiResponse.success();
+        }
+
+        String code = request.getOrDefault("code", "");
+        String language = request.get("language");
+        studyProblemDraftService.saveDraft(studyId, userId, studyProblemId, code, language);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/{studyId}/last-active-problem")
+    public ApiResponse<Map<String, Object>> getLastActiveProblem(
+            @PathVariable Long studyId,
+            @AuthenticationPrincipal Long userId) {
+        if (userId == null) {
+            return ApiResponse.success(Map.of());
+        }
+
+        StudyRoom studyRef = StudyRoom.builder().id(studyId).build();
+        boolean requesterInStudy = studyMemberRepository.existsByStudyAndUser_Id(studyRef, userId);
+        if (!requesterInStudy) {
+            return ApiResponse.success(Map.of());
+        }
+
+        return ApiResponse.success(
+                studyMemberProgressService.getLastStudyProblem(studyId, userId)
+                        .<Map<String, Object>>map(problem -> Map.of(
+                                "studyProblemId", problem.getId(),
+                                "problemDate", problem.getProblemDate().toString()))
+                        .orElseGet(Map::of));
+    }
 }
