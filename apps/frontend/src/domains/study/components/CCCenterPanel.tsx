@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { type ReactNode } from 'react';
@@ -13,6 +13,7 @@ import { WhiteboardPanel } from '@/domains/study/components/whiteboard/Whiteboar
 import { useRealtimeCode } from '@/domains/study/hooks/useRealtimeCode';
 import { useSocket } from '@/domains/study/hooks/useSocket';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown, Lock } from 'lucide-react';
@@ -37,13 +38,48 @@ export function CCCenterPanel({
   onSettingsClick,
   className,
 }: CCCenterPanelProps) {
-  const getDraftStorageKey = (
-    roomIdValue: number | null,
-    studyProblemIdValue: number | null,
-    languageValue: string,
-  ) => {
-    if (!roomIdValue || !studyProblemIdValue) return null;
-    return `peekle:study:${roomIdValue}:problem:${studyProblemIdValue}:lang:${languageValue}`;
+  const getTemplateCode = (languageValue: string): string => {
+    const normalized = languageValue.toLowerCase();
+
+    if (normalized.includes('java') && !normalized.includes('script')) {
+      return `import java.io.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        System.out.println("Hello World!");
+    }
+}`;
+    }
+
+    if (normalized.includes('cpp') || normalized.includes('c++')) {
+      return `#include <iostream>
+
+using namespace std;
+
+int main() {
+    cout << "Hello World!" << endl;
+    return 0;
+}`;
+    }
+
+    return `import sys
+
+print("Hello World!")`;
+  };
+
+  const normalizeLanguage = (languageValue: string): string => {
+    const normalized = languageValue.toLowerCase();
+    if (normalized.includes('java') && !normalized.includes('script')) return 'java';
+    if (normalized.includes('cpp') || normalized.includes('c++')) return 'cpp';
+    return 'python';
+  };
+
+  const getLanguageBadgeLabel = (languageValue: string): string => {
+    const normalized = normalizeLanguage(languageValue);
+    if (normalized === 'cpp') return 'C++';
+    if (normalized === 'java') return 'Java';
+    return 'Python';
   };
 
   const {
@@ -66,7 +102,12 @@ export function CCCenterPanel({
 
   const { isExecuting, executionResult, executeCode } = useExecution();
 
-  const { code: realtimeCode, language: realtimeLanguage } = useRealtimeCode(
+  const {
+    code: realtimeCode,
+    language: realtimeLanguage,
+    problemTitle: realtimeProblemTitle,
+    problemExternalId: realtimeProblemExternalId,
+  } = useRealtimeCode(
     viewMode === 'SPLIT_REALTIME' ? viewingUser : null,
   );
   const roomId = useRoomStore((state) => state.roomId);
@@ -187,32 +228,83 @@ export function CCCenterPanel({
 
   // Show right panel when viewing other's code OR whiteboard is open
   const showRightPanel = isViewingOther || isWhiteboardVisible;
+  const myProblemLabel = selectedProblemTitle
+    ? `${selectedProblemExternalId ? `[${selectedProblemExternalId}] ` : ''}${selectedProblemTitle}`
+    : '문제 선택 중';
+  const otherProblemLabel =
+    viewMode === 'SPLIT_SAVED'
+      ? targetSubmission?.problemTitle || '저장된 코드'
+      : (() => {
+          const title = (realtimeProblemTitle || '').trim();
+          if (!title) return '문제 선택 중';
+          const externalPrefix = realtimeProblemExternalId
+            ? `[${realtimeProblemExternalId}] `
+            : '';
+          const languageSuffix = realtimeLanguage
+            ? ` (${getLanguageBadgeLabel(realtimeLanguage)})`
+            : '';
+          return `${externalPrefix}${title}${languageSuffix}`;
+        })();
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
   const [restoredCode, setRestoredCode] = useState<string | null>(null);
   const [restoreVersion, setRestoreVersion] = useState(0);
-  const previousProblemIdRef = useRef<number | null>(null);
+  const [isHydratingDraft, setIsHydratingDraft] = useState(false);
+  const restorePublishPayloadRef = useRef<{
+    problemId: number;
+    code: string;
+    language: string;
+  } | null>(null);
+  const hydratedProblemKeyRef = useRef<string | null>(null);
+  const restoreRequestSeqRef = useRef(0);
+  const lastRestoredLanguageRef = useRef<string>('python');
+  const previousSelectionRef = useRef<{ studyProblemId: number | null; language: string }>({
+    studyProblemId: null,
+    language: 'python',
+  });
+  const ideEventTsRef = useRef(0);
+
+  const nextIdeEventTs = () => {
+    const now = Date.now();
+    if (now <= ideEventTsRef.current) {
+      ideEventTsRef.current += 1;
+    } else {
+      ideEventTsRef.current = now;
+    }
+    return ideEventTsRef.current;
+  };
+
+  const publishIdeUpdate = (
+    codeValue: string,
+    languageValue: string,
+    problemIdValue?: number | null,
+    eventTsValue?: number,
+  ) => {
+    const targetProblemId = problemIdValue ?? selectedStudyProblemId;
+    if (!socket || !roomId || !targetProblemId) return;
+    const eventTs = eventTsValue ?? nextIdeEventTs();
+
+    socket.publish({
+      destination: '/pub/ide/update',
+      body: JSON.stringify({
+        problemId: targetProblemId,
+        problemTitle: selectedProblemTitle,
+        externalId: selectedProblemExternalId,
+        code: codeValue,
+        lang: languageValue,
+        language: languageValue,
+        eventTs,
+      }),
+    });
+  };
 
   // [Problem Selection] Save current code before switching, then request new problem's code
   const handleCodeChange = (code: string, languageOverride?: string): void => {
     myLatestCodeRef.current = code;
     const targetLanguage = languageOverride || language;
-    const draftKey = getDraftStorageKey(roomId, selectedStudyProblemId, targetLanguage);
-    if (draftKey) {
-      try {
-        sessionStorage.setItem(draftKey, code);
-      } catch {
-        // Ignore storage write failures
-      }
-    }
 
-    if (socket && roomId && selectedStudyProblemId) {
-      socket.publish({
-        destination: '/pub/ide/update',
-        body: JSON.stringify({ problemId: selectedStudyProblemId, code, language: targetLanguage }),
-      });
-    }
+    publishIdeUpdate(code, targetLanguage);
   };
 
   // Provide IDE code to external components (like Testcase Runner Modal) via custom events
@@ -235,6 +327,22 @@ export function CCCenterPanel({
 
   const handleLanguageChange = (lang: string): void => {
     setLanguage(lang);
+    const templateCode = getTemplateCode(lang);
+    myLatestCodeRef.current = templateCode;
+    if (socket && roomId && selectedStudyProblemId) {
+      const eventTs = nextIdeEventTs();
+      socket.publish({
+        destination: '/pub/ide/language',
+        body: JSON.stringify({
+          problemId: selectedStudyProblemId,
+          problemTitle: selectedProblemTitle,
+          externalId: selectedProblemExternalId,
+          lang,
+          language: lang,
+          eventTs,
+        }),
+      });
+    }
   };
 
   const handleExecuteWrapper = useCallback((input: string) => {
@@ -264,20 +372,116 @@ export function CCCenterPanel({
   };
 
   useEffect(() => {
-    const draftKey = getDraftStorageKey(roomId, selectedStudyProblemId, language);
-    if (!draftKey) return;
-
-    try {
-      const cachedDraft = sessionStorage.getItem(draftKey);
-      if (cachedDraft === null) return;
-
-      myLatestCodeRef.current = cachedDraft;
-      setRestoredCode(cachedDraft);
-      setRestoreVersion((prev) => prev + 1);
-    } catch {
-      // Ignore storage read failures
+    if (!roomId) {
+      previousSelectionRef.current = { studyProblemId: selectedStudyProblemId, language };
+      return;
     }
-  }, [roomId, selectedStudyProblemId, language]);
+
+    const previousProblemId = previousSelectionRef.current.studyProblemId;
+    const previousLanguage = previousSelectionRef.current.language;
+
+    if (previousProblemId && previousProblemId !== selectedStudyProblemId) {
+      const latestCode = leftPanelRef.current?.getValue() || myLatestCodeRef.current || '';
+      void apiFetch(`/api/studies/${roomId}/problems/${previousProblemId}/draft`, {
+        method: 'POST',
+        body: JSON.stringify({
+          code: latestCode,
+          language: previousLanguage,
+        }),
+      });
+    }
+
+    previousSelectionRef.current = { studyProblemId: selectedStudyProblemId, language };
+  }, [roomId, selectedStudyProblemId, language, leftPanelRef]);
+
+  useEffect(() => {
+    if (!roomId || !selectedStudyProblemId) {
+      hydratedProblemKeyRef.current = null;
+      setIsHydratingDraft(false);
+      return;
+    }
+
+    const problemKey = `${roomId}:${selectedStudyProblemId}`;
+    hydratedProblemKeyRef.current = problemKey;
+    const requestSeq = ++restoreRequestSeqRef.current;
+    setIsHydratingDraft(true);
+
+    const isLatestRequest = () => restoreRequestSeqRef.current === requestSeq;
+
+    const applyCode = (nextCode: string, storageLanguage: string) => {
+      if (!isLatestRequest()) return;
+
+      const normalizedStorageLanguage = normalizeLanguage(storageLanguage);
+      myLatestCodeRef.current = nextCode;
+      lastRestoredLanguageRef.current = normalizedStorageLanguage;
+      restorePublishPayloadRef.current = {
+        problemId: selectedStudyProblemId,
+        code: nextCode,
+        language: normalizedStorageLanguage,
+      };
+      setRestoredCode(nextCode);
+      setRestoreVersion((prev) => prev + 1);
+
+      if (normalizeLanguage(language) !== normalizedStorageLanguage) {
+        // Keep editor language and restored draft language in sync without
+        // showing an intermediate template state.
+        setLanguage(normalizedStorageLanguage);
+      }
+    };
+
+    const seedTemplateCode = () => {
+      const defaultLanguage = 'python';
+      const templateCode = getTemplateCode(defaultLanguage);
+      applyCode(templateCode, defaultLanguage);
+    };
+
+    const finishHydration = () => {
+      if (!isLatestRequest()) return;
+      window.requestAnimationFrame(() => {
+        if (!isLatestRequest()) return;
+        setIsHydratingDraft(false);
+      });
+    };
+
+    const hydrateDraft = async () => {
+      try {
+        const response = await apiFetch<{ code?: string; language?: string }>(
+          `/api/studies/${roomId}/problems/${selectedStudyProblemId}/draft`,
+        );
+
+        if (!isLatestRequest()) return;
+
+        const draftCode = response.data?.code;
+        const draftLanguage = response.data?.language
+          ? normalizeLanguage(response.data.language)
+          : 'python';
+
+        if (response.success && typeof draftCode === 'string') {
+          applyCode(draftCode, draftLanguage);
+          finishHydration();
+          return;
+        }
+      } catch {
+        // Ignore draft fetch failures and fall back to template code
+      }
+
+      seedTemplateCode();
+      finishHydration();
+    };
+
+    void hydrateDraft();
+  }, [roomId, selectedStudyProblemId, setLanguage]);
+
+  useEffect(() => {
+    if (!socket || !roomId || !selectedStudyProblemId) return;
+    if (restoreVersion <= 0) return;
+
+    const payload = restorePublishPayloadRef.current;
+    if (!payload) return;
+    if (payload.problemId !== selectedStudyProblemId) return;
+
+    publishIdeUpdate(payload.code, payload.language, selectedStudyProblemId);
+  }, [socket, roomId, selectedStudyProblemId, restoreVersion]);
 
   return (
     <div className={cn('flex h-full flex-col min-w-0 min-h-0', className)}>
@@ -435,8 +639,21 @@ export function CCCenterPanel({
           <div className="flex min-h-0 flex-1 min-w-0 relative">
             {/* Left IDE Panel (My Code) */}
             <div
-              className={cn('flex-1 min-w-0 relative', showRightPanel && 'border-r border-border')}
+              className={cn(
+                'flex flex-1 min-w-0 flex-col',
+                showRightPanel && 'border-r border-border',
+              )}
             >
+              <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
+                <div className="flex h-full items-center gap-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="shrink-0">내 문제</span>
+                  <span className="truncate text-foreground/90" title={myProblemLabel}>
+                    {myProblemLabel}
+                  </span>
+                </div>
+              </div>
+              <div className="relative min-h-0 flex-1">
               {ideContent ?? (
                 <IDEPanel
                   ref={leftPanelRef}
@@ -453,6 +670,12 @@ export function CCCenterPanel({
                 />
               )}
 
+              {isHydratingDraft && !!selectedStudyProblemId && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+                  <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
+                </div>
+              )}
+
               {/* [New] Overlay if no problem is selected and not viewing other */}
               {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
@@ -462,29 +685,45 @@ export function CCCenterPanel({
                   </p>
                 </div>
               )}
+              </div>
             </div>
             {/* Right Panel: Whiteboard OR Other's Code */}
             {showRightPanel && (
-              <div className="flex-1 min-w-0">
+              <div className="flex min-w-0 flex-1 flex-col">
                 {isWhiteboardVisible ? (
                   <WhiteboardPanel className="border-l-2 border-rose-400" />
                 ) : (
-                  <IDEPanel
-                    key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
-                    editorId="other-editor"
-                    readOnly
-                    hideToolbar
-                    initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
-                    language={
-                      viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
-                    }
-                    theme={theme} // Sync theme
-                    fontSize={fontSize}
-                    onFontSizeChange={handleFontSizeChange}
-                    borderColorClass={
-                      viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
-                    }
-                  />
+                  <>
+                    <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
+                      <div className="flex h-full items-center gap-2">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
+                        <span className="shrink-0">
+                          {viewMode === 'SPLIT_SAVED' ? '저장 코드 문제' : '상대 문제'}
+                        </span>
+                        <span className="truncate text-foreground/90" title={otherProblemLabel}>
+                          {otherProblemLabel}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="min-h-0 flex-1">
+                      <IDEPanel
+                        key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
+                        editorId="other-editor"
+                        readOnly
+                        hideToolbar
+                        initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
+                        language={
+                          viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
+                        }
+                        theme={theme} // Sync theme
+                        fontSize={fontSize}
+                        onFontSizeChange={handleFontSizeChange}
+                        borderColorClass={
+                          viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
+                        }
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -527,3 +766,5 @@ export function CCCenterPanel({
     </div>
   );
 }
+
+
