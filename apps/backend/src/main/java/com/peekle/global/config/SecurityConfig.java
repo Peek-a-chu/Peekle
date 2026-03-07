@@ -77,7 +77,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/studies/**").permitAll() // [TEST] 스터디 API
                                                 .requestMatchers("/api/games/**").permitAll() // [TEST] 게임 API
                                                 .requestMatchers("/api/workbooks/**").permitAll() // [TEST] 문제집 API
-                                                .requestMatchers("/api/benchmark/**").permitAll() // benchmark-only APIs
                                                 .requestMatchers("/api/dev/users/**").permitAll()
                                                 .requestMatchers("/api/ranks/**").permitAll()
                                                 .requestMatchers("/api/recommendations/**").permitAll()

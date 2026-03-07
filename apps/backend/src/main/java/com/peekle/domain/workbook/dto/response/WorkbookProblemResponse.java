@@ -10,7 +10,7 @@ import lombok.Getter;
 public class WorkbookProblemResponse {
     // 필요한 정보만 골라서, frontend측으로 보내기
     private Long id;
-    private long number;
+    private int number;
     private String title;
     private String tier;
     private String url;
@@ -22,7 +22,7 @@ public class WorkbookProblemResponse {
 
         return WorkbookProblemResponse.builder()
                 .id(problem.getId())
-                .number(Long.parseLong(problem.getExternalId()))
+                .number(Integer.parseInt(problem.getExternalId()))
                 .title(problem.getTitle())
                 .tier(problem.getTier())
                 .url(problem.getUrl())
