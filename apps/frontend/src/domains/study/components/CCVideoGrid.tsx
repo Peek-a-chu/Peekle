@@ -1,9 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useRoomStore, type Participant as StoreParticipant } from '@/domains/study/hooks/useRoomStore';
 import { CCVideoTile } from '@/domains/study/components/CCVideoTile';
 import { CCWhiteboardTile as WhiteboardTile } from '@/domains/study/components/CCWhiteboardTile';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 import { useParticipants } from '@livekit/components-react';
 import { useMemo, useRef, type WheelEvent } from 'react';
 import { toast } from 'sonner';
@@ -16,16 +17,17 @@ interface CCVideoGridProps {
 
 export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const roomId = useRoomStore((state) => state.roomId);
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const participants = useParticipants();
   const roomStoreParticipants = useRoomStore((state) => state.participants);
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const viewRealtimeCode = useRoomStore((state) => state.viewRealtimeCode);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
-  // [Added] To control whiteboard split View from within Grid if needed, or rely on Parent
+  const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
   const setWhiteboardOverlayOpen = useRoomStore((state) => state.setWhiteboardOverlayOpen);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
-  const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
+  const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
 
   const sortedParticipants = [...participants].sort((a, b) => {
     if (a.isLocal) return -1;
@@ -36,21 +38,17 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   const liveKitUserIds = useMemo(() => {
     const ids = new Set<number>();
     participants.forEach((p) => {
-      // Identity format: "userId" or "userId_uuid"
       let userIdString = p.identity;
       if (p.identity.includes('_')) {
         userIdString = p.identity.split('_')[0];
       }
       const userId = Number(userIdString);
-      if (!isNaN(userId)) {
+      if (!Number.isNaN(userId)) {
         ids.add(userId);
       }
     });
     return ids;
   }, [participants]);
-
-  // Ensure store online status reflects LiveKit presence (only promote to online, do not force offline)
-  // Presence sync is handled globally by useStudyPresenceSync
 
   const storeById = useMemo(() => {
     const map = new Map<number, StoreParticipant>();
@@ -72,21 +70,52 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   }, [sortedParticipants, storeById]);
 
   const offlineParticipants = roomStoreParticipants.filter((p) => {
-    if (p.id === currentUserId) return false; // Me is handled by LiveKit (LocalParticipant) usually
-    if (liveKitUserIds.has(p.id)) return false; // Already in LiveKit
-    // Should we check p.isOnline? If they are offline in store, maybe don't show?
-    // User requested "toast appears -> tile not added", implying they entered (online).
-    // The ENTER event sets isOnline=true.
+    if (p.id === currentUserId) return false;
+    if (liveKitUserIds.has(p.id)) return false;
     return p.isOnline;
   });
 
-  const handleTileClick = (identity: string) => {
-    // When clicking a participant tile, we want to close whiteboard split view if open
-    // to focus on code viewing (or self view)
+  const selectTargetProblemIfNeeded = async (targetUserId: number): Promise<boolean> => {
+    if (selectedStudyProblemId) return true;
+
+    if (!roomId) {
+      toast.error('\uC2A4\uD130\uB514 \uC815\uBCF4\uAC00 \uC5C6\uC5B4 \uBB38\uC81C\uB97C \uC120\uD0DD\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.');
+      return false;
+    }
+
+    try {
+      const response = await apiFetch<{
+        studyProblemId?: number;
+        problemTitle?: string;
+        externalId?: string;
+      }>(
+        `/api/studies/${roomId}/ide/active-problem/${targetUserId}`,
+      );
+      const studyProblemId = Number(response.data?.studyProblemId);
+      const problemTitle = (response.data?.problemTitle || '').trim();
+      const externalId = (response.data?.externalId || '').trim();
+
+      if (!response.success || !Number.isFinite(studyProblemId) || studyProblemId <= 0) {
+        toast.error('\uC0C1\uB300\uBC29\uC774 \uD604\uC7AC \uD478\uB294 \uBB38\uC81C\uAC00 \uC5C6\uC5B4 \uCF54\uB4DC\uB97C \uBCFC \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.');
+        return false;
+      }
+
+      setSelectedProblem(
+        studyProblemId,
+        studyProblemId,
+        problemTitle.length > 0 ? problemTitle : 'Problem',
+        externalId.length > 0 ? externalId : null,
+      );
+      return true;
+    } catch {
+      toast.error('\uC0C1\uB300\uBC29 \uBB38\uC81C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');
+      return false;
+    }
+  };
+
+  const handleTileClick = async (identity: string) => {
     setWhiteboardOverlayOpen(false);
 
-    // Identity format is now "userId_uuid" or just "userId" (legacy)
-    // We need to parse it to get the userId for comparison
     let userIdString = identity;
     if (identity.includes('_')) {
       userIdString = identity.split('_')[0];
@@ -95,18 +124,19 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
 
     if (userId === currentUserId) {
       resetToOnlyMine();
-    } else {
-      if (!selectedProblemId) {
-        toast.error('문제를 선택안하면 상대방 코드를 볼수없습니다.');
-        return;
-      }
+      return;
+    }
 
-      const p = roomStoreParticipants.find((p) => p.id === userId);
-      if (p) {
-        viewRealtimeCode(p);
-      } else {
-        console.warn('Participant not found in store:', userId);
-      }
+    const isProblemReady = await selectTargetProblemIfNeeded(userId);
+    if (!isProblemReady) {
+      return;
+    }
+
+    const participant = roomStoreParticipants.find((p) => p.id === userId);
+    if (participant) {
+      viewRealtimeCode(participant);
+    } else {
+      console.warn('Participant not found in store:', userId);
     }
   };
 
@@ -139,13 +169,14 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
         }
         const userId = Number(userIdString);
         const storeParticipant = Number.isNaN(userId) ? undefined : storeById.get(userId);
+
         return (
           <CCVideoTile
             key={participant.identity}
             participant={participant}
             isCurrentUser={participant.isLocal}
             displayName={storeParticipant?.nickname}
-            onClick={() => handleTileClick(participant.identity)}
+            onClick={() => void handleTileClick(participant.identity)}
           />
         );
       })}
@@ -155,20 +186,19 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
           key={`offline-${p.id}`}
           participant={p}
           isCurrentUser={p.id === currentUserId}
-          onClick={() => handleTileClick(String(p.id))}
+          onClick={() => void handleTileClick(String(p.id))}
         />
       ))}
 
       {visibleLiveKitParticipants.length === 0 && offlineParticipants.length === 0 && (
         <div className="flex h-32 w-48 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-          참가자 대기 중...
+          {'\uCC38\uAC00\uC790 \uB300\uAE30 \uC911..'}
         </div>
       )}
     </div>
   );
 }
 
-// Internal component for users not yet connected to LiveKit
 function CCOfflineTile({
   participant,
   isCurrentUser,
@@ -200,7 +230,7 @@ function CCOfflineTile({
 
       <div className="absolute bottom-1 left-2 max-w-[80%]">
         <span className="truncate text-xs font-medium text-white shadow-sm drop-shadow-md">
-          {participant.nickname} {isCurrentUser && '(나)'}
+          {participant.nickname} {isCurrentUser && '(\uB098)'}
         </span>
       </div>
     </div>
