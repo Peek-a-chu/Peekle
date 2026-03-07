@@ -7,6 +7,7 @@ import type { RankResponse } from '@/api/rankingApi';
 import PeopleIcon from '@/assets/icons/people.svg';
 import TrophyIcon from '@/assets/icons/trophy.svg';
 import { CCUserProfileModal } from '@/components/common/CCUserProfileModal';
+import { UserIcon } from '@/components/UserIcon';
 
 interface StudyRankingListProps {
   rankings: RankResponse[];
@@ -226,7 +227,7 @@ export function StudyRankingList({
                       </h4>
                       <div className="grid gap-3">
                         {ranking.members.map((member) => {
-                          const displayImg = member.profileImgThumb || member.profileImg;
+                          const displayImg = member.profileImg || member.profileImgThumb;
                           return (
                             <div
                               key={member.userId}
@@ -234,17 +235,12 @@ export function StudyRankingList({
                               onClick={() => handleUserClick(member.nickname)}
                             >
                               <div className="flex items-center gap-3">
-                                {displayImg ? (
-                                  <img
-                                    src={encodeURI(displayImg)}
-                                    alt={member.nickname}
-                                    className="h-10 w-10 rounded-full bg-slate-100 border border-slate-100"
-                                  />
-                                ) : (
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 border border-slate-100 text-sm font-bold text-slate-500">
-                                    {member.nickname.charAt(0)}
-                                  </div>
-                                )}
+                                <UserIcon
+                                  src={displayImg}
+                                  nickname={member.nickname}
+                                  size={40}
+                                  className="border-slate-100"
+                                />
                                 <div className="flex flex-col">
                                   <span className="font-bold text-slate-700 text-sm dark:text-card-foreground">
                                     {member.nickname}
