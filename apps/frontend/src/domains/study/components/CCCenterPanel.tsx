@@ -46,7 +46,9 @@ export function CCCenterPanel({
 import java.util.*;
 
 public class Main {
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        // 코드를 작성해주세요
         System.out.println("Hello World!");
     }
 }`;
@@ -54,10 +56,13 @@ public class Main {
 
     if (normalized.includes('cpp') || normalized.includes('c++')) {
       return `#include <iostream>
+#include <vector>
+#include <algorithm>
 
 using namespace std;
 
 int main() {
+    // 코드를 작성해주세요
     cout << "Hello World!" << endl;
     return 0;
 }`;
@@ -65,6 +70,7 @@ int main() {
 
     return `import sys
 
+# 코드를 작성해주세요
 print("Hello World!")`;
   };
 
@@ -325,9 +331,9 @@ print("Hello World!")`;
     return () => window.removeEventListener('request-ide-code', handleRequestCode);
   }, [language, leftPanelRef]);
 
-  const handleLanguageChange = (lang: string): void => {
+  const handleLanguageChange = (lang: string, switchedCode?: string): void => {
     setLanguage(lang);
-    const templateCode = getTemplateCode(lang);
+    const templateCode = switchedCode ?? getTemplateCode(lang);
     myLatestCodeRef.current = templateCode;
     if (socket && roomId && selectedStudyProblemId) {
       const eventTs = nextIdeEventTs();
@@ -337,6 +343,7 @@ print("Hello World!")`;
           problemId: selectedStudyProblemId,
           problemTitle: selectedProblemTitle,
           externalId: selectedProblemExternalId,
+          code: templateCode,
           lang,
           language: lang,
           eventTs,
