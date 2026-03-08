@@ -206,6 +206,7 @@ public class SubmissionService {
                 request.getLanguage(), submittedAt);
 
         log.setRoomId(request.getRoomId());
+        log.setStudyProblemId(request.getStudyProblemId());
 
         submissionLogRepository.save(log);
 
