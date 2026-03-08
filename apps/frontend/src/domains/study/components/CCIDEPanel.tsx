@@ -430,13 +430,26 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       editor.setValue(code);
 
       const container = editor.getContainerDomNode();
+      const isInteractiveOverlayTarget = (target: EventTarget | null): boolean => {
+        const element = target instanceof HTMLElement ? target : null;
+        if (!element) return false;
+        if (element.closest('.view-zones')) return true;
+        const tagName = element.tagName;
+        if (['TEXTAREA', 'INPUT', 'BUTTON', 'SELECT'].includes(tagName)) return true;
+        if (element.isContentEditable) return true;
+        return false;
+      };
+
       const preventClipboard = (e: Event): void => {
+        if (isInteractiveOverlayTarget(e.target)) return;
         e.preventDefault();
         e.stopPropagation();
       };
 
       // 폰트 크기 조절 이벤트 리스너 (Wheel + Ctrl)
       const handleWheel = (e: WheelEvent) => {
+        if (isInteractiveOverlayTarget(e.target)) return;
+
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           e.stopPropagation();
@@ -459,6 +472,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       };
 
       const handleKeyDown = (e: KeyboardEvent): void => {
+        if (isInteractiveOverlayTarget(e.target)) return;
+
         // Code Execution Shortcut (Ctrl + Enter)
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
           e.preventDefault();

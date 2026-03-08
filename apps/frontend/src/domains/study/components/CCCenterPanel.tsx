@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { type ReactNode } from 'react';
 import { useCenterPanel } from '@/domains/study/hooks/useCenterPanel';
 import { CCVideoGrid as VideoGrid } from '@/domains/study/components/CCVideoGrid';
@@ -16,7 +16,7 @@ import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { ChevronUp, ChevronDown, Lock, MessageSquare, Send, CornerDownRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CCCenterPanelProps {
@@ -27,6 +27,21 @@ interface CCCenterPanelProps {
   onWhiteboardToggle?: () => void;
   onSettingsClick?: () => void;
   className?: string;
+}
+
+interface SubmissionCommentItem {
+  id: number;
+  submissionId: number;
+  parentId: number | null;
+  type: 'INLINE' | 'GENERAL';
+  isDeleted: boolean;
+  authorId: number;
+  authorNickname: string;
+  authorProfileImage?: string | null;
+  lineStart: number;
+  lineEnd: number;
+  content: string;
+  createdAt: string;
 }
 
 export function CCCenterPanel({
@@ -124,6 +139,30 @@ print("Hello World!")`;
   const selectedProblemExternalId = useRoomStore((state) => state.selectedProblemExternalId);
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
+  const targetSubmissionId = targetSubmission?.submissionId;
+
+  const savedEditorRef = useRef<any>(null);
+  const inlineZoneIdsRef = useRef<string[]>([]);
+  const inlineDraftZoneIdRef = useRef<string | null>(null);
+  const hoveredLineRef = useRef<number | null>(null);
+  const hoverHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHoveringAddButtonRef = useRef(false);
+
+  const [submissionComments, setSubmissionComments] = useState<SubmissionCommentItem[]>([]);
+  const [isCommentsLoading, setIsCommentsLoading] = useState(false);
+  const [isPostingInlineComment, setIsPostingInlineComment] = useState(false);
+  const [isPostingGeneralComment, setIsPostingGeneralComment] = useState(false);
+  const [generalCommentContent, setGeneralCommentContent] = useState('');
+  const [generalReplyParentId, setGeneralReplyParentId] = useState<number | null>(null);
+  const [generalEditingCommentId, setGeneralEditingCommentId] = useState<number | null>(null);
+  const [generalEditingContent, setGeneralEditingContent] = useState('');
+  const [inlineDraftLine, setInlineDraftLine] = useState<number | null>(null);
+  const [inlineDraftParentId, setInlineDraftParentId] = useState<number | null>(null);
+  const [inlineEditingCommentId, setInlineEditingCommentId] = useState<number | null>(null);
+  const [inlineEditingContent, setInlineEditingContent] = useState('');
+  const [hoveredLineForAdd, setHoveredLineForAdd] = useState<number | null>(null);
+  const [hoverAddButtonLeft, setHoverAddButtonLeft] = useState(0);
+  const [hoverAddButtonTop, setHoverAddButtonTop] = useState(0);
 
   // Video Grid Resize State
   const [videoGridHeight, setVideoGridHeight] = useState(240);
@@ -155,6 +194,707 @@ print("Hello World!")`;
     setFontSize(newSize);
     localStorage.setItem('ide-font-size', newSize.toString());
   };
+
+  const formatCommentDate = useCallback((value?: string): string => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleString('ko-KR', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
+
+  const clearInlineZones = useCallback(() => {
+    const editor = savedEditorRef.current;
+    if (!editor) return;
+
+    editor.changeViewZones((accessor: any) => {
+      inlineZoneIdsRef.current.forEach((zoneId) => accessor.removeZone(zoneId));
+      if (inlineDraftZoneIdRef.current) {
+        accessor.removeZone(inlineDraftZoneIdRef.current);
+      }
+    });
+    inlineZoneIdsRef.current = [];
+    inlineDraftZoneIdRef.current = null;
+  }, []);
+
+  const clearHoverHideTimer = useCallback(() => {
+    if (!hoverHideTimerRef.current) return;
+    clearTimeout(hoverHideTimerRef.current);
+    hoverHideTimerRef.current = null;
+  }, []);
+
+  const hideHoverAddButton = useCallback(() => {
+    hoveredLineRef.current = null;
+    setHoveredLineForAdd(null);
+  }, []);
+
+  const focusSavedLine = useCallback((lineNumber: number) => {
+    const editor = savedEditorRef.current;
+    if (!editor) return;
+
+    editor.revealLineInCenter(lineNumber);
+    editor.setPosition({ lineNumber, column: 1 });
+    editor.focus();
+  }, []);
+
+  const fetchSubmissionComments = useCallback(async () => {
+    if (viewMode !== 'SPLIT_SAVED' || !roomId || !targetSubmissionId) {
+      setSubmissionComments([]);
+      return;
+    }
+
+    setIsCommentsLoading(true);
+    try {
+      const response = await apiFetch<SubmissionCommentItem[]>(
+        `/api/studies/${roomId}/submissions/${targetSubmissionId}/comments`,
+      );
+
+      if (!response.success || !Array.isArray(response.data)) {
+        setSubmissionComments([]);
+        return;
+      }
+
+      setSubmissionComments(response.data);
+    } catch {
+      setSubmissionComments([]);
+    } finally {
+      setIsCommentsLoading(false);
+    }
+  }, [viewMode, roomId, targetSubmissionId]);
+
+  const inlineComments = useMemo(
+    () => submissionComments.filter((comment) => comment.type === 'INLINE'),
+    [submissionComments],
+  );
+
+  const inlineRootComments = useMemo(
+    () => inlineComments.filter((comment) => !comment.parentId),
+    [inlineComments],
+  );
+
+  const inlineRepliesByParent = useMemo(() => {
+    const map = new Map<number, SubmissionCommentItem[]>();
+    inlineComments.forEach((comment) => {
+      if (!comment.parentId) return;
+      const bucket = map.get(comment.parentId) || [];
+      bucket.push(comment);
+      map.set(comment.parentId, bucket);
+    });
+    return map;
+  }, [inlineComments]);
+
+  const generalComments = useMemo(
+    () => submissionComments.filter((comment) => comment.type === 'GENERAL'),
+    [submissionComments],
+  );
+
+  const generalRootComments = useMemo(
+    () => generalComments.filter((comment) => !comment.parentId),
+    [generalComments],
+  );
+
+  const generalRepliesByParent = useMemo(() => {
+    const map = new Map<number, SubmissionCommentItem[]>();
+    generalComments.forEach((comment) => {
+      if (!comment.parentId) return;
+      const bucket = map.get(comment.parentId) || [];
+      bucket.push(comment);
+      map.set(comment.parentId, bucket);
+    });
+    return map;
+  }, [generalComments]);
+
+  const handleCreateInlineComment = useCallback(async (
+    lineNumber: number,
+    content: string,
+    parentId?: number | null,
+  ) => {
+    if (viewMode !== 'SPLIT_SAVED' || !roomId || !targetSubmissionId) return;
+
+    const trimmed = content.trim();
+    if (!trimmed) {
+      toast.error('댓글 내용을 입력해주세요.');
+      return;
+    }
+
+    setIsPostingInlineComment(true);
+    try {
+      const response = await apiFetch<SubmissionCommentItem>(
+        `/api/studies/${roomId}/submissions/${targetSubmissionId}/comments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'INLINE',
+            parentId: parentId ?? null,
+            lineStart: lineNumber,
+            lineEnd: lineNumber,
+            content: trimmed,
+          }),
+        },
+      );
+
+      if (!response.success) {
+        toast.error(response.error?.message || '댓글 저장에 실패했습니다.');
+        return;
+      }
+
+      setInlineDraftLine(null);
+      setInlineDraftParentId(null);
+      setInlineEditingCommentId(null);
+      setInlineEditingContent('');
+      await fetchSubmissionComments();
+    } catch {
+      toast.error('댓글 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsPostingInlineComment(false);
+    }
+  }, [viewMode, roomId, targetSubmissionId, fetchSubmissionComments]);
+
+  const handleCreateGeneralComment = useCallback(async () => {
+    if (viewMode !== 'SPLIT_SAVED' || !roomId || !targetSubmissionId) return;
+
+    const trimmed = generalCommentContent.trim();
+    if (!trimmed) {
+      toast.error('댓글 내용을 입력해주세요.');
+      return;
+    }
+
+    setIsPostingGeneralComment(true);
+    try {
+      const response = await apiFetch<SubmissionCommentItem>(
+        `/api/studies/${roomId}/submissions/${targetSubmissionId}/comments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'GENERAL',
+            parentId: generalReplyParentId,
+            content: trimmed,
+          }),
+        },
+      );
+
+      if (!response.success) {
+        toast.error(response.error?.message || '댓글 저장에 실패했습니다.');
+        return;
+      }
+
+      setGeneralCommentContent('');
+      setGeneralReplyParentId(null);
+      setGeneralEditingCommentId(null);
+      setGeneralEditingContent('');
+      await fetchSubmissionComments();
+    } catch {
+      toast.error('댓글 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsPostingGeneralComment(false);
+    }
+  }, [
+    viewMode,
+    roomId,
+    targetSubmissionId,
+    generalCommentContent,
+    generalReplyParentId,
+    fetchSubmissionComments,
+  ]);
+
+  const handleDeleteComment = useCallback(async (commentId: number) => {
+    if (viewMode !== 'SPLIT_SAVED' || !roomId || !targetSubmissionId) return;
+
+    setIsPostingInlineComment(true);
+    setIsPostingGeneralComment(true);
+    try {
+      const response = await apiFetch<null>(
+        `/api/studies/${roomId}/submissions/${targetSubmissionId}/comments/${commentId}`,
+        {
+          method: 'DELETE',
+        },
+      );
+
+      if (!response.success) {
+        toast.error(response.error?.message || '댓글 삭제에 실패했습니다.');
+        return;
+      }
+
+      if (inlineEditingCommentId === commentId) {
+        setInlineEditingCommentId(null);
+        setInlineEditingContent('');
+      }
+      if (generalEditingCommentId === commentId) {
+        setGeneralEditingCommentId(null);
+        setGeneralEditingContent('');
+      }
+
+      await fetchSubmissionComments();
+    } catch {
+      toast.error('댓글 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsPostingInlineComment(false);
+      setIsPostingGeneralComment(false);
+    }
+  }, [
+    viewMode,
+    roomId,
+    targetSubmissionId,
+    fetchSubmissionComments,
+    inlineEditingCommentId,
+    generalEditingCommentId,
+  ]);
+
+  const handleUpdateComment = useCallback(async (commentId: number, content: string) => {
+    if (viewMode !== 'SPLIT_SAVED' || !roomId || !targetSubmissionId) return false;
+
+    const trimmed = content.trim();
+    if (!trimmed) {
+      toast.error('댓글 내용을 입력해주세요.');
+      return false;
+    }
+
+    setIsPostingInlineComment(true);
+    setIsPostingGeneralComment(true);
+    try {
+      const response = await apiFetch<SubmissionCommentItem>(
+        `/api/studies/${roomId}/submissions/${targetSubmissionId}/comments/${commentId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ content: trimmed }),
+        },
+      );
+
+      if (!response.success) {
+        toast.error(response.error?.message || '댓글 수정에 실패했습니다.');
+        return false;
+      }
+
+      await fetchSubmissionComments();
+      return true;
+    } catch {
+      toast.error('댓글 수정 중 오류가 발생했습니다.');
+      return false;
+    } finally {
+      setIsPostingInlineComment(false);
+      setIsPostingGeneralComment(false);
+    }
+  }, [viewMode, roomId, targetSubmissionId, fetchSubmissionComments]);
+
+  const updateHoverAddPosition = useCallback((lineNumber: number | null) => {
+    clearHoverHideTimer();
+    const editor = savedEditorRef.current;
+    if (!editor || !lineNumber || viewMode !== 'SPLIT_SAVED') {
+      hideHoverAddButton();
+      return;
+    }
+
+    const model = editor.getModel();
+    if (!model || lineNumber < 1 || lineNumber > model.getLineCount()) {
+      hideHoverAddButton();
+      return;
+    }
+
+    const lineTop = editor.getTopForLineNumber(lineNumber) - editor.getScrollTop();
+    const layoutInfo = editor.getLayoutInfo();
+    const viewportHeight = layoutInfo.height;
+    if (lineTop < -8 || lineTop > viewportHeight - 8) {
+      hideHoverAddButton();
+      return;
+    }
+
+    hoveredLineRef.current = lineNumber;
+    setHoveredLineForAdd(lineNumber);
+    setHoverAddButtonLeft(Math.max(2, layoutInfo.contentLeft - 10));
+    setHoverAddButtonTop(Math.max(4, lineTop + 2));
+  }, [clearHoverHideTimer, hideHoverAddButton, viewMode]);
+
+  const renderInlineZones = useCallback(() => {
+    const editor = savedEditorRef.current;
+    if (!editor || viewMode !== 'SPLIT_SAVED') return;
+
+    editor.changeViewZones((accessor: any) => {
+      inlineZoneIdsRef.current.forEach((zoneId) => accessor.removeZone(zoneId));
+      if (inlineDraftZoneIdRef.current) {
+        accessor.removeZone(inlineDraftZoneIdRef.current);
+      }
+      inlineZoneIdsRef.current = [];
+      inlineDraftZoneIdRef.current = null;
+
+      inlineRootComments.forEach((comment) => {
+        const replies = inlineRepliesByParent.get(comment.id) || [];
+        const wrap = document.createElement('div');
+        wrap.classList.add('peekle-inline-zone');
+        wrap.style.pointerEvents = 'auto';
+        wrap.style.position = 'relative';
+        wrap.style.zIndex = '40';
+        wrap.style.background = 'hsl(var(--card))';
+        wrap.style.border = '1px solid hsl(var(--border) / 0.45)';
+        wrap.style.borderLeft = '3px solid hsl(var(--primary) / 0.85)';
+        wrap.style.borderRadius = '6px';
+        wrap.style.margin = '0 12px';
+        wrap.style.padding = '8px 10px';
+        wrap.style.width = '78%';
+        wrap.style.maxWidth = 'calc(100% - 24px)';
+        wrap.style.boxSizing = 'border-box';
+        wrap.style.fontSize = '12px';
+        wrap.style.lineHeight = '1.45';
+        wrap.addEventListener('mousedown', (event) => event.stopPropagation());
+        wrap.addEventListener('click', (event) => event.stopPropagation());
+
+        const topRow = document.createElement('div');
+        topRow.style.display = 'flex';
+        topRow.style.justifyContent = 'space-between';
+        topRow.style.alignItems = 'center';
+        topRow.style.gap = '8px';
+        topRow.style.marginBottom = '4px';
+
+        const author = document.createElement('span');
+        author.textContent = `${comment.authorNickname} · ${formatCommentDate(comment.createdAt)}`;
+        author.style.color = 'hsl(var(--muted-foreground))';
+
+        const actionWrap = document.createElement('div');
+        actionWrap.style.display = 'flex';
+        actionWrap.style.alignItems = 'center';
+        actionWrap.style.gap = '4px';
+
+        const replyBtn = document.createElement('button');
+        replyBtn.type = 'button';
+        replyBtn.textContent = '답글';
+        replyBtn.style.border = 'none';
+        replyBtn.style.background = 'transparent';
+        replyBtn.style.color = 'hsl(var(--muted-foreground))';
+        replyBtn.style.cursor = 'pointer';
+        replyBtn.onmousedown = (event) => event.stopPropagation();
+        replyBtn.onclick = (event) => {
+          event.stopPropagation();
+          setInlineDraftLine(comment.lineStart);
+          setInlineDraftParentId(comment.id);
+          setInlineEditingCommentId(null);
+          setInlineEditingContent('');
+        };
+
+        const showInlineReply = !comment.isDeleted;
+        if (showInlineReply) {
+          actionWrap.appendChild(replyBtn);
+        }
+
+        const ownActionWrap = document.createElement('div');
+        ownActionWrap.style.display = 'flex';
+        ownActionWrap.style.alignItems = 'center';
+        ownActionWrap.style.gap = '4px';
+
+        if (comment.authorId === currentUserId && !comment.isDeleted) {
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.textContent = '수정';
+          editBtn.style.border = 'none';
+          editBtn.style.background = 'transparent';
+          editBtn.style.color = 'hsl(var(--muted-foreground))';
+          editBtn.style.cursor = 'pointer';
+          editBtn.onmousedown = (event) => event.stopPropagation();
+          editBtn.onclick = (event) => {
+            event.stopPropagation();
+            setInlineDraftLine(comment.lineStart);
+            setInlineDraftParentId(comment.parentId);
+            setInlineEditingCommentId(comment.id);
+            setInlineEditingContent(comment.content);
+            hideHoverAddButton();
+          };
+          ownActionWrap.appendChild(editBtn);
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.textContent = '삭제';
+          deleteBtn.style.border = 'none';
+          deleteBtn.style.background = 'transparent';
+          deleteBtn.style.color = 'hsl(var(--muted-foreground))';
+          deleteBtn.style.cursor = 'pointer';
+          deleteBtn.onmousedown = (event) => event.stopPropagation();
+          deleteBtn.onclick = (event) => {
+            event.stopPropagation();
+            void handleDeleteComment(comment.id);
+          };
+          ownActionWrap.appendChild(deleteBtn);
+        }
+
+        actionWrap.appendChild(ownActionWrap);
+
+        topRow.appendChild(author);
+        topRow.appendChild(actionWrap);
+        wrap.appendChild(topRow);
+
+        const body = document.createElement('p');
+        body.style.margin = '0';
+        body.style.color = comment.isDeleted
+          ? 'hsl(var(--muted-foreground))'
+          : 'hsl(var(--foreground))';
+        if (comment.isDeleted) {
+          body.style.fontStyle = 'italic';
+        }
+        body.textContent = comment.content;
+        wrap.appendChild(body);
+
+        replies.forEach((reply) => {
+          const replyBox = document.createElement('div');
+          replyBox.style.marginTop = '6px';
+          replyBox.style.marginLeft = '10px';
+          replyBox.style.borderLeft = '2px solid #cbd5e1';
+          replyBox.style.paddingLeft = '8px';
+
+          const replyMeta = document.createElement('div');
+          replyMeta.style.display = 'flex';
+          replyMeta.style.alignItems = 'center';
+          replyMeta.style.justifyContent = 'space-between';
+          replyMeta.style.gap = '8px';
+          replyMeta.style.color = 'hsl(var(--muted-foreground))';
+          replyMeta.style.fontSize = '11px';
+
+          const replyMetaText = document.createElement('span');
+          replyMetaText.textContent = `${reply.authorNickname} · ${formatCommentDate(reply.createdAt)}`;
+          replyMeta.appendChild(replyMetaText);
+
+          const replyOwnActions = document.createElement('div');
+          replyOwnActions.style.display = 'flex';
+          replyOwnActions.style.alignItems = 'center';
+          replyOwnActions.style.gap = '4px';
+
+          if (reply.authorId === currentUserId && !reply.isDeleted) {
+            const replyEditBtn = document.createElement('button');
+            replyEditBtn.type = 'button';
+            replyEditBtn.textContent = '수정';
+            replyEditBtn.style.border = 'none';
+            replyEditBtn.style.background = 'transparent';
+            replyEditBtn.style.color = 'hsl(var(--muted-foreground))';
+            replyEditBtn.style.cursor = 'pointer';
+            replyEditBtn.onmousedown = (event) => event.stopPropagation();
+            replyEditBtn.onclick = (event) => {
+              event.stopPropagation();
+              setInlineDraftLine(reply.lineStart);
+              setInlineDraftParentId(reply.parentId);
+              setInlineEditingCommentId(reply.id);
+              setInlineEditingContent(reply.content);
+              hideHoverAddButton();
+            };
+            replyOwnActions.appendChild(replyEditBtn);
+
+            const replyDeleteBtn = document.createElement('button');
+            replyDeleteBtn.type = 'button';
+            replyDeleteBtn.textContent = '삭제';
+            replyDeleteBtn.style.border = 'none';
+            replyDeleteBtn.style.background = 'transparent';
+            replyDeleteBtn.style.color = 'hsl(var(--muted-foreground))';
+            replyDeleteBtn.style.cursor = 'pointer';
+            replyDeleteBtn.onmousedown = (event) => event.stopPropagation();
+            replyDeleteBtn.onclick = (event) => {
+              event.stopPropagation();
+              void handleDeleteComment(reply.id);
+            };
+            replyOwnActions.appendChild(replyDeleteBtn);
+          }
+
+          replyMeta.appendChild(replyOwnActions);
+
+          const replyBody = document.createElement('div');
+          replyBody.style.color = 'hsl(var(--foreground))';
+          replyBody.textContent = reply.content;
+
+          if (reply.isDeleted) {
+            replyBody.style.color = 'hsl(var(--muted-foreground))';
+            replyBody.style.fontStyle = 'italic';
+          }
+
+          replyBox.appendChild(replyMeta);
+          replyBox.appendChild(replyBody);
+          wrap.appendChild(replyBox);
+        });
+
+        const zoneId = accessor.addZone({
+          afterLineNumber: Math.max(1, comment.lineEnd || comment.lineStart || 1),
+          heightInPx: Math.max(104, 104 + replies.length * 42),
+          domNode: wrap,
+        });
+        inlineZoneIdsRef.current.push(zoneId);
+      });
+
+      if (inlineDraftLine) {
+        const draftWrap = document.createElement('div');
+        draftWrap.classList.add('peekle-inline-zone', 'peekle-inline-zone-draft');
+        draftWrap.style.pointerEvents = 'auto';
+        draftWrap.style.position = 'relative';
+        draftWrap.style.zIndex = '50';
+        draftWrap.style.margin = '0 12px';
+        draftWrap.style.padding = '10px';
+        draftWrap.style.border = '1px solid hsl(var(--border) / 0.55)';
+        draftWrap.style.borderTop = '2px solid hsl(var(--primary))';
+        draftWrap.style.borderRadius = '8px';
+        draftWrap.style.background = 'hsl(var(--card))';
+        draftWrap.style.boxShadow = '0 10px 22px -18px rgba(15, 23, 42, 0.45)';
+        draftWrap.style.width = '78%';
+        draftWrap.style.maxWidth = 'calc(100% - 24px)';
+        draftWrap.style.boxSizing = 'border-box';
+
+        const title = document.createElement('div');
+        title.textContent = inlineEditingCommentId
+          ? `L${inlineDraftLine} 댓글 수정`
+          : inlineDraftParentId
+            ? `L${inlineDraftLine} 답글 작성`
+            : `L${inlineDraftLine} 인라인 댓글 작성`;
+        title.style.fontSize = '11px';
+        title.style.fontWeight = '600';
+        title.style.color = 'hsl(var(--primary))';
+        title.style.marginBottom = '6px';
+
+        const textarea = document.createElement('textarea');
+        textarea.style.pointerEvents = 'auto';
+        textarea.placeholder = '라인 댓글을 입력하세요';
+        textarea.style.width = '100%';
+        textarea.style.height = '54px';
+        textarea.style.resize = 'none';
+        textarea.style.border = '1px solid hsl(var(--border) / 0.65)';
+        textarea.style.borderRadius = '6px';
+        textarea.style.padding = '6px';
+        textarea.style.fontSize = '12px';
+        textarea.style.background = 'hsl(var(--background))';
+        textarea.style.color = 'hsl(var(--foreground))';
+        textarea.value = inlineEditingCommentId ? inlineEditingContent : '';
+
+        const buttonRow = document.createElement('div');
+        buttonRow.style.display = 'flex';
+        buttonRow.style.justifyContent = 'flex-end';
+        buttonRow.style.gap = '6px';
+        buttonRow.style.marginTop = '6px';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.style.pointerEvents = 'auto';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = '취소';
+        cancelBtn.style.border = '1px solid hsl(var(--border) / 0.65)';
+        cancelBtn.style.borderRadius = '6px';
+        cancelBtn.style.background = 'hsl(var(--background))';
+        cancelBtn.style.color = 'hsl(var(--foreground))';
+        cancelBtn.style.fontSize = '11px';
+        cancelBtn.style.padding = '2px 8px';
+        cancelBtn.onclick = () => {
+          setInlineDraftLine(null);
+          setInlineDraftParentId(null);
+          setInlineEditingCommentId(null);
+          setInlineEditingContent('');
+        };
+
+        const submitBtn = document.createElement('button');
+        submitBtn.style.pointerEvents = 'auto';
+        submitBtn.type = 'button';
+        submitBtn.textContent = isPostingInlineComment
+          ? '저장중...'
+          : inlineEditingCommentId
+            ? '수정'
+            : '등록';
+        submitBtn.style.border = '1px solid hsl(var(--primary))';
+        submitBtn.style.borderRadius = '6px';
+        submitBtn.style.background = 'hsl(var(--primary))';
+        submitBtn.style.color = 'hsl(var(--primary-foreground))';
+        submitBtn.style.fontSize = '11px';
+        submitBtn.style.padding = '2px 8px';
+        submitBtn.disabled = isPostingInlineComment;
+        submitBtn.onclick = () => {
+          if (inlineEditingCommentId) {
+            void handleUpdateComment(inlineEditingCommentId, textarea.value).then((updated) => {
+              if (updated) {
+                setInlineDraftLine(null);
+                setInlineDraftParentId(null);
+                setInlineEditingCommentId(null);
+                setInlineEditingContent('');
+              }
+            });
+            return;
+          }
+
+          void handleCreateInlineComment(inlineDraftLine, textarea.value, inlineDraftParentId);
+        };
+
+        buttonRow.appendChild(cancelBtn);
+        buttonRow.appendChild(submitBtn);
+
+        draftWrap.appendChild(title);
+        draftWrap.appendChild(textarea);
+        draftWrap.appendChild(buttonRow);
+
+        draftWrap.addEventListener('mousedown', (event) => event.stopPropagation());
+        draftWrap.addEventListener('click', (event) => event.stopPropagation());
+
+        inlineDraftZoneIdRef.current = accessor.addZone({
+          afterLineNumber: inlineDraftLine,
+          heightInPx: 148,
+          domNode: draftWrap,
+        });
+      }
+    });
+  }, [
+    viewMode,
+    inlineRootComments,
+    inlineRepliesByParent,
+    inlineDraftLine,
+    inlineDraftParentId,
+    isPostingInlineComment,
+    formatCommentDate,
+    focusSavedLine,
+    currentUserId,
+    handleDeleteComment,
+    handleCreateInlineComment,
+    handleUpdateComment,
+    inlineEditingCommentId,
+    inlineEditingContent,
+    hideHoverAddButton,
+  ]);
+
+  const handleSavedEditorMount = useCallback((editor: any) => {
+    savedEditorRef.current = editor;
+    const container = editor.getContainerDomNode?.();
+    if (container instanceof HTMLElement) {
+      container.classList.add('peekle-inline-interactive');
+    }
+
+    editor.onMouseMove((event: any) => {
+      if (viewMode !== 'SPLIT_SAVED') return;
+      clearHoverHideTimer();
+
+      // Monaco MouseTargetType.CONTENT_VIEW_ZONE = 8
+      // Ignore hover trigger on inline comment boxes/view-zones.
+      const targetType = event?.target?.type;
+      const targetElement = event?.target?.element as HTMLElement | undefined;
+      const isViewZoneTarget = targetType === 8 || Boolean(targetElement?.closest?.('.view-zones'));
+      if (isViewZoneTarget) {
+        hideHoverAddButton();
+        return;
+      }
+
+      const lineNumber = event?.target?.position?.lineNumber;
+      if (!lineNumber) {
+        hideHoverAddButton();
+        return;
+      }
+
+      updateHoverAddPosition(lineNumber);
+    });
+
+    editor.onMouseLeave(() => {
+      clearHoverHideTimer();
+      hoverHideTimerRef.current = setTimeout(() => {
+        if (isHoveringAddButtonRef.current) return;
+        hideHoverAddButton();
+      }, 80);
+    });
+
+    editor.onDidScrollChange(() => {
+      updateHoverAddPosition(hoveredLineRef.current);
+    });
+
+    editor.onDidLayoutChange(() => {
+      updateHoverAddPosition(hoveredLineRef.current);
+    });
+
+    renderInlineZones();
+  }, [clearHoverHideTimer, hideHoverAddButton, renderInlineZones, updateHoverAddPosition, viewMode]);
 
   const startResizingVideo = useCallback(
     (e: React.MouseEvent) => {
@@ -500,6 +1240,53 @@ print("Hello World!")`;
     publishIdeUpdate(payload.code, payload.language, selectedStudyProblemId);
   }, [socket, roomId, selectedStudyProblemId, restoreVersion]);
 
+  useEffect(() => {
+    void fetchSubmissionComments();
+  }, [fetchSubmissionComments]);
+
+  useEffect(() => {
+    if (viewMode !== 'SPLIT_SAVED') {
+      clearInlineZones();
+      clearHoverHideTimer();
+      isHoveringAddButtonRef.current = false;
+      setGeneralCommentContent('');
+      setGeneralReplyParentId(null);
+      setGeneralEditingCommentId(null);
+      setGeneralEditingContent('');
+      setInlineDraftLine(null);
+      setInlineDraftParentId(null);
+      setInlineEditingCommentId(null);
+      setInlineEditingContent('');
+      hideHoverAddButton();
+      return;
+    }
+    renderInlineZones();
+  }, [viewMode, clearHoverHideTimer, clearInlineZones, hideHoverAddButton, renderInlineZones]);
+
+  useEffect(() => {
+    clearHoverHideTimer();
+    isHoveringAddButtonRef.current = false;
+    setGeneralCommentContent('');
+    setGeneralReplyParentId(null);
+    setGeneralEditingCommentId(null);
+    setGeneralEditingContent('');
+    setInlineDraftLine(null);
+    setInlineDraftParentId(null);
+    setInlineEditingCommentId(null);
+    setInlineEditingContent('');
+    hideHoverAddButton();
+  }, [targetSubmissionId, clearHoverHideTimer, hideHoverAddButton]);
+
+  useEffect(() => {
+    renderInlineZones();
+  }, [renderInlineZones]);
+
+  useEffect(() => () => {
+    clearHoverHideTimer();
+    isHoveringAddButtonRef.current = false;
+    clearInlineZones();
+  }, [clearHoverHideTimer, clearInlineZones]);
+
   return (
     <div className={cn('flex h-full flex-col min-w-0 min-h-0', className)}>
       {/* Video Grid Header */}
@@ -722,24 +1509,303 @@ print("Hello World!")`;
                         </span>
                       </div>
                     </div>
-                    <div className="min-h-0 flex-1">
-                      <IDEPanel
-                        key={viewMode} // [Fix] Force remount when switching view modes to prevent stale content
-                        editorId="other-editor"
-                        readOnly
-                        hideToolbar
-                        initialCode={viewMode === 'SPLIT_SAVED' ? targetSubmission?.code : realtimeCode}
-                        language={
-                          viewMode === 'SPLIT_SAVED' ? targetSubmission?.language : realtimeLanguage
-                        }
-                        theme={theme} // Sync theme
-                        fontSize={fontSize}
-                        onFontSizeChange={handleFontSizeChange}
-                        borderColorClass={
-                          viewMode === 'SPLIT_SAVED' ? 'border-indigo-400' : 'border-pink-400'
-                        }
-                      />
-                    </div>
+                    {viewMode === 'SPLIT_SAVED' ? (
+                      <div className="min-h-0 flex-1 flex flex-col">
+                        <div className="relative min-h-0 flex-1">
+                          <IDEPanel
+                            key={`${viewMode}-${targetSubmissionId || 'none'}`}
+                            editorId="other-editor"
+                            readOnly
+                            hideToolbar
+                            initialCode={targetSubmission?.code}
+                            language={targetSubmission?.language}
+                            theme={theme}
+                            fontSize={fontSize}
+                            onFontSizeChange={handleFontSizeChange}
+                            onEditorMount={handleSavedEditorMount}
+                            borderColorClass="border-indigo-400"
+                          />
+                          {hoveredLineForAdd && (
+                            <button
+                              type="button"
+                              title={`L${hoveredLineForAdd}에 인라인 댓글 추가`}
+                              className="absolute z-20 flex h-5 w-5 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-md ring-1 ring-primary/30 hover:opacity-90"
+                              style={{ top: hoverAddButtonTop, left: hoverAddButtonLeft }}
+                              onMouseEnter={() => {
+                                isHoveringAddButtonRef.current = true;
+                                clearHoverHideTimer();
+                              }}
+                              onMouseLeave={() => {
+                                isHoveringAddButtonRef.current = false;
+                                hideHoverAddButton();
+                              }}
+                              onClick={() => {
+                                setInlineDraftLine(hoveredLineForAdd);
+                                setInlineDraftParentId(null);
+                                setInlineEditingCommentId(null);
+                                setInlineEditingContent('');
+                                focusSavedLine(hoveredLineForAdd);
+                              }}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="h-64 border-t border-border bg-card/40">
+                          <div className="h-10 border-b border-border px-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>일반 댓글</span>
+                              <span className="text-foreground/80">
+                                인라인 {inlineComments.length} · 일반 {generalComments.length}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">
+                              코드 라인 클릭 시 인라인 댓글 작성
+                            </span>
+                          </div>
+
+                          <div className="h-[calc(100%-40px)] grid grid-rows-[1fr_auto]">
+                            <div className="overflow-y-auto p-3 space-y-2">
+                              {isCommentsLoading ? (
+                                <p className="text-xs text-muted-foreground">댓글 불러오는 중...</p>
+                              ) : generalRootComments.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                  아직 일반 댓글이 없습니다.
+                                </p>
+                              ) : (
+                                generalRootComments.map((comment) => (
+                                  <div key={comment.id} className="rounded-md border border-border bg-background">
+                                    <div className="px-2 py-1 border-b border-border/70 flex items-center justify-between gap-2">
+                                      <span className="text-[11px] text-muted-foreground truncate">
+                                        {comment.authorNickname} · {formatCommentDate(comment.createdAt)}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        {comment.authorId === currentUserId && !comment.isDeleted && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              className="text-[11px] text-muted-foreground hover:text-foreground"
+                                              onClick={() => {
+                                                setGeneralEditingCommentId(comment.id);
+                                                setGeneralEditingContent(comment.content);
+                                                setGeneralReplyParentId(null);
+                                              }}
+                                            >
+                                              수정
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="text-[11px] text-muted-foreground hover:text-foreground"
+                                              onClick={() => void handleDeleteComment(comment.id)}
+                                            >
+                                              삭제
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="px-2 py-1.5">
+                                      {generalEditingCommentId === comment.id ? (
+                                        <div className="space-y-1.5">
+                                          <textarea
+                                            value={generalEditingContent}
+                                            onChange={(event) => setGeneralEditingContent(event.target.value)}
+                                            className="w-full h-16 resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                                          />
+                                          <div className="flex justify-end gap-1">
+                                            <button
+                                              type="button"
+                                              className="text-[11px] px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground"
+                                              onClick={() => {
+                                                setGeneralEditingCommentId(null);
+                                                setGeneralEditingContent('');
+                                              }}
+                                            >
+                                              취소
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="text-[11px] px-2 py-1 rounded border border-primary bg-primary text-primary-foreground disabled:opacity-60"
+                                              disabled={!generalEditingContent.trim() || isPostingGeneralComment}
+                                              onClick={() =>
+                                                void handleUpdateComment(comment.id, generalEditingContent).then((updated) => {
+                                                  if (updated) {
+                                                    setGeneralEditingCommentId(null);
+                                                    setGeneralEditingContent('');
+                                                  }
+                                                })
+                                              }
+                                            >
+                                              저장
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <p
+                                            className={cn(
+                                              'text-xs whitespace-pre-wrap break-words',
+                                              comment.isDeleted && 'italic text-muted-foreground',
+                                            )}
+                                          >
+                                            {comment.content}
+                                          </p>
+                                          {!comment.isDeleted && (
+                                            <button
+                                              type="button"
+                                              className="mt-1 text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                                              onClick={() => {
+                                                setGeneralReplyParentId(comment.id);
+                                                setGeneralEditingCommentId(null);
+                                                setGeneralEditingContent('');
+                                              }}
+                                            >
+                                              <CornerDownRight className="h-3 w-3" />
+                                              답글
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {(generalRepliesByParent.get(comment.id) || []).map((reply) => (
+                                      <div
+                                        key={reply.id}
+                                        className="ml-3 mr-2 mb-2 rounded border border-border/70 bg-muted/20"
+                                      >
+                                        <div className="px-2 py-1 border-b border-border/60 text-[11px] text-muted-foreground flex items-center justify-between gap-2">
+                                          <span>
+                                            {reply.authorNickname} · {formatCommentDate(reply.createdAt)}
+                                          </span>
+                                          <div className="flex items-center gap-1">
+                                            {reply.authorId === currentUserId && !reply.isDeleted && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  className="text-[11px] text-muted-foreground hover:text-foreground"
+                                                  onClick={() => {
+                                                    setGeneralEditingCommentId(reply.id);
+                                                    setGeneralEditingContent(reply.content);
+                                                    setGeneralReplyParentId(null);
+                                                  }}
+                                                >
+                                                  수정
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="text-[11px] text-muted-foreground hover:text-foreground"
+                                                  onClick={() => void handleDeleteComment(reply.id)}
+                                                >
+                                                  삭제
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="px-2 py-1.5">
+                                          {generalEditingCommentId === reply.id ? (
+                                            <div className="space-y-1.5">
+                                              <textarea
+                                                value={generalEditingContent}
+                                                onChange={(event) => setGeneralEditingContent(event.target.value)}
+                                                className="w-full h-16 resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                                              />
+                                              <div className="flex justify-end gap-1">
+                                                <button
+                                                  type="button"
+                                                  className="text-[11px] px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground"
+                                                  onClick={() => {
+                                                    setGeneralEditingCommentId(null);
+                                                    setGeneralEditingContent('');
+                                                  }}
+                                                >
+                                                  취소
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="text-[11px] px-2 py-1 rounded border border-primary bg-primary text-primary-foreground disabled:opacity-60"
+                                                  disabled={!generalEditingContent.trim() || isPostingGeneralComment}
+                                                  onClick={() =>
+                                                    void handleUpdateComment(reply.id, generalEditingContent).then((updated) => {
+                                                      if (updated) {
+                                                        setGeneralEditingCommentId(null);
+                                                        setGeneralEditingContent('');
+                                                      }
+                                                    })
+                                                  }
+                                                >
+                                                  저장
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <p
+                                              className={cn(
+                                                'text-xs whitespace-pre-wrap break-words',
+                                                reply.isDeleted && 'italic text-muted-foreground',
+                                              )}
+                                            >
+                                              {reply.content}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+
+                            <div className="border-t border-border px-3 py-2 space-y-2 bg-background/70">
+                              {generalReplyParentId && (
+                                <div className="flex items-center justify-between rounded bg-muted/70 px-2 py-1 text-[11px] text-muted-foreground">
+                                  <span>답글 작성 중</span>
+                                  <button
+                                    type="button"
+                                    className="hover:text-foreground"
+                                    onClick={() => setGeneralReplyParentId(null)}
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              )}
+                              <div className="flex items-end gap-2">
+                                <textarea
+                                  value={generalCommentContent}
+                                  onChange={(event) => setGeneralCommentContent(event.target.value)}
+                                  placeholder="일반 댓글을 입력하세요"
+                                  className="w-full h-16 resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-8 px-2"
+                                  disabled={isPostingGeneralComment || !generalCommentContent.trim()}
+                                  onClick={() => void handleCreateGeneralComment()}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="min-h-0 flex-1">
+                        <IDEPanel
+                          key={viewMode}
+                          editorId="other-editor"
+                          readOnly
+                          hideToolbar
+                          initialCode={realtimeCode}
+                          language={realtimeLanguage}
+                          theme={theme}
+                          fontSize={fontSize}
+                          onFontSizeChange={handleFontSizeChange}
+                          borderColorClass="border-pink-400"
+                        />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
