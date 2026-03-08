@@ -43,6 +43,12 @@ public class BenchmarkController {
         return ApiResponse.success(benchmarkFixtureService.createCreateRoomFixtures(command));
     }
 
+    @PostMapping("/fixtures/finish-race")
+    public ApiResponse<BenchmarkFixtureService.FinishRaceFixtures> createFinishRaceFixtures(
+            @RequestBody BenchmarkFixtureService.FinishRaceFixtureCommand command) {
+        return ApiResponse.success(benchmarkFixtureService.createFinishRaceFixtures(command));
+    }
+
     @PostMapping("/games/{roomId}/ready")
     public ApiResponse<BenchmarkRoomActionResponse> ready(
             @PathVariable Long roomId,
