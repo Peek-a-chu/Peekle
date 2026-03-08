@@ -152,6 +152,7 @@ export function CCProblemListPanel({
 
     setTargetSubmission({
       id: submission.submissionId!,
+      submissionId: submission.submissionId!,
       problemId: currentProblem?.problemId,
       problemTitle: currentProblem ? currentProblem.title : 'Unknown Problem',
       username: submission.nickname || 'Unknown',
