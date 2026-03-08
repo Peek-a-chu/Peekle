@@ -12,13 +12,8 @@ export interface Submission {
   // Additional fields from spec (Success User List)
   userId?: number;
   nickname?: string;
-  profileImage?: string;
   memory?: number;
   executionTime?: number;
-  studyProblemId?: number;
-  result?: string;
-  isSuccess?: boolean;
-  submittedAt?: string;
 }
 
 export interface SubmissionSuccessUser {

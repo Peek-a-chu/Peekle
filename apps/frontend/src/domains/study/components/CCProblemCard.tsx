@@ -217,10 +217,7 @@ export function CCProblemCard({
             onClick={(e) => {
               e.stopPropagation();
               if (!isCustom) {
-                const studyProblemId = (problem as any).studyProblemId ?? (problem as any).id;
-                if (studyProblemId) {
-                  onOpenSubmission?.(Number(studyProblemId));
-                }
+                onOpenSubmission?.(problem.problemId!);
               }
             }}
             disabled={isCustom}

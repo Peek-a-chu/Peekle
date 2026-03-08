@@ -24,7 +24,6 @@ public class SubmissionLogResponse {
     private String tier;
     private String sourceType;
     private String sourceDetail;
-    private Long studyProblemId;
     private String code;
     private String result; // 제출 결과 (맞았습니다, 틀렸습니다, 런타임 에러 등)
     private Boolean isSuccess; // 성공 여부
@@ -50,7 +49,6 @@ public class SubmissionLogResponse {
                 .tier(log.getProblemTier())
                 .sourceType(log.getSourceType() != null ? log.getSourceType().name() : "SOLO")
                 .sourceDetail(log.getTag())
-                .studyProblemId(log.getStudyProblemId())
                 .code(log.getCode())
                 .result(log.getResult())
                 .isSuccess(log.getIsSuccess())

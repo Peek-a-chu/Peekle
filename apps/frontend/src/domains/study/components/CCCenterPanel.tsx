@@ -237,23 +237,9 @@ print("Hello World!")`;
   const myProblemLabel = selectedProblemTitle
     ? `${selectedProblemExternalId ? `[${selectedProblemExternalId}] ` : ''}${selectedProblemTitle}`
     : '문제 선택 중';
-  const savedCodeOwner = (targetSubmission?.username || '').trim();
-  const savedCodeLanguageLabel = targetSubmission?.language
-    ? getLanguageBadgeLabel(targetSubmission.language)
-    : '';
-  const savedCodeMetaLabel = [savedCodeOwner, savedCodeLanguageLabel]
-    .filter((value) => value.length > 0)
-    .join(' · ');
-  const savedCodePanelLabel = savedCodeMetaLabel
-    ? `저장 코드 (${savedCodeMetaLabel})`
-    : '저장 코드 문제';
   const otherProblemLabel =
     viewMode === 'SPLIT_SAVED'
-      ? (() => {
-          const title = (targetSubmission?.problemTitle || '저장된 코드').trim();
-          if (!savedCodeMetaLabel) return title;
-          return `${title} (${savedCodeMetaLabel})`;
-        })()
+      ? targetSubmission?.problemTitle || '저장된 코드'
       : (() => {
           const title = (realtimeProblemTitle || '').trim();
           if (!title) return '문제 선택 중';
@@ -719,7 +705,7 @@ print("Hello World!")`;
                       <div className="flex h-full items-center gap-2">
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
                         <span className="shrink-0">
-                          {viewMode === 'SPLIT_SAVED' ? savedCodePanelLabel : '상대 문제'}
+                          {viewMode === 'SPLIT_SAVED' ? '저장 코드 문제' : '상대 문제'}
                         </span>
                         <span className="truncate text-foreground/90" title={otherProblemLabel}>
                           {otherProblemLabel}
