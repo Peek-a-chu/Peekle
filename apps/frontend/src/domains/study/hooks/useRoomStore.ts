@@ -16,6 +16,7 @@ export interface Participant {
 
 export interface TargetSubmission {
   id: number;
+  submissionId?: number;
   problemId?: number;
   problemTitle: string;
   username: string;

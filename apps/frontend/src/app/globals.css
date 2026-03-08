@@ -159,6 +159,57 @@ div[class*='monaco-editor-overlaymessage'],
   display: none;
 }
 
+/* Inline comment zones in Monaco must stay interactive over readonly editor layers */
+.monaco-editor .view-zones,
+.monaco-editor .view-zones .view-zone,
+.monaco-editor .view-zones .peekle-inline-zone,
+.monaco-editor .view-zones .peekle-inline-zone * {
+  pointer-events: auto !important;
+}
+
+.monaco-editor .view-zones {
+  z-index: 30 !important;
+}
+
+.monaco-editor .view-zones .peekle-inline-zone {
+  z-index: 40 !important;
+}
+
+.monaco-editor .view-zones .peekle-inline-zone-draft {
+  z-index: 50 !important;
+}
+
+/* Force stacking so inline comment zones stay above Monaco readonly layers */
+.monaco-editor.peekle-inline-interactive .overflow-guard,
+.monaco-editor.peekle-inline-interactive .lines-content {
+  position: relative;
+}
+
+.monaco-editor.peekle-inline-interactive .view-lines {
+  position: relative;
+  z-index: 1;
+}
+
+.monaco-editor.peekle-inline-interactive .view-overlays,
+.monaco-editor.peekle-inline-interactive .margin-view-overlays {
+  position: relative;
+  z-index: 2;
+}
+
+.monaco-editor.peekle-inline-interactive .view-zones,
+.monaco-editor.peekle-inline-interactive .view-zones .view-zone,
+.monaco-editor.peekle-inline-interactive .view-zones .peekle-inline-zone {
+  position: relative;
+  z-index: 60 !important;
+  pointer-events: auto !important;
+}
+
+.monaco-editor.peekle-inline-interactive .inputarea,
+.monaco-editor.peekle-inline-interactive textarea.inputarea {
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
 /* 설정 모달용 커스텀 스크롤바 */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
