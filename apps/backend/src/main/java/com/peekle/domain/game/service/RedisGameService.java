@@ -22,6 +22,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -70,11 +71,45 @@ public class RedisGameService {
     private static final String FINISH_TRIGGER_SOLVE = "solve";
     private static final String FINISH_TRIGGER_GRACE_TIMEOUT = "grace_timeout";
     private static final long FINISH_CLAIM_TTL_SECONDS = 300L;
+    private static final long FINISH_CLAIM_RESULT_NOOP_NON_PLAYING = 0L;
+    private static final long FINISH_CLAIM_RESULT_GRANTED = 1L;
+    private static final long FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING = 2L;
+    private static final long FINISH_CLAIM_RESULT_REJECTED = -1L;
     private static final String CACHE_STATUS_HIT = "hit";
     private static final String CACHE_STATUS_FALLBACK = "fallback";
     private static final String CACHE_STATUS_MISS = "miss";
     private static final String CACHE_STATUS_DB = "db";
     private static final String CACHE_STATUS_NA = "na";
+    private static final DefaultRedisScript<Long> FINISH_CLAIM_ACQUIRE_SCRIPT = buildLongScript(
+            "local currentStatus = redis.call('GET', KEYS[1])\n"
+                    + "local hasClaim = redis.call('EXISTS', KEYS[2])\n"
+                    + "if currentStatus == ARGV[1] then\n"
+                    + "  if hasClaim == 1 then\n"
+                    + "    return -1\n"
+                    + "  end\n"
+                    + "  redis.call('SET', KEYS[2], ARGV[3], 'EX', " + FINISH_CLAIM_TTL_SECONDS + ")\n"
+                    + "  redis.call('SET', KEYS[1], ARGV[2])\n"
+                    + "  return 1\n"
+                    + "end\n"
+                    + "if currentStatus == ARGV[2] then\n"
+                    + "  if hasClaim == 1 then\n"
+                    + "    return -1\n"
+                    + "  end\n"
+                    + "  redis.call('SET', KEYS[2], ARGV[3], 'EX', " + FINISH_CLAIM_TTL_SECONDS + ")\n"
+                    + "  return 2\n"
+                    + "end\n"
+                    + "return 0\n");
+    private static final DefaultRedisScript<Long> FINISH_CLAIM_ROLLBACK_SCRIPT = buildLongScript(
+            "local currentClaim = redis.call('GET', KEYS[2])\n"
+                    + "if currentClaim ~= ARGV[1] then\n"
+                    + "  return 0\n"
+                    + "end\n"
+                    + "redis.call('DEL', KEYS[2])\n"
+                    + "if redis.call('GET', KEYS[1]) == ARGV[3] then\n"
+                    + "  redis.call('SET', KEYS[1], ARGV[2])\n"
+                    + "  return 1\n"
+                    + "end\n"
+                    + "return 2\n");
     private static final Map<String, String> DEFAULT_TEMPLATES = new HashMap<>();
 
     static {
@@ -83,6 +118,32 @@ public class RedisGameService {
                 "import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println(\"Hello World!\");\n    }\n}");
         DEFAULT_TEMPLATES.put("cpp",
                 "#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << \"Hello World!\" << endl;\n    return 0;\n}");
+    }
+
+    private static DefaultRedisScript<Long> buildLongScript(String scriptText) {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(scriptText);
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    private static final class FinishClaimState {
+        private final long resultCode;
+        private final String claimToken;
+
+        private FinishClaimState(long resultCode, String claimToken) {
+            this.resultCode = resultCode;
+            this.claimToken = claimToken;
+        }
+
+        private boolean isGranted() {
+            return resultCode == FINISH_CLAIM_RESULT_GRANTED
+                    || resultCode == FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING;
+        }
+
+        private boolean isRecoveredFromStaleEnding() {
+            return resultCode == FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING;
+        }
     }
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -749,29 +810,50 @@ public class RedisGameService {
         return result == null || result.isBlank() ? FINISH_RESULT_FAILED : result;
     }
 
-    private long tryAcquireFinishClaim(Long roomId, String trigger) {
+    private FinishClaimState tryAcquireFinishClaim(Long roomId, String trigger) {
         String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
         String claimKey = String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId);
-        String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
-        if (!GameStatus.PLAYING.name().equals(currentStatus)) {
-            return 0L;
-        }
+        String claimToken = trigger + ":" + UUID.randomUUID();
 
         if (!finishClaimEnabled) {
-            return 1L;
+            String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
+            if (!GameStatus.PLAYING.name().equals(currentStatus)) {
+                return new FinishClaimState(FINISH_CLAIM_RESULT_NOOP_NON_PLAYING, null);
+            }
+            return new FinishClaimState(FINISH_CLAIM_RESULT_GRANTED, null);
         }
 
-        Boolean granted = redisTemplate.opsForValue().setIfAbsent(
-                claimKey,
-                trigger + ":" + UUID.randomUUID(),
-                FINISH_CLAIM_TTL_SECONDS,
-                TimeUnit.SECONDS);
-        if (!Boolean.TRUE.equals(granted)) {
-            return -1L;
+        Long claimResult = redisTemplate.execute(
+                FINISH_CLAIM_ACQUIRE_SCRIPT,
+                List.of(statusKey, claimKey),
+                GameStatus.PLAYING.name(),
+                GameStatus.ENDING.name(),
+                claimToken);
+        long normalizedResult = claimResult != null ? claimResult : FINISH_CLAIM_RESULT_NOOP_NON_PLAYING;
+        return new FinishClaimState(normalizedResult, claimToken);
+    }
+
+    private void rollbackFinishClaim(Long roomId, FinishClaimState claimState) {
+        if (!finishClaimEnabled || claimState == null || !claimState.isGranted() || claimState.claimToken == null) {
+            return;
         }
 
-        redisTemplate.opsForValue().set(statusKey, GameStatus.ENDING.name());
-        return 1L;
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String claimKey = String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId);
+        Long rollbackResult = redisTemplate.execute(
+                FINISH_CLAIM_ROLLBACK_SCRIPT,
+                List.of(statusKey, claimKey),
+                claimState.claimToken,
+                GameStatus.PLAYING.name(),
+                GameStatus.ENDING.name());
+        long normalizedResult = rollbackResult != null ? rollbackResult : 0L;
+        if (normalizedResult == 1L) {
+            log.warn("↩️ Rolled back finish claim for game {} after failure", roomId);
+            return;
+        }
+        if (normalizedResult == 2L) {
+            log.warn("🧹 Released finish claim for game {} after failure without reverting status", roomId);
+        }
     }
 
     // 채팅 보내기
@@ -1417,11 +1499,13 @@ public class RedisGameService {
         long sqlSnapshot = snapshotSqlCount();
         String normalizedTrigger = normalizeFinishTrigger(trigger);
         String result = FINISH_RESULT_FAILED;
+        FinishClaimState claimState = null;
 
         try {
-            long claimResult = tryAcquireFinishClaim(roomId, normalizedTrigger);
+            claimState = tryAcquireFinishClaim(roomId, normalizedTrigger);
+            long claimResult = claimState.resultCode;
 
-            if (claimResult == 0L) {
+            if (claimResult == FINISH_CLAIM_RESULT_NOOP_NON_PLAYING) {
                 String currentStatus = (String) redisTemplate.opsForValue()
                         .get(String.format(RedisKeyConst.GAME_STATUS, roomId));
                 log.warn("⚠️ Cannot finish game {} - not in PLAYING state (current: {})", roomId, currentStatus);
@@ -1429,7 +1513,7 @@ public class RedisGameService {
                 return;
             }
 
-            if (claimResult < 0L) {
+            if (claimResult == FINISH_CLAIM_RESULT_REJECTED) {
                 meterRegistry.counter(METRIC_GAME_FINISH_CLAIM_REJECTED, "trigger", normalizedTrigger).increment();
                 log.info("🚫 Finish claim rejected for game {} (trigger: {})", roomId, normalizedTrigger);
                 result = FINISH_RESULT_CLAIM_REJECTED;
@@ -1437,6 +1521,9 @@ public class RedisGameService {
             }
 
             meterRegistry.counter(METRIC_GAME_FINISH_CLAIM_GRANTED, "trigger", normalizedTrigger).increment();
+            if (claimState.isRecoveredFromStaleEnding()) {
+                log.warn("♻️ Recovered stale ENDING finish claim for game {} (trigger: {})", roomId, normalizedTrigger);
+            }
             log.info("🏁 Finishing game {} (trigger: {})", roomId, normalizedTrigger);
 
             String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
@@ -1606,6 +1693,7 @@ public class RedisGameService {
             log.info("✅ Game {} finished and cleaned up successfully. Winner: {}", roomId, winner);
             result = FINISH_RESULT_PROCESSED;
         } catch (Exception e) {
+            rollbackFinishClaim(roomId, claimState);
             log.error("❌ Failed to finish game {} (trigger: {})", roomId, normalizedTrigger, e);
             throw e;
         } finally {
