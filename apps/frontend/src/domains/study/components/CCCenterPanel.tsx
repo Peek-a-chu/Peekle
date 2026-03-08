@@ -249,11 +249,7 @@ print("Hello World!")`;
     : '저장 코드 문제';
   const otherProblemLabel =
     viewMode === 'SPLIT_SAVED'
-      ? (() => {
-          const title = (targetSubmission?.problemTitle || '저장된 코드').trim();
-          if (!savedCodeMetaLabel) return title;
-          return `${title} (${savedCodeMetaLabel})`;
-        })()
+      ? targetSubmission?.problemTitle || '저장된 코드'
       : (() => {
           const title = (realtimeProblemTitle || '').trim();
           if (!title) return '문제 선택 중';
