@@ -314,7 +314,7 @@ public class RedisGameWaitService {
             return;
         }
 
-        if ("PLAYING".equals(status) || "END".equals(status)) {
+        if ("PLAYING".equals(status) || "ENDING".equals(status) || "END".equals(status)) {
             log.info("🔌 User {} disconnected during game ({}). Allowing reconnection.", userId, status);
             return;
         }
@@ -339,7 +339,7 @@ public class RedisGameWaitService {
             }
         }
 
-        if ("PLAYING".equals(status) || "END".equals(status)) {
+        if ("PLAYING".equals(status) || "ENDING".equals(status) || "END".equals(status)) {
             log.info("User {} temporarily left game room {} ({}). Allowing reconnection.", userId, roomId, status);
             String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
             // User might be null if already deleted, so try/catch or optional
