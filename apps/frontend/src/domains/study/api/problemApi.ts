@@ -9,9 +9,11 @@ import { apiFetch } from '@/lib/api';
 // 1. Successful Users list
 export async function fetchSubmissions(
   studyId: number,
-  problemId: number,
+  studyProblemId: number,
 ): Promise<SubmissionSuccessUser[]> {
-  const res = await apiFetch<any>(`/api/submissions/studies/${studyId}/problems/${problemId}`);
+  const res = await apiFetch<any>(
+    `/api/submissions/studies/${studyId}/study-problems/${studyProblemId}`,
+  );
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to fetch submissions');
   }
