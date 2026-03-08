@@ -249,22 +249,18 @@ print("Hello World!")`;
     : '저장 코드 문제';
   const otherProblemLabel =
     viewMode === 'SPLIT_SAVED'
-      ? (() => {
-          const title = (targetSubmission?.problemTitle || '저장된 코드').trim();
-          if (!savedCodeMetaLabel) return title;
-          return `${title} (${savedCodeMetaLabel})`;
-        })()
+      ? targetSubmission?.problemTitle || '저장된 코드'
       : (() => {
-          const title = (realtimeProblemTitle || '').trim();
-          if (!title) return '문제 선택 중';
-          const externalPrefix = realtimeProblemExternalId
-            ? `[${realtimeProblemExternalId}] `
-            : '';
-          const languageSuffix = realtimeLanguage
-            ? ` (${getLanguageBadgeLabel(realtimeLanguage)})`
-            : '';
-          return `${externalPrefix}${title}${languageSuffix}`;
-        })();
+        const title = (realtimeProblemTitle || '').trim();
+        if (!title) return '문제 선택 중';
+        const externalPrefix = realtimeProblemExternalId
+          ? `[${realtimeProblemExternalId}] `
+          : '';
+        const languageSuffix = realtimeLanguage
+          ? ` (${getLanguageBadgeLabel(realtimeLanguage)})`
+          : '';
+        return `${externalPrefix}${title}${languageSuffix}`;
+      })();
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -675,37 +671,37 @@ print("Hello World!")`;
                 </div>
               </div>
               <div className="relative min-h-0 flex-1">
-              {ideContent ?? (
-                <IDEPanel
-                  ref={leftPanelRef}
-                  editorId="my-editor"
-                  language={language}
-                  onLanguageChange={handleLanguageChange}
-                  theme={theme}
-                  fontSize={fontSize}
-                  hideToolbar // Pass this so it doesn't render double toolbar
-                  onFontSizeChange={handleFontSizeChange}
-                  onCodeChange={handleCodeChange}
-                  restoredCode={restoredCode}
-                  restoreVersion={restoreVersion}
-                />
-              )}
+                {ideContent ?? (
+                  <IDEPanel
+                    ref={leftPanelRef}
+                    editorId="my-editor"
+                    language={language}
+                    onLanguageChange={handleLanguageChange}
+                    theme={theme}
+                    fontSize={fontSize}
+                    hideToolbar // Pass this so it doesn't render double toolbar
+                    onFontSizeChange={handleFontSizeChange}
+                    onCodeChange={handleCodeChange}
+                    restoredCode={restoredCode}
+                    restoreVersion={restoreVersion}
+                  />
+                )}
 
-              {isHydratingDraft && !!selectedStudyProblemId && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
-                  <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
-                </div>
-              )}
+                {isHydratingDraft && !!selectedStudyProblemId && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+                    <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
+                  </div>
+                )}
 
-              {/* [New] Overlay if no problem is selected and not viewing other */}
-              {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
-                  <Lock className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium text-muted-foreground">
-                    좌측 목록에서 문제를 선택해주세요
-                  </p>
-                </div>
-              )}
+                {/* [New] Overlay if no problem is selected and not viewing other */}
+                {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
+                    <Lock className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      좌측 목록에서 문제를 선택해주세요
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             {/* Right Panel: Whiteboard OR Other's Code */}
