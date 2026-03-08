@@ -31,14 +31,14 @@ public class SubmissionController {
         return ApiResponse.success(response);
     }
 
-    @GetMapping("/studies/{studyId}/problems/{problemId}")
+    @GetMapping("/studies/{studyId}/study-problems/{studyProblemId}")
     public ApiResponse<Page<SubmissionLogResponse>> getStudyProblemSubmissions(
             @PathVariable Long studyId,
-            @PathVariable Long problemId,
+            @PathVariable Long studyProblemId,
             @PageableDefault(size = 5) Pageable pageable) {
 
         Page<SubmissionLogResponse> page = submissionService
-                .getStudyProblemSubmissions(studyId, problemId, pageable);
+                .getStudyProblemSubmissions(studyId, studyProblemId, pageable);
 
         return ApiResponse.success(page);
     }
