@@ -6,6 +6,7 @@ import com.peekle.domain.point.repository.PointLogRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.redis.RedisKeyConst;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -20,9 +21,12 @@ import java.util.*;
 @RequiredArgsConstructor
 public class GameService {
 
+    private static final String METRIC_GAME_FINISH_POINT_LOG_WRITTEN = "game.finish.point_log_written";
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final UserRepository userRepository;
     private final PointLogRepository pointLogRepository;
+    private final MeterRegistry meterRegistry;
 
     /**
      * 게임 종료 후 결과 처리 (포인트 지급 및 로그 저장)
@@ -35,6 +39,11 @@ public class GameService {
      */
     @Transactional
     public Map<Long, Integer> processGameResult(Long gameId, String winner, String teamType) {
+        return processGameResult(gameId, winner, teamType, "manual");
+    }
+
+    @Transactional
+    public Map<Long, Integer> processGameResult(Long gameId, String winner, String teamType, String trigger) {
         log.info("🏁 Processing game result for Game ID: {}", gameId);
 
         // 1. Redis에서 랭킹 조회 (높은 점수 순)
@@ -149,6 +158,7 @@ public class GameService {
                         description,
                         metadata);
                 pointLogRepository.save(pointLog);
+                meterRegistry.counter(METRIC_GAME_FINISH_POINT_LOG_WRITTEN, "trigger", trigger).increment();
 
                 log.info("💰 User {} awarded {} points (Rank: {})", userId, gainedPoints, finalRank + 1);
             });
