@@ -7,7 +7,6 @@ apps/backend/data/*.trace
 # Extension Testers
 apps/extension/tester.html
 apps/extension/tester.js
-apps/extension/extension.zip
 
 # Local Environment Settings
 _bmad

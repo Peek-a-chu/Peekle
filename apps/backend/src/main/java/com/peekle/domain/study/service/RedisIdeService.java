@@ -110,9 +110,7 @@ public class RedisIdeService {
                     import java.util.*;
 
                     public class Main {
-                        public static void main(String[] args) throws IOException {
-                            BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-                            // 코드를 작성해주세요
+                        public static void main(String[] args) throws Exception {
                             System.out.println("Hello World!");
                         }
                     }""";
@@ -120,13 +118,10 @@ public class RedisIdeService {
         if ("cpp".equals(normalized)) {
             return """
                     #include <iostream>
-                    #include <vector>
-                    #include <algorithm>
 
                     using namespace std;
 
                     int main() {
-                        // 코드를 작성해주세요
                         cout << "Hello World!" << endl;
                         return 0;
                     }""";
@@ -134,7 +129,6 @@ public class RedisIdeService {
         return """
                 import sys
 
-                # 코드를 작성해주세요
                 print("Hello World!")""";
     }
 
