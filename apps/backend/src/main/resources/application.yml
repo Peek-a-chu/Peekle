@@ -95,9 +95,11 @@ management:
       percentiles-histogram:
         game.start.duration: true
         game.create.duration: true
+        game.finish.duration: true
       percentiles:
         game.start.duration: 0.5,0.95,0.99
         game.create.duration: 0.95
+        game.finish.duration: 0.5,0.95,0.99
 
 logging:
   level:
