@@ -342,6 +342,7 @@ public class StudyRoomService {
 
                 // 2. Request에 스터디 컨텍스트 설정
                 request.setRoomId(studyId);
+                request.setStudyProblemId(studyProblemId);
                 request.setSourceType("STUDY");
 
                 // 3. 일반 제출 처리 (검증 및 저장)

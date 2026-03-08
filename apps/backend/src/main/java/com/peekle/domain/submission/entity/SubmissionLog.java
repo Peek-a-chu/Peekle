@@ -42,6 +42,9 @@ public class SubmissionLog {
     @Column(name = "room_id")
     private Long roomId;
 
+    @Column(name = "study_problem_id")
+    private Long studyProblemId;
+
     @Column(name = "external_id")
     private String externalId; // BOJ Problem ID (e.g. "1000")
 
