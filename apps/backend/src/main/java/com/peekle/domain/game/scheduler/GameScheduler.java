@@ -78,7 +78,7 @@ public class GameScheduler {
                     if (elapsedSeconds >= timeLimit + 5) {
                         log.info("⏳ Time Attack Limit Reached (with buffer): Game {}, Elapsed: {}s, Limit: {}s",
                                 roomId, elapsedSeconds, timeLimit);
-                        redisGameService.finishGame(roomId); // Use roomId directly
+                        redisGameService.finishGame(roomId, "scheduler"); // Use roomId directly
                         count++; // Increment count here as finishGame is called directly
                     }
                 } else if ("SPEED_RACE".equals(mode)) {
@@ -90,7 +90,7 @@ public class GameScheduler {
                 }
 
                 if (shouldEnd) {
-                    redisGameService.finishGame(roomId);
+                    redisGameService.finishGame(roomId, "scheduler");
                     count++;
                 }
 
