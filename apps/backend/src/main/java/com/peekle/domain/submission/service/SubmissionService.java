@@ -285,10 +285,10 @@ public class SubmissionService {
      */
     @Transactional(readOnly = true)
     public Page<SubmissionLogResponse> getStudyProblemSubmissions(
-            Long studyId, Long problemId, Pageable pageable) {
+            Long studyId, Long studyProblemId, Pageable pageable) {
 
         Page<SubmissionLog> logs = submissionLogRepository
-                .findLatestSubmissionsByRoomIdAndProblemId(studyId, problemId, pageable);
+                .findAllByRoomIdAndStudyProblemIdOrderBySubmittedAtDesc(studyId, studyProblemId, pageable);
 
         return logs.map(SubmissionLogResponse::from);
     }
@@ -304,6 +304,7 @@ public class SubmissionService {
         return SubmissionResponse.builder()
                 .success(true)
                 .submissionId(log.getId())
+                .studyProblemId(log.getStudyProblemId())
                 .code(log.getCode()) // 코드 포함
                 .language(log.getLanguage())
                 .memory(log.getMemory())

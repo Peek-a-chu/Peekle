@@ -36,7 +36,7 @@ export interface CCProblemListPanelProps {
   ) => Promise<void>;
   onRemoveProblem?: (problemId: number, studyProblemId?: number) => Promise<void>;
   submissions?: Submission[];
-  onFetchSubmissions?: (problemId: number) => void;
+  onFetchSubmissions?: (studyProblemId: number) => void;
   historyDates?: Date[];
   showFoldButton?: boolean;
 }
@@ -60,7 +60,7 @@ export function CCProblemListPanel({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
   const [addProblemModalOpen, setAddProblemModalOpen] = useState(false);
-  const [selectedSubmissionProblemId, setSelectedSubmissionProblemId] = useState<number | null>(
+  const [selectedSubmissionStudyProblemId, setSelectedSubmissionStudyProblemId] = useState<number | null>(
     null,
   );
   // State for Flip/Custom View
@@ -134,10 +134,10 @@ export function CCProblemListPanel({
     selectedDate,
   ]);
 
-  const handleOpenSubmission = (problemId: number) => {
-    setSelectedSubmissionProblemId(problemId);
+  const handleOpenSubmission = (studyProblemId: number) => {
+    setSelectedSubmissionStudyProblemId(studyProblemId);
     setSubmissionModalOpen(true);
-    onFetchSubmissions?.(problemId);
+    onFetchSubmissions?.(studyProblemId);
   };
 
   const handleViewCode = (submissionId: number) => {
@@ -145,7 +145,10 @@ export function CCProblemListPanel({
     if (!submission) return;
 
     // Use selectedProblem from outer scope logic or find it here
-    const currentProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
+    const currentProblem = problems.find((p) => {
+      const id = Number((p as any).studyProblemId ?? (p as any).id);
+      return id === selectedSubmissionStudyProblemId;
+    });
 
     setTargetSubmission({
       id: submission.submissionId!,
@@ -191,7 +194,10 @@ export function CCProblemListPanel({
     return pId === selectedStudyProblemId;
   });
 
-  const selectedProblem = problems.find((p) => p.problemId === selectedSubmissionProblemId);
+  const selectedProblem = problems.find((p) => {
+    const id = Number((p as any).studyProblemId ?? (p as any).id);
+    return id === selectedSubmissionStudyProblemId;
+  });
 
   const handleOpenDescription = (problem: StudyProblem) => {
     onSelectProblem?.(problem);
