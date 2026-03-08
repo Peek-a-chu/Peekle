@@ -6,7 +6,7 @@ interface UseSubmissionsResult {
   submissions: Submission[];
   isLoading: boolean;
   error: Error | null;
-  loadSubmissions: (studyProblemId: number) => Promise<void>;
+  loadSubmissions: (problemId: number) => Promise<void>;
 }
 
 export function useSubmissions(studyId: number): UseSubmissionsResult {
@@ -15,11 +15,11 @@ export function useSubmissions(studyId: number): UseSubmissionsResult {
   const [error, setError] = useState<Error | null>(null);
 
   const loadSubmissions = useCallback(
-    async (studyProblemId: number) => {
+    async (problemId: number) => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await fetchSubmissions(studyId, studyProblemId);
+        const data = await fetchSubmissions(studyId, problemId);
         setSubmissions(data);
       } catch (err) {
         setError(err as Error);

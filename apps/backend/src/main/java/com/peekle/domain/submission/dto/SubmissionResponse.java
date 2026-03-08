@@ -21,7 +21,6 @@ public class SubmissionResponse {
     private String message; // 표시할 메시지
 
     // 상세 조회용 필드 (목록 조회에서는 null일 수 있음)
-    private Long studyProblemId;
     private String code;
     private String language;
     private Integer memory;

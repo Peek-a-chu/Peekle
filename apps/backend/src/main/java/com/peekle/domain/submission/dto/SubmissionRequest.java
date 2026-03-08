@@ -30,6 +30,5 @@ public class SubmissionRequest {
 
     // Study/Game Context
     private Long roomId;
-    private Long studyProblemId;
     private String sourceType; // STUDY, GAME, EXTENSION
 }

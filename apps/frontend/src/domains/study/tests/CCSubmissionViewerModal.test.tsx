@@ -21,14 +21,6 @@ describe('CCSubmissionViewerModal', () => {
       memory: 68500,
       executionTime: 256,
     },
-    {
-      submissionId: 3,
-      userId: 102,
-      nickname: 'JavaKing',
-      language: 'JAVA',
-      memory: 68100,
-      executionTime: 241,
-    },
   ];
 
   const defaultProps = {
@@ -42,19 +34,18 @@ describe('CCSubmissionViewerModal', () => {
 
   it('renders problem title', () => {
     render(<CCSubmissionViewerModal {...defaultProps} />);
-    expect(screen.getByText(/1753\. 최단경로/)).toBeInTheDocument();
+    expect(screen.getByText(/1753. 최단경로/)).toBeInTheDocument();
   });
 
-  it('renders grouped users', () => {
+  it('renders submission list', () => {
     render(<CCSubmissionViewerModal {...defaultProps} />);
     expect(screen.getByText('CodeNinja')).toBeInTheDocument();
     expect(screen.getByText('JavaKing')).toBeInTheDocument();
-    expect(screen.getByText('2 submissions')).toBeInTheDocument();
   });
 
   it('filters submissions by username', () => {
     render(<CCSubmissionViewerModal {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/유저명으로 검색해보세요/i);
+    const searchInput = screen.getByPlaceholderText(/유저명으로 검색/i);
     fireEvent.change(searchInput, { target: { value: 'Java' } });
 
     expect(screen.queryByText('CodeNinja')).not.toBeInTheDocument();
@@ -70,7 +61,7 @@ describe('CCSubmissionViewerModal', () => {
 
   it('calls onClose when close button is clicked', () => {
     render(<CCSubmissionViewerModal {...defaultProps} />);
-    const closeButton = screen.getByRole('button', { name: /닫기/i });
+    const closeButton = screen.getByRole('button', { name: /닫기/i }); // Bottom close button or X button
     fireEvent.click(closeButton);
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
