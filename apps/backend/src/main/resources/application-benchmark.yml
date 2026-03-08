@@ -86,6 +86,8 @@ benchmark:
     path: ${BENCHMARK_PROBLEMS_CSV_PATH:file:../ai-server/problems.csv}
   redis:
     flush-on-startup: ${BENCHMARK_REDIS_FLUSH_ON_STARTUP:false}
+  game-finish:
+    claim-enabled: ${BENCHMARK_GAME_FINISH_CLAIM_ENABLED:true}
 
 springwolf:
   enabled: false

@@ -22,7 +22,9 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -51,13 +53,63 @@ public class RedisGameService {
     private static final String METRIC_GAME_START_FAILURE = "game.start.failure";
     private static final String METRIC_GAME_START_SQL_COUNT = "game.start.sql_count";
     private static final String METRIC_GAME_CREATE_SQL_COUNT = "game.create.sql_count";
+    private static final String METRIC_GAME_FINISH_DURATION = "game.finish.duration";
+    private static final String METRIC_GAME_FINISH_SQL_COUNT = "game.finish.sql_count";
+    private static final String METRIC_GAME_FINISH_RESULT_PROCESSED = "game.finish.result.processed";
+    private static final String METRIC_GAME_FINISH_EVENT_PUBLISHED = "game.finish.event.published";
+    private static final String METRIC_GAME_FINISH_CLAIM_GRANTED = "game.finish.claim.granted";
+    private static final String METRIC_GAME_FINISH_CLAIM_REJECTED = "game.finish.claim.rejected";
     private static final String RESULT_SUCCESS = "success";
     private static final String RESULT_FAILURE = "failure";
+    private static final String FINISH_RESULT_PROCESSED = "processed";
+    private static final String FINISH_RESULT_CLAIM_REJECTED = "claim_rejected";
+    private static final String FINISH_RESULT_NOOP_NON_PLAYING = "noop_non_playing";
+    private static final String FINISH_RESULT_FAILED = "failed";
+    private static final String FINISH_TRIGGER_MANUAL = "manual";
+    private static final String FINISH_TRIGGER_SCHEDULER = "scheduler";
+    private static final String FINISH_TRIGGER_TIMEOUT_ASYNC = "timeout_async";
+    private static final String FINISH_TRIGGER_SOLVE = "solve";
+    private static final String FINISH_TRIGGER_GRACE_TIMEOUT = "grace_timeout";
+    private static final long FINISH_CLAIM_TTL_SECONDS = 300L;
+    private static final long FINISH_CLAIM_RESULT_NOOP_NON_PLAYING = 0L;
+    private static final long FINISH_CLAIM_RESULT_GRANTED = 1L;
+    private static final long FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING = 2L;
+    private static final long FINISH_CLAIM_RESULT_REJECTED = -1L;
     private static final String CACHE_STATUS_HIT = "hit";
     private static final String CACHE_STATUS_FALLBACK = "fallback";
     private static final String CACHE_STATUS_MISS = "miss";
     private static final String CACHE_STATUS_DB = "db";
     private static final String CACHE_STATUS_NA = "na";
+    private static final DefaultRedisScript<Long> FINISH_CLAIM_ACQUIRE_SCRIPT = buildLongScript(
+            "local currentStatus = redis.call('GET', KEYS[1])\n"
+                    + "local hasClaim = redis.call('EXISTS', KEYS[2])\n"
+                    + "if currentStatus == ARGV[1] then\n"
+                    + "  if hasClaim == 1 then\n"
+                    + "    return -1\n"
+                    + "  end\n"
+                    + "  redis.call('SET', KEYS[2], ARGV[3], 'EX', " + FINISH_CLAIM_TTL_SECONDS + ")\n"
+                    + "  redis.call('SET', KEYS[1], ARGV[2])\n"
+                    + "  return 1\n"
+                    + "end\n"
+                    + "if currentStatus == ARGV[2] then\n"
+                    + "  if hasClaim == 1 then\n"
+                    + "    return -1\n"
+                    + "  end\n"
+                    + "  redis.call('SET', KEYS[2], ARGV[3], 'EX', " + FINISH_CLAIM_TTL_SECONDS + ")\n"
+                    + "  return 2\n"
+                    + "end\n"
+                    + "return 0\n");
+    private static final DefaultRedisScript<Long> FINISH_CLAIM_ROLLBACK_SCRIPT = buildLongScript(
+            "local currentClaim = redis.call('GET', KEYS[2])\n"
+                    + "if currentClaim ~= ARGV[1] then\n"
+                    + "  return 0\n"
+                    + "end\n"
+                    + "redis.call('DEL', KEYS[2])\n"
+                    + "if redis.call('GET', KEYS[1]) == ARGV[3] then\n"
+                    + "  redis.call('SET', KEYS[1], ARGV[2])\n"
+                    + "  return 1\n"
+                    + "end\n"
+                    + "return 2\n");
     private static final Map<String, String> DEFAULT_TEMPLATES = new HashMap<>();
 
     static {
@@ -66,6 +118,32 @@ public class RedisGameService {
                 "import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println(\"Hello World!\");\n    }\n}");
         DEFAULT_TEMPLATES.put("cpp",
                 "#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << \"Hello World!\" << endl;\n    return 0;\n}");
+    }
+
+    private static DefaultRedisScript<Long> buildLongScript(String scriptText) {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(scriptText);
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    private static final class FinishClaimState {
+        private final long resultCode;
+        private final String claimToken;
+
+        private FinishClaimState(long resultCode, String claimToken) {
+            this.resultCode = resultCode;
+            this.claimToken = claimToken;
+        }
+
+        private boolean isGranted() {
+            return resultCode == FINISH_CLAIM_RESULT_GRANTED
+                    || resultCode == FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING;
+        }
+
+        private boolean isRecoveredFromStaleEnding() {
+            return resultCode == FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING;
+        }
     }
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -81,6 +159,9 @@ public class RedisGameService {
     private final WorkbookPreviewCacheService workbookPreviewCacheService;
     private final MeterRegistry meterRegistry;
     private final Optional<BenchmarkSqlStatisticsService> benchmarkSqlStatisticsService;
+
+    @Value("${benchmark.game-finish.claim-enabled:true}")
+    private boolean finishClaimEnabled;
 
     /**
      * 게임 상태 변경 메서드
@@ -162,8 +243,11 @@ public class RedisGameService {
             // 대기(WAITING)에서는 -> 카운트다운(시작) 혹은 종료(방폭)만 가능
             case WAITING -> next == GameStatus.PLAYING || next == GameStatus.END;
 
-            // 게임 중(PLAYING)에는 -> 오직 종료(END)만 가능
-            case PLAYING -> next == GameStatus.END;
+            // 게임 중(PLAYING)에는 -> 종료 처리중(ENDING) 또는 종료(END)만 가능
+            case PLAYING -> next == GameStatus.ENDING || next == GameStatus.END;
+
+            // 종료 처리중(ENDING)에서는 -> 오직 종료(END)만 가능
+            case ENDING -> next == GameStatus.END;
 
             // 이미 종료(END)된 게임은 -> 상태 변경 불가
             case END -> false;
@@ -502,7 +586,7 @@ public class RedisGameService {
 
                 if ("PLAYING".equals(currentStatus)) {
                     log.info("⌛ Time is up for Game {}. Finishing game automatically.", roomId);
-                    finishGame(roomId);
+                    finishGame(roomId, FINISH_TRIGGER_TIMEOUT_ASYNC);
                 }
             } catch (Exception e) {
                 log.error("Failed to execute game timeout for Game {}", roomId, e);
@@ -666,6 +750,18 @@ public class RedisGameService {
         recordSqlCount(METRIC_GAME_START_SQL_COUNT, problemSource, result, cacheStatus, sqlSnapshot);
     }
 
+    private void recordFinishGameMetrics(
+            Timer.Sample timerSample,
+            String trigger,
+            String result,
+            long sqlSnapshot) {
+        timerSample.stop(Timer.builder(METRIC_GAME_FINISH_DURATION)
+                .tag("trigger", normalizeFinishTrigger(trigger))
+                .tag("result", normalizeFinishResult(result))
+                .register(meterRegistry));
+        recordFinishSqlCount(trigger, result, sqlSnapshot);
+    }
+
     private void recordSqlCount(
             String metricName,
             String problemSource,
@@ -684,6 +780,18 @@ public class RedisGameService {
                 .record(sqlDelta);
     }
 
+    private void recordFinishSqlCount(String trigger, String result, long sqlSnapshot) {
+        if (sqlSnapshot < 0) {
+            return;
+        }
+
+        long sqlDelta = Math.max(snapshotSqlCount() - sqlSnapshot, 0L);
+        meterRegistry.summary(METRIC_GAME_FINISH_SQL_COUNT,
+                "trigger", normalizeFinishTrigger(trigger),
+                "result", normalizeFinishResult(result))
+                .record(sqlDelta);
+    }
+
     private String normalizeProblemSource(String problemSource) {
         return problemSource == null || problemSource.isBlank() || "null".equals(problemSource)
                 ? "BOJ_RANDOM"
@@ -692,6 +800,60 @@ public class RedisGameService {
 
     private String normalizeCacheStatus(String cacheStatus) {
         return cacheStatus == null || cacheStatus.isBlank() ? CACHE_STATUS_NA : cacheStatus;
+    }
+
+    private String normalizeFinishTrigger(String trigger) {
+        return trigger == null || trigger.isBlank() ? FINISH_TRIGGER_MANUAL : trigger;
+    }
+
+    private String normalizeFinishResult(String result) {
+        return result == null || result.isBlank() ? FINISH_RESULT_FAILED : result;
+    }
+
+    private FinishClaimState tryAcquireFinishClaim(Long roomId, String trigger) {
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String claimKey = String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId);
+        String claimToken = trigger + ":" + UUID.randomUUID();
+
+        if (!finishClaimEnabled) {
+            String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
+            if (!GameStatus.PLAYING.name().equals(currentStatus)) {
+                return new FinishClaimState(FINISH_CLAIM_RESULT_NOOP_NON_PLAYING, null);
+            }
+            return new FinishClaimState(FINISH_CLAIM_RESULT_GRANTED, null);
+        }
+
+        Long claimResult = redisTemplate.execute(
+                FINISH_CLAIM_ACQUIRE_SCRIPT,
+                List.of(statusKey, claimKey),
+                GameStatus.PLAYING.name(),
+                GameStatus.ENDING.name(),
+                claimToken);
+        long normalizedResult = claimResult != null ? claimResult : FINISH_CLAIM_RESULT_NOOP_NON_PLAYING;
+        return new FinishClaimState(normalizedResult, claimToken);
+    }
+
+    private void rollbackFinishClaim(Long roomId, FinishClaimState claimState) {
+        if (!finishClaimEnabled || claimState == null || !claimState.isGranted() || claimState.claimToken == null) {
+            return;
+        }
+
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String claimKey = String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId);
+        Long rollbackResult = redisTemplate.execute(
+                FINISH_CLAIM_ROLLBACK_SCRIPT,
+                List.of(statusKey, claimKey),
+                claimState.claimToken,
+                GameStatus.PLAYING.name(),
+                GameStatus.ENDING.name());
+        long normalizedResult = rollbackResult != null ? rollbackResult : 0L;
+        if (normalizedResult == 1L) {
+            log.warn("↩️ Rolled back finish claim for game {} after failure", roomId);
+            return;
+        }
+        if (normalizedResult == 2L) {
+            log.warn("🧹 Released finish claim for game {} after failure without reverting status", roomId);
+        }
     }
 
     // 채팅 보내기
@@ -953,8 +1115,8 @@ public class RedisGameService {
         List<GameRoomResponse.ProblemInfo> problems = new ArrayList<>();
         GameStatus gameStatus = status != null ? GameStatus.valueOf(status) : GameStatus.WAITING;
 
-        if (gameStatus == GameStatus.PLAYING || gameStatus == GameStatus.END) {
-            // PLAYING/END: Redis에서 조회
+        if (gameStatus == GameStatus.PLAYING || gameStatus == GameStatus.ENDING || gameStatus == GameStatus.END) {
+            // PLAYING/ENDING/END: Redis에서 조회
             String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
             List<Object> pList = redisTemplate.opsForList().range(problemsKey, 0, -1);
             if (pList != null) {
@@ -1238,7 +1400,7 @@ public class RedisGameService {
             if (teamScore != null && teamScore >= problemCount) {
                 log.info("🏆 Team {} completed all {} problems in mode {}! Finishing game...", solverTeam, problemCount,
                         mode);
-                finishGame(gameId);
+                finishGame(gameId, FINISH_TRIGGER_SOLVE);
             }
         }
         // 2. 개인전 스피드 레이스 종료 조건 -> 모든 참가자가 다 풀어야 끝
@@ -1265,7 +1427,7 @@ public class RedisGameService {
 
             if (allCompleted) {
                 log.info("🏆 All players completed all {} problems! Finishing game...", problemCount);
-                finishGame(gameId);
+                finishGame(gameId, FINISH_TRIGGER_SOLVE);
             } else if (anyCompleted) {
                 // 한 명이라도 다 풀었으면 그 사람의 닉네임을 찾아서 1분 유예 시간 시작 알림
                 String finisherNickname = "누군가";
@@ -1316,7 +1478,7 @@ public class RedisGameService {
                 // 아직 플레이 중이라면 종료 처리
                 if ("PLAYING".equals(currentStatus)) {
                     log.info("⏰ Grace period ended for Game {}. Auto finishing...", gameId);
-                    finishGame(gameId);
+                    finishGame(gameId, FINISH_TRIGGER_GRACE_TIMEOUT);
                 }
             });
         }
@@ -1329,212 +1491,214 @@ public class RedisGameService {
      * - 참여자들의 USER_CURRENT_GAME 키 삭제
      */
     public void finishGame(Long roomId) {
-        // 상태 체크
-        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
-        String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
+        finishGame(roomId, FINISH_TRIGGER_MANUAL);
+    }
 
-        if (!"PLAYING".equals(currentStatus)) {
-            log.warn("⚠️ Cannot finish game {} - not in PLAYING state (current: {})", roomId, currentStatus);
-            return;
-        }
+    public void finishGame(Long roomId, String trigger) {
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        long sqlSnapshot = snapshotSqlCount();
+        String normalizedTrigger = normalizeFinishTrigger(trigger);
+        String result = FINISH_RESULT_FAILED;
+        FinishClaimState claimState = null;
 
-        log.info("🏁 Finishing game {}", roomId);
+        try {
+            claimState = tryAcquireFinishClaim(roomId, normalizedTrigger);
+            long claimResult = claimState.resultCode;
 
-        // 1. 상태 변경
-        updateGameStatus(roomId, GameStatus.END);
-
-        // 승자 및 팀 정보 선행 계산 및 조회
-        String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
-        String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
-        String mode = (String) redisTemplate.opsForHash().get(infoKey, "mode");
-        Object timeLimitObj = redisTemplate.opsForHash().get(infoKey, "timeLimit");
-        int timeLimit = (timeLimitObj != null) ? Integer.parseInt(String.valueOf(timeLimitObj)) : 0;
-        Object problemCountObj = redisTemplate.opsForHash().get(infoKey, "problemCount");
-        int problemCount = (problemCountObj != null) ? Integer.parseInt(String.valueOf(problemCountObj)) : 0;
-
-        // problemCount가 0이면 문제 리스트 사이즈로 fallback
-        if (problemCount == 0) {
-            String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
-            Long size = redisTemplate.opsForList().size(problemsKey);
-            if (size != null) {
-                problemCount = size.intValue();
+            if (claimResult == FINISH_CLAIM_RESULT_NOOP_NON_PLAYING) {
+                String currentStatus = (String) redisTemplate.opsForValue()
+                        .get(String.format(RedisKeyConst.GAME_STATUS, roomId));
+                log.warn("⚠️ Cannot finish game {} - not in PLAYING state (current: {})", roomId, currentStatus);
+                result = FINISH_RESULT_NOOP_NON_PLAYING;
+                return;
             }
-        }
 
-        Map<String, Double> teamRankingMap = new HashMap<>();
-        String winner = null;
+            if (claimResult == FINISH_CLAIM_RESULT_REJECTED) {
+                meterRegistry.counter(METRIC_GAME_FINISH_CLAIM_REJECTED, "trigger", normalizedTrigger).increment();
+                log.info("🚫 Finish claim rejected for game {} (trigger: {})", roomId, normalizedTrigger);
+                result = FINISH_RESULT_CLAIM_REJECTED;
+                return;
+            }
 
-        // 랭킹 조회 (승자 결정용)
-        String rankingKey = String.format(RedisKeyConst.GAME_RANKING, roomId);
-        Set<ZSetOperations.TypedTuple<Object>> rankingSet = redisTemplate.opsForZSet()
-                .reverseRangeWithScores(rankingKey, 0, -1);
+            meterRegistry.counter(METRIC_GAME_FINISH_CLAIM_GRANTED, "trigger", normalizedTrigger).increment();
+            if (claimState.isRecoveredFromStaleEnding()) {
+                log.warn("♻️ Recovered stale ENDING finish claim for game {} (trigger: {})", roomId, normalizedTrigger);
+            }
+            log.info("🏁 Finishing game {} (trigger: {})", roomId, normalizedTrigger);
 
-        List<Map<String, Object>> rankingList = new ArrayList<>();
+            String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+            String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
+            String mode = (String) redisTemplate.opsForHash().get(infoKey, "mode");
+            Object timeLimitObj = redisTemplate.opsForHash().get(infoKey, "timeLimit");
+            int timeLimit = (timeLimitObj != null) ? Integer.parseInt(String.valueOf(timeLimitObj)) : 0;
+            Object problemCountObj = redisTemplate.opsForHash().get(infoKey, "problemCount");
+            int problemCount = (problemCountObj != null) ? Integer.parseInt(String.valueOf(problemCountObj)) : 0;
 
-        if ("TEAM".equals(teamType)) {
-            String teamRankingKey = String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId);
-            Set<ZSetOperations.TypedTuple<Object>> teamSet = redisTemplate.opsForZSet()
-                    .reverseRangeWithScores(teamRankingKey, 0, -1);
-
-            if (teamSet != null) {
-                for (ZSetOperations.TypedTuple<Object> t : teamSet) {
-                    teamRankingMap.put(String.valueOf(t.getValue()), t.getScore());
-                }
-                // 1등 팀 선정
-                if (!teamSet.isEmpty()) {
-                    winner = String.valueOf(teamSet.iterator().next().getValue());
+            if (problemCount == 0) {
+                String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
+                Long size = redisTemplate.opsForList().size(problemsKey);
+                if (size != null) {
+                    problemCount = size.intValue();
                 }
             }
-        } else {
-            // 개인전 우승자
-            if (rankingSet != null && !rankingSet.isEmpty()) {
+
+            Map<String, Double> teamRankingMap = new HashMap<>();
+            String winner = null;
+
+            String rankingKey = String.format(RedisKeyConst.GAME_RANKING, roomId);
+            Set<ZSetOperations.TypedTuple<Object>> rankingSet = redisTemplate.opsForZSet()
+                    .reverseRangeWithScores(rankingKey, 0, -1);
+
+            List<Map<String, Object>> rankingList = new ArrayList<>();
+
+            if ("TEAM".equals(teamType)) {
+                String teamRankingKey = String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId);
+                Set<ZSetOperations.TypedTuple<Object>> teamSet = redisTemplate.opsForZSet()
+                        .reverseRangeWithScores(teamRankingKey, 0, -1);
+
+                if (teamSet != null) {
+                    for (ZSetOperations.TypedTuple<Object> t : teamSet) {
+                        teamRankingMap.put(String.valueOf(t.getValue()), t.getScore());
+                    }
+                    if (!teamSet.isEmpty()) {
+                        winner = String.valueOf(teamSet.iterator().next().getValue());
+                    }
+                }
+            } else if (rankingSet != null && !rankingSet.isEmpty()) {
                 winner = String.valueOf(rankingSet.iterator().next().getValue());
             }
-        }
 
-        // 2. 포인트 지급 및 결과 처리
-        Map<Long, Integer> gainedPointsMap = new HashMap<>();
-        try {
-            // Refactored method call
-            gainedPointsMap = gameService.processGameResult(roomId, winner, teamType);
-        } catch (Exception e) {
-            log.error("❌ Failed to process game result for Game ID: {}", roomId, e);
-        }
+            Map<Long, Integer> gainedPointsMap = new HashMap<>();
+            try {
+                gainedPointsMap = gameService.processGameResult(roomId, winner, teamType, normalizedTrigger);
+            } catch (Exception e) {
+                log.error("❌ Failed to process game result for Game ID: {}", roomId, e);
+            }
 
-        // 3. 최종 랭킹 리스트 구성 (Event Payload)
-        if (rankingSet != null) {
-            for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
-                Long uId = Long.parseLong(String.valueOf(entry.getValue()));
-                Double s = entry.getScore();
+            if (rankingSet != null) {
+                for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
+                    Long uId = Long.parseLong(String.valueOf(entry.getValue()));
+                    Double s = entry.getScore();
 
-                // User Entity 조회 (리그 정보 등)
-                User user = userRepository.findById(uId).orElse(null);
-                String nickname = (user != null) ? user.getNickname() : "Unknown";
-                String league = (user != null) ? user.getLeague().name() : "STONE";
-                int currentExp = (user != null) ? user.getLeaguePoint() : 0;
+                    User user = userRepository.findById(uId).orElse(null);
+                    String nickname = (user != null) ? user.getNickname() : "Unknown";
+                    String league = (user != null) ? user.getLeague().name() : "STONE";
+                    int currentExp = (user != null) ? user.getLeaguePoint() : 0;
 
-                // 팀 정보 조회
-                String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
-                String tColor = (String) redisTemplate.opsForHash().get(teamsKey, String.valueOf(uId));
+                    String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
+                    String tColor = (String) redisTemplate.opsForHash().get(teamsKey, String.valueOf(uId));
 
-                // 푼 문제 수 조회
-                String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, roomId, uId);
-                Object solvedCountObj = redisTemplate.opsForHash().get(scoreKey, "solvedCount");
-                int solvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 0;
+                    String scoreKey = String.format(RedisKeyConst.GAME_USER_SCORE, roomId, uId);
+                    Object solvedCountObj = redisTemplate.opsForHash().get(scoreKey, "solvedCount");
+                    int solvedCount = (solvedCountObj != null) ? Integer.parseInt(String.valueOf(solvedCountObj)) : 0;
 
-                Object lastSolvedObj = redisTemplate.opsForHash().get(scoreKey, "lastSolvedSeconds");
-                long lastSolvedSec = (lastSolvedObj != null) ? Long.parseLong(String.valueOf(lastSolvedObj)) : 0;
-                Long clearTime = lastSolvedSec;
+                    Object lastSolvedObj = redisTemplate.opsForHash().get(scoreKey, "lastSolvedSeconds");
+                    long lastSolvedSec = (lastSolvedObj != null) ? Long.parseLong(String.valueOf(lastSolvedObj)) : 0;
+                    Long clearTime = lastSolvedSec;
 
-                // [NEW] Calculate Total Game Duration
-                String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, roomId);
-                String startTimeStr = (String) redisTemplate.opsForValue().get(startTimeKey);
-                long startTime = (startTimeStr != null) ? Long.parseLong(startTimeStr) : System.currentTimeMillis();
-                long totalDuration = (System.currentTimeMillis() - startTime) / 1000;
+                    String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, roomId);
+                    String startTimeStr = (String) redisTemplate.opsForValue().get(startTimeKey);
+                    long startTime = (startTimeStr != null) ? Long.parseLong(startTimeStr) : System.currentTimeMillis();
+                    long totalDuration = (System.currentTimeMillis() - startTime) / 1000;
 
-                if ("TIME_ATTACK".equals(mode) && solvedCount < problemCount) {
-                    clearTime = (long) timeLimit;
-                } else if ("SPEED_RACE".equals(mode) && solvedCount < problemCount) {
-                    // [New] Speed Race: If not finished, set to null (FAILED)
-                    clearTime = null;
+                    if ("TIME_ATTACK".equals(mode) && solvedCount < problemCount) {
+                        clearTime = (long) timeLimit;
+                    } else if ("SPEED_RACE".equals(mode) && solvedCount < problemCount) {
+                        clearTime = null;
+                    }
+
+                    Map<String, Object> userRank = new HashMap<>();
+                    userRank.put("userId", uId);
+                    userRank.put("nickname", nickname);
+                    userRank.put("score", s);
+                    userRank.put("solvedCount", solvedCount);
+                    userRank.put("teamColor", tColor);
+                    userRank.put("clearTime", clearTime);
+                    userRank.put("profileImg", (user != null) ? user.getProfileImg() : null);
+                    userRank.put("league", league);
+                    userRank.put("currentExp", currentExp);
+                    userRank.put("gainedExp", gainedPointsMap.getOrDefault(uId, 0));
+                    userRank.put("totalDuration", totalDuration);
+
+                    rankingList.add(userRank);
                 }
-
-                Map<String, Object> userRank = new HashMap<>();
-                userRank.put("userId", uId);
-                userRank.put("nickname", nickname);
-                userRank.put("score", s);
-                userRank.put("solvedCount", solvedCount);
-                userRank.put("teamColor", tColor);
-                userRank.put("clearTime", clearTime);
-
-                // [NEW] League Info
-                userRank.put("profileImg", (user != null) ? user.getProfileImg() : null);
-                userRank.put("league", league);
-                userRank.put("currentExp", currentExp);
-                userRank.put("gainedExp", gainedPointsMap.getOrDefault(uId, 0));
-                // maxExp is removed as requested
-
-                rankingList.add(userRank);
             }
-        }
 
-        // 5. GAME_END 이벤트 발행
-        String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
-        Map<String, Object> endData = new HashMap<>();
-        endData.put("status", "END");
-        endData.put("ranking", rankingList);
-        endData.put("teamRanking", teamRankingMap);
+            String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
+            Map<String, Object> endData = new HashMap<>();
+            endData.put("status", "END");
+            endData.put("ranking", rankingList);
+            endData.put("teamRanking", teamRankingMap);
 
-        // [Fix] Explicitly send solved counts for teams to avoid "Time" display
-        // confusion
-        Map<String, Integer> teamSolvedCounts = new HashMap<>();
-        for (Map.Entry<String, Double> entry : teamRankingMap.entrySet()) {
-            teamSolvedCounts.put(entry.getKey(), entry.getValue().intValue());
-        }
-        endData.put("teamSolvedCounts", teamSolvedCounts);
-
-        endData.put("winner", winner);
-        endData.put("teamType", teamType);
-
-        redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("GAME_END", endData));
-
-        // 6. 참여자들의 USER_CURRENT_GAME 키 삭제
-        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
-        Set<Object> players = redisTemplate.opsForSet().members(playersKey);
-        if (players != null) {
-            for (Object playerObj : players) {
-                Long playerId = Long.parseLong(String.valueOf(playerObj));
-                redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, playerId));
+            Map<String, Integer> teamSolvedCounts = new HashMap<>();
+            for (Map.Entry<String, Double> entry : teamRankingMap.entrySet()) {
+                teamSolvedCounts.put(entry.getKey(), entry.getValue().intValue());
             }
-        }
+            endData.put("teamSolvedCounts", teamSolvedCounts);
+            endData.put("winner", winner);
+            endData.put("teamType", teamType);
 
-        // 7. 활성 방 목록에서 제거 (로비에서 숨김)
-        redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
+            updateGameStatusInternal(roomId, GameStatus.END);
+            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("GAME_END", endData));
+            meterRegistry.counter(METRIC_GAME_FINISH_EVENT_PUBLISHED, "trigger", normalizedTrigger).increment();
+            meterRegistry.counter(METRIC_GAME_FINISH_RESULT_PROCESSED, "trigger", normalizedTrigger).increment();
 
-        // 8. 초대 코드 만료 처리
-        String inviteCode = (String) redisTemplate.opsForValue()
-                .get(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
-        if (inviteCode != null) {
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_INVITE_CODE, inviteCode));
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
-        }
-
-        // 9. 종료 타이머 키 삭제
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_TIMER, roomId));
-
-        // 10. 게임 종료 후 모든 Redis 데이터 삭제 (깔끔하게 정리)
-        log.info("🗑️ Cleaning up all Redis data for finished game {}", roomId);
-
-        workbookPreviewCacheService.releaseRoomWorkbookCache(roomId);
-
-        // 게임 기본 정보
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_STATUS, roomId));
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_START_TIME, roomId));
-
-        // 랭킹 데이터
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_RANKING, roomId));
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId));
-
-        // 참여자 및 팀 데이터
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId));
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId));
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId)); // Ready 상태 삭제
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_ONLINE, roomId));
-
-        // 문제 데이터
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS, roomId));
-        redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId));
-
-        // 각 유저별 점수 키 삭제 (참여자 목록 순회)
-        if (rankingSet != null) {
-            for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
-                Long uId = Long.parseLong(String.valueOf(entry.getValue()));
-                redisTemplate.delete(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, uId));
+            String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+            Set<Object> players = redisTemplate.opsForSet().members(playersKey);
+            if (players != null) {
+                for (Object playerObj : players) {
+                    Long playerId = Long.parseLong(String.valueOf(playerObj));
+                    redisTemplate.delete(String.format(RedisKeyConst.USER_CURRENT_GAME, playerId));
+                }
             }
-        }
 
-        log.info("✅ Game {} finished and cleaned up successfully. Winner: {}", roomId, winner);
+            redisTemplate.opsForSet().remove(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
+
+            String inviteCode = (String) redisTemplate.opsForValue()
+                    .get(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+            if (inviteCode != null) {
+                redisTemplate.delete(String.format(RedisKeyConst.GAME_INVITE_CODE, inviteCode));
+                redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INVITE_CODE, roomId));
+            }
+
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_TIMER, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId));
+
+            log.info("🗑️ Cleaning up all Redis data for finished game {}", roomId);
+
+            workbookPreviewCacheService.releaseRoomWorkbookCache(roomId);
+
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_INFO, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_STATUS, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_START_TIME, roomId));
+
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_RANKING, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_TEAM_RANKING, roomId));
+
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_ROOM_ONLINE, roomId));
+
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS, roomId));
+            redisTemplate.delete(String.format(RedisKeyConst.GAME_PROBLEMS_PREVIEW, roomId));
+
+            if (rankingSet != null) {
+                for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
+                    Long uId = Long.parseLong(String.valueOf(entry.getValue()));
+                    redisTemplate.delete(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, uId));
+                }
+            }
+
+            log.info("✅ Game {} finished and cleaned up successfully. Winner: {}", roomId, winner);
+            result = FINISH_RESULT_PROCESSED;
+        } catch (Exception e) {
+            rollbackFinishClaim(roomId, claimState);
+            log.error("❌ Failed to finish game {} (trigger: {})", roomId, normalizedTrigger, e);
+            throw e;
+        } finally {
+            recordFinishGameMetrics(timerSample, normalizedTrigger, result, sqlSnapshot);
+        }
     }
 
     public Long getUserCurrentGameId(Long userId) {

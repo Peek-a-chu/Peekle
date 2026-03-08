@@ -154,6 +154,7 @@ public class RedisKeyConst {
 
     // 개인전 스피드 레이스 1등 종료 타이머 시작 여부 (Value)
     public static final String GAME_FINISH_TIMER = "game:room:%d:finish_timer";
+    public static final String GAME_FINISH_CLAIM = "game:room:%d:finish_claim";
 
     // Game Room Broadcasted (Value) -> game:room:{roomId}:broadcasted -> "true"
     public static final String GAME_ROOM_BROADCASTED = "game:room:%d:broadcasted";

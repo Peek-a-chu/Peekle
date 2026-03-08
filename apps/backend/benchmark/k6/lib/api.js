@@ -168,6 +168,25 @@ export function strictCreateRoomFixtures(baseUrl, config, prefix) {
   return expectSuccess(response, "createCreateRoomFixtures");
 }
 
+export function strictCreateFinishRaceFixtures(baseUrl, roomCount, prefix) {
+  const response = http.post(
+    `${baseUrl}/api/benchmark/fixtures/finish-race`,
+    JSON.stringify({
+      roomCount,
+      prefix,
+    }),
+    benchmarkSetupParams()
+  );
+  return expectSuccess(response, "createFinishRaceFixtures");
+}
+
+export function endRoom(baseUrl, roomId, tags = {}) {
+  return http.post(`${baseUrl}/api/games/${roomId}/end`, null, {
+    headers: buildHeaders(),
+    tags,
+  });
+}
+
 export function readApiResult(response) {
   try {
     const payload = response.json();

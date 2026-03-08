@@ -138,6 +138,20 @@ public class BenchmarkFixtureService {
         return new CreateRoomFixtures(workbookFixture.workbookId(), hostFixtures);
     }
 
+    public FinishRaceFixtures createFinishRaceFixtures(FinishRaceFixtureCommand command) {
+        FinishRaceFixtureCommand normalized = normalize(command);
+        List<User> players = createBenchmarkUsers(normalized.prefix(), "finish-player", normalized.roomCount() * 2);
+        List<FinishRaceRoomFixture> rooms = new ArrayList<>(normalized.roomCount());
+
+        for (int roomIndex = 0; roomIndex < normalized.roomCount(); roomIndex++) {
+            User firstPlayer = players.get(roomIndex * 2);
+            User secondPlayer = players.get(roomIndex * 2 + 1);
+            rooms.add(seedFinishRaceRoom(normalized.prefix(), roomIndex, firstPlayer, secondPlayer));
+        }
+
+        return new FinishRaceFixtures(2, rooms);
+    }
+
     private List<Problem> loadProblems(int count) {
         return problemRepository.findBySource(
                         BENCHMARK_SOURCE,
@@ -404,6 +418,21 @@ public class BenchmarkFixtureService {
                 prefix);
     }
 
+    private FinishRaceFixtureCommand normalize(FinishRaceFixtureCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("finish race fixture command is required");
+        }
+        if (command.roomCount() <= 0) {
+            throw new IllegalArgumentException("roomCount must be positive");
+        }
+
+        String prefix = command.prefix() == null || command.prefix().isBlank()
+                ? "benchmark-finish"
+                : command.prefix();
+
+        return new FinishRaceFixtureCommand(command.roomCount(), prefix);
+    }
+
     private User createBenchmarkUser(String prefix, String role, int index) {
         User user = new User(
                 "benchmark_" + UUID.randomUUID(),
@@ -473,6 +502,58 @@ public class BenchmarkFixtureService {
         return prefix + "-room-" + index + "-" + UUID.randomUUID();
     }
 
+    private FinishRaceRoomFixture seedFinishRaceRoom(String prefix, int roomIndex, User firstPlayer, User secondPlayer) {
+        Long roomId = redisTemplate.opsForValue().increment(RedisKeyConst.GAME_ROOM_ID_SEQ);
+        if (roomId == null) {
+            throw new IllegalStateException("Failed to allocate benchmark finish room id");
+        }
+
+        String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
+        String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
+        String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
+        String readyKey = String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId);
+        String rankingKey = String.format(RedisKeyConst.GAME_RANKING, roomId);
+
+        Map<String, String> roomInfo = new HashMap<>();
+        roomInfo.put("title", prefix + "-finish-room-" + roomIndex);
+        roomInfo.put("maxPlayers", "2");
+        roomInfo.put("timeLimit", "300");
+        roomInfo.put("problemCount", "2");
+        roomInfo.put("problemSource", "BOJ_RANDOM");
+        roomInfo.put("teamType", "INDIVIDUAL");
+        roomInfo.put("mode", "TIME_ATTACK");
+        roomInfo.put("hostId", String.valueOf(firstPlayer.getId()));
+        roomInfo.put("hostNickname", firstPlayer.getNickname());
+        roomInfo.put("hostProfileImg", firstPlayer.getProfileImg() != null ? firstPlayer.getProfileImg() : "");
+
+        redisTemplate.opsForHash().putAll(infoKey, roomInfo);
+        redisTemplate.opsForValue().set(statusKey, GameStatus.PLAYING.name());
+        redisTemplate.opsForValue().set(String.format(RedisKeyConst.GAME_START_TIME, roomId),
+                String.valueOf(System.currentTimeMillis() - 60_000));
+        redisTemplate.opsForSet().add(RedisKeyConst.GAME_ROOM_IDS, String.valueOf(roomId));
+        redisTemplate.opsForSet().add(playersKey, String.valueOf(firstPlayer.getId()), String.valueOf(secondPlayer.getId()));
+        redisTemplate.opsForHash().put(readyKey, String.valueOf(firstPlayer.getId()), "true");
+        redisTemplate.opsForHash().put(readyKey, String.valueOf(secondPlayer.getId()), "true");
+        redisTemplate.opsForValue().set(String.format(RedisKeyConst.USER_CURRENT_GAME, firstPlayer.getId()),
+                String.valueOf(roomId));
+        redisTemplate.opsForValue().set(String.format(RedisKeyConst.USER_CURRENT_GAME, secondPlayer.getId()),
+                String.valueOf(roomId));
+
+        redisTemplate.opsForHash().put(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, firstPlayer.getId()),
+                "solvedCount", "2");
+        redisTemplate.opsForHash().put(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, firstPlayer.getId()),
+                "lastSolvedSeconds", "12");
+        redisTemplate.opsForHash().put(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, secondPlayer.getId()),
+                "solvedCount", "1");
+        redisTemplate.opsForHash().put(String.format(RedisKeyConst.GAME_USER_SCORE, roomId, secondPlayer.getId()),
+                "lastSolvedSeconds", "48");
+
+        redisTemplate.opsForZSet().add(rankingKey, String.valueOf(firstPlayer.getId()), 200_000_000D - 12D);
+        redisTemplate.opsForZSet().add(rankingKey, String.valueOf(secondPlayer.getId()), 100_000_000D - 48D);
+
+        return new FinishRaceRoomFixture(roomId);
+    }
+
     private StartRoomFixture createWaitingRoomFixture(
             Long workbookId,
             BenchmarkFixtureCommand command,
@@ -525,6 +606,11 @@ public class BenchmarkFixtureService {
             String prefix) {
     }
 
+    public record FinishRaceFixtureCommand(
+            int roomCount,
+            String prefix) {
+    }
+
     public record StartFixtures(Long workbookId, List<StartRoomFixture> rooms) {
     }
 
@@ -535,6 +621,12 @@ public class BenchmarkFixtureService {
     }
 
     public record CreateRoomHostFixture(String token, String title) {
+    }
+
+    public record FinishRaceFixtures(int playersPerRoom, List<FinishRaceRoomFixture> rooms) {
+    }
+
+    public record FinishRaceRoomFixture(Long roomId) {
     }
 
     private record BenchmarkWorkbookFixture(Long workbookId, List<Problem> problems) {
