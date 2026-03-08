@@ -211,7 +211,11 @@ public class CollaborationSocketController {
         }
 
         String normalizedLang = redisIdeService.normalizeLanguage(lang);
-        String templateCode = redisIdeService.getTemplateCode(normalizedLang);
+        boolean hasCodePayload = payload.containsKey("code");
+        Object rawCode = payload.get("code");
+        String templateCode = hasCodePayload
+                ? (rawCode != null ? rawCode.toString() : "")
+                : redisIdeService.getTemplateCode(normalizedLang);
         String filename = redisIdeService.getDefaultFilename(normalizedLang);
         redisIdeService.saveCode(
                 studyId,

@@ -62,7 +62,7 @@ export interface CCIDEPanelProps {
   fontSize?: number;
   borderColorClass?: string;
   onEditorMount?: (editor: Parameters<OnMount>[0]) => void;
-  onLanguageChange?: (lang: string) => void;
+  onLanguageChange?: (lang: string, code?: string) => void;
   onThemeChange?: (theme: 'light' | 'vs-dark') => void;
   onFontSizeChange?: (size: number) => void;
   onCodeChange?: (code: string, language?: string) => void; // Updated signature
@@ -258,7 +258,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       setModelId((prev) => prev + 1);
 
       if (propOnLanguageChange) {
-        propOnLanguageChange(newLang);
+        propOnLanguageChange(newLang, newCode);
       }
 
       setIsConfirmModalOpen(false);
