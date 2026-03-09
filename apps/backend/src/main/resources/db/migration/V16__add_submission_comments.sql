@@ -9,7 +9,7 @@ CREATE TABLE submission_comments (
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    comment_type VARCHAR(20) NOT NULL DEFAULT 'INLINE';
+    comment_type VARCHAR(20) NOT NULL DEFAULT 'INLINE',
     CONSTRAINT fk_submission_comments_submission
         FOREIGN KEY (submission_id) REFERENCES submission_logs(id) ON DELETE CASCADE,
     CONSTRAINT fk_submission_comments_user
