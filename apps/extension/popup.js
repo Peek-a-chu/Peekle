@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // [Check Env]
     let frontendBaseUrl = 'https://peekle.today'; // Default to prod
-    let apiBaseUrl = 'https://peekle.today';     // Default to prod
+    let apiBaseUrl = 'https://peekle.today'; // Default to prod
 
     chrome.runtime.sendMessage({ type: 'CHECK_ENV' }, (response) => {
         if (response) {
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const goSiteBtn = document.getElementById('go-site-btn');
     if (goSiteBtn) {
         goSiteBtn.onclick = () => {
-            chrome.tabs.create({ url: `${frontendBaseUrl}/profile/me` });
+            chrome.tabs.create({ url: `${frontendBaseUrl}/home` });
         };
     }
 
@@ -68,10 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 loggedInBtns.style.display = 'none';
                 loggedOutBtns.style.display = 'flex';
 
-                nicknameEl.innerText = "로그인이 필요해요";
-                document.getElementById('league-name').innerText = "-";
-                document.getElementById('tier-icon').innerText = "❓";
-                statusEl.innerText = "사이트에서 계정을 연동해 주세요.";
+                nicknameEl.innerText = '로그인이 필요해요';
+                document.getElementById('league-name').innerText = '-';
+                document.getElementById('tier-icon').innerText = '❓';
+                statusEl.innerText = '사이트에서 계정을 연결해 주세요.';
             }
         });
     }
@@ -83,8 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // UI 즉시 반영
                 loggedInBtns.style.display = 'none';
                 loggedOutBtns.style.display = 'flex';
-                nicknameEl.innerText = "로그인이 필요해요";
-                statusEl.innerText = "연동이 해제되었습니다.";
+                nicknameEl.innerText = '로그인이 필요해요';
+                statusEl.innerText = '연결이 해제되었습니다.';
                 // 팝업을 닫거나 새로고침
                 location.reload();
             });
@@ -94,18 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. 버튼 이벤트 리스너 (Moved to top with dynamic URL)
     document.getElementById('logout-btn').onclick = handleLogout;
 
-    // Refresh 버튼 (새로고침)
-    const refreshBtn = document.getElementById('refresh-btn');
-    if (refreshBtn) {
-        refreshBtn.onclick = () => {
-            location.reload();
-        };
-    }
-
     // 4. 데이터 갱신 (Backend API Call)
     async function fetchFreshData(token) {
         try {
-            statusEl.innerText = "최신 정보를 가져오는 중...";
+            statusEl.innerText = '최신 정보 가져오는 중';
             const response = await fetch(`${apiBaseUrl}/api/users/me/profile`, {
                 headers: { 'X-Peekle-Token': token }
             });
@@ -129,23 +121,24 @@ document.addEventListener('DOMContentLoaded', () => {
                             userData.leagueStatus = statusJson.data.leagueStatus;
                             userData.bojId = statusJson.data.bojId;
                             userData.leagueGroupId = statusJson.data.leagueGroupId;
+                            userData.totalGroupMembers = statusJson.data.totalGroupMembers;
                         }
                     }
 
                     // 캐싱
                     chrome.storage.local.set({ userData: userData });
                     updateUI(userData);
-                    statusEl.innerText = "최신 데이터로 업데이트되었습니다.";
+                    statusEl.innerText = '방금 업데이트';
                 } else {
                     // 토큰이 만료되었거나 유효하지 않은 경우 처리
-                    statusEl.innerText = "정보를 가져오는데 실패했습니다.";
+                    statusEl.innerText = '프로필 정보를 불러오지 못했어요';
                 }
             } else {
-                statusEl.innerText = "서버와 통신이 원활하지 않습니다.";
+                statusEl.innerText = '서버와 통신할 수 없어요';
             }
         } catch (e) {
             console.error(e);
-            statusEl.innerText = "네트워크 오류가 발생했습니다.";
+            statusEl.innerText = '네트워크 오류가 발생했어요';
         }
     }
 
@@ -153,39 +146,43 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUI(data) {
         if (!data) return;
 
-        nicknameEl.innerText = data.nickname || "알 수 없음";
-        document.getElementById('boj-id').innerText = data.bojId ? `boj: ${data.bojId}` : "";
+        nicknameEl.innerText = data.nickname || '닉네임 없음';
+        document.getElementById('boj-id').innerText = data.bojId ? `BOJ: ${data.bojId}` : '';
         document.getElementById('league-name').innerText = getLeagueDisplayName(data.leagueName);
-        document.getElementById('user-score').innerText = (data.score || 0) + "점";
+        document.getElementById('user-score').innerText = (data.score || 0) + '점';
 
         // 순위와 상태 함께 표시
         const rankEl = document.getElementById('user-rank');
         if (data.totalGroupMembers < 4) {
             // 그룹 명수가 4명 미만이면: 리그명이 stone이면 배치 대기, 아니면 쉬는 중
             const leagueName = (data.leagueName || '').toLowerCase();
-            const waitMsg = leagueName === 'stone' ? '배치 대기' : '이번주 쉬는 중';
-            rankEl.innerHTML = `<span style="font-size: 12px; color: var(--muted-foreground);">${waitMsg}</span>`;
+            const waitMsg = leagueName === 'stone' ? '배치 대기' : '이번 주 쉬는 중';
+            rankEl.innerHTML = `<span class="rank-wait">${waitMsg}</span>`;
+            rankEl.style.removeProperty('--rank-status-color');
         } else if (data.groupRank) {
             const statusText = getStatusText(data.leagueStatus);
-            rankEl.innerHTML = `<span style="font-weight: 700;">${data.groupRank}위</span> <span style="font-size: 10px; color: ${getStatusColor(data.leagueStatus)};">${statusText}</span>`;
+            rankEl.style.setProperty('--rank-status-color', getStatusColor(data.leagueStatus));
+            rankEl.innerHTML = `<span class="rank-main">${data.groupRank}위</span> <span class="rank-status">${statusText}</span>`;
         } else if (data.rank) {
-            rankEl.innerText = data.rank + "위";
+            rankEl.innerText = data.rank + '위';
+            rankEl.style.removeProperty('--rank-status-color');
         } else {
-            rankEl.innerText = "-";
+            rankEl.innerText = '-';
+            rankEl.style.removeProperty('--rank-status-color');
         }
 
         // [New] 스트릭 및 오늘 문제 상태
         const streakEl = document.getElementById('user-streak');
-        if (streakEl) streakEl.innerText = (data.streakCurrent || 0) + "일";
+        if (streakEl) streakEl.innerText = (data.streakCurrent || 0) + '일';
 
         const todayStatusEl = document.getElementById('today-status');
         if (todayStatusEl) {
             if (data.isSolvedToday) {
-                todayStatusEl.innerText = "오늘의 문제 완료! 🎉";
-                todayStatusEl.style.color = "var(--primary)";
+                todayStatusEl.innerText = '오늘 문제 해결 완료';
+                todayStatusEl.style.color = 'var(--primary)';
             } else {
-                todayStatusEl.innerText = "아직 문제를 풀지 않았어요";
-                todayStatusEl.style.color = "var(--muted-foreground)";
+                todayStatusEl.innerText = '아직 문제를 풀지 않았어요';
+                todayStatusEl.style.color = 'var(--muted-foreground)';
             }
         }
 
@@ -198,16 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedUrl = encodeURIComponent(rawImgUrl);
         const imgUrl = `${frontendBaseUrl}/_next/image?url=${encodedUrl}&w=256&q=75`;
 
-        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile Image" style="width:100%; height:100%; object-fit:cover; border-radius:50%; background-color:#eee;">`;
-
+        tierIconEl.innerHTML = `<img src="${imgUrl}" alt="Profile Image" class="tier-image">`;
     }
 
     // Helper: Get status text
     function getStatusText(status) {
         const statusMap = {
-            'PROMOTE': '승급예정',
-            'STAY': '유지',
-            'DEMOTE': '강등위기'
+            PROMOTE: '승급 예정',
+            STAY: '유지',
+            DEMOTE: '강등 위기'
         };
         return statusMap[status] || '';
     }
@@ -215,9 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helper: Get status color
     function getStatusColor(status) {
         const colorMap = {
-            'PROMOTE': 'var(--primary)',
-            'STAY': 'var(--muted-foreground)',
-            'DEMOTE': '#ef4444'
+            PROMOTE: 'var(--primary)',
+            STAY: 'var(--muted-foreground)',
+            DEMOTE: '#ef4444'
         };
         return colorMap[status] || 'var(--muted-foreground)';
     }
@@ -288,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         root.style.setProperty('--primary', primaryColor);
 
-        // 추가: 오늘 문제 완료 상태 텍스트 색상 실시간 반영용 (변수가 이미 설정되어 있으므로 명시적 호출 불필요할 수 있으나 안전장치)
+        // 추가: 오늘 문제 완료 상태 텍스트 색상 실시간 반영용
         const statusText = document.getElementById('today-status');
         if (statusText) {
             if (statusText.innerText.includes('완료')) {
@@ -308,21 +304,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const type = task.sourceType || 'EXTENSION';
 
                 if (type === 'STUDY') {
-                    contextEl.innerText = `📚 스터디 진행 중`;
+                    contextEl.innerText = '📚 스터디 진행 중';
                     contextEl.style.color = 'var(--primary)';
                 } else if (type === 'GAME') {
-                    contextEl.innerText = `🎮 게임 진행 중`;
-                    contextEl.style.color = '#f97316'; // Orange
+                    contextEl.innerText = '🎮 게임 진행 중';
+                    contextEl.style.color = '#f97316';
                 } else {
-                    contextEl.innerText = `📝 문제 풀이 중`;
+                    contextEl.innerText = '📝 문제 풀이 중';
                     contextEl.style.color = 'var(--foreground)';
                 }
 
                 if (task.consumed) {
-                    contextEl.innerText += " (제출 대기)";
+                    contextEl.innerText += ' (제출 대기)';
                 }
             } else if (contextEl) {
-                contextEl.innerText = `대기 중인 작업 없음`;
+                contextEl.innerText = '대기 중인 작업 없음';
                 contextEl.style.color = 'var(--muted-foreground)';
             }
         });
