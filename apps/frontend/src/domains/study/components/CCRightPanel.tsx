@@ -1,12 +1,13 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRoomStore, selectOnlineCount } from '@/domains/study/hooks/useRoomStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 import { StudyChatPanel } from './chat/StudyChatPanel';
 import { StudyParticipantPanel } from './StudyParticipantPanel';
+import { SubmissionCommentsPanel } from './comments/SubmissionCommentsPanel';
 
 interface CCRightPanelProps {
   chatContent?: ReactNode;
@@ -26,9 +27,12 @@ export function CCRightPanel({
   const onlineCount = useRoomStore(selectOnlineCount);
   const totalCount = useRoomStore((state) => state.participants.length);
 
+  useEffect(() => {
+    console.info('[peekle-comments] right-panel-active-tab', { activeTab });
+  }, [activeTab]);
+
   return (
     <div className={cn('flex h-full flex-col border-l border-border', className)} data-tour="right-panel">
-      {/* Tab Headers */}
       <div className="flex bg-card border-b border-border items-center h-14 shrink-0">
         <Button
           variant="ghost"
@@ -54,6 +58,18 @@ export function CCRightPanel({
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab('comments')}
+          className={cn(
+            'flex-1 px-4 h-full flex items-center justify-center text-sm font-medium transition-colors',
+            activeTab === 'comments'
+              ? 'border-b-2 border-primary text-primary'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          댓글
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab('participants')}
           className={cn(
             'flex-1 px-4 h-full flex items-center justify-center text-sm font-medium transition-colors',
@@ -67,10 +83,13 @@ export function CCRightPanel({
         </button>
       </div>
 
-      {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'chat' ? (
           <div className="h-full">{chatContent ?? <StudyChatPanel />}</div>
+        ) : activeTab === 'comments' ? (
+          <div className="h-full">
+            <SubmissionCommentsPanel />
+          </div>
         ) : (
           <div className="h-full">{participantsContent ?? <StudyParticipantPanel />}</div>
         )}
