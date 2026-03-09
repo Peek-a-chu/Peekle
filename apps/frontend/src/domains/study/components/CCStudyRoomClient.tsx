@@ -136,6 +136,7 @@ function StudyRoomContent({
   const isRightPanelFolded = useRoomStore((state) => state.isRightPanelFolded);
   const setIsLeftPanelFolded = useRoomStore((state) => state.setIsLeftPanelFolded);
   const setIsRightPanelFolded = useRoomStore((state) => state.setIsRightPanelFolded);
+  const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
 
   // Auto-close sidebars if window is on the right half of the screen on load
   useEffect(() => {
@@ -254,6 +255,33 @@ function StudyRoomContent({
     prevLeftFolded.current = isLeftPanelFolded;
     prevRightFolded.current = isRightPanelFolded;
   }, [isCompact, isLeftPanelFolded, isRightPanelFolded, setIsLeftPanelFolded, setIsRightPanelFolded]);
+
+  useEffect(() => {
+    const handleOpenCommentsPanel = (event: Event) => {
+      const detail = (event as CustomEvent<{ lineNumber?: number | null }>).detail;
+      console.info('[peekle-comments] room-received-open-comments-panel', {
+        lineNumber: detail?.lineNumber ?? null,
+        isCompact,
+        isLeftPanelFolded,
+        isRightPanelFolded,
+      });
+      setRightPanelActiveTab('comments');
+      if (isCompact) {
+        setIsLeftPanelFolded(true);
+      }
+      setIsRightPanelFolded(false);
+    };
+
+    window.addEventListener('peekle:open-comments-panel', handleOpenCommentsPanel);
+    return () => window.removeEventListener('peekle:open-comments-panel', handleOpenCommentsPanel);
+  }, [
+    isCompact,
+    isLeftPanelFolded,
+    isRightPanelFolded,
+    setIsLeftPanelFolded,
+    setIsRightPanelFolded,
+    setRightPanelActiveTab,
+  ]);
 
   // Global state for selected problem
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);

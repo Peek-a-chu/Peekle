@@ -638,6 +638,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
               fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
               fontSize: fontSize,
               minimap: { enabled: false },
+              glyphMargin: true,
+              lineDecorationsWidth: 22,
               wordWrap: 'on',
               automaticLayout: true,
               scrollBeyondLastLine: false,

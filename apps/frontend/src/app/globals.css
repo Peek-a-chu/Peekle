@@ -341,3 +341,53 @@ div[class*='monaco-editor-overlaymessage'],
     /* Firefox */
   }
 }
+
+.monaco-editor .peekle-comment-glyph {
+  position: relative;
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+
+.monaco-editor .peekle-comment-glyph::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 0 1px hsl(var(--background));
+}
+
+.monaco-editor .peekle-comment-inline-badge {
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+
+.monaco-editor .peekle-comment-inline-dot {
+  color: hsl(var(--primary));
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+
+.monaco-editor .peekle-comment-line-number {
+  position: relative;
+  cursor: pointer;
+}
+
+.monaco-editor .peekle-comment-line-number::after {
+  content: '';
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  transform: translateY(-50%);
+}
