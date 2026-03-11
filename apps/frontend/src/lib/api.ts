@@ -202,11 +202,23 @@ async function retryOriginalRequest<T>(url: string, fetchOptions: RequestInit): 
   }
 }
 
+function isAuthOrPublicRoute(pathname: string): boolean {
+  return (
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup')
+  );
+}
+
 function handleAuthFailure<T>(): ApiResponse<T> {
   if (typeof window !== 'undefined') {
-    // Call logout API to clear cookies before redirecting
+    const shouldRedirectToLogin = !isAuthOrPublicRoute(window.location.pathname);
+
+    // Clear auth cookies. Redirect only when not already on auth/public routes.
     fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
-      window.location.href = '/login';
+      if (shouldRedirectToLogin) {
+        window.location.replace('/login');
+      }
     });
   }
   return {

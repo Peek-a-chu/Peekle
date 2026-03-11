@@ -1,28 +1,33 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 
+const AUTH_OR_PUBLIC_ROUTES = new Set(['/login', '/signup', '/']);
+
 export function ClientSessionManager() {
-    const router = useRouter();
-    const { checkAuth } = useAuthStore();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { checkAuth } = useAuthStore();
 
-    useEffect(() => {
-        // 앱 초기 진입 시 인증 상태 확인
-        checkAuth();
+  useEffect(() => {
+    if (!pathname || AUTH_OR_PUBLIC_ROUTES.has(pathname)) {
+      return;
+    }
 
-        const handleAuthRefreshed = () => {
-            // 토큰 갱신됨 -> 서버 컴포넌트(데이터) 새로고침
-            router.refresh();
-        };
+    checkAuth();
 
-        window.addEventListener('auth:refreshed', handleAuthRefreshed);
+    const handleAuthRefreshed = () => {
+      router.refresh();
+    };
 
-        return () => {
-            window.removeEventListener('auth:refreshed', handleAuthRefreshed);
-        };
-    }, [router, checkAuth]);
+    window.addEventListener('auth:refreshed', handleAuthRefreshed);
 
-    return null;
+    return () => {
+      window.removeEventListener('auth:refreshed', handleAuthRefreshed);
+    };
+  }, [pathname, router, checkAuth]);
+
+  return null;
 }
