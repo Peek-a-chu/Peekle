@@ -115,7 +115,11 @@ jobs:
 
   deploy:
     needs: [changes, build-backend, build-ai-server]
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ai_server == 'true' || needs.changes.outputs.docker == 'true'
+    if: |
+      always() &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.ai_server == 'true' || needs.changes.outputs.docker == 'true') &&
+      (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') &&
+      (needs.build-ai-server.result == 'success' || needs.build-ai-server.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to EC2
