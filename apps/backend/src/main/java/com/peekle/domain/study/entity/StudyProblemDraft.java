@@ -35,7 +35,7 @@ public class StudyProblemDraft {
     private StudyProblem studyProblem;
 
     @Lob
-    @Column(name = "code", columnDefinition = "LONGTEXT")
+    @Column(name = "code")
     private String code;
 
     @Column(name = "language", length = 50)
