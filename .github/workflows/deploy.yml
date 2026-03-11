@@ -75,14 +75,12 @@ jobs:
         run: corepack enable
 
       - name: Pull Vercel project settings
-        working-directory: apps/frontend
         run: pnpm dlx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy frontend to Vercel (production)
-        working-directory: apps/frontend
         run: pnpm dlx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
