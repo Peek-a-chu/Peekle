@@ -53,8 +53,40 @@ jobs:
             NEXT_PUBLIC_SOCKET_URL=https://${{ secrets.DOMAIN_NAME }}
             NEXT_PUBLIC_BACKEND_URL=https://${{ secrets.DOMAIN_NAME }}
             NEXT_PUBLIC_LIVEKIT_URL=wss://${{ secrets.DOMAIN_NAME }}
+            BACKEND_API_URL=https://${{ secrets.DOMAIN_NAME }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:buildcache,mode=max
+
+  deploy-frontend-vercel:
+    needs: [build-frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Pull Vercel project settings
+        working-directory: apps/frontend
+        run: pnpm dlx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy frontend to Vercel (production)
+        working-directory: apps/frontend
+        run: pnpm dlx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   build-backend:
     runs-on: ubuntu-latest
