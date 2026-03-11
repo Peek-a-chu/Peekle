@@ -1,0 +1,23 @@
+services:
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: peekle-postgres-vector
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-peekle}
+      POSTGRES_USER: ${POSTGRES_USER:-peekle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-peekle-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-vector-data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-peekle} -d ${POSTGRES_DB:-peekle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-vector-data:
+    driver: local

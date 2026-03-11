@@ -15,7 +15,31 @@ env:
   IMAGE_NAME: peek-a-chu/peekle
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      ai_server: ${{ steps.filter.outputs.ai_server }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+            ai_server:
+              - 'apps/ai-server/**'
+            docker:
+              - 'docker/**'
+
   build-backend:
+    needs: [changes]
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,6 +76,8 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:buildcache,mode=max
 
   build-ai-server:
+    needs: [changes]
+    if: needs.changes.outputs.ai_server == 'true' || needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,7 +114,8 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ai-server:buildcache,mode=max
 
   deploy:
-    needs: [build-backend, build-ai-server]
+    needs: [changes, build-backend, build-ai-server]
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ai_server == 'true' || needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to EC2
@@ -122,17 +149,35 @@ jobs:
             if [ ! -f .env ]; then
               touch .env
             fi
-            
-            # 4. Pull new images
-            docker compose -f docker-compose.prod.yml pull backend ai-server nginx
-            
-            # 5. Restart application containers
-            docker compose -f docker-compose.prod.yml up -d backend ai-server redis chroma livekit certbot
 
-            # 6. Recreate nginx so updated config files are always applied
-            docker compose -f docker-compose.prod.yml up -d --force-recreate nginx
-            docker exec peekle-nginx nginx -t
-            docker exec peekle-nginx nginx -s reload
+            BACKEND_CHANGED=${{ needs.changes.outputs.backend }}
+            AI_CHANGED=${{ needs.changes.outputs.ai_server }}
+            DOCKER_CHANGED=${{ needs.changes.outputs.docker }}
 
-            # 7. Clean up unused loose images
+            # 4. Pull images only when needed
+            if [ "$BACKEND_CHANGED" = "true" ] || [ "$DOCKER_CHANGED" = "true" ]; then
+              docker compose -f docker-compose.prod.yml pull backend
+            fi
+            if [ "$AI_CHANGED" = "true" ] || [ "$DOCKER_CHANGED" = "true" ]; then
+              docker compose -f docker-compose.prod.yml pull ai-server
+            fi
+
+            # 5. Deploy strategy
+            if [ "$DOCKER_CHANGED" = "true" ]; then
+              # docker/** changed => full infra redeploy
+              docker compose -f docker-compose.prod.yml up -d backend ai-server redis chroma livekit certbot
+              docker compose -f docker-compose.prod.yml up -d --force-recreate nginx
+              docker exec peekle-nginx nginx -t
+              docker exec peekle-nginx nginx -s reload
+            else
+              # App-only changes => only changed services
+              if [ "$BACKEND_CHANGED" = "true" ]; then
+                docker compose -f docker-compose.prod.yml up -d backend
+              fi
+              if [ "$AI_CHANGED" = "true" ]; then
+                docker compose -f docker-compose.prod.yml up -d ai-server
+              fi
+            fi
+
+            # 6. Clean up unused loose images
             docker image prune -f
