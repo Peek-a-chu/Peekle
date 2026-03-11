@@ -1,6 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "BACKEND_API_URL",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_SOCKET_URL",
+    "NEXT_PUBLIC_LIVEKIT_URL",
+    "NEXT_PUBLIC_GA_ID"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
