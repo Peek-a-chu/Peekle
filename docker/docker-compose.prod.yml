@@ -27,7 +27,6 @@ services:
       - "host.docker.internal:host-gateway"
       # - "livekit:host-gateway"
     depends_on:
-      - frontend
       - backend
     restart: unless-stopped
     networks:
@@ -42,32 +41,6 @@ services:
       - nginx-certs:/etc/letsencrypt
       - certbot-www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    networks:
-      - peekle-network
-    logging: *default-logging
-
-  # Frontend (Next.js)
-  frontend:
-    image: ${CI_REGISTRY_IMAGE:-peekle}/frontend:${CI_COMMIT_SHORT_SHA:-latest}
-    build:
-      context: ../
-      dockerfile: apps/frontend/Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=https://peekle.today
-        - NEXT_PUBLIC_SOCKET_URL=https://peekle.today
-        - NEXT_PUBLIC_BACKEND_URL=https://peekle.today
-        - NEXT_PUBLIC_LIVEKIT_URL=wss://peekle.today:8880
-      cache_from:
-        - ${CI_REGISTRY_IMAGE:-peekle}/frontend:latest
-    container_name: peekle-frontend
-    env_file:
-      - ../apps/frontend/.env
-    environment:
-      - NODE_ENV=production
-      - BACKEND_API_URL=http://backend:8080
-    expose:
-      - "3000"
-    restart: unless-stopped
     networks:
       - peekle-network
     logging: *default-logging
