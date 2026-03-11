@@ -15,77 +15,6 @@ env:
   IMAGE_NAME: peek-a-chu/peekle
 
 jobs:
-  build-frontend:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for Frontend
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
-
-      - name: Build and push Frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/frontend/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=https://${{ secrets.DOMAIN_NAME }}
-            NEXT_PUBLIC_SOCKET_URL=https://${{ secrets.DOMAIN_NAME }}
-            NEXT_PUBLIC_BACKEND_URL=https://${{ secrets.DOMAIN_NAME }}
-            NEXT_PUBLIC_LIVEKIT_URL=wss://${{ secrets.DOMAIN_NAME }}
-            BACKEND_API_URL=https://${{ secrets.DOMAIN_NAME }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:buildcache,mode=max
-
-  deploy-frontend-vercel:
-    needs: [build-frontend]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Pull Vercel project settings
-        run: pnpm dlx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Deploy frontend to Vercel (production)
-        run: pnpm dlx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
   build-backend:
     runs-on: ubuntu-latest
     permissions:
@@ -159,7 +88,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ai-server:buildcache,mode=max
 
   deploy:
-    needs: [build-frontend, build-backend, build-ai-server]
+    needs: [build-backend, build-ai-server]
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to EC2
@@ -195,13 +124,15 @@ jobs:
             fi
             
             # 4. Pull new images
-            docker compose -f docker-compose.prod.yml pull frontend backend ai-server
+            docker compose -f docker-compose.prod.yml pull backend ai-server nginx
             
-            # 5. Restart containers
-            docker compose -f docker-compose.prod.yml up -d
-            
-            # 5.1 Reload Nginx to clear upstream IP cache (prevents 502 Bad Gateway)
-            docker exec peekle-nginx nginx -s reload || true
-            
-            # 6. Clean up unused loose images
+            # 5. Restart application containers
+            docker compose -f docker-compose.prod.yml up -d backend ai-server redis chroma livekit certbot
+
+            # 6. Recreate nginx so updated config files are always applied
+            docker compose -f docker-compose.prod.yml up -d --force-recreate nginx
+            docker exec peekle-nginx nginx -t
+            docker exec peekle-nginx nginx -s reload
+
+            # 7. Clean up unused loose images
             docker image prune -f
