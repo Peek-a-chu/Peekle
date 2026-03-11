@@ -9,7 +9,7 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: ${DB_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
 
   jpa:
     hibernate:
@@ -18,12 +18,13 @@ spring:
       hibernate:
         format_sql: false
         show_sql: false
-    database-platform: org.hibernate.dialect.MySQLDialect
+    database-platform: ${DB_DIALECT:org.hibernate.dialect.MySQLDialect}
 
   flyway:
     enabled: true
     baseline-on-migrate: true
     validate-on-migrate: true
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration}
 
   data:
     redis:
