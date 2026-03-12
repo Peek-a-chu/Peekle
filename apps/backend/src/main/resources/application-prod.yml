@@ -9,7 +9,7 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-    driver-class-name: ${DB_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
+    driver-class-name: ${DB_DRIVER_CLASS_NAME:org.postgresql.Driver}
 
   jpa:
     hibernate:
@@ -24,7 +24,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     validate-on-migrate: true
-    locations: ${FLYWAY_LOCATIONS:classpath:db/migration}
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration-postgres}
 
   data:
     redis:
