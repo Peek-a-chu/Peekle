@@ -18,7 +18,7 @@ spring:
       hibernate:
         format_sql: false
         show_sql: false
-    database-platform: ${DB_DIALECT:org.hibernate.dialect.MySQLDialect}
+    database-platform: ${DB_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
 
   flyway:
     enabled: true

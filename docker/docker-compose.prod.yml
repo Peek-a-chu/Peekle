@@ -133,26 +133,22 @@ services:
     env_file:
       - ../apps/ai-server/.env
     environment:
-      - CHROMA_HOST=chroma
-      - CHROMA_PORT=8000
+      - PGVECTOR_HOST=postgres-vector
+      - PGVECTOR_PORT=5432
+      - PGVECTOR_DB=${POSTGRES_DB:-peekle}
+      - PGVECTOR_USER=${POSTGRES_USER:-peekle}
+      - PGVECTOR_PASSWORD=${POSTGRES_PASSWORD:-peekle-password}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_BASE_URL=${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      - GEMINI_CHAT_MODEL=${GEMINI_CHAT_MODEL:-gemini-2.5-flash}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-004}
     expose:
       - "8000"
     depends_on:
-      - redis
-      - chroma
-    restart: unless-stopped
-    networks:
-      - peekle-network
-    logging: *default-logging
-
-  # ChromaDB
-  chroma:
-    image: chromadb/chroma:latest
-    container_name: peekle-chroma
-    volumes:
-      - chroma-data:/chroma/chroma
-    expose:
-      - "8000"
+      redis:
+        condition: service_healthy
+      postgres-vector:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - peekle-network
@@ -191,8 +187,6 @@ volumes:
   nginx-certs:
     driver: local
   certbot-www:
-    driver: local
-  chroma-data:
     driver: local
   postgres-vector-data:
     driver: local
