@@ -147,12 +147,46 @@ jobs:
             export CI_REGISTRY_IMAGE=ghcr.io/peek-a-chu/peekle
             # For simplicity, we just use 'main' or 'master' tag. In a real scenario, you can pass SHA.
             export CI_COMMIT_SHORT_SHA=main
-            export DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
             
             # (Create dummy .env if doesn't exist to avoid compose errors)
             if [ ! -f .env ]; then
               touch .env
             fi
+            # AI 서버 전용 env 파일
+            if [ ! -f ../apps/ai-server/.env ]; then
+              touch ../apps/ai-server/.env
+            fi
+            
+            # 파일별 env를 통일 관리
+            upsert_env_file() {
+              FILE="$1"
+              KEY="$2"
+              VALUE="$3"
+              if [ -z "$VALUE" ]; then
+                return 0
+              fi
+              ESCAPED_VALUE=$(printf '%s\n' "$VALUE" | sed -e 's/[\/&]/\\&/g')
+              if grep -q "^${KEY}=" "$FILE"; then
+                sed -i "s|^${KEY}=.*|${KEY}=${ESCAPED_VALUE}|" "$FILE"
+              else
+                echo "${KEY}=${VALUE}" >> "$FILE"
+              fi
+            }
+
+            upsert_env() {
+              KEY="$1"
+              VALUE="$2"
+              upsert_env_file .env "$KEY" "$VALUE"
+            }
+
+            upsert_env DOMAIN_NAME "${{ secrets.DOMAIN_NAME }}"
+            upsert_env POSTGRES_DB "${{ secrets.POSTGRES_DB }}"
+            upsert_env POSTGRES_USER "${{ secrets.POSTGRES_USER }}"
+            upsert_env POSTGRES_PASSWORD "${{ secrets.POSTGRES_PASSWORD }}"
+            upsert_env_file ../apps/ai-server/.env GEMINI_API_KEY "${{ secrets.GEMINI_API_KEY }}"
+            upsert_env_file ../apps/ai-server/.env GEMINI_BASE_URL "${{ secrets.GEMINI_BASE_URL }}"
+            upsert_env_file ../apps/ai-server/.env GEMINI_CHAT_MODEL "${{ secrets.GEMINI_CHAT_MODEL }}"
+            upsert_env_file ../apps/ai-server/.env EMBEDDING_MODEL "${{ secrets.EMBEDDING_MODEL }}"
 
             BACKEND_CHANGED=${{ needs.changes.outputs.backend }}
             AI_CHANGED=${{ needs.changes.outputs.ai_server }}
@@ -169,17 +203,17 @@ jobs:
             # 5. Deploy strategy
             if [ "$DOCKER_CHANGED" = "true" ]; then
               # docker/** changed => full infra redeploy
-              docker compose -f docker-compose.prod.yml up -d backend ai-server redis chroma livekit certbot
-              docker compose -f docker-compose.prod.yml up -d --force-recreate nginx
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans backend ai-server redis postgres-vector livekit certbot
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate nginx
               docker exec peekle-nginx nginx -t
               docker exec peekle-nginx nginx -s reload
             else
               # App-only changes => only changed services
               if [ "$BACKEND_CHANGED" = "true" ]; then
-                docker compose -f docker-compose.prod.yml up -d backend
+                docker compose -f docker-compose.prod.yml up -d --remove-orphans backend
               fi
               if [ "$AI_CHANGED" = "true" ]; then
-                docker compose -f docker-compose.prod.yml up -d ai-server
+                docker compose -f docker-compose.prod.yml up -d --remove-orphans ai-server
               fi
             fi
 
