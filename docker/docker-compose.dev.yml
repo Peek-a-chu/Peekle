@@ -114,14 +114,22 @@ services:
     networks:
       - peekle-network-dev
 
-  # ChromaDB - Vector Database
-  chroma:
-    image: chromadb/chroma:latest
-    container_name: peekle-chroma-dev
-    ports:
-      - "8001:8000"
+  # PostgreSQL + pgvector (Vector Database)
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: peekle-postgres-vector-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-peekle}
+      POSTGRES_USER: ${POSTGRES_USER:-peekle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-peekle-password}
     volumes:
-      - chroma-data:/chroma/chroma
+      - postgres-vector-data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-peekle} -d ${POSTGRES_DB:-peekle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - peekle-network-dev
 
@@ -134,8 +142,15 @@ services:
     env_file:
       - ../apps/ai-server/.env
     environment:
-      - CHROMA_HOST=chroma
-      - CHROMA_PORT=8000
+      - PGVECTOR_HOST=postgres-vector
+      - PGVECTOR_PORT=5432
+      - PGVECTOR_DB=${POSTGRES_DB:-peekle}
+      - PGVECTOR_USER=${POSTGRES_USER:-peekle}
+      - PGVECTOR_PASSWORD=${POSTGRES_PASSWORD:-peekle-password}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_BASE_URL=${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      - GEMINI_CHAT_MODEL=${GEMINI_CHAT_MODEL:-gemini-2.5-flash}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-004}
     ports:
       - "8000:8000"
     volumes:
@@ -143,7 +158,7 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - redis
-      - chroma
+      - postgres-vector
     networks:
       - peekle-network-dev
 
@@ -156,5 +171,5 @@ volumes:
     driver: local
   nginx-certs:
     driver: local
-  chroma-data:
+  postgres-vector-data:
     driver: local

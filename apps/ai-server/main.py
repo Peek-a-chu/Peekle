@@ -9,22 +9,24 @@ from openai import OpenAI
 from contextlib import asynccontextmanager
 from embedding_service import search_similar_problems, get_collection_count
 
-# GPT-4o-mini API 클라이언트 설정
+GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+
+# Gemini API 클라이언트 설정 (OpenAI 호환 엔드포인트)
 ai_client = OpenAI(
-    api_key=os.getenv("GMS_API_KEY"),
-    base_url=os.getenv("GPT_BASE_URL")
+    api_key=os.getenv("GEMINI_API_KEY"),
+    base_url=os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"),
 )
 
-# --- ChromaDB 초기화 체크 및 자동 로딩 ---
+# --- pgvector 초기화 체크 및 자동 로딩 ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """서버 시작 시 ChromaDB 컬렉션이 비어있으면 problems.csv 자동 로드"""
+    """서버 시작 시 pgvector 데이터가 비어있으면 problems.csv 자동 로드"""
     try:
         count = get_collection_count()
-        print(f"[INIT] ChromaDB 컬렉션에 {count}개의 문제가 저장되어 있습니다.")
+        print(f"[INIT] pgvector 컬렉션에 {count}개의 문제가 저장되어 있습니다.")
         
         if count == 0:
-            print("[INIT] ChromaDB가 비어있습니다.")
+            print("[INIT] pgvector 데이터가 비어있습니다.")
         else:
             print(f"[INIT] 기존 데이터 {count}건 존재 (누락 데이터 확인 중...)")
             
@@ -35,9 +37,9 @@ async def lifespan(app: FastAPI):
         indexing_thread = threading.Thread(target=run_auto_indexing, daemon=True)
         indexing_thread.start()
         print("[INIT] 백그라운드 인덱싱 작업이 시작되었습니다.")
-        print("[INIT] ChromaDB 초기화 완료!")
+        print("[INIT] pgvector 초기화 완료!")
     except Exception as e:
-        print(f"[ERROR] ChromaDB 초기화 중 오류 발생: {e}")
+        print(f"[ERROR] pgvector 초기화 중 오류 발생: {e}")
         print("[WARN] 추천 기능이 제대로 작동하지 않을 수 있습니다.")
     
     yield  # 서버 실행
@@ -125,7 +127,7 @@ async def get_intelligent_recommendation(request: Request):
 당신은 알고리즘 코치입니다. 이 유저는 우리 서비스를 처음 사용하는 신규 유저입니다.
 유저 정보: 현재 티어 {activity.currentTier}, 풀이 기록 없음.
 
-이 유저가 코딩테스트 실력을 본인의 티어에 맞게 성장시킬 수 있도록, ChromaDB에서 검색할 인기 알고리즘 유형 키워드 3개를 정해주세요.
+이 유저가 코딩테스트 실력을 본인의 티어에 맞게 성장시킬 수 있도록, pgvector 벡터 DB에서 검색할 인기 알고리즘 유형 키워드 3개를 정해주세요.
 
 🚨 [중요] 응답 형식:
 "키워드 | 의도" 형태로 콤마(,)로 구분해 주세요.
@@ -164,7 +166,7 @@ async def get_intelligent_recommendation(request: Request):
 """
 
         response = ai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=GEMINI_CHAT_MODEL,
             messages=[{"role": "user", "content": strategy_prompt}]
         )
         
@@ -182,7 +184,7 @@ async def get_intelligent_recommendation(request: Request):
         print(f"[DEBUG] 파싱된 전략: {parsed_strategies}")
 
         # ---------------------------------------------------------
-        # 2단계: ChromaDB 검색 (전략 정보를 유지하며 검색)
+        # 2단계: pgvector 검색 (전략 정보를 유지하며 검색)
         # ---------------------------------------------------------
         final_recommendations = []
         seen_problems = set()
@@ -273,7 +275,7 @@ async def get_intelligent_recommendation(request: Request):
 
         # AI에게 멘트 생성 요청
         reason_response = ai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=GEMINI_CHAT_MODEL,
             messages=[{"role": "user", "content": reason_prompt}]
         )
         
