@@ -156,7 +156,6 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
           </div>
         )}
       </div>
-
       {selectedProblem && (
         <AddToWorkbookModal
           isOpen={isModalOpen}
