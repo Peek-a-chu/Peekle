@@ -5,9 +5,14 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import re
+from pathlib import Path
 from openai import OpenAI
+from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from embedding_service import search_similar_problems, get_collection_count
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 
 GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 
