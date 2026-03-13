@@ -293,42 +293,16 @@ public class LeagueService {
             totalGroupMembers = groupUsers.size();
         }
 
-        // 승급/강등 인원 계산
+        // 승급/강등 인원 계산 (시즌 종료 판정 로직과 동일한 기준)
         LeagueTier currentTier = user.getLeague();
-        int promoteCount = 0;
-        int demoteCount = 0;
-
-        if (totalGroupMembers > 1) { // 1명 이하는 변동 없음
-            // 승급 = min( ceil(N * P), N - 1 )
-            promoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getPromotePercent() / 100.0));
-            promoteCount = Math.min(promoteCount, totalGroupMembers - 1);
-
-            // 강등 = min( ceil(N * D), N - 승급 - 1 )
-            demoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getDemotePercent() / 100.0));
-            demoteCount = Math.min(demoteCount, totalGroupMembers - promoteCount - 1);
-        }
-
         List<LeagueRankingMemberDto> members = new ArrayList<>();
         int currentRank = 1;
         for (User u : groupUsers) {
-            LeagueStatus status;
-
-            // 0점인 경우 순위와 상관없이 승급 불가 (STAY 혹은 DEMOTE만 가능)
-            if (u.getLeaguePoint() <= 0) {
-                if (currentRank > (totalGroupMembers - demoteCount)) {
-                    status = LeagueStatus.DEMOTE;
-                } else {
-                    status = LeagueStatus.STAY;
-                }
-            } else {
-                if (currentRank <= promoteCount) {
-                    status = LeagueStatus.PROMOTE;
-                } else if (currentRank > (totalGroupMembers - demoteCount)) {
-                    status = LeagueStatus.DEMOTE;
-                } else {
-                    status = LeagueStatus.STAY;
-                }
-            }
+            LeagueStatus status = determineLiveLeagueStatus(
+                    currentRank,
+                    totalGroupMembers,
+                    currentTier,
+                    u.getLeaguePoint());
 
             members.add(LeagueRankingMemberDto.builder()
                     .rank(currentRank++)
@@ -589,31 +563,17 @@ public class LeagueService {
     }
 
     /**
-     * 시즌 종료 시 승급/강등/유지 판정
-     * - 3명 이하: MAINTAINED (closeSeason에서 이미 필터링됨)
-     * - 4-6명: 상위 1명 승급, 하위 1명 강등
-     * - 7-9명: 상위 2명 승급, 하위 2명 강등
-     * - 10명 이상: 30% 승급/강등
+     * 시즌 인원별 승급/강등 인원 계산
+     * - 3명 이하: 승급/강등 없음
+     * - 4명 이상: 티어별 퍼센트 규칙을 올림(Ceiling) 적용
      */
-    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier, int userPoint) {
-        // 안전 장치: 3명 이하는 변동 없음, 혹은 0점인 경우 승급 불가
+    private int[] calculateSeasonMovementCounts(int totalUsers, LeagueTier currentTier) {
+        int promoteCount = 0;
+        int demoteCount = 0;
+
         if (totalUsers <= 3) {
-            return "MAINTAINED";
-        }
-
-        int promoteCount;
-        int demoteCount;
-
-        if (totalUsers <= 6) {
-            // 4-6명: 1명씩
-            promoteCount = 1;
-            demoteCount = 1;
-        } else if (totalUsers <= 9) {
-            // 7-9명: 2명씩
-            promoteCount = 2;
-            demoteCount = 2;
+            // no-op
         } else {
-            // 10명 이상: 30% 규칙
             promoteCount = (int) Math.ceil(totalUsers * (currentTier.getPromotePercent() / 100.0));
             promoteCount = Math.min(promoteCount, totalUsers - 1);
 
@@ -621,17 +581,61 @@ public class LeagueService {
             demoteCount = Math.min(demoteCount, totalUsers - promoteCount - 1);
         }
 
-        // 상위 promoteCount명: 승급 (단, 최상위 티어 제외 및 점수가 0점보다 커야 함)
-        if (userPoint > 0 && rank <= promoteCount && currentTier != LeagueTier.RUBY) {
+        // 실제 시즌 반영 규칙과 동일하게 최대/최소 티어 예외 적용
+        if (currentTier == LeagueTier.RUBY) {
+            promoteCount = 0;
+        }
+        if (currentTier == LeagueTier.STONE) {
+            demoteCount = 0;
+        }
+
+        return new int[] { promoteCount, demoteCount };
+    }
+
+    /**
+     * 현재 시즌 진행 중 프리뷰 상태 계산
+     * - 0점은 승급 불가, STONE을 제외하고 순위와 무관하게 강등
+     */
+    private LeagueStatus determineLiveLeagueStatus(int rank, int totalUsers, LeagueTier currentTier, int userPoint) {
+        if (totalUsers <= 3) {
+            return LeagueStatus.STAY;
+        }
+
+        int[] movementCounts = calculateSeasonMovementCounts(totalUsers, currentTier);
+        int promoteCount = movementCounts[0];
+        int demoteCount = movementCounts[1];
+
+        if (userPoint <= 0) {
+            return currentTier == LeagueTier.STONE ? LeagueStatus.STAY : LeagueStatus.DEMOTE;
+        }
+
+        if (rank <= promoteCount) {
+            return LeagueStatus.PROMOTE;
+        }
+
+        if (rank > (totalUsers - demoteCount)) {
+            return LeagueStatus.DEMOTE;
+        }
+
+        return LeagueStatus.STAY;
+    }
+
+    /**
+     * 시즌 종료 시 승급/강등/유지 판정
+     */
+    private String determineSeasonResult(int rank, int totalUsers, LeagueTier currentTier, int userPoint) {
+        // 안전 장치: 3명 이하는 변동 없음
+        if (totalUsers <= 3) {
+            return "MAINTAINED";
+        }
+
+        LeagueStatus status = determineLiveLeagueStatus(rank, totalUsers, currentTier, userPoint);
+        if (status == LeagueStatus.PROMOTE) {
             return "PROMOTED";
         }
-
-        // 하위 demoteCount명: 강등 (단, 최하위 티어는 제외)
-        if (rank > (totalUsers - demoteCount) && currentTier != LeagueTier.STONE) {
+        if (status == LeagueStatus.DEMOTE) {
             return "DEMOTED";
         }
-
-        // 나머지: 유지
         return "MAINTAINED";
     }
 
@@ -719,23 +723,15 @@ public class LeagueService {
             // 그룹 총 인원
             totalGroupMembers = userRepository.countByLeagueGroupId(user.getLeagueGroupId());
 
-            // 승급/강등 인원 계산
+            // 승급/강등 인원 계산 (시즌 종료 판정 로직과 동일한 기준)
             LeagueTier currentTier = user.getLeague();
             if (totalGroupMembers > 1) {
-                int promoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getPromotePercent() / 100.0));
-                promoteCount = Math.min(promoteCount, totalGroupMembers - 1);
-
-                int demoteCount = (int) Math.ceil(totalGroupMembers * (currentTier.getDemotePercent() / 100.0));
-                demoteCount = Math.min(demoteCount, totalGroupMembers - promoteCount - 1);
-
-                // 상태 결정 (0점 초과여야 승급 가능)
-                if (user.getLeaguePoint() > 0 && groupRank <= promoteCount) {
-                    leagueStatus = LeagueStatus.PROMOTE;
-                } else if (groupRank > (totalGroupMembers - demoteCount)) {
-                    leagueStatus = LeagueStatus.DEMOTE;
-                } else {
-                    leagueStatus = LeagueStatus.STAY;
-                }
+                // 상태 결정 (0점은 STONE 제외 무조건 강등)
+                leagueStatus = determineLiveLeagueStatus(
+                        groupRank,
+                        totalGroupMembers,
+                        currentTier,
+                        user.getLeaguePoint());
 
                 // 점수 차이 계산을 위해 그룹 유저 조회
                 List<User> groupUsers = userRepository
@@ -746,11 +742,17 @@ public class LeagueService {
                 List<User> maintainers = new ArrayList<>();
 
                 for (int i = 0; i < groupUsers.size(); i++) {
+                    User groupUser = groupUsers.get(i);
                     int rank = i + 1;
-                    if (rank <= promoteCount) {
-                        promoters.add(groupUsers.get(i));
-                    } else if (rank <= (totalGroupMembers - demoteCount)) {
-                        maintainers.add(groupUsers.get(i));
+                    LeagueStatus memberStatus = determineLiveLeagueStatus(
+                            rank,
+                            totalGroupMembers,
+                            currentTier,
+                            groupUser.getLeaguePoint());
+                    if (memberStatus == LeagueStatus.PROMOTE) {
+                        promoters.add(groupUser);
+                    } else if (memberStatus == LeagueStatus.STAY) {
+                        maintainers.add(groupUser);
                     }
                 }
 

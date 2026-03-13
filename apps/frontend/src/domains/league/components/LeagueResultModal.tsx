@@ -95,7 +95,8 @@ function RankingView({
   const maintenanceZone = ranking.filter((m) => m.status === 'STAY');
   const demotionZone = ranking.filter((m) => m.status === 'DEMOTE');
   const myMember = ranking.find((m) => m.me);
-  const isPromotionBlockedByZeroScore = !!myMember && myMember.score <= 0;
+  const isPromotionBlockedByZeroScore =
+    !!myMember && myMember.score <= 0 && history.league.toLowerCase() === 'stone';
 
   return (
     <>

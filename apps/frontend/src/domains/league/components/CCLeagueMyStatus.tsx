@@ -130,7 +130,8 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
   // 내 상태 파악
   const myStatusMember = rankingData.members.find((m) => m.me);
   const myCurrentStatus = myStatusMember?.status || 'STAY'; // Default fallback
-  const isPromotionBlockedByZeroScore = rankingData.members.length >= 4 && rankingData.myScore <= 0;
+  const isPromotionBlockedByZeroScore =
+    rankingData.members.length >= 4 && rankingData.myLeague === 'stone' && rankingData.myScore <= 0;
 
   const isStone = rankingData.myLeague === 'stone';
 
