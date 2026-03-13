@@ -1,6 +1,9 @@
 package com.peekle.domain.league.service;
 
+import com.peekle.domain.league.dto.LeagueStatusResponse;
 import com.peekle.domain.league.entity.LeagueGroup;
+import com.peekle.domain.league.entity.LeagueHistory;
+import com.peekle.domain.league.enums.LeagueStatus;
 import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.league.repository.LeagueGroupRepository;
 import com.peekle.domain.league.repository.LeagueHistoryRepository;
@@ -17,6 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import com.peekle.global.storage.R2StorageService;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.WeekFields;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,6 +55,8 @@ public class LeaguePromotionIntegrationTest {
         @Autowired
         private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
 
+        private int currentSeasonWeek;
+
         @BeforeEach
         void setUp() {
                 // Clean up
@@ -53,36 +64,10 @@ public class LeaguePromotionIntegrationTest {
                 leagueHistoryRepository.deleteAll();
                 leagueGroupRepository.deleteAll();
                 userRepository.deleteAll();
-        }
 
-        @Test
-        @DisplayName("실버 50명, 골드 50명 → 플래티넘 15, 골드 35, 실버 35, 브론즈 15 분배 검증")
-        void testPromotionDemotionDistribution() {
-                // Given: 실버 10명 * 5팀 = 50명
-                createUsersInGroups(LeagueTier.SILVER, 5, 10);
-
-                // Given: 골드 10명 * 5팀 = 50명
-                createUsersInGroups(LeagueTier.GOLD, 5, 10);
-
-                // 모든 유저에게 포인트 부여 (순위 차등화)
-                assignRankedPoints();
-
-                // When: 시즌 종료 및 승급/강등 처리
-                leagueService.closeSeason();
-                leagueService.startNewSeason();
-
-                // Then: 티어별 인원 확인
-                List<User> allUsers = userRepository.findAll();
-                Map<LeagueTier, Long> tierCounts = allUsers.stream()
-                                .collect(Collectors.groupingBy(User::getLeague, Collectors.counting()));
-
-                assertThat(tierCounts.get(LeagueTier.PLATINUM)).isEqualTo(15L);
-                assertThat(tierCounts.get(LeagueTier.GOLD)).isEqualTo(35L);
-                assertThat(tierCounts.get(LeagueTier.SILVER)).isEqualTo(35L);
-                assertThat(tierCounts.get(LeagueTier.BRONZE)).isEqualTo(15L);
-
-                // Then: 전체 인원 100명 유지
-                assertThat(allUsers.size()).isEqualTo(100);
+                ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+                WeekFields weekFields = WeekFields.ISO;
+                currentSeasonWeek = now.getYear() * 100 + now.get(weekFields.weekOfWeekBasedYear());
         }
 
         private void createUsersInGroups(LeagueTier tier, int groupCount, int usersPerGroup) {
@@ -117,179 +102,247 @@ public class LeaguePromotionIntegrationTest {
                 }
         }
 
-        private void assignRankedPoints() {
-                List<User> allUsers = userRepository.findAll();
+        @Test
+        @DisplayName("스톤4 브론즈15 실버26 골드37 플래티넘48 다이아59 루비63: 프리뷰와 실제 정산 일치")
+        void testTierPopulationMatrix_PreviewMatchesSettlement() {
+                Map<LeagueTier, Integer> matrix = new LinkedHashMap<>();
+                matrix.put(LeagueTier.STONE, 4);
+                matrix.put(LeagueTier.BRONZE, 15);
+                matrix.put(LeagueTier.SILVER, 26);
+                matrix.put(LeagueTier.GOLD, 37);
+                matrix.put(LeagueTier.PLATINUM, 48);
+                matrix.put(LeagueTier.DIAMOND, 59);
+                matrix.put(LeagueTier.RUBY, 63);
 
-                // 티어별로 그룹화
-                Map<LeagueTier, List<User>> usersByTier = allUsers.stream()
-                                .collect(Collectors.groupingBy(User::getLeague));
-
-                // 각 티어 내에서 순위에 따라 포인트 차등 부여
-                for (Map.Entry<LeagueTier, List<User>> entry : usersByTier.entrySet()) {
-                        List<User> users = entry.getValue();
-
-                        for (int i = 0; i < users.size(); i++) {
-                                User user = users.get(i);
-                                // 상위권일수록 높은 점수 (역순)
-                                int points = 1000 - (i * 10);
-                                user.addLeaguePoint(points);
-                        }
+                List<GroupScenario> scenarios = new ArrayList<>();
+                for (Map.Entry<LeagueTier, Integer> entry : matrix.entrySet()) {
+                        scenarios.addAll(createUsersWithTotalCount(entry.getKey(), entry.getValue()));
                 }
 
-                userRepository.saveAll(allUsers);
+                assignRankedPointsDetailed();
+
+                // 티어별 예측값(총 승급/총 강등) [승급, 강등]
+                // 점수 부여 규칙: 그룹별 하위 2명은 0점
+                // 0점 정책: STONE 제외 모든 티어에서 0점은 순위와 무관하게 강등
+                // STONE(4): [2, 0]   -> (4명:[2,0]) STONE은 강등 없음
+                // BRONZE(15): [5, 4] -> (10명:[3,2]) + (5명:[2,2])  // 5명 그룹은 기본 강등 1 + 0점 강등 추가
+                // SILVER(26): [8, 8] -> (10명:[3,3]) + (10명:[3,3]) + (6명:[2,2])
+                // GOLD(37): [12,12]  -> (10명:[3,3]) * 3 + (7명:[3,3])
+                // PLATINUM(48): [10,15] -> (10명:[2,3]) * 4 + (8명:[2,3])
+                // DIAMOND(59): [6,18] -> (10명:[1,3]) * 5 + (9명:[1,3])
+                // RUBY(63): [0,18]   -> (10명:[0,3]) * 6 + (3명:[0,0], 3명 이하는 정산 스킵)
+                Map<LeagueTier, int[]> expectedByTier = new EnumMap<>(LeagueTier.class);
+                expectedByTier.put(LeagueTier.STONE, new int[] { 2, 0 });
+                expectedByTier.put(LeagueTier.BRONZE, new int[] { 5, 4 });
+                expectedByTier.put(LeagueTier.SILVER, new int[] { 8, 8 });
+                expectedByTier.put(LeagueTier.GOLD, new int[] { 12, 12 });
+                expectedByTier.put(LeagueTier.PLATINUM, new int[] { 10, 15 });
+                expectedByTier.put(LeagueTier.DIAMOND, new int[] { 6, 18 });
+                expectedByTier.put(LeagueTier.RUBY, new int[] { 0, 18 });
+
+                Map<LeagueTier, Long> previewPromotedByTier = new EnumMap<>(LeagueTier.class);
+                Map<LeagueTier, Long> previewDemotedByTier = new EnumMap<>(LeagueTier.class);
+
+                // 프리뷰(status API) 검증
+                for (GroupScenario scenario : scenarios) {
+                        Long viewerId = userRepository
+                                        .findByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(scenario.groupId()).get(0)
+                                        .getId();
+                        LeagueStatusResponse preview = leagueService.getMyLeagueStatus(viewerId);
+                        int[] expected = expectedMovementCounts(scenario.groupSize(), scenario.tier());
+
+                        long previewPromoted = preview.getMembers().stream()
+                                        .filter(m -> m.getStatus() == LeagueStatus.PROMOTE)
+                                        .count();
+                        long previewDemoted = preview.getMembers().stream()
+                                        .filter(m -> m.getStatus() == LeagueStatus.DEMOTE)
+                                        .count();
+
+                        assertThat(previewPromoted).isEqualTo(expected[0]);
+                        assertThat(previewDemoted).isEqualTo(expected[1]);
+
+                        previewPromotedByTier.merge(scenario.tier(), previewPromoted, Long::sum);
+                        previewDemotedByTier.merge(scenario.tier(), previewDemoted, Long::sum);
+                }
+
+                for (Map.Entry<LeagueTier, int[]> entry : expectedByTier.entrySet()) {
+                        LeagueTier tier = entry.getKey();
+                        int[] expected = entry.getValue();
+                        assertThat(previewPromotedByTier.getOrDefault(tier, 0L)).isEqualTo((long) expected[0]);
+                        assertThat(previewDemotedByTier.getOrDefault(tier, 0L)).isEqualTo((long) expected[1]);
+                }
+
+                // 실제 시즌 정산 검증
+                leagueService.closeSeason();
+
+                Map<LeagueTier, Long> actualPromotedByTier = new EnumMap<>(LeagueTier.class);
+                Map<LeagueTier, Long> actualDemotedByTier = new EnumMap<>(LeagueTier.class);
+
+                for (GroupScenario scenario : scenarios) {
+                        int[] expected = expectedMovementCounts(scenario.groupSize(), scenario.tier());
+                        List<LeagueHistory> histories = leagueHistoryRepository
+                                        .findAllByLeagueGroupIdAndSeasonWeekOrderByRankAsc(
+                                                        scenario.groupId(),
+                                                        currentSeasonWeek);
+
+                        if (scenario.groupSize() <= 3) {
+                                assertThat(histories).isEmpty();
+                                continue;
+                        }
+
+                        long actualPromoted = histories.stream()
+                                        .filter(h -> "PROMOTED".equals(h.getResult()))
+                                        .count();
+                        long actualDemoted = histories.stream()
+                                        .filter(h -> "DEMOTED".equals(h.getResult()))
+                                        .count();
+
+                        assertThat(actualPromoted).isEqualTo(expected[0]);
+                        assertThat(actualDemoted).isEqualTo(expected[1]);
+
+                        actualPromotedByTier.merge(scenario.tier(), actualPromoted, Long::sum);
+                        actualDemotedByTier.merge(scenario.tier(), actualDemoted, Long::sum);
+                }
+
+                for (Map.Entry<LeagueTier, int[]> entry : expectedByTier.entrySet()) {
+                        LeagueTier tier = entry.getKey();
+                        int[] expected = entry.getValue();
+                        assertThat(actualPromotedByTier.getOrDefault(tier, 0L)).isEqualTo((long) expected[0]);
+                        assertThat(actualDemotedByTier.getOrDefault(tier, 0L)).isEqualTo((long) expected[1]);
+                }
         }
 
         @Test
-        @DisplayName("7개 전체 리그 승급/강등 및 그룹 개수 분배 검증 (브론즈~루비 각각 20명씩)")
-        void testAllLeaguesPromotionDemotionDetailed() {
-                // Given: 브론즈 ~ 루비 (STONE 제외 7개 티어) 각각 20명씩 (10명 * 2그룹)
-                LeagueTier[] targetTiers = {
-                                LeagueTier.BRONZE, LeagueTier.SILVER, LeagueTier.GOLD,
-                                LeagueTier.PLATINUM, LeagueTier.EMERALD, LeagueTier.DIAMOND, LeagueTier.RUBY
-                };
+        @DisplayName("0점 5명(스톤 제외)은 정원과 무관하게 5명 강등")
+        void testFiveZeroPoints_AllDemoted() {
+                List<GroupScenario> scenarios = createUsersWithTotalCount(LeagueTier.SILVER, 10);
+                Long groupId = scenarios.get(0).groupId();
 
-                for (LeagueTier tier : targetTiers) {
-                        createUsersInGroups(tier, 2, 10);
-                }
+                // 10명 중 하위 5명을 0점으로 설정: 0 0 0 0 0 1 2 3 4 5
+                assignRankedPointsByGroup(groupId, 5);
 
-                // 각 티어별/그룹별로 1~10점씩 점수 부여 (1위: 10점, 10위: 1점)
-                assignRankedPointsDetailed();
+                Long viewerId = userRepository.findByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(groupId).get(0).getId();
+                LeagueStatusResponse preview = leagueService.getMyLeagueStatus(viewerId);
 
-                // When: 시즌 종료 및 승급/강등 처리
-                System.out.println("========== 시즌 종료 및 승급/강등 처리 시작 ==========");
+                long previewPromoted = preview.getMembers().stream()
+                                .filter(m -> m.getStatus() == LeagueStatus.PROMOTE)
+                                .count();
+                long previewDemoted = preview.getMembers().stream()
+                                .filter(m -> m.getStatus() == LeagueStatus.DEMOTE)
+                                .count();
+
+                assertThat(previewPromoted).isEqualTo(3); // SILVER 10명 승급 30% = 3명
+                assertThat(previewDemoted).isEqualTo(5); // 0점 5명 전원 강등
+
                 leagueService.closeSeason();
-                leagueService.startNewSeason();
-                System.out.println("========== 시즌 종료 및 승급/강등 처리 완료 ==========");
+                List<LeagueHistory> histories = leagueHistoryRepository
+                                .findAllByLeagueGroupIdAndSeasonWeekOrderByRankAsc(groupId, currentSeasonWeek);
 
-                // Then: 전체 유저 수 140명 유지
-                List<User> allUsers = userRepository.findAll();
-                assertThat(allUsers.size()).isEqualTo(140);
+                long actualPromoted = histories.stream()
+                                .filter(h -> "PROMOTED".equals(h.getResult()))
+                                .count();
+                long actualDemoted = histories.stream()
+                                .filter(h -> "DEMOTED".equals(h.getResult()))
+                                .count();
 
-                // Then: 각 티어별 예상 인원 및 그룹 개수 검증
-                // 그룹당 인원 10명 기준:
-                // - STONE (0% 승급 / 30% 강등) - 제외 (현재 참여 인원 없음)
-                // - BRONZE (30% 승급 / 20% 강등) -> 그룹당 3명 승급, 2명 강등.
-                // 이전 시즌 BRONZE 강등자 없음 (STONE 제외이므로 강등 불가), SILVER 강등자(그룹당 3명 * 2그룹 = 6명)가
-                // BRONZE로 유입
-                // 원래 BRONZE 유지자(그룹당 5명 * 2그룹 = 10명) + SILVER 강등자(6명) = 16명
-                // - SILVER (30% 승급 / 30% 강등) -> 그룹당 3명 승급, 3명 강등.
-                // 원래 SILVER 유지자(그룹당 4명 * 2그룹 = 8명) + BRONZE 승급자(그룹당 3명 * 2그룹 = 6명) + GOLD
-                // 강등자(그룹당 3명 * 2그룹 = 6명) = 20명
-                // - GOLD (30% 승급 / 30% 강등) -> 그룹당 3명 승급, 3명 강등.
-                // 원래 GOLD 유지자(8명) + SILVER 승급자(6명) + PLATINUM 강등자(6명) = 20명
-                // - PLATINUM (20% 승급 / 30% 강등) -> 그룹당 2명 승급, 3명 강등.
-                // 원래 PLATINUM 유지자(그룹당 5명 * 2그룹 = 10명) + GOLD 승급자(6명) + EMERALD 강등자(6명) = 22명
-                // - EMERALD (20% 승급 / 30% 강등) -> 그룹당 2명 승급, 3명 강등.
-                // 원래 EMERALD 유지자(10명) + PLATINUM 승급자(4명) + DIAMOND 강등자(6명) = 20명
-                // - DIAMOND (10% 승급 / 30% 강등) -> 그룹당 1명 승급, 3명 강등.
-                // 원래 DIAMOND 유지자(그룹당 6명 * 2그룹 = 12명) + EMERALD 승급자(4명) + RUBY 강등자(6명) = 22명
-                // - RUBY (0% 승급 / 30% 강등) -> 그룹당 0명 승급, 3명 강등.
-                // 원래 RUBY 유지자(그룹당 7명 * 2그룹 = 14명) + DIAMOND 승급자(2명) = 16명
-
-                Map<LeagueTier, Long> tierCounts = allUsers.stream()
-                                .collect(Collectors.groupingBy(User::getLeague, Collectors.counting()));
-
-                // 생성되어야 하는 그룹 개수 (인원수 / 10명, 나머지가 4명 이상이면 1그룹 추가, 미만이면 이전 그룹 편입)
-                // 16명: 1그룹(10명) + 2그룹(6명) = 2그룹
-                // 20명: 1그룹(10명) + 2그룹(10명) = 2그룹
-                // 22명: 1그룹(10명) + 2그룹(10명) + 3그룹(2명 -> 2번째 그룹 편입해서 12명 그룹) = 2그룹
-
-                System.out.println("========== 최종 티어별 인원 및 그룹 배정 결과 ==========");
-                for (LeagueTier t : targetTiers) {
-                        long count = tierCounts.getOrDefault(t, 0L);
-                        long groups = leagueGroupRepository.findBySeasonWeek(
-                                        leagueService.getUserRank(allUsers.get(0)) == 0 ? 0 : 0 /*
-                                                                                                 * dummy, calculated
-                                                                                                 * below
-                                                                                                 */).size(); // Not
-                                                                                                             // quite
-                                                                                                             // right,
-                                                                                                             // need
-                                                                                                             // findBySeasonWeek
-                                                                                                             // And
-                                                                                                             // Tier
-                }
-
-                int nextSeasonWeek = calculateNextSeasonWeek();
-
-                // Assertions & Logging
-                // Assertions & Logging
-                // Just print sizes first to see what happened without asserting group sizes
-                assertTierPopulationAndGroups(LeagueTier.BRONZE, tierCounts, 16L, nextSeasonWeek, leagueGroupRepository
-                                .findBySeasonWeek(nextSeasonWeek).stream().filter(g -> g.getTier() == LeagueTier.BRONZE)
-                                .count());
-                assertTierPopulationAndGroups(LeagueTier.SILVER, tierCounts, 20L, nextSeasonWeek, leagueGroupRepository
-                                .findBySeasonWeek(nextSeasonWeek).stream().filter(g -> g.getTier() == LeagueTier.SILVER)
-                                .count());
-                assertTierPopulationAndGroups(LeagueTier.GOLD, tierCounts, 20L, nextSeasonWeek, leagueGroupRepository
-                                .findBySeasonWeek(nextSeasonWeek).stream().filter(g -> g.getTier() == LeagueTier.GOLD)
-                                .count());
-                assertTierPopulationAndGroups(LeagueTier.PLATINUM, tierCounts, 22L, nextSeasonWeek,
-                                leagueGroupRepository
-                                                .findBySeasonWeek(nextSeasonWeek).stream()
-                                                .filter(g -> g.getTier() == LeagueTier.PLATINUM).count());
-                assertTierPopulationAndGroups(LeagueTier.EMERALD, tierCounts, 20L, nextSeasonWeek, leagueGroupRepository
-                                .findBySeasonWeek(nextSeasonWeek).stream()
-                                .filter(g -> g.getTier() == LeagueTier.EMERALD).count());
-                assertTierPopulationAndGroups(LeagueTier.DIAMOND, tierCounts, 22L, nextSeasonWeek, leagueGroupRepository
-                                .findBySeasonWeek(nextSeasonWeek).stream()
-                                .filter(g -> g.getTier() == LeagueTier.DIAMOND).count());
-                assertTierPopulationAndGroups(LeagueTier.RUBY, tierCounts, 16L, nextSeasonWeek, leagueGroupRepository
-                                .findBySeasonWeek(nextSeasonWeek).stream().filter(g -> g.getTier() == LeagueTier.RUBY)
-                                .count());
-        }
-
-        private int calculateNextSeasonWeek() {
-                String value = redisTemplate.opsForValue().get("league:season:current");
-                return Integer.parseInt(value);
-        }
-
-        private void assertTierPopulationAndGroups(LeagueTier tier, Map<LeagueTier, Long> tierCounts,
-                        long expectedUsers,
-                        int seasonWeek, long expectedGroups) {
-                long actualUsers = tierCounts.getOrDefault(tier, 0L);
-                List<LeagueGroup> groups = leagueGroupRepository.findBySeasonWeek(seasonWeek).stream()
-                                .filter(g -> g.getTier() == tier)
-                                .collect(Collectors.toList());
-                long actualGroups = groups.size();
-
-                System.out.printf("[%s] 인원: %d명 (예상: %d명) | 그룹 수: %d개 (예상: %d개)%n",
-                                tier.name(), actualUsers, expectedUsers, actualGroups, expectedGroups);
-
-                assertThat(actualUsers).isEqualTo(expectedUsers);
-                assertThat(actualGroups).isEqualTo(expectedGroups);
-
-                // 실제 유저들이 해당 그룹에 배정되었는지 검증 (leagueGroupId가 생성된 그룹 ID 중 하나여야 함)
-                List<Long> groupIds = groups.stream().map(LeagueGroup::getId).collect(Collectors.toList());
-                List<User> usersInTier = userRepository.findAll().stream()
-                                .filter(u -> u.getLeague() == tier)
-                                .collect(Collectors.toList());
-
-                for (User u : usersInTier) {
-                        assertThat(u.getLeagueGroupId())
-                                        .as("유저 %s가 그룹에 배정되지 않았습니다.", u.getNickname())
-                                        .isNotNull();
-                        assertThat(groupIds)
-                                        .as("유저 %s가 올바른 리그 그룹에 있지 않습니다. (현재: %d)", u.getNickname(),
-                                                        u.getLeagueGroupId())
-                                        .contains(u.getLeagueGroupId());
-                }
+                assertThat(actualPromoted).isEqualTo(3);
+                assertThat(actualDemoted).isEqualTo(5);
         }
 
         private void assignRankedPointsDetailed() {
-                List<User> allUsers = userRepository.findAll();
-                Map<Long, List<User>> usersByGroup = allUsers.stream()
-                                .collect(Collectors.groupingBy(User::getLeagueGroupId));
+                List<Long> groupIds = userRepository.findAll().stream()
+                                .map(User::getLeagueGroupId)
+                                .filter(java.util.Objects::nonNull)
+                                .distinct()
+                                .collect(Collectors.toList());
 
-                for (List<User> groupUsers : usersByGroup.values()) {
-                        for (int i = 0; i < groupUsers.size(); i++) {
-                                User user = groupUsers.get(i);
-                                // 각 그룹 내에서 1위는 10점, 10위는 1점이 되도록 부여
-                                int points = 10 - i;
-                                user.addLeaguePoint(points);
-                        }
+                for (Long groupId : groupIds) {
+                        assignRankedPointsByGroup(groupId, 2);
                 }
-                userRepository.saveAll(allUsers);
+        }
+
+        private void assignRankedPointsByGroup(Long groupId, int zeroPointUsers) {
+                List<User> groupUsers = userRepository.findByLeagueGroupIdOrderByLeaguePointDescUpdatedAtAsc(groupId);
+                int boundedZeroUsers = groupUsers.size() > 3 ? Math.min(zeroPointUsers, groupUsers.size() - 1) : 0;
+                int positiveUsers = groupUsers.size() - boundedZeroUsers;
+
+                for (int i = 0; i < groupUsers.size(); i++) {
+                        User user = groupUsers.get(i);
+                        int points = i < positiveUsers ? (positiveUsers - i) : 0;
+                        user.addLeaguePoint(points);
+                }
+                userRepository.saveAll(groupUsers);
+        }
+
+        private List<GroupScenario> createUsersWithTotalCount(LeagueTier tier, int totalUsers) {
+                List<GroupScenario> scenarios = new ArrayList<>();
+                int remaining = totalUsers;
+                int groupIndex = 0;
+
+                while (remaining > 0) {
+                        int groupSize = Math.min(10, remaining);
+                        LeagueGroup group = LeagueGroup.builder()
+                                        .tier(tier)
+                                        .seasonWeek(currentSeasonWeek)
+                                        .build();
+                        leagueGroupRepository.save(group);
+
+                        for (int i = 0; i < groupSize; i++) {
+                                String uniqueSuffix = "m_" + tier.name().toLowerCase() + "_" + groupIndex + "_" + i
+                                                + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                                User user = User.builder()
+                                                .socialId("social_" + uniqueSuffix)
+                                                .provider("TEST")
+                                                .nickname("nick_" + uniqueSuffix)
+                                                .bojId("boj_" + uniqueSuffix)
+                                                .league(tier)
+                                                .leagueGroupId(group.getId())
+                                                .leaguePoint(0)
+                                                .profileImg("default.png")
+                                                .profileImgThumb("default_thumb.png")
+                                                .build();
+                                userRepository.save(user);
+                        }
+
+                        scenarios.add(new GroupScenario(tier, group.getId(), groupSize));
+                        remaining -= groupSize;
+                        groupIndex++;
+                }
+
+                return scenarios;
+        }
+
+        private int[] expectedMovementCounts(int totalUsers, LeagueTier tier) {
+                int promote = 0;
+                int demote = 0;
+                int zeroPointUsers = 0;
+
+                if (totalUsers > 3) {
+                        zeroPointUsers = Math.min(2, totalUsers - 1);
+
+                        promote = (int) Math.ceil(totalUsers * (tier.getPromotePercent() / 100.0));
+                        promote = Math.min(promote, totalUsers - 1);
+
+                        demote = (int) Math.ceil(totalUsers * (tier.getDemotePercent() / 100.0));
+                        demote = Math.min(demote, totalUsers - promote - 1);
+                }
+
+                if (tier == LeagueTier.RUBY) {
+                        promote = 0;
+                }
+                if (tier == LeagueTier.STONE) {
+                        demote = 0;
+                }
+
+                int nonZeroUsers = totalUsers - zeroPointUsers;
+                int expectedPromote = Math.min(promote, Math.max(0, nonZeroUsers));
+                int expectedDemote = tier == LeagueTier.STONE ? 0 : Math.max(demote, zeroPointUsers);
+                expectedDemote = Math.min(expectedDemote, totalUsers - expectedPromote);
+
+                return new int[] { expectedPromote, expectedDemote };
+        }
+
+        private record GroupScenario(LeagueTier tier, Long groupId, int groupSize) {
         }
 
         @Test
@@ -352,7 +405,7 @@ public class LeaguePromotionIntegrationTest {
                 // Given: 브론즈 3명 (그룹 3)
                 createUsersInGroups(LeagueTier.BRONZE, 1, 3);
 
-                // 점수 차등 부여 (순위 결정을 위해 10, 9, 8... 점수 부여)
+                // 점수 차등 부여 (각 그룹 하위 2명은 0점)
                 assignRankedPointsDetailed();
 
                 // When
