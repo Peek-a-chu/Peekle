@@ -130,6 +130,7 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
   // 내 상태 파악
   const myStatusMember = rankingData.members.find((m) => m.me);
   const myCurrentStatus = myStatusMember?.status || 'STAY'; // Default fallback
+  const isPromotionBlockedByZeroScore = rankingData.members.length >= 4 && rankingData.myScore <= 0;
 
   const isStone = rankingData.myLeague === 'stone';
 
@@ -138,6 +139,9 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
     statusDetail = isStone
       ? '이번 주 해당 티어의 참가 인원이 부족해 리그 그룹이 배정되지 않았습니다.'
       : '이번 주는 같은 티어 인원이 부족해 리그가 운영되지 않습니다. 다음 주를 기다려 주세요!';
+  } else if (isPromotionBlockedByZeroScore) {
+    statusMessage = '승급 불가';
+    statusDetail = '아직 0점이라 승급할 수 없어요. 이번 주는 한 문제 이상 풀어보세요!';
   } else if (myCurrentStatus === 'PROMOTE') {
     statusMessage = '승급 안정권';
     statusDetail = '승급 구간에 속해있습니다!';
