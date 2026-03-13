@@ -1,16 +1,62 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
+﻿import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://peekle.today';
+
+export const metadata: Metadata = {
+  title: '힐끔힐끔코딩 Peekle | Real-time Algorithm Study Platform',
+  description:
+    '힐끔힐끔코딩(Peekle)은 실시간 화상 스터디, 경쟁형 게임 모드, AI 문제 추천을 제공하는 알고리즘 학습 플랫폼입니다.',
+  keywords: [
+    '힐끔힐끔코딩',
+    '힐힐코',
+    'Peekle',
+    '알고리즘 스터디',
+    '코딩테스트',
+    'PS 스터디',
+    '백준',
+    'Baekjoon',
+    '프로그래머스',
+    'Programmers',
+    'SWEA',
+    '삼성 SW Expert Academy',
+  ],
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: '힐끔힐끔코딩 Peekle | Real-time Algorithm Study Platform',
+    description: '실시간 화상 스터디와 경쟁형 게임 모드로 알고리즘 실력을 빠르게 성장시키세요.',
+    url: siteUrl,
+    siteName: '힐끔힐끔코딩 Peekle',
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '힐끔힐끔코딩 Peekle',
+    description: '실시간 스터디, 게임 모드, AI 추천으로 알고리즘 학습을 더 재미있게.',
+  },
+};
 
 export default function Home() {
-  const router = useRouter();
+  const websiteJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: '힐끔힐끔코딩 Peekle',
+    alternateName: ['힐힐코', 'Peekle'],
+    url: siteUrl,
+    inLanguage: 'ko-KR',
+  };
 
   return (
     // 1. 전체 배경: config의 background (#F7F8FC)
     <div className="min-h-screen bg-background font-sans selection:bg-secondary selection:text-primary flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
       {/* --- 헤더 --- */}
       <header className="sticky top-0 w-full flex justify-between items-center px-6 py-4 bg-background/80 backdrop-blur-md z-50 border-b border-border max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-2">
