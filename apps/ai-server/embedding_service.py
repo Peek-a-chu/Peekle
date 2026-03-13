@@ -1,5 +1,7 @@
 import os
 import threading
+import math
+from pathlib import Path
 from contextlib import contextmanager
 
 import psycopg2
@@ -7,9 +9,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from psycopg2.extras import execute_values
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1536"))
 
 PGVECTOR_HOST = os.getenv("PGVECTOR_HOST", os.getenv("POSTGRES_HOST", "localhost"))
@@ -48,11 +51,34 @@ def _vector_literal(values):
     return "[" + ",".join(f"{float(v):.8f}" for v in values) + "]"
 
 
+def _normalize(values):
+    norm = math.sqrt(sum(v * v for v in values))
+    if norm == 0:
+        return values
+    return [v / norm for v in values]
+
+
 def _embed_texts(texts):
     if not texts:
         return []
     response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
-    return [item.embedding for item in response.data]
+    embeddings = []
+    for item in response.data:
+        values = list(item.embedding)
+        if len(values) < EMBEDDING_DIM:
+            raise ValueError(
+                f"Embedding dimension mismatch: model returned {len(values)}, "
+                f"but EMBEDDING_DIM={EMBEDDING_DIM}"
+            )
+
+        # Gemini embeddings support Matryoshka-style truncation.
+        if len(values) > EMBEDDING_DIM:
+            values = values[:EMBEDDING_DIM]
+
+        # Keep cosine behavior stable, especially for truncated vectors.
+        embeddings.append(_normalize(values))
+
+    return embeddings
 
 
 def _ensure_schema():
@@ -81,14 +107,20 @@ def _ensure_schema():
                     );
                     """
                 )
-                cur.execute(
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_ai_problem_embeddings_embedding
-                    ON ai_problem_embeddings
-                    USING ivfflat (embedding vector_cosine_ops)
-                    WITH (lists = 100);
-                    """
-                )
+                if EMBEDDING_DIM <= 2000:
+                    cur.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_ai_problem_embeddings_embedding
+                        ON ai_problem_embeddings
+                        USING ivfflat (embedding vector_cosine_ops)
+                        WITH (lists = 100);
+                        """
+                    )
+                else:
+                    print(
+                        f"[WARN] Skipping ivfflat index: EMBEDDING_DIM={EMBEDDING_DIM} "
+                        "exceeds pgvector ivfflat vector limit (2000)."
+                    )
             conn.commit()
 
         _schema_ready = True
