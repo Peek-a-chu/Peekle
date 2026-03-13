@@ -10,7 +10,7 @@ interface LeagueInfo {
   score: number;
   rank: number;
   totalPlayers: number;
-  status: 'promotion' | 'maintenance' | 'demotion';
+  status: 'promotion' | 'maintenance' | 'demotion' | 'blocked';
 }
 
 interface Props {
@@ -41,6 +41,10 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
     promotion: { label: '승급예정', color: 'text-success bg-success/10' },
     maintenance: { label: '유지', color: 'text-muted-foreground bg-muted' },
     demotion: { label: '강등위기', color: 'text-destructive bg-destructive/10' },
+    blocked: {
+      label: '승급준비(0점)',
+      color: 'text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/20',
+    },
   };
 
   // Determine what to show
@@ -70,12 +74,19 @@ const MyLeagueCard = ({ initialTier, initialScore }: Props) => {
   const isGroupAssigned = !isLoading ? data.members.length >= 4 : true;
   const displayRank = !isLoading ? data.myRank : 0;
   const displayTotal = !isLoading ? data.members.length : 0;
-  const displayStatusKey = !isLoading && isGroupAssigned ? getStatus(myMember?.status) : 'maintenance';
+  const displayStatusKey =
+    !isLoading && isGroupAssigned ? getStatus(myMember?.status) : 'maintenance';
+  const isPromotionBlockedByZeroScore = !isLoading && isGroupAssigned && displayScore <= 0;
   const displayStatus = isLoading
     ? statusMap.maintenance
     : !isGroupAssigned
-      ? { label: data.myLeague === 'stone' ? '배치대기' : '휴식중', color: 'text-muted-foreground bg-muted' }
-      : statusMap[displayStatusKey];
+      ? {
+          label: data.myLeague === 'stone' ? '배치대기' : '휴식중',
+          color: 'text-muted-foreground bg-muted',
+        }
+      : isPromotionBlockedByZeroScore
+        ? statusMap.blocked
+        : statusMap[displayStatusKey];
 
   if (showSkeleton) return <div className="h-20 bg-muted/30 rounded-xl animate-pulse" />;
 

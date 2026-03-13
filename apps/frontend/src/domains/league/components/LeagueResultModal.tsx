@@ -94,6 +94,8 @@ function RankingView({
   const promotionZone = ranking.filter((m) => m.status === 'PROMOTE');
   const maintenanceZone = ranking.filter((m) => m.status === 'STAY');
   const demotionZone = ranking.filter((m) => m.status === 'DEMOTE');
+  const myMember = ranking.find((m) => m.me);
+  const isPromotionBlockedByZeroScore = !!myMember && myMember.score <= 0;
 
   return (
     <>
@@ -116,6 +118,12 @@ function RankingView({
           <div className="text-muted-foreground py-10">랭킹 불러오는 중...</div>
         ) : ranking.length > 0 ? (
           <>
+            {isPromotionBlockedByZeroScore && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
+                아직 0점이라 승급할 수 없어요. 이번 주는 한 문제 이상 풀어보세요!
+              </div>
+            )}
+
             {/* 1. 승급 구간 */}
             {promotionZone.length > 0 && (
               <div className="space-y-2">
