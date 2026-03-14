@@ -57,6 +57,9 @@ public class RedisKeyConst {
     // lock:game:room:{roomId}:status
     public static final String LOCK_GAME_STATUS = "lock:game:room:%d:status";
 
+    // Problem Sync Lock
+    public static final String LOCK_PROBLEM_SYNC_BOJ = "lock:problem:sync:boj";
+
     // Game Topic (Pub/Sub)
     // /topic/games/{gameId}/room
     public static final String TOPIC_GAME_ROOM = "topic/games/%d/room";

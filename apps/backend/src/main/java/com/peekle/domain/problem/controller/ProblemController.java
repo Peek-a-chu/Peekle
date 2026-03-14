@@ -2,9 +2,13 @@ package com.peekle.domain.problem.controller;
 
 import com.peekle.domain.problem.dto.ProblemSearchResponse;
 import com.peekle.domain.problem.service.ProblemService;
+import com.peekle.domain.problem.service.ProblemSyncJobService;
 import com.peekle.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,13 +19,34 @@ import java.util.Map;
 @RequestMapping("/api/problems")
 public class ProblemController {
 
+    @Value("${problem.sync.manual.admin-user-id:1}")
+    private Long problemSyncAdminUserId;
+
     private final ProblemService problemService;
+    private final ProblemSyncJobService problemSyncJobService;
 
     @PostMapping("/sync")
     public ResponseEntity<String> syncProblems(
+            @AuthenticationPrincipal Long userId,
             @RequestParam(defaultValue = "1") int startPage) {
-        new Thread(() -> problemService.fetchAndSaveAllProblems(startPage)).start();
-        return ResponseEntity.ok("🚀 Problem sync started from Page " + startPage);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("❌ Authentication required.");
+        }
+
+        if (!problemSyncAdminUserId.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("❌ Only admin can trigger problem sync.");
+        }
+
+        boolean accepted = problemSyncJobService.triggerManualSyncAsync(startPage);
+        if (!accepted) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("⚠️ Problem sync is already running.");
+        }
+
+        return ResponseEntity.accepted()
+                .body("🚀 Problem sync started from Page " + Math.max(startPage, 1));
     }
 
     /**

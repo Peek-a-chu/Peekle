@@ -132,3 +132,16 @@ livekit:
   url: ${LIVEKIT_URL:ws://localhost:7880}
   api-key: ${LIVEKIT_API_KEY:devkey}
   api-secret: ${LIVEKIT_API_SECRET:secret}
+
+problem:
+  sync:
+    monthly:
+      enabled: true
+      cron: "0 0 4 * * SUN"
+      zone: Asia/Seoul
+      first-week-only: true
+    manual:
+      admin-user-id: ${PROBLEM_SYNC_ADMIN_USER_ID:1}
+    retry:
+      max-attempts: 3
+      backoff-seconds: 0,1800,7200
