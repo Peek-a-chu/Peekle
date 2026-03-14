@@ -100,6 +100,25 @@ export default function HomeClient({
           </div>
         </div>
       </div>
+
+      {/* 홈 화면 전용 푸터 */}
+      <footer className="mt-24 py-10 flex flex-col items-center justify-center gap-4 text-[#6B7280] text-sm">
+        <div className="flex items-center gap-4 font-medium">
+          <span className="flex items-center gap-1">
+            Contact : taesun4767@gmail.com
+          </span>
+          <span className="text-border/50">|</span>
+          <a
+            href="https://docs.google.com/forms/d/e/1FAIpQLScGhVj0MPivuyxrjrWQQaEMZzWqU9p-k-A-lnJJ7Q4cWh9bVg/viewform?usp=publish-editor"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors flex items-center gap-1 underline underline-offset-4"
+          >
+            피드백 및 건의사항 남기기
+          </a>
+        </div>
+        <p>© 2026 Peekle. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
