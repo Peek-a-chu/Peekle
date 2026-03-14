@@ -11,126 +11,292 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.util.SolvedAcLevelUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.springframework.transaction.support.TransactionTemplate;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProblemService {
+
+    private static final String BOJ_SOURCE = "BOJ";
+    private static final String SOLVED_AC_URL_TEMPLATE = "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=%d";
+    private static final String BOJ_URL_TEMPLATE = "https://www.acmicpc.net/problem/%s";
+    private static final long PAGE_DELAY_MILLIS = 300L;
 
     private final ProblemRepository problemRepository;
     private final TagRepository tagRepository;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final TransactionTemplate transactionTemplate; // 트랜잭션 템플릿 주입
+    private final TransactionTemplate transactionTemplate;
 
     public void fetchAndSaveAllProblems(int startPage) {
-        int page = startPage;
-        boolean hasMore = true;
-        int totalSaved = 0;
-        int totalSkipped = 0;
+        syncAllBojProblems(startPage);
+    }
 
-        System.out.println("🚀 Starting Problem Sync from Solved.ac (Page " + page + ")...");
+    public ProblemSyncSummary syncAllBojProblems(int startPage) {
+        int page = Math.max(startPage, 1);
+        int lastProcessedPage = page - 1;
+        long fetched = 0L;
+        long inserted = 0L;
+        long updated = 0L;
+        long unchanged = 0L;
+        long failed = 0L;
 
-        while (hasMore) {
+        log.info("=== BOJ 문제 전체 재동기화 시작 (startPage={}) ===", page);
+
+        while (true) {
             try {
-                // final 변수로 만들어야 람다 내부에서 접근 가능 (page는 계속 변하므로 로컬 변수 복사)
-                int currentPage = page;
-
-                // 트랜잭션 범위 시작: API 호출은 트랜잭션 밖에서 하는 게 좋지만, 로직 분리가 어려우면 포함해도 됨.
-                // 여기서는 API 호출 후 파싱/저장을 트랜잭션으로 묶는 게 베스트지만, 코드가 복잡해지니 통째로 묶음.
-                // 또는 API 호출을 메서드로 분리해도 됨.
-
-                Boolean hasNextPage = transactionTemplate.execute(status -> {
-                    try {
-                        String url = "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page="
-                                + currentPage;
-                        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-                        JsonNode root = objectMapper.readTree(response.getBody());
-                        JsonNode items = root.path("items");
-
-                        if (items.isEmpty()) {
-                            System.out.println("✅ Reached end of data at page " + currentPage);
-                            return false; // Stop loop
-                        }
-
-                        List<Problem> problemsToSave = new ArrayList<>();
-
-                        for (JsonNode item : items) {
-                            String externalId = String.valueOf(item.get("problemId").asInt());
-
-                            // 이미 존재하는지 체크
-                            if (problemRepository.findByExternalIdAndSource(externalId, "BOJ").isPresent()) {
-                                // totalSkipped 증가 로직은 람다 밖에서 처리하거나 여기서 로그만
-                                continue;
-                            }
-
-                            String title = item.get("titleKo").asText();
-                            int level = item.get("level").asInt();
-                            String tierStr = SolvedAcLevelUtil.convertLevelToTier(level);
-                            String problemUrl = "https://www.acmicpc.net/problem/" + externalId;
-
-                            Problem problem = new Problem("BOJ", externalId, title, tierStr, problemUrl);
-
-                            // 태그 처리
-                            JsonNode tagsNode = item.path("tags");
-                            for (JsonNode tagNode : tagsNode) {
-                                String key = tagNode.get("key").asText();
-                                String tagName = key;
-                                for (JsonNode displayName : tagNode.path("displayNames")) {
-                                    if ("ko".equals(displayName.path("language").asText())) {
-                                        tagName = displayName.path("name").asText();
-                                    }
-                                }
-
-                                String finalTagName = tagName;
-                                Tag tag = tagRepository.findByKey(key)
-                                        .orElseGet(() -> tagRepository.save(new Tag(key, finalTagName)));
-                                problem.addTag(tag);
-                            }
-
-                            problemsToSave.add(problem);
-                        }
-
-                        if (!problemsToSave.isEmpty()) {
-                            problemRepository.saveAll(problemsToSave);
-                            System.out.println(
-                                    "Page " + currentPage + " done. Saved: " + problemsToSave.size() + " problems.");
-                        }
-
-                        return true; // Continue loop
-
-                    } catch (Exception e) {
-                        throw new RuntimeException(e); // 트랜잭션 롤백 유도
-                    }
-                });
-
-                if (Boolean.FALSE.equals(hasNextPage)) {
-                    hasMore = false;
+                PageSyncResult pageSyncResult = syncSinglePage(page);
+                if (!pageSyncResult.hasItems()) {
                     break;
                 }
 
-                page++;
-                Thread.sleep(500);
+                lastProcessedPage = page;
+                fetched += pageSyncResult.fetched();
+                inserted += pageSyncResult.inserted();
+                updated += pageSyncResult.updated();
+                unchanged += pageSyncResult.unchanged();
+                failed += pageSyncResult.failed();
 
+                log.info(
+                        "BOJ 동기화 페이지 완료 page={} fetched={} inserted={} updated={} unchanged={} failed={}",
+                        page,
+                        pageSyncResult.fetched(),
+                        pageSyncResult.inserted(),
+                        pageSyncResult.updated(),
+                        pageSyncResult.unchanged(),
+                        pageSyncResult.failed());
+
+                page++;
+                Thread.sleep(PAGE_DELAY_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("BOJ 문제 동기화가 인터럽트되었습니다.", e);
             } catch (Exception e) {
-                System.err.println("❌ Error fetching page " + page + ": " + e.getMessage());
-                System.err.println("⚠️ Stopped at page " + page + ". Resume using sync?startPage=" + page);
-                break;
+                throw new IllegalStateException("BOJ 문제 동기화 실패 (page=" + page + ")", e);
             }
         }
-        System.out.println("🏁 Sync Loop Finished. Total Saved: " + totalSaved);
+
+        ProblemSyncSummary summary = new ProblemSyncSummary(
+                Math.max(startPage, 1),
+                lastProcessedPage,
+                fetched,
+                inserted,
+                updated,
+                unchanged,
+                failed);
+
+        log.info(
+                "=== BOJ 문제 전체 재동기화 종료 startPage={} lastPage={} fetched={} inserted={} updated={} unchanged={} failed={} ===",
+                summary.startPage(),
+                summary.lastProcessedPage(),
+                summary.fetched(),
+                summary.inserted(),
+                summary.updated(),
+                summary.unchanged(),
+                summary.failed());
+        return summary;
+    }
+
+    private PageSyncResult syncSinglePage(int page) throws Exception {
+        JsonNode items = fetchProblemItems(page);
+        if (items.isEmpty()) {
+            log.info("BOJ 동기화 종료 지점 도달 (page={})", page);
+            return PageSyncResult.empty();
+        }
+
+        PageSyncResult result = transactionTemplate.execute(status -> {
+            List<String> externalIds = new java.util.ArrayList<>();
+            Set<String> pageTagKeys = new HashSet<>();
+
+            items.forEach(item -> {
+                if (item.path("problemId").isMissingNode()) {
+                    return;
+                }
+                externalIds.add(String.valueOf(item.path("problemId").asInt()));
+                collectTagKeys(item.path("tags"), pageTagKeys);
+            });
+
+            if (externalIds.isEmpty()) {
+                log.warn("BOJ 동기화 페이지에 유효한 problemId가 없습니다. page={}", page);
+                return new PageSyncResult(true, items.size(), 0L, 0L, 0L, items.size());
+            }
+
+            Map<String, Problem> existingProblemMap = problemRepository
+                    .findBySourceAndExternalIdInWithTags(BOJ_SOURCE, externalIds)
+                    .stream()
+                    .collect(Collectors.toMap(Problem::getExternalId, Function.identity(), (left, right) -> left));
+
+            Map<String, Tag> pageTagMap = pageTagKeys.isEmpty()
+                    ? new HashMap<>()
+                    : tagRepository.findByKeyIn(pageTagKeys)
+                            .stream()
+                            .collect(Collectors.toMap(Tag::getKey, Function.identity()));
+
+            List<Problem> toInsert = new java.util.ArrayList<>();
+            long inserted = 0L;
+            long updated = 0L;
+            long unchanged = 0L;
+            long failed = 0L;
+
+            for (JsonNode item : items) {
+                try {
+                    String externalId = String.valueOf(item.path("problemId").asInt());
+                    String title = resolveTitle(item);
+                    int level = item.path("level").asInt();
+                    String tier = SolvedAcLevelUtil.convertLevelToTier(level);
+                    String url = BOJ_URL_TEMPLATE.formatted(externalId);
+                    Set<Tag> resolvedTags = resolveTags(item.path("tags"), pageTagMap);
+
+                    Problem existing = existingProblemMap.get(externalId);
+                    if (existing == null) {
+                        Problem created = new Problem(BOJ_SOURCE, externalId, title, tier, url);
+                        created.setTags(new HashSet<>(resolvedTags));
+                        toInsert.add(created);
+                        inserted++;
+                        continue;
+                    }
+
+                    boolean changed = applyProblemChanges(existing, title, tier, url, resolvedTags);
+                    if (changed) {
+                        updated++;
+                    } else {
+                        unchanged++;
+                    }
+                } catch (Exception e) {
+                    failed++;
+                    log.warn("BOJ 문제 동기화 항목 실패 page={} rawProblemId={}", page, item.path("problemId"), e);
+                }
+            }
+
+            if (!toInsert.isEmpty()) {
+                problemRepository.saveAll(toInsert);
+            }
+
+            return new PageSyncResult(true, items.size(), inserted, updated, unchanged, failed);
+        });
+        if (result == null) {
+            throw new IllegalStateException("동기화 페이지 처리 결과가 null 입니다. page=" + page);
+        }
+        return result;
+    }
+
+    private JsonNode fetchProblemItems(int page) throws Exception {
+        String url = SOLVED_AC_URL_TEMPLATE.formatted(page);
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+        if (response.getBody() == null) {
+            throw new IllegalStateException("solved.ac 응답 body가 비어 있습니다.");
+        }
+        JsonNode root = objectMapper.readTree(response.getBody());
+        return root.path("items");
+    }
+
+    private void collectTagKeys(JsonNode tagsNode, Set<String> collector) {
+        if (tagsNode == null || !tagsNode.isArray()) {
+            return;
+        }
+        tagsNode.forEach(tagNode -> {
+            String key = tagNode.path("key").asText("").trim();
+            if (!key.isBlank()) {
+                collector.add(key);
+            }
+        });
+    }
+
+    private Set<Tag> resolveTags(JsonNode tagsNode, Map<String, Tag> pageTagMap) {
+        Set<Tag> tags = new HashSet<>();
+        if (tagsNode == null || !tagsNode.isArray()) {
+            return tags;
+        }
+
+        for (JsonNode tagNode : tagsNode) {
+            String key = tagNode.path("key").asText("").trim();
+            if (key.isBlank()) {
+                continue;
+            }
+
+            String tagName = resolveTagName(tagNode, key);
+            Tag tag = pageTagMap.get(key);
+            if (tag == null) {
+                tag = tagRepository.save(new Tag(key, tagName));
+                pageTagMap.put(key, tag);
+            } else if (!Objects.equals(tag.getName(), tagName)) {
+                tag.updateName(tagName);
+            }
+            tags.add(tag);
+        }
+        return tags;
+    }
+
+    private String resolveTitle(JsonNode item) {
+        String titleKo = item.path("titleKo").asText("").trim();
+        if (!titleKo.isBlank()) {
+            return titleKo;
+        }
+
+        String fallbackTitle = item.path("title").asText("").trim();
+        if (!fallbackTitle.isBlank()) {
+            return fallbackTitle;
+        }
+
+        return "제목 미상";
+    }
+
+    private String resolveTagName(JsonNode tagNode, String defaultName) {
+        for (JsonNode displayName : tagNode.path("displayNames")) {
+            if ("ko".equals(displayName.path("language").asText())) {
+                String translated = displayName.path("name").asText("").trim();
+                if (!translated.isBlank()) {
+                    return translated;
+                }
+            }
+        }
+        return defaultName;
+    }
+
+    private boolean applyProblemChanges(Problem problem, String title, String tier, String url, Set<Tag> newTags) {
+        boolean changed = false;
+
+        if (!Objects.equals(problem.getTitle(), title)) {
+            problem.setTitle(title);
+            changed = true;
+        }
+        if (!Objects.equals(problem.getTier(), tier)) {
+            problem.setTier(tier);
+            changed = true;
+        }
+        if (!Objects.equals(problem.getUrl(), url)) {
+            problem.setUrl(url);
+            changed = true;
+        }
+
+        Set<String> currentTagKeys = problem.getTags().stream()
+                .map(Tag::getKey)
+                .collect(Collectors.toSet());
+        Set<String> nextTagKeys = newTags.stream()
+                .map(Tag::getKey)
+                .collect(Collectors.toSet());
+        if (!currentTagKeys.equals(nextTagKeys)) {
+            problem.setTags(new HashSet<>(newTags));
+            changed = true;
+        }
+        return changed;
     }
 
     /**
@@ -170,6 +336,28 @@ public class ProblemService {
 
     public List<Tag> getAllTags() {
         return tagRepository.findAll();
+    }
+
+    public record ProblemSyncSummary(
+            int startPage,
+            int lastProcessedPage,
+            long fetched,
+            long inserted,
+            long updated,
+            long unchanged,
+            long failed) {
+    }
+
+    private record PageSyncResult(
+            boolean hasItems,
+            long fetched,
+            long inserted,
+            long updated,
+            long unchanged,
+            long failed) {
+        private static PageSyncResult empty() {
+            return new PageSyncResult(false, 0L, 0L, 0L, 0L, 0L);
+        }
     }
 
 }

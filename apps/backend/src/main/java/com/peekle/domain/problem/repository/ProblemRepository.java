@@ -13,6 +13,13 @@ import java.util.Optional;
 public interface ProblemRepository extends JpaRepository<Problem, Long>, ProblemRepositoryCustom {
        Optional<Problem> findByExternalIdAndSource(String externalId, String source);
 
+       @Query("SELECT DISTINCT p FROM Problem p " +
+                     "LEFT JOIN FETCH p.tags t " +
+                     "WHERE p.source = :source AND p.externalId IN :externalIds")
+       List<Problem> findBySourceAndExternalIdInWithTags(
+                     @Param("source") String source,
+                     @Param("externalIds") List<String> externalIds);
+
        Page<Problem> findBySource(String source, Pageable pageable);
 
        long countBySource(String source);
