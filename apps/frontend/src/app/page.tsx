@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
@@ -58,19 +58,21 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
       />
       {/* --- 헤더 --- */}
-      <header className="sticky top-0 w-full flex justify-between items-center px-6 py-4 bg-background/80 backdrop-blur-md z-50 border-b border-border max-w-7xl mx-auto w-full">
-        <div className="flex items-center gap-2">
-          <Code2 className="text-primary w-6 h-6" />
-          <span className="text-xl font-bold tracking-tight text-foreground">
-            힐끔힐끔코딩 <span className="text-primary">Peekle</span>
-          </span>
-        </div>
-        <div>
-          <Button asChild className="font-bold rounded-md px-6">
-            <Link href="/login">로그인</Link>
-          </Button>
-        </div>
-      </header>
+      <div className="sticky top-0 w-full bg-background/80 backdrop-blur-md z-50 border-b border-border">
+        <header className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-2">
+            <Code2 className="text-primary w-6 h-6" />
+            <span className="text-xl font-bold tracking-tight text-foreground">
+              힐끔힐끔코딩 <span className="text-primary">Peekle</span>
+            </span>
+          </div>
+          <div>
+            <Button asChild className="font-bold rounded-md px-6">
+              <Link href="/login">로그인</Link>
+            </Button>
+          </div>
+        </header>
+      </div>
 
       <main className="flex-1 w-full">
         {/* --- 메인 히어로 섹션 --- */}
@@ -187,7 +189,21 @@ export default function Home() {
       </main>
 
       {/* --- 푸터 --- */}
-      <footer className="py-10 text-center text-[#6B7280] text-sm bg-background border-t border-border">
+      <footer className="py-10 flex flex-col items-center justify-center gap-4 text-[#6B7280] text-sm bg-background">
+        <div className="flex items-center gap-4 font-medium">
+          <span className="flex items-center gap-1">
+            Contact : taesun4767@gmail.com
+          </span>
+          <span className="text-border/50">|</span>
+          <a
+            href="https://docs.google.com/forms/d/e/1FAIpQLScGhVj0MPivuyxrjrWQQaEMZzWqU9p-k-A-lnJJ7Q4cWh9bVg/viewform?usp=publish-editor"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors flex items-center gap-1 underline underline-offset-4"
+          >
+            피드백 및 건의사항 남기기
+          </a>
+        </div>
         <p>© 2026 Peekle. All rights reserved.</p>
       </footer>
     </div>

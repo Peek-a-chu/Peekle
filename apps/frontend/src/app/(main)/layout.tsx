@@ -14,7 +14,7 @@ export default async function MainLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar user={user} />
-      <main className="flex-1 ml-[240px] px-8 py-0 w-full">{children}</main>
+      <main className="flex-1 ml-[240px] px-8 py-0 w-full max-w-7xl mx-auto">{children}</main>
       <LeagueResultModal />
     </div>
   );
