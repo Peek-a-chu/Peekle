@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Puzzle } from 'lucide-react';
 import { ExtensionStatus, UserProfile } from '../types';
 import { ConfirmModal, ActionModal } from '@/components/common/Modal';
-import { useExtensionVersionCheck } from '@/hooks/useExtensionVersionCheck';
 
 interface Props {
   user: UserProfile;
@@ -24,30 +23,17 @@ interface TokenResponse {
 
 export function CCExtensionGuide({
   user,
-  isInstalled,
-  extensionVersion,
   checkInstallation,
   extensionToken,
   status,
   isLoading,
   onRegisterBojId,
 }: Props) {
-  // Version Check from R2
-  const { versionInfo, isLoading: isVersionLoading } = useExtensionVersionCheck();
-  const REQUIRED_VERSION = versionInfo?.latestVersion ?? null;
-  const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
+  const DOWNLOAD_URL = 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
-
-  // Show/update mismatch only after latest version metadata is fully loaded.
-  const isVersionMismatch =
-    !isVersionLoading &&
-    isInstalled &&
-    !!extensionVersion &&
-    !!REQUIRED_VERSION &&
-    extensionVersion !== REQUIRED_VERSION;
 
   // Modal State
   const [modal, setModal] = useState<{
@@ -276,28 +262,6 @@ export function CCExtensionGuide({
         </div>
       </div>
 
-      {/* Version Mismatch Warning */}
-      {isVersionMismatch && REQUIRED_VERSION && (
-        <div className="rounded-lg p-4 mb-8 bg-red-500/10 border border-red-500/20 flex items-center gap-3">
-          <div className="text-lg">🚨</div>
-          <div className="flex-1">
-            <h4 className="font-bold text-sm text-red-700 dark:text-red-300">업데이트가 필요합니다</h4>
-            <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">
-              현재 설치된 버전({extensionVersion})이 최신 버전({REQUIRED_VERSION})이 아닙니다. 최적의 기능을 위해 업데이트해주세요.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
-              handleInstallClick();
-            }}
-            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-bold hover:bg-red-700"
-          >
-            스토어에서 업데이트
-          </button>
-        </div>
-      )}
-
       {/* Stepper */}
       <div className="space-y-8 pl-2">
         {steps.map((s, idx) => (
@@ -410,7 +374,7 @@ export function CCExtensionGuide({
           <div className="flex flex-col gap-2">
             <button
               onClick={() => void handleLinkAccount(false)}
-              disabled={isSubmitting || !!isVersionMismatch}
+              disabled={isSubmitting}
               className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting ? (
@@ -422,11 +386,6 @@ export function CCExtensionGuide({
                 '🔗 계정 연동하기 (기존 토큰 불러오기)'
               )}
             </button>
-            {isVersionMismatch && (
-              <p className="text-xs text-orange-600 dark:text-orange-400">
-                ⚠️ 연동하려면 먼저 확장 프로그램을 업데이트해주세요.
-              </p>
-            )}
           </div>
         )}
 
