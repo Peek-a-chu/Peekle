@@ -63,7 +63,7 @@ services:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
-      - LIVEKIT_URL=http://localhost:7880
+      - LIVEKIT_URL=http://host.docker.internal:7880
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - AI_SERVER_URL=http://ai-server:8000

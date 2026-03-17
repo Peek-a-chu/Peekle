@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import retrofit2.Call;
 import retrofit2.Response;
 
+import java.net.ConnectException;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -72,12 +74,33 @@ public class MediaService {
             Response<Void> response = call.execute();
             if (response.isSuccessful()) {
                 log.info("Evicted user {} from room {}", userId, roomName);
+            } else if (response.code() == 404) {
+                // 이미 퇴장/연결 종료된 참가자일 수 있으므로 noisy log를 피한다.
+                log.debug("Skip evict for user {} in room {}: participant not found", userId, roomName);
             } else {
-                log.warn("Failed to evict user {}: {}", userId, response.message());
+                log.warn("Failed to evict user {} from room {}: status={} message={}",
+                        userId, roomName, response.code(), response.message());
             }
         } catch (Exception e) {
-            log.error("Error evicting user {}", userId, e);
+            if (isConnectionRefused(e)) {
+                // LiveKit 일시 불가용 시 퇴장 플로우 자체는 계속 진행되도록 debug로만 남긴다.
+                log.debug("Skip evict for user {} in room {}: livekit unreachable ({})",
+                        userId, roomName, e.getMessage());
+                return;
+            }
+            log.warn("Error evicting user {} from room {}: {}", userId, roomName, e.getMessage());
         }
+    }
+
+    private boolean isConnectionRefused(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof ConnectException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
 }

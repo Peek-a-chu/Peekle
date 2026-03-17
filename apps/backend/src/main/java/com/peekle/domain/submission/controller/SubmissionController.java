@@ -18,7 +18,7 @@ public class SubmissionController {
 
     private final SubmissionService submissionService;
 
-    @PostMapping("/")
+    @PostMapping({ "", "/" })
     public ApiResponse<SubmissionResponse> createGeneralSubmission(@RequestBody SubmissionRequest request) {
         SubmissionResponse response = submissionService.saveGeneralSubmission(request);
         System.out.println("Received Extension Submission: " + request);
