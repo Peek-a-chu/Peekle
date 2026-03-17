@@ -23,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -161,19 +162,24 @@ public class ProblemService {
                     String title = resolveTitle(item);
                     int level = item.path("level").asInt();
                     String tier = SolvedAcLevelUtil.convertLevelToTier(level);
+                    int acceptedUserCount = item.path("acceptedUserCount").asInt(0);
+                    String language = resolveLanguage(item);
                     String url = BOJ_URL_TEMPLATE.formatted(externalId);
                     Set<Tag> resolvedTags = resolveTags(item.path("tags"), pageTagMap);
 
                     Problem existing = existingProblemMap.get(externalId);
                     if (existing == null) {
                         Problem created = new Problem(BOJ_SOURCE, externalId, title, tier, url);
+                        created.setLevel(level);
+                        created.setAcceptedUserCount(Math.max(acceptedUserCount, 0));
+                        created.setLanguage(language);
                         created.setTags(new HashSet<>(resolvedTags));
                         toInsert.add(created);
                         inserted++;
                         continue;
                     }
 
-                    boolean changed = applyProblemChanges(existing, title, tier, url, resolvedTags);
+                    boolean changed = applyProblemChanges(existing, title, tier, url, level, acceptedUserCount, language, resolvedTags);
                     if (changed) {
                         updated++;
                     } else {
@@ -258,6 +264,65 @@ public class ProblemService {
         return "제목 미상";
     }
 
+    private String resolveLanguage(JsonNode item) {
+        String languageFromTitles = resolveLanguageFromTitles(item.path("titles"));
+        if (!languageFromTitles.isBlank()) {
+            return languageFromTitles;
+        }
+
+        String titleKo = item.path("titleKo").asText("").trim();
+        if (!titleKo.isBlank()) {
+            return "ko";
+        }
+
+        String titleEn = item.path("title").asText("").trim();
+        if (!titleEn.isBlank()) {
+            return "en";
+        }
+
+        return "ko";
+    }
+
+    private String resolveLanguageFromTitles(JsonNode titlesNode) {
+        if (titlesNode == null || !titlesNode.isArray()) {
+            return "";
+        }
+
+        for (JsonNode titleNode : titlesNode) {
+            if (!titleNode.path("isOriginal").asBoolean(false)) {
+                continue;
+            }
+
+            String normalized = normalizeLanguageCode(titleNode.path("language").asText(""));
+            if (!normalized.isBlank()) {
+                return normalized;
+            }
+
+            normalized = normalizeLanguageCode(titleNode.path("languageDisplayName").asText(""));
+            if (!normalized.isBlank()) {
+                return normalized;
+            }
+        }
+
+        return "";
+    }
+
+    private String normalizeLanguageCode(String rawLanguage) {
+        String language = rawLanguage == null ? "" : rawLanguage.trim().toLowerCase(Locale.ROOT);
+        if (language.isBlank()) {
+            return "";
+        }
+
+        if (language.equals("ko") || language.startsWith("ko-")) {
+            return "ko";
+        }
+        if (language.equals("en") || language.startsWith("en-")) {
+            return "en";
+        }
+
+        return "";
+    }
+
     private String resolveTagName(JsonNode tagNode, String defaultName) {
         for (JsonNode displayName : tagNode.path("displayNames")) {
             if ("ko".equals(displayName.path("language").asText())) {
@@ -270,7 +335,16 @@ public class ProblemService {
         return defaultName;
     }
 
-    private boolean applyProblemChanges(Problem problem, String title, String tier, String url, Set<Tag> newTags) {
+    private boolean applyProblemChanges(
+            Problem problem,
+            String title,
+            String tier,
+            String url,
+            int level,
+            int acceptedUserCount,
+            String language,
+            Set<Tag> newTags
+    ) {
         boolean changed = false;
 
         if (!Objects.equals(problem.getTitle(), title)) {
@@ -283,6 +357,19 @@ public class ProblemService {
         }
         if (!Objects.equals(problem.getUrl(), url)) {
             problem.setUrl(url);
+            changed = true;
+        }
+        if (!Objects.equals(problem.getLevel(), level)) {
+            problem.setLevel(level);
+            changed = true;
+        }
+        int normalizedAcceptedUserCount = Math.max(acceptedUserCount, 0);
+        if (!Objects.equals(problem.getAcceptedUserCount(), normalizedAcceptedUserCount)) {
+            problem.setAcceptedUserCount(normalizedAcceptedUserCount);
+            changed = true;
+        }
+        if (!Objects.equals(problem.getLanguage(), language)) {
+            problem.setLanguage(language);
             changed = true;
         }
 

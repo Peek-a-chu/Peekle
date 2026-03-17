@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/problems")
 public class ProblemController {
 
-    @Value("${problem.sync.manual.admin-user-id:1}")
+    @Value("${problem.sync.manual.admin-user-id}")
     private Long problemSyncAdminUserId;
 
     private final ProblemService problemService;
@@ -27,8 +28,20 @@ public class ProblemController {
 
     @PostMapping("/sync")
     public ResponseEntity<String> syncProblems(
+            HttpServletRequest request,
             @AuthenticationPrincipal Long userId,
             @RequestParam(defaultValue = "1") int startPage) {
+        if (problemSyncAdminUserId == null || problemSyncAdminUserId < 1L) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("❌ Problem sync admin user id is not configured.");
+        }
+
+        String authorization = request.getHeader("Authorization");
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("❌ Bearer Authorization header is required.");
+        }
+
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("❌ Authentication required.");

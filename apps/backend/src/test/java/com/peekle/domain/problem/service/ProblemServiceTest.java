@@ -237,4 +237,207 @@ class ProblemServiceTest {
 
         mockServer.verify();
     }
+
+    @Test
+    void syncAllBojProblems_updatesAcceptedUserCountLevelAndLanguage_fromSolvedAcFields() {
+        ProblemService problemService = new ProblemService(problemRepository, tagRepository, transactionTemplate);
+        RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(problemService, "restTemplate");
+        MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restTemplate).build();
+
+        Tag implementation = new Tag("implementation", "구현");
+
+        Problem existingProblem = new Problem("BOJ", "1000", "A+B", "Bronze 5",
+                "https://www.acmicpc.net/problem/1000");
+        existingProblem.setLevel(0);
+        existingProblem.setAcceptedUserCount(0);
+        existingProblem.setLanguage("en");
+        existingProblem.setTags(new java.util.HashSet<>(Set.of(implementation)));
+
+        String firstPageResponse = """
+                {
+                  "items": [
+                    {
+                      "problemId": 1000,
+                      "titleKo": "A+B",
+                      "title": "A+B",
+                      "level": 1,
+                      "acceptedUserCount": 366256,
+                      "tags": [
+                        {
+                          "key": "implementation",
+                          "displayNames": [
+                            { "language": "ko", "name": "구현" }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+        String secondPageResponse = """
+                { "items": [] }
+                """;
+
+        mockServer.expect(requestTo(
+                        "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=1"))
+                .andRespond(withSuccess(firstPageResponse, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo(
+                        "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=2"))
+                .andRespond(withSuccess(secondPageResponse, MediaType.APPLICATION_JSON));
+
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            TransactionCallback<Object> callback = (TransactionCallback<Object>) invocation.getArgument(0);
+            return callback.doInTransaction(transactionStatus);
+        });
+
+        when(problemRepository.findBySourceAndExternalIdInWithTags(eq("BOJ"), anyList()))
+                .thenReturn(List.of(existingProblem));
+        when(tagRepository.findByKeyIn(anyCollection())).thenReturn(List.of(implementation));
+
+        ProblemService.ProblemSyncSummary summary = problemService.syncAllBojProblems(1);
+
+        assertThat(summary.updated()).isEqualTo(1);
+        assertThat(existingProblem.getAcceptedUserCount()).isEqualTo(366256);
+        assertThat(existingProblem.getLevel()).isEqualTo(1);
+        assertThat(existingProblem.getLanguage()).isEqualTo("ko");
+
+        verify(problemRepository, never()).saveAll(anyList());
+        mockServer.verify();
+    }
+
+    @Test
+    void syncAllBojProblems_resolvesLanguageFromOriginalTitleLanguage_whenTitlesExist() {
+        ProblemService problemService = new ProblemService(problemRepository, tagRepository, transactionTemplate);
+        RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(problemService, "restTemplate");
+        MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restTemplate).build();
+
+        Tag implementation = new Tag("implementation", "구현");
+
+        Problem existingProblem = new Problem("BOJ", "35408", "Lonely Creatures", "Gold 1",
+                "https://www.acmicpc.net/problem/35408");
+        existingProblem.setLanguage("ko");
+        existingProblem.setTags(new java.util.HashSet<>(Set.of(implementation)));
+
+        String firstPageResponse = """
+                {
+                  "items": [
+                    {
+                      "problemId": 35408,
+                      "titleKo": "Lonely Creatures",
+                      "title": "Lonely Creatures",
+                      "level": 22,
+                      "acceptedUserCount": 6,
+                      "titles": [
+                        { "language": "en", "languageDisplayName": "en", "title": "Lonely Creatures", "isOriginal": true }
+                      ],
+                      "tags": [
+                        {
+                          "key": "implementation",
+                          "displayNames": [
+                            { "language": "ko", "name": "구현" }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+        String secondPageResponse = """
+                { "items": [] }
+                """;
+
+        mockServer.expect(requestTo(
+                        "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=1"))
+                .andRespond(withSuccess(firstPageResponse, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo(
+                        "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=2"))
+                .andRespond(withSuccess(secondPageResponse, MediaType.APPLICATION_JSON));
+
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            TransactionCallback<Object> callback = (TransactionCallback<Object>) invocation.getArgument(0);
+            return callback.doInTransaction(transactionStatus);
+        });
+
+        when(problemRepository.findBySourceAndExternalIdInWithTags(eq("BOJ"), anyList()))
+                .thenReturn(List.of(existingProblem));
+        when(tagRepository.findByKeyIn(anyCollection())).thenReturn(List.of(implementation));
+
+        ProblemService.ProblemSyncSummary summary = problemService.syncAllBojProblems(1);
+
+        assertThat(summary.updated()).isEqualTo(1);
+        assertThat(existingProblem.getLanguage()).isEqualTo("en");
+
+        verify(problemRepository, never()).saveAll(anyList());
+        mockServer.verify();
+    }
+
+    @Test
+    void syncAllBojProblems_insertsNewProblemWithAcceptedUserCountLevelAndLanguage() {
+        ProblemService problemService = new ProblemService(problemRepository, tagRepository, transactionTemplate);
+        RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(problemService, "restTemplate");
+        MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restTemplate).build();
+
+        Tag implementation = new Tag("implementation", "implementation");
+
+        String firstPageResponse = """
+                {
+                  "items": [
+                    {
+                      "problemId": 1000,
+                      "titleKo": "",
+                      "title": "A+B",
+                      "level": 1,
+                      "acceptedUserCount": 560,
+                      "tags": [
+                        {
+                          "key": "implementation",
+                          "displayNames": [
+                            { "language": "en", "name": "implementation" }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+        String secondPageResponse = """
+                { "items": [] }
+                """;
+
+        mockServer.expect(requestTo(
+                        "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=1"))
+                .andRespond(withSuccess(firstPageResponse, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo(
+                        "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=2"))
+                .andRespond(withSuccess(secondPageResponse, MediaType.APPLICATION_JSON));
+
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            TransactionCallback<Object> callback = (TransactionCallback<Object>) invocation.getArgument(0);
+            return callback.doInTransaction(transactionStatus);
+        });
+
+        when(problemRepository.findBySourceAndExternalIdInWithTags(eq("BOJ"), anyList()))
+                .thenReturn(List.of());
+        when(tagRepository.findByKeyIn(anyCollection()))
+                .thenReturn(List.of(implementation));
+
+        ProblemService.ProblemSyncSummary summary = problemService.syncAllBojProblems(1);
+        assertThat(summary.inserted()).isEqualTo(1);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Problem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(problemRepository).saveAll(captor.capture());
+        List<Problem> saved = captor.getValue();
+        assertThat(saved).hasSize(1);
+        Problem inserted = saved.get(0);
+        assertThat(inserted.getExternalId()).isEqualTo("1000");
+        assertThat(inserted.getAcceptedUserCount()).isEqualTo(560);
+        assertThat(inserted.getLevel()).isEqualTo(1);
+        assertThat(inserted.getLanguage()).isEqualTo("en");
+
+        mockServer.verify();
+    }
 }
