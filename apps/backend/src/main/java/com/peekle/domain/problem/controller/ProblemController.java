@@ -20,7 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/problems")
 public class ProblemController {
 
-    @Value("${problem.sync.manual.admin-user-id}")
+    @Value("${problem.sync.manual.admin-user-id:1}")
     private Long problemSyncAdminUserId;
 
     private final ProblemService problemService;
