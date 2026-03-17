@@ -1,30 +1,29 @@
-﻿spring:
+spring:
   config:
     activate:
       on-profile: dev
 
   datasource:
-    url: jdbc:h2:file:./data/peekle;AUTO_SERVER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:peekle}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:peekle}
+    password: ${DB_PASSWORD:peekle-password}
 
   jpa:
     hibernate:
-      ddl-auto: update # 개발용: 엔티티 기반 자동 생성
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: false
         show_sql: false
-    database-platform: org.hibernate.dialect.H2Dialect
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   flyway:
-    enabled: false # 개발용: Flyway 비활성화
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    locations: classpath:db/migration-postgres
 
 livekit:
   url: ${LIVEKIT_URL:http://localhost:7880} # 환경변수 없으면 로컬호스트 사용
@@ -47,4 +46,3 @@ springwolf:
       local-ws:
         protocol: ws
         host: localhost:8080
-

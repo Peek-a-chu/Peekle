@@ -49,6 +49,7 @@ public class User extends BaseTimeEntity {
         this.league = LeagueTier.STONE;
         this.leaguePoint = 0;
         this.isDeleted = false;
+        this.recLevelX10 = 30;
         this.extensionToken = java.util.UUID.randomUUID().toString();
         this.extensionTokenUpdatedAt = java.time.LocalDateTime.now();
         this.streakMax = 0;
@@ -106,8 +107,15 @@ public class User extends BaseTimeEntity {
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
+    @Builder.Default
+    @Column(name = "rec_level_x10", nullable = false)
+    private Integer recLevelX10 = 30;
+
     @Column(name = "last_solved_date")
     private java.time.LocalDate lastSolvedDate;
+
+    @Column(name = "last_recommended_date")
+    private java.time.LocalDate lastRecommendedDate;
 
     public void updateStreak(boolean increment, java.time.LocalDate streakDate) {
         if (increment) {
@@ -136,6 +144,14 @@ public class User extends BaseTimeEntity {
 
     public void updateLeagueGroup(Long leagueGroupId) {
         this.leagueGroupId = leagueGroupId;
+    }
+
+    public void updateRecLevelX10(int recLevelX10) {
+        this.recLevelX10 = recLevelX10;
+    }
+
+    public void updateLastRecommendedDate(java.time.LocalDate date) {
+        this.lastRecommendedDate = date;
     }
 
     public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
@@ -198,5 +214,12 @@ public class User extends BaseTimeEntity {
      */
     public void assignToLeagueGroup(Long leagueGroupId) {
         this.leagueGroupId = leagueGroupId;
+    }
+
+    @PrePersist
+    protected void prePersist() {
+        if (this.recLevelX10 == null) {
+            this.recLevelX10 = 30;
+        }
     }
 }
