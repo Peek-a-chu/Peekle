@@ -38,6 +38,19 @@ public class Problem {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String url;
 
+    @Builder.Default
+    @Column(name = "accepted_user_count", nullable = false)
+    private Integer acceptedUserCount = 0;
+
+    @Builder.Default
+    @Column(name = "level", nullable = false)
+    private Integer level = 0;
+
+    @Builder.Default
+    @Column(name = "language", nullable = false, length = 5)
+    private String language = "ko";
+
+    @Builder.Default
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     @JoinTable(name = "problem_tags", joinColumns = @JoinColumn(name = "problem_id"), inverseJoinColumns = @JoinColumn(name = "tag_id"))
     private Set<Tag> tags = new HashSet<>();
@@ -48,6 +61,9 @@ public class Problem {
         this.title = title;
         this.tier = tier;
         this.url = url;
+        this.acceptedUserCount = 0;
+        this.level = 0;
+        this.language = "ko";
         this.tags = new HashSet<>();
     }
 

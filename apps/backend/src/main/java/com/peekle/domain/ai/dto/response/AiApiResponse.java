@@ -17,6 +17,7 @@ public record AiApiResponse(
         String tier,    
         String tags,   
         String reason,
-        String keyword
+        String keyword,
+        String intent
     ) {}
 }

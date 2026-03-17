@@ -43,7 +43,16 @@ export async function getTimelineServer(
 }
 
 export async function getAIRecommendationsServer(): Promise<AIRecommendationData[]> {
-  // Currently mock
-  const { MOCK_AI_RECOMMENDATIONS } = await import('@/domains/home/mocks/dashboardMocks');
-  return MOCK_AI_RECOMMENDATIONS;
+  const data = await fetchServer<any[]>('/api/recommendations/daily');
+  if (!data) return [];
+
+  return data.map((item: any) => ({
+    problemId: `#${item.id}`,
+    title: item.title,
+    tier: item.tierType ? item.tierType.toLowerCase() : 'bronze',
+    tierLevel: item.tierLevel || 1,
+    tags: item.tags || [],
+    reason: item.reason || 'AI 추천 문제',
+    solved: !!item.solved,
+  }));
 }

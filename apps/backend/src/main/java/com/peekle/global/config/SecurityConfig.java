@@ -21,6 +21,7 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
@@ -57,7 +58,10 @@ public class SecurityConfig {
 
                                                 // Extension / APIs
                                                 .requestMatchers("/api/submissions/**").permitAll()
-                                                .requestMatchers("/api/problems/**").permitAll() // 문제 검색/동기화
+                                                .requestMatchers(HttpMethod.GET, "/api/problems/search",
+                                                                "/api/problems/by-external-id", "/api/problems/tags")
+                                                .permitAll()
+                                                .requestMatchers("/api/problems/sync").authenticated()
                                                 .requestMatchers("/api/users/me/**").permitAll() // Extension token
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                                                 "/api/users/*/profile")

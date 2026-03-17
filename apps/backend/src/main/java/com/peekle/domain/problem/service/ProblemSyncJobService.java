@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ public class ProblemSyncJobService {
 
     private final ProblemService problemService;
     private final RedissonClient redissonClient;
+    private final ApplicationContext applicationContext;
 
     @Value("${problem.sync.retry.max-attempts:3}")
     private int maxAttempts;
@@ -34,7 +36,7 @@ public class ProblemSyncJobService {
         if (isSyncRunning()) {
             return false;
         }
-        runManualSyncAsync(startPage);
+        applicationContext.getBean(ProblemSyncJobService.class).runManualSyncAsync(startPage);
         return true;
     }
 

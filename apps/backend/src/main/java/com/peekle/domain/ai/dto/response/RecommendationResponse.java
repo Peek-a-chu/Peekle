@@ -11,6 +11,7 @@ public record RecommendationResponse(
         String tierType,  
         Integer tierLevel, 
         List<String> tags,
-        String reason
+        String reason,
+        Boolean solved
     ) {}
 }

@@ -243,6 +243,49 @@ def search_similar_problems(query_text, n_results=5):
     }
 
 
+def score_candidate_similarities(query_text, candidate_ids):
+    """
+    후보 problem_id 집합에 대해 query_text 임베딩 유사도(코사인 기반)를 계산한다.
+    return: {problem_id: similarity}
+    """
+    if not query_text or not candidate_ids:
+        return {}
+
+    try:
+        _ensure_schema()
+        query_embedding = _embed_texts([query_text])[0]
+        query_vector = _vector_literal(query_embedding)
+        str_ids = [str(pid).strip() for pid in candidate_ids if str(pid).strip()]
+        if not str_ids:
+            return {}
+
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        problem_id,
+                        (1 - (embedding <=> %s::vector)) AS similarity
+                    FROM ai_problem_embeddings
+                    WHERE problem_id = ANY(%s);
+                    """,
+                    (query_vector, str_ids),
+                )
+                rows = cur.fetchall()
+
+        result = {}
+        for row in rows:
+            pid = str(row[0])
+            sim = float(row[1]) if row[1] is not None else 0.0
+            if sim != sim:  # NaN guard
+                sim = 0.0
+            result[pid] = sim
+        return result
+    except Exception as e:
+        print(f"[WARN] 후보 임베딩 점수 계산 실패: {e}")
+        return {}
+
+
 def check_existing_ids(ids):
     """주어진 ID 리스트 중 이미 DB에 존재하는 ID만 반환"""
     if not ids:

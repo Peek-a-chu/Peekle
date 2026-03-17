@@ -1,311 +1,490 @@
+from contextlib import asynccontextmanager
+import json
+import os
+from pathlib import Path
+import re
+from typing import List, Optional
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import List, Optional
-import os
-import re
-from pathlib import Path
 from openai import OpenAI
-from dotenv import load_dotenv
-from contextlib import asynccontextmanager
-from embedding_service import search_similar_problems, get_collection_count
+from pydantic import BaseModel
+
+from embedding_service import get_collection_count, score_candidate_similarities
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+TARGET_RECOMMENDATION_COUNT = 3
+CANDIDATE_LIMIT = 20
+COLD_START_MIN_SIGNAL = 5
+VALID_INTENTS = {"WEAKNESS_REPAIR", "STABLE_FIT", "STRETCH", "REVIEW"}
+EMBEDDING_BLEND_WEIGHT = float(os.getenv("EMBEDDING_BLEND_WEIGHT", "5.0"))
 
-# Gemini API 클라이언트 설정 (OpenAI 호환 엔드포인트)
 ai_client = OpenAI(
     api_key=os.getenv("GEMINI_API_KEY"),
     base_url=os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"),
 )
 
-# --- pgvector 초기화 체크 및 자동 로딩 ---
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """서버 시작 시 pgvector 데이터가 비어있으면 problems.csv 자동 로드"""
     try:
         count = get_collection_count()
-        print(f"[INIT] pgvector 컬렉션에 {count}개의 문제가 저장되어 있습니다.")
-        
-        if count == 0:
-            print("[INIT] pgvector 데이터가 비어있습니다.")
-        else:
-            print(f"[INIT] 기존 데이터 {count}건 존재 (누락 데이터 확인 중...)")
-            
-        # 3. 백그라운드 스레드에서 이어하기 인덱싱 실행 (서버 시작 차단 방지)
-        import threading
-        from indexing import run_auto_indexing
-        
-        indexing_thread = threading.Thread(target=run_auto_indexing, daemon=True)
-        indexing_thread.start()
-        print("[INIT] 백그라운드 인덱싱 작업이 시작되었습니다.")
-        print("[INIT] pgvector 초기화 완료!")
+        print(f"[INIT] pgvector 컬렉션 문서 수: {count}")
     except Exception as e:
-        print(f"[ERROR] pgvector 초기화 중 오류 발생: {e}")
-        print("[WARN] 추천 기능이 제대로 작동하지 않을 수 있습니다.")
-    
-    yield  # 서버 실행
-    
-    # 종료 시 정리 작업 (필요시)
+        print(f"[WARN] 초기 상태 확인 실패: {e}")
+    yield
     print("[SHUTDOWN] AI 서버 종료")
+
 
 app = FastAPI(lifespan=lifespan)
 
 
-# --- 데이터 모델 정의 ---
 class TagStat(BaseModel):
     tagName: Optional[str] = ""
     accuracyRate: Optional[float] = 0.0
     attemptCount: Optional[int] = 0
+
+
+class CandidateProblem(BaseModel):
+    problemId: Optional[str] = ""
+    title: Optional[str] = ""
+    tier: Optional[str] = ""
+    level: Optional[int] = 0
+    tags: Optional[List[str]] = []
+    difficultyGap: Optional[int] = 0
+    weakTagMatchCount: Optional[int] = 0
+    strongTagMatchCount: Optional[int] = 0
+    staleTagMatchCount: Optional[int] = 0
+    recentlyRecommended: Optional[bool] = False
+    candidateScore: Optional[float] = 0.0
+    selectionIntentHint: Optional[str] = "STABLE_FIT"
+    popularityScore: Optional[float] = 0.0
+    noveltyScore: Optional[float] = 0.0
+
 
 class UserActivity(BaseModel):
     solvedProblemTitles: Optional[List[str]] = []
     failedProblemTitles: Optional[List[str]] = []
     tagStats: Optional[List[TagStat]] = []
     currentTier: Optional[str] = "STONE"
+    recLevelX10: Optional[int] = 10
+    tone: Optional[str] = "시작용/적응용"
+    strongTags: Optional[List[str]] = []
+    weakTags: Optional[List[str]] = []
+    staleTags: Optional[List[str]] = []
+    candidateProblems: Optional[List[CandidateProblem]] = []
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # 미들웨어 없이도 에러 발생 시 로그를 통해 확인 가능
-    print(f"\n[422 ERROR] Body Validation Failed!")
-    print(f"Error detail: {exc}")
     return JSONResponse(
         status_code=422,
-        content={"detail": str(exc), "msg": "Check field names and types."}
+        content={"detail": str(exc), "msg": "Check field names and types."},
     )
 
-# --- 헬퍼 함수: 러시아어 등 필터링 ---
-def is_bad_language(text):
-    if re.search('[\u0400-\u04FF]', text):
+
+def is_bad_language(text: str) -> bool:
+    if not text:
+        return False
+    if re.search("[\u0400-\u04FF]", text):
         return True
-    if re.search('[\u0100-\u024F]', text):
+    if re.search("[\u0100-\u024F]", text):
         return True
-    if re.search('[\u4E00-\u9FFF]', text):
+    if re.search("[\u4E00-\u9FFF]", text):
         return True
     return False
+
+
+def normalize_intent(intent: Optional[str], fallback: Optional[str]) -> str:
+    value = (intent or "").strip().upper()
+    if value not in VALID_INTENTS:
+        value = (fallback or "").strip().upper()
+    if value not in VALID_INTENTS:
+        value = "STABLE_FIT"
+    return value
+
+
+def fallback_reason(intent: str) -> str:
+    normalized = normalize_intent(intent, "STABLE_FIT")
+    if normalized == "WEAKNESS_REPAIR":
+        return "최근 약한 유형을 보완하는 데 적절한 문제예요."
+    if normalized == "STRETCH":
+        return "익숙한 유형을 한 단계 높은 난이도로 확장해 보기 좋은 문제예요."
+    if normalized == "REVIEW":
+        return "한동안 손이 닿지 않았던 유형 감각을 다시 살리기 좋은 문제예요."
+    return "현재 추천 난이도에 맞춰 안정적으로 풀기 좋은 문제예요."
+
+
+def normalize_candidates(candidates: List[CandidateProblem]) -> List[dict]:
+    normalized = []
+    seen = set()
+
+    for c in candidates or []:
+        pid = str(c.problemId or "").strip()
+        if not pid or pid in seen:
+            continue
+
+        title = str(c.title or "").strip()
+        tier = str(c.tier or "").strip()
+        if not title or not tier or is_bad_language(title):
+            continue
+
+        tags = []
+        for tag in c.tags or []:
+            value = str(tag or "").strip()
+            if value:
+                tags.append(value)
+
+        normalized.append(
+            {
+                "problemId": pid,
+                "title": title,
+                "tier": tier,
+                "level": int(c.level or 0),
+                "tags": tags,
+                "difficultyGap": int(c.difficultyGap or 0),
+                "weakTagMatchCount": int(c.weakTagMatchCount or 0),
+                "strongTagMatchCount": int(c.strongTagMatchCount or 0),
+                "staleTagMatchCount": int(c.staleTagMatchCount or 0),
+                "recentlyRecommended": bool(c.recentlyRecommended),
+                "candidateScore": float(c.candidateScore or 0.0),
+                "selectionIntentHint": normalize_intent(c.selectionIntentHint, "STABLE_FIT"),
+                "popularityScore": float(c.popularityScore or 0.0),
+                "noveltyScore": float(c.noveltyScore or 0.0),
+            }
+        )
+        seen.add(pid)
+
+        if len(normalized) >= CANDIDATE_LIMIT:
+            break
+
+    return normalized
+
+
+def build_embedding_query_text(
+    activity: UserActivity,
+    strong_tags: List[str],
+    weak_tags: List[str],
+    stale_tags: List[str],
+    is_cold_start: bool,
+) -> str:
+    parts = [
+        f"currentTier: {activity.currentTier}",
+        f"tone: {activity.tone}",
+        f"coldStart: {is_cold_start}",
+    ]
+
+    if weak_tags:
+        parts.append("weak tags: " + ", ".join(weak_tags[:8]))
+    if strong_tags:
+        parts.append("strong tags: " + ", ".join(strong_tags[:8]))
+    if stale_tags:
+        parts.append("stale tags: " + ", ".join(stale_tags[:8]))
+
+    solved = [title for title in (activity.solvedProblemTitles or []) if title][:6]
+    failed = [title for title in (activity.failedProblemTitles or []) if title][:6]
+    if solved:
+        parts.append("recent solved: " + ", ".join(solved))
+    if failed:
+        parts.append("recent failed: " + ", ".join(failed))
+
+    return " | ".join(parts)
+
+
+def rerank_candidates_with_embedding(
+    activity: UserActivity,
+    candidates: List[dict],
+    strong_tags: List[str],
+    weak_tags: List[str],
+    stale_tags: List[str],
+    is_cold_start: bool,
+) -> List[dict]:
+    if not candidates:
+        return []
+
+    query_text = build_embedding_query_text(activity, strong_tags, weak_tags, stale_tags, is_cold_start)
+    candidate_ids = [c["problemId"] for c in candidates]
+    similarity_map = score_candidate_similarities(query_text, candidate_ids)
+    if not similarity_map:
+        return sorted(candidates, key=lambda c: c.get("candidateScore", 0.0), reverse=True)
+
+    sims = [similarity_map[pid] for pid in candidate_ids if pid in similarity_map]
+    if not sims:
+        return sorted(candidates, key=lambda c: c.get("candidateScore", 0.0), reverse=True)
+
+    sim_min = min(sims)
+    sim_max = max(sims)
+    sim_range = sim_max - sim_min
+
+    reranked = []
+    for c in candidates:
+        pid = c["problemId"]
+        raw_sim = similarity_map.get(pid)
+        if raw_sim is None:
+            norm_sim = 0.0
+            raw_sim = 0.0
+        elif sim_range > 1e-9:
+            norm_sim = (raw_sim - sim_min) / sim_range
+        else:
+            norm_sim = 0.5
+
+        base_score = float(c.get("candidateScore", 0.0))
+        hybrid_score = base_score + (norm_sim * EMBEDDING_BLEND_WEIGHT)
+
+        copied = dict(c)
+        copied["embeddingSimilarity"] = raw_sim
+        copied["hybridScore"] = hybrid_score
+        reranked.append(copied)
+
+    return sorted(
+        reranked,
+        key=lambda c: (c.get("hybridScore", 0.0), c.get("candidateScore", 0.0)),
+        reverse=True,
+    )
+
+
+def extract_json_object(text: str) -> Optional[dict]:
+    if not text:
+        return None
+
+    stripped = text.strip()
+    try:
+        return json.loads(stripped)
+    except Exception:
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", stripped)
+    if not match:
+        return None
+
+    try:
+        return json.loads(match.group(0))
+    except Exception:
+        return None
+
+
+def build_prompt(activity: UserActivity, candidates: List[dict], strong_tags: List[str], weak_tags: List[str], stale_tags: List[str]) -> str:
+    lines = []
+    for c in candidates:
+        tags = ",".join(c["tags"]) if c["tags"] else ""
+        hybrid = c.get("hybridScore", c.get("candidateScore", 0.0))
+        emb = c.get("embeddingSimilarity", 0.0)
+        lines.append(
+            "- problemId={problemId} | title={title} | tier={tier} | tags=[{tags}] | gap={gap} | weak={weak} | strong={strong} | stale={stale} | intent={intent} | score={score:.2f} | hybrid={hybrid:.2f} | emb={emb:.4f}".format(
+                problemId=c["problemId"],
+                title=c["title"],
+                tier=c["tier"],
+                tags=tags,
+                gap=c["difficultyGap"],
+                weak=c["weakTagMatchCount"],
+                strong=c["strongTagMatchCount"],
+                stale=c["staleTagMatchCount"],
+                intent=c["selectionIntentHint"],
+                score=c["candidateScore"],
+                hybrid=hybrid,
+                emb=emb,
+            )
+        )
+    candidate_block = "\n".join(lines)
+
+    return f"""
+당신은 알고리즘 추천 어시스턴트입니다.
+아래 후보 문제 목록 안에서만 추천해야 합니다. 후보 밖 문제는 절대 선택하지 마세요.
+
+유저 정보:
+- currentTier: {activity.currentTier}
+- recLevelX10: {activity.recLevelX10}
+- 추천 톤: {activity.tone}
+- 강점 태그: {strong_tags if strong_tags else []}
+- 약점 태그: {weak_tags if weak_tags else []}
+- 오래 안 푼 태그: {stale_tags if stale_tags else []}
+- 최근 성공(상위 10개): {(activity.solvedProblemTitles or [])[:10]}
+- 최근 실패(상위 10개): {(activity.failedProblemTitles or [])[:10]}
+
+후보 문제 목록({len(candidates)}개):
+{candidate_block}
+
+선정 원칙:
+1. 반드시 후보 목록의 problemId만 사용
+2. problemId는 중복 금지
+3. 정확히 {TARGET_RECOMMENDATION_COUNT}개 추천
+4. reason은 한국어 한 문장, 과장 없는 권유형
+5. 3개는 가능한 한 다음 균형을 따를 것:
+   - 최소 1개: 약점 보완형 (WEAKNESS_REPAIR)
+   - 최대 1개: 상향 도전형 (STRETCH)
+   - 나머지: STABLE_FIT 또는 REVIEW
+6. 같은 핵심 태그의 문제만 3개 고르지 말 것
+7. selectionIntentHint, difficultyGap, weakTagMatchCount를 적극 반영할 것
+8. hybrid 점수(emb 유사도 반영)를 참고하되, 태그/의도 균형 규칙을 우선할 것
+
+응답 형식(JSON만 출력, 마크다운 금지):
+{{
+  "recommendations": [
+    {{"problemId": "문제번호", "reason": "추천 이유", "intent": "WEAKNESS_REPAIR"}},
+    {{"problemId": "문제번호", "reason": "추천 이유", "intent": "STABLE_FIT"}},
+    {{"problemId": "문제번호", "reason": "추천 이유", "intent": "STRETCH"}}
+  ]
+}}
+"""
+
 
 @app.post("/recommend/intelligent")
 async def get_intelligent_recommendation(request: Request):
     try:
-        # 1. 원본 데이터 로깅 (422 에러 원인 추적용)
-        body_bytes = await request.body()
-        body_str = body_bytes.decode('utf-8') if body_bytes else "EMPTY"
-        print(f"\n[DEBUG] Raw Body received: '{body_str}'")
-
-        if not body_bytes:
-            print("[ERROR] Body is empty (None/Empty string)")
-            return {"recommendations": [], "error": "Empty body from client"}
-
-        # 2. JSON 파싱 및 모델 변환
         try:
             data = await request.json()
             activity = UserActivity(**data)
-        except Exception as parse_err:
-            print(f"[ERROR] JSON/Pydantic mapping failed: {parse_err}")
-            # 데이터 형식이 살짝 틀려도 진행 가능하도록 최선을 다해 파싱 (Optional 필드 활용)
-            activity = UserActivity() 
+        except Exception:
+            activity = UserActivity()
 
-        # 필드 값 자체가 null(None)로 명시되어 올 경우를 위해 안전장치 추가
-        current_tier = activity.currentTier or "STONE"
         tag_stats = activity.tagStats or []
         solved_titles = activity.solvedProblemTitles or []
         failed_titles = activity.failedProblemTitles or []
 
-        print(f"[DEBUG] {current_tier} 티어 유저 추천 요청 수신 (정상 파싱됨)")
-        
-        # 유저 데이터 분석 (TagStat 모델 필드명인 tagName, accuracyRate 사용)
-        strong_tags = [s.tagName for s in tag_stats if (s.accuracyRate or 0) >= 0.7 and s.tagName]
-        weak_tags = [s.tagName for s in tag_stats if (s.accuracyRate or 0) < 0.7 and s.tagName]
-        total_solved = len(solved_titles)
-        
-        is_new_user = total_solved == 0 and not tag_stats
-        print(f"[DEBUG] 신규 유저 여부: {is_new_user}")
-        
-        # ---------------------------------------------------------
-        # 1단계: AI에게 전략 수립 요청 (형식 변경: 키워드 | 전략)
-        # ---------------------------------------------------------
-        if is_new_user:
-            strategy_prompt = f"""
-당신은 알고리즘 코치입니다. 이 유저는 우리 서비스를 처음 사용하는 신규 유저입니다.
-유저 정보: 현재 티어 {activity.currentTier}, 풀이 기록 없음.
+        strong_tags = [tag for tag in (activity.strongTags or []) if tag]
+        weak_tags = [tag for tag in (activity.weakTags or []) if tag]
+        stale_tags = [tag for tag in (activity.staleTags or []) if tag]
 
-이 유저가 코딩테스트 실력을 본인의 티어에 맞게 성장시킬 수 있도록, pgvector 벡터 DB에서 검색할 인기 알고리즘 유형 키워드 3개를 정해주세요.
+        if not strong_tags:
+            strong_tags = [
+                stat.tagName
+                for stat in tag_stats
+                if stat.tagName and (stat.attemptCount or 0) >= 3 and (stat.accuracyRate or 0.0) >= 0.7
+            ]
+        if not weak_tags:
+            weak_tags = [
+                stat.tagName
+                for stat in tag_stats
+                if stat.tagName and (stat.attemptCount or 0) >= 3 and (stat.accuracyRate or 0.0) < 0.4
+            ]
 
-🚨 [중요] 응답 형식:
-"키워드 | 의도" 형태로 콤마(,)로 구분해 주세요.
-- 키워드 항목은 "알고리즘유형 난이도" 형식 (예: 구현 Bronze)
-- 의도는 아주 짧게(명사형 추천)
+        attempt_signal = len(solved_titles) + len(failed_titles) + sum((stat.attemptCount or 0) for stat in tag_stats)
+        is_cold_start = attempt_signal < COLD_START_MIN_SIGNAL
+        if not activity.tone:
+            activity.tone = "시작용/적응용" if is_cold_start else "성장/보완"
 
-예시:
-구현 Bronze | 기초 구현력 점검, 수학 Bronze | 논리적 사고 배양, 문자열 Bronze | 문자열 처리 기초
-"""
-        else:
-            strategy_prompt = f"""
-당신은 데이터 기반 알고리즘 코치입니다. 
-아래 유저 데이터를 종합적으로 분석하여, 현재 시점에서 가장 성장에 필요한 문제 유형 3개를 선정해주세요.
+        candidates = normalize_candidates(activity.candidateProblems or [])
+        if not candidates:
+            return {"recommendations": []}
+        candidates = rerank_candidates_with_embedding(
+            activity,
+            candidates,
+            strong_tags,
+            weak_tags,
+            stale_tags,
+            is_cold_start,
+        )
 
-📊 유저 데이터:
-- 현재 티어: {activity.currentTier}
-- 최근 성공: {activity.solvedProblemTitles[:10]}
-- 최근 실패: {activity.failedProblemTitles[:10]}
-- 강점 유형: {strong_tags if strong_tags else "분석 중"}
-- 취약 유형: {weak_tags if weak_tags else "분석 중"}
-
-🎯 판단 가이드 (우선순위를 유동적으로 결정하세요):
-1. [취약점] 실패했거나 정답률 낮은 유형 -> "보완 필요"
-2. [도전] 강점 유형의 상위 난이도 -> "실력 상승 도전"
-3. [복습] 오랫동안 안 푼 유형 -> "감 유지"
-
-🚨 [중요] 응답 형식:
-"키워드 | 의도" 형태로 콤마(,)로 구분해 주세요.
-- 키워드: 반드시 "알고리즘유형 난이도" (예: 그리디 Silver) 형식.
-- 의도: '취약점 보완', '티어 상승', '기초 다지기' 처럼 짧고 명확하게.
-
-예시:
-그리디 Silver | 취약점 보완,
-구현 Gold | 실력 상승 도전,
-그래프 Silver | 푼 지 오래된 유형 복습
-"""
-
+        prompt = build_prompt(activity, candidates, strong_tags, weak_tags, stale_tags)
         response = ai_client.chat.completions.create(
             model=GEMINI_CHAT_MODEL,
-            messages=[{"role": "user", "content": strategy_prompt}]
+            messages=[{"role": "user", "content": prompt}],
         )
-        
-        # 응답 파싱: "키워드 | 전략" 쌍으로 분리
-        raw_items = [item.strip() for item in response.choices[0].message.content.split(",")]
-        parsed_strategies = []
-        
-        for item in raw_items:
-            if "|" in item:
-                kw, reason = item.split("|", 1)
-                parsed_strategies.append({"keyword": kw.strip(), "strategy_note": reason.strip()})
-            else:
-                parsed_strategies.append({"keyword": item.strip(), "strategy_note": "성장을 위한 맞춤 문제입니다."})
 
-        print(f"[DEBUG] 파싱된 전략: {parsed_strategies}")
+        raw_content = (response.choices[0].message.content or "").strip()
+        parsed = extract_json_object(raw_content) or {}
+        raw_recs = parsed.get("recommendations", []) if isinstance(parsed, dict) else []
 
-        # ---------------------------------------------------------
-        # 2단계: pgvector 검색 (전략 정보를 유지하며 검색)
-        # ---------------------------------------------------------
-        final_recommendations = []
-        seen_problems = set()
-        
-        for item in parsed_strategies[:3]: # 최대 3개
-            kw = item["keyword"]
-            strategy_note = item["strategy_note"]
-            
-
-            search_results = search_similar_problems(kw, n_results=7)
-            
-            if search_results['documents'] and search_results['documents'][0]:
-                found = False
-                for idx in range(len(search_results['documents'][0])):
-                    p_info = search_results['documents'][0][idx]
-                    p_meta = search_results['metadatas'][0][idx] if search_results['metadatas'][0] else {}
-                    
-                    if p_info not in seen_problems and not is_bad_language(p_info):
-                        final_recommendations.append({
-                            "keyword": kw,
-                            "problem_info": p_info,
-                            "strategy_note": strategy_note, 
-                            "metadata": p_meta
-                        })
-                        seen_problems.add(p_info)
-                        found = True
-                        break
-                
-                # 검색 결과가 하나도 없거나 필터링된 경우
-                if not found:
-                    print(f"[WARN] '{kw}' 키워드에 적합한 문제를 찾지 못함")
-
-        # ---------------------------------------------------------
-        # 3단계: 추천 사유 생성 (문제 정보 + 1단계 전략 메모 전달)
-        # ---------------------------------------------------------
-        
-
-        context_lines = []
-        for i, rec in enumerate(final_recommendations):
-            context_lines.append(f"{i+1}. 문제: {rec['problem_info']} (추천 의도: {rec['strategy_note']})")
-        
-        context_text = "\n".join(context_lines)
-
-        if is_new_user:
-            reason_prompt = f"""
-당신은 친절한 알고리즘 멘토입니다. 
-신규 유저에게 아래 문제들을 추천합니다. 괄호 안의 '추천 의도'를 참고하여, 유저에게 건네는 따뜻한 한 마디를 작성해주세요.
-
-추천 목록:
-{context_text}
-
-🚨 [작성 규칙]
-1. 각 문제에 대한 코멘트를 줄바꿈(Enter)으로 구분하여 총 {len(final_recommendations)}줄을 작성하세요.
-2. 문제 제목이나 번호는 적지 말고, 문장만 적으세요.
-3. 첫 번째 줄에만 "환영합니다!" 같은 인사를 자연스럽게 섞어주세요.
-
-응답 예시:
-환영합니다! 이 문제는 추천 의도처럼 기초 입출력을 배우기에 아주 적합합니다.
-조건문이 처음엔 낯설겠지만, 이 문제를 통해 논리적인 사고를 길러보세요.
-반복문을 마스터하면 코딩의 신세계가 열립니다. 화이팅!
-"""
-        else:
-            reason_prompt = f"""
-당신은 친근한 알고리즘 선배입니다. 유저(현재 티어:{activity.currentTier})에게 왜 이문제를 풀어야 하는지 딱 한문장으로 
-핵심만 말해주세요.
-괄호 안에 적힌 **'추천 의도'**가 문장에 잘 녹아들어야 합니다.
-
-[추천 목록 및 의도]
-{context_text}
-
-🚨 [말투 가이드 - 중요]
-1. 분석 보고서처럼 쓰지 마세요. ("~함", "~임", "데이터 분석 결과" 금지)
-2. **"~네요", "~해봅시다(해보아요)", "~겁니다"** 같은 **자연스러운 권유형**을 쓰세요.
-3. 구체적인 문제 이름이나 숫자를 나열하지 말고, **느낌과 목적**만 전달하세요.
-
-✅ [따라해야 할 모범 답안]
-- (취약점 보완일 때): "최근 어려워하셨던 DP 유형이네요. 이 문제로 기초 점화식 세우기를 연습해봅시다."
-- (티어 상승일 때): "현재 티어보다 조금 높지만, 이 구현 문제를 풀면 실력이 확실히 늘 겁니다."
-- (감 유지일 때): "최근 그래프 문제를 안 푸셨네요. 감을 잃지 않게 가볍게 풀어보는 게 좋겠어요."
-- (기초 다지기일 때): "아직 그리디가 낯설 수 있어요. 가장 정석적인 문제로 연습해봅시다."
-
-🚨 [작성 규칙]
-1. 위 예시와 비슷한 톤으로 {len(final_recommendations)}개의 문장을 작성하세요.
-2. 문장 앞에 숫자, 기호없이 바로 서술하세요. 문제 제목, 번호, 서론을 절대 적지 마세요. 바로 본론(이유)만 적으세요.
-
-
-"""
-
-        # AI에게 멘트 생성 요청
-        reason_response = ai_client.chat.completions.create(
-            model=GEMINI_CHAT_MODEL,
-            messages=[{"role": "user", "content": reason_prompt}]
+        candidate_map = {c["problemId"]: c for c in candidates}
+        ranked_candidates = sorted(
+            candidates,
+            key=lambda x: (x.get("hybridScore", 0.0), x.get("candidateScore", 0.0)),
+            reverse=True,
         )
-        
-        reasons = [r.strip() for r in reason_response.choices[0].message.content.strip().split("\n") if r.strip()]
 
-        # ---------------------------------------------------------
-        # 4단계: 결과 조립 및 반환
-        # ---------------------------------------------------------
+        selected = []
+        seen = set()
+        stretch_count = 0
+
+        for item in raw_recs:
+            if len(selected) >= TARGET_RECOMMENDATION_COUNT:
+                break
+            if not isinstance(item, dict):
+                continue
+            pid = str(item.get("problemId", "")).strip()
+            if not pid or pid in seen or pid not in candidate_map:
+                continue
+
+            candidate = candidate_map[pid]
+            intent = normalize_intent(item.get("intent"), candidate.get("selectionIntentHint"))
+            if intent == "STRETCH" and stretch_count >= 1:
+                continue
+            reason = str(item.get("reason", "")).strip() or fallback_reason(intent)
+            selected.append({"problemId": pid, "reason": reason, "intent": intent})
+            seen.add(pid)
+            if intent == "STRETCH":
+                stretch_count += 1
+
+        for candidate in ranked_candidates:
+            if len(selected) >= TARGET_RECOMMENDATION_COUNT:
+                break
+            pid = candidate["problemId"]
+            if pid in seen:
+                continue
+            intent = normalize_intent(None, candidate.get("selectionIntentHint"))
+            if intent == "STRETCH" and stretch_count >= 1:
+                continue
+            selected.append({"problemId": pid, "reason": fallback_reason(intent), "intent": intent})
+            seen.add(pid)
+            if intent == "STRETCH":
+                stretch_count += 1
+
+        if len(selected) < TARGET_RECOMMENDATION_COUNT:
+            for candidate in ranked_candidates:
+                if len(selected) >= TARGET_RECOMMENDATION_COUNT:
+                    break
+                pid = candidate["problemId"]
+                if pid in seen:
+                    continue
+                intent = normalize_intent(None, candidate.get("selectionIntentHint"))
+                selected.append({"problemId": pid, "reason": fallback_reason(intent), "intent": intent})
+                seen.add(pid)
+
+        has_weakness = any(rec["intent"] == "WEAKNESS_REPAIR" for rec in selected)
+        if not has_weakness:
+            weakness_candidate = next(
+                (
+                    c
+                    for c in ranked_candidates
+                    if c["problemId"] not in seen and c.get("selectionIntentHint") == "WEAKNESS_REPAIR"
+                ),
+                None,
+            )
+            if weakness_candidate is not None:
+                replacement = {
+                    "problemId": weakness_candidate["problemId"],
+                    "reason": fallback_reason("WEAKNESS_REPAIR"),
+                    "intent": "WEAKNESS_REPAIR",
+                }
+                if len(selected) < TARGET_RECOMMENDATION_COUNT:
+                    selected.append(replacement)
+                else:
+                    replace_idx = next((i for i, rec in reversed(list(enumerate(selected))) if rec["intent"] != "WEAKNESS_REPAIR"), -1)
+                    if replace_idx >= 0:
+                        selected[replace_idx] = replacement
+
         results = []
-        for i, rec in enumerate(final_recommendations):
-            # 혹시나 AI가 줄 수를 못 맞췄을 경우를 대비한 안전장치
-            user_reason = reasons[i] if i < len(reasons) else f"{rec['strategy_note']} 도전해보세요!"
-            
-            p_meta = rec.get('metadata', {})
-            
-            results.append({
-                "problemId": str(p_meta.get('id', '')),
-                "title": p_meta.get('title', ''),
-                "tier": p_meta.get('tier', ''),
-                "tags": p_meta.get('tags', ''),
-                "reason": user_reason,
-                "keyword": rec['keyword']
-            })
+        for rec in selected[:TARGET_RECOMMENDATION_COUNT]:
+            meta = candidate_map.get(rec["problemId"])
+            if meta is None:
+                continue
+            results.append(
+                {
+                    "problemId": meta["problemId"],
+                    "title": meta["title"],
+                    "tier": meta["tier"],
+                    "tags": "|".join(meta["tags"]),
+                    "reason": rec["reason"],
+                    "keyword": "candidate-filter",
+                    "intent": rec["intent"],
+                }
+            )
 
-        print("[DEBUG] 추천 로직 완료")
         return {"recommendations": results}
 
     except Exception as e:

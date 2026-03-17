@@ -1,5 +1,6 @@
 package com.peekle.domain.submission.service;
 
+import com.peekle.domain.ai.repository.RecommendProblemRepository;
 import com.peekle.domain.league.service.LeagueService;
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
@@ -39,6 +40,7 @@ public class SubmissionService {
     private final SubmissionValidator submissionValidator;
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisGameService redisGameService;
+    private final RecommendProblemRepository recommendProblemRepository;
 
     @Transactional
     public SubmissionResponse saveGeneralSubmission(SubmissionRequest request) {
@@ -149,6 +151,8 @@ public class SubmissionService {
                     Problem newProblem = new Problem(
                             "BOJ", externalId, request.getProblemTitle(),
                             tierStr, "https://www.acmicpc.net/problem/" + externalId);
+                    newProblem.setLevel(Math.max(tierLevel, 0));
+                    newProblem.setLanguage("ko");
                     return problemRepository.save(newProblem);
                 });
 
@@ -209,6 +213,10 @@ public class SubmissionService {
         log.setStudyProblemId(request.getStudyProblemId());
 
         submissionLogRepository.save(log);
+
+        if (Boolean.TRUE.equals(request.getIsSuccess())) {
+            recommendProblemRepository.markSolved(user.getId(), problem.getId());
+        }
 
         // 5. 리그 포인트 & 랭킹 계산
         int earnedPoints = leagueService.updateLeaguePointForSolvedProblem(user, problem);

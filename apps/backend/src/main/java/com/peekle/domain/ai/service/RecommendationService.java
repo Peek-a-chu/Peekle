@@ -2,71 +2,191 @@ package com.peekle.domain.ai.service;
 
 import com.peekle.domain.ai.dto.request.TagStatDto;
 import com.peekle.domain.ai.dto.request.UserActivityRequest;
+import com.peekle.domain.ai.dto.request.CandidateProblemDto;
 import com.peekle.domain.ai.dto.response.AiApiResponse;
-import com.peekle.domain.ai.dto.response.DailyRecommendation;
 import com.peekle.domain.ai.dto.response.RecommendationResponse;
 import com.peekle.domain.ai.dto.response.RecommendationResponse.RecommendedProblem;
+import com.peekle.domain.ai.entity.RecommendFeedback;
+import com.peekle.domain.ai.entity.RecommendProblem;
+import com.peekle.domain.ai.enums.RecommendationFeedbackType;
+import com.peekle.domain.ai.repository.RecommendFeedbackRepository;
+import com.peekle.domain.ai.repository.RecommendProblemRepository;
+import com.peekle.domain.problem.entity.Problem;
+import com.peekle.domain.problem.entity.Tag;
+import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.submission.entity.SubmissionLog;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 import com.peekle.global.util.SolvedAcLevelUtil;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class RecommendationService {
-    private final RedisTemplate<String, Object> redisTemplate;
     private final SubmissionLogRepository logRepository;
     private final UserRepository userRepository;
+    private final ProblemRepository problemRepository;
+    private final RecommendProblemRepository recommendProblemRepository;
+    private final RecommendFeedbackRepository recommendFeedbackRepository;
     private final RestClient aiRestClient; 
-    private final ObjectMapper objectMapper;
 
-    private static final String REDIS_KEY_PREFIX = "user:recommend:";
-    private static final long CACHE_TTL_HOURS = 24;
+    private static final int TARGET_RECOMMENDATION_COUNT = 3;
+    private static final int CANDIDATE_POOL_SIZE = 120;
+    private static final int AI_CANDIDATE_LIMIT = 15;
+    private static final int MIN_REC_LEVEL_X10 = 10;
+    private static final int MAX_REC_LEVEL_X10 = 300;
+    private static final int LONG_WINDOW_DAYS = 30;
+    private static final int SHORT_WINDOW_DAYS = 7;
+    private static final int NOVELTY_WINDOW_DAYS = 14;
+    private static final int RECENT_HINT_LIMIT = 10;
+    private static final int RECOMMEND_COOLDOWN_DAYS = 3;
+    private static final int RELAXED_COOLDOWN_DAYS = 1;
+    private static final int SOLVED_ALL_DELTA_X10 = 5;
+    private static final int SOLVED_TWO_DELTA_X10 = 3;
+    private static final int SOLVED_ZERO_OR_ONE_DELTA_X10 = -2;
+    private static final int FEEDBACK_TOO_EASY_DELTA_X10 = 3;
+    private static final int FEEDBACK_TOO_HARD_DELTA_X10 = -3;
+    private static final double DIFFICULTY_WEIGHT = 35.0;
+    private static final double WEAK_WEIGHT = 12.0;
+    private static final double STRONG_WEIGHT = 6.0;
+    private static final double STALE_WEIGHT = 5.0;
+    private static final double RECENTLY_RECOMMENDED_PENALTY = 20.0;
+    private static final double OUT_OF_RANGE_PENALTY = 15.0;
+    private static final double POPULARITY_WEIGHT = 2.0;
+    private static final double NOVELTY_WEIGHT = 4.0;
+    private static final double PRACTICALITY_WEIGHT = 6.0;
+    private static final double POPULARITY_NORMALIZER = Math.log1p(1_000_000);
+    private static final int MAX_LOW_FREQ_CENTERED_IN_SET = 1;
+    private static final int MIN_POSITIVE_PRACTICALITY_COUNT = 2;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    private enum PracticalTagCategory {
+        PRACTICAL_CORE,
+        PRACTICAL_MID,
+        MATH_BASIC,
+        MATH_SPECIAL,
+        SPECIAL_LOW_FREQ,
+        AUXILIARY
+    }
+
+    private static final Set<String> PRACTICAL_CORE_TAGS = Set.of(
+            "implementation", "bruteforcing", "backtracking", "greedy", "dp",
+            "graph_traversal", "bfs", "dfs", "string", "sorting", "binary_search",
+            "parametric_search", "two_pointer", "sliding_window", "prefix_sum", "simulation",
+            "data_structures", "priority_queue", "parsing", "ad_hoc", "case_work",
+            "coordinate_compression", "hashing", "constructive"
+    );
+
+    private static final Set<String> PRACTICAL_MID_TAGS = Set.of(
+            "graphs", "trees", "shortest_path", "dijkstra", "disjoint_set",
+            "mst", "topological_sorting", "dag", "bitmask", "knapsack",
+            "lis", "lcs", "trie", "floyd_warshall", "0_1_bfs", "lca", "scc"
+    );
+
+    private static final Set<String> BASIC_MATH_TAGS = Set.of(
+            "arithmetic", "math", "euclidean", "extended_euclidean", "prime_factorization",
+            "primality_test", "sieve", "parity", "combinatorics", "probability", "statistics"
+    );
+
+    private static final Set<String> SPECIAL_MATH_TAGS = Set.of(
+            "number_theory", "crt", "mobius_inversion", "discrete_log",
+            "modular_multiplicative_inverse", "euler_phi", "flt", "lucas", "burnside",
+            "linear_algebra", "gaussian_elimination", "calculus", "numerical_analysis",
+            "physics", "pollard_rho", "miller_rabin"
+    );
+
+    private static final Set<String> SPECIAL_LOW_FREQ_TAGS = Set.of(
+            "flow", "mfmc", "mcmf", "bipartite_matching", "general_matching", "hungarian",
+            "fft", "suffix_array", "suffix_tree", "aho_corasick", "manacher",
+            "segtree", "lazyprop", "pst", "hld", "centroid_decomposition",
+            "mo", "link_cut_tree", "li_chao_tree", "geometry", "geometry_3d",
+            "convex_hull", "half_plane_intersection", "voronoi", "delaunay",
+            "top_tree", "beats", "matroid", "stoer_wagner", "sprague_grundy"
+    );
+
+    private static final Set<String> AUXILIARY_TAGS = Set.of(
+            "queue", "stack", "deque", "set", "hash_set", "tree_set", "linked_list",
+            "recursion", "traceback", "precomputation", "regex", "bitset"
+    );
+
+    @Transactional(readOnly = true)
+    public RecommendationFeedbackType getFeedback(Long userId) {
+        return recommendFeedbackRepository.findByUserId(userId)
+                .map(RecommendFeedback::getFeedback)
+                .orElse(null);
+    }
+
+    @Transactional
+    public RecommendationFeedbackType upsertFeedback(Long userId, RecommendationFeedbackType feedbackType) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        RecommendFeedback existing = recommendFeedbackRepository.findByUserId(userId).orElse(null);
+        if (existing != null) {
+            existing.updateFeedback(feedbackType);
+            recommendFeedbackRepository.save(existing);
+        } else {
+            RecommendFeedback newFeedback = RecommendFeedback.builder()
+                    .user(user)
+                    .feedback(feedbackType)
+                    .build();
+            recommendFeedbackRepository.save(newFeedback);
+        }
+        return feedbackType;
+    }
+
+    @Transactional
     public List<RecommendedProblem> getOrGenerateRecommendations(Long userId) {
         log.info("추천 로직 시작 - userId: {}", userId);
-        String key = REDIS_KEY_PREFIX + userId;
+        LocalDate today = LocalDate.now(KST);
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        applyPendingFeedbackIfNeeded(user, today);
 
         try {
-            // 1. Redis 캐시 확인
-            Object cachedObject = redisTemplate.opsForValue().get(key);
-            if (cachedObject != null) {
-                DailyRecommendation cached;
-                if (cachedObject instanceof DailyRecommendation) {
-                    cached = (DailyRecommendation) cachedObject;
-                } else {
-                    // LinkedHashMap 등으로 반환된 경우 변환
-                    cached = objectMapper.convertValue(cachedObject, DailyRecommendation.class);
-                }
-                return cached.problems();
+            List<RecommendedProblem> todayFromDb = loadTodayRecommendations(user, today);
+            if (!todayFromDb.isEmpty()) {
+                return todayFromDb;
             }
 
-            // 2. 캐시 없으면 AI 서버 호출
-            RecommendationResponse response = callAiServer(userId);
+            UserActivityRequest userActivity = fetchUserActivity(userId);
+            // DB에 오늘 추천이 부족하면 AI 서버 호출
+            RecommendationResponse response = callAiServer(user, today, userActivity);
 
             if (response == null || response.recommendations().isEmpty()) {
                 log.warn("AI 서버에서 추천 결과를 받지 못했습니다. user: {}", userId);
                 return List.of();
             }
 
-            // 3. Redis 저장
-            DailyRecommendation daily = new DailyRecommendation(userId, response.recommendations(), LocalDateTime.now());
-            redisTemplate.opsForValue().set(key, daily, CACHE_TTL_HOURS, TimeUnit.HOURS);
+            if (response.recommendations().isEmpty()) {
+                log.warn("시도한 문제 제외 후 남은 추천이 없습니다. user: {}", userId);
+                return List.of();
+            }
 
-            return response.recommendations();
+            saveTodayRecommendations(user, response.recommendations(), today);
+            return loadTodayRecommendations(user, today);
 
         } catch (Exception e) {
             log.error("추천 로직 수행 중 오류 발생: {}", e.getMessage());
@@ -74,39 +194,459 @@ public class RecommendationService {
         }
     }
 
-    private RecommendationResponse callAiServer(Long userId) {
-        UserActivityRequest request = fetchUserActivity(userId);
-
-        try {
-            String jsonBody = objectMapper.writeValueAsString(request);
-            log.info("AI 서버로 보낼 JSON 데이터: {}", jsonBody);
-        } catch (Exception e) {
-            log.warn("요청 JSON 변환 중 오류 발생: {}", e.getMessage());
-        }
-
-        AiApiResponse aiResponse = aiRestClient.post()
-                .uri("/recommend/intelligent")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request) // RestClient가 객체를 JSON으로 자동 변환
-                .retrieve()
-                .body(AiApiResponse.class);
-
-        if (aiResponse == null || aiResponse.recommendations() == null) {
+    private RecommendationResponse callAiServer(User user, LocalDate today, UserActivityRequest request) {
+        List<CandidateProblemDto> candidates = request.candidateProblems() == null
+                ? List.of()
+                : request.candidateProblems();
+        if (candidates.isEmpty()) {
             return new RecommendationResponse(List.of());
         }
 
-        List<RecommendedProblem> mapped = aiResponse.recommendations().stream()
-                .map(this::mapToRecommendedProblem)
+        Map<String, CandidateProblemDto> candidateMap = candidates.stream()
+                .filter(candidate -> candidate.problemId() != null && !candidate.problemId().isBlank())
+                .collect(Collectors.toMap(CandidateProblemDto::problemId, Function.identity(), (left, right) -> left));
+
+        List<AiApiResponse.AiRecommendedProblem> aiRecommendations = List.of();
+        try {
+            AiApiResponse aiResponse = aiRestClient.post()
+                    .uri("/recommend/intelligent")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(AiApiResponse.class);
+            if (aiResponse != null && aiResponse.recommendations() != null) {
+                aiRecommendations = aiResponse.recommendations();
+            }
+        } catch (Exception e) {
+            log.warn("AI 서버 응답 실패. score 기반 폴백으로 전환합니다. reason={}", e.getMessage());
+        }
+
+        List<CandidateProblemDto> rankedCandidates = candidates.stream()
+                .sorted(Comparator.comparing(
+                        (CandidateProblemDto candidate) -> candidate.candidateScore() == null ? 0.0 : candidate.candidateScore()
+                ).reversed())
+                .toList();
+
+        List<SelectedRecommendation> selected = new ArrayList<>();
+        Set<String> selectedIds = new HashSet<>();
+        Map<String, Integer> coreTagCounts = new HashMap<>();
+        int stretchCount = 0;
+        int hardCount = 0;
+        int lowFreqCenteredCount = 0;
+        int positivePracticalityCount = 0;
+
+        for (AiApiResponse.AiRecommendedProblem aiProblem : aiRecommendations) {
+            if (selected.size() >= TARGET_RECOMMENDATION_COUNT) {
+                break;
+            }
+            String problemId = aiProblem.problemId() != null ? aiProblem.problemId().trim() : "";
+            if (problemId.isBlank() || selectedIds.contains(problemId)) {
+                continue;
+            }
+            CandidateProblemDto candidate = candidateMap.get(problemId);
+            if (candidate == null) {
+                continue;
+            }
+
+            if (!canAddCandidate(candidate, coreTagCounts, stretchCount, hardCount, lowFreqCenteredCount)) {
+                continue;
+            }
+
+            String intent = normalizeIntent(aiProblem.intent(), candidate.selectionIntentHint());
+            String reason = normalizeReason(aiProblem.reason(), candidate, intent);
+            selected.add(new SelectedRecommendation(problemId, reason, intent, "LLM"));
+            selectedIds.add(problemId);
+            stretchCount += "STRETCH".equals(intent) ? 1 : 0;
+            hardCount += (candidate.difficultyGap() != null && candidate.difficultyGap() >= 2) ? 1 : 0;
+            lowFreqCenteredCount += isLowFreqCentered(candidate.tags()) ? 1 : 0;
+            positivePracticalityCount += calculatePracticalityScore(candidate.tags()) > 0 ? 1 : 0;
+            incrementCoreTagCount(coreTagCounts, candidate);
+        }
+
+        for (CandidateProblemDto candidate : rankedCandidates) {
+            if (selected.size() >= TARGET_RECOMMENDATION_COUNT) {
+                break;
+            }
+            String problemId = candidate.problemId();
+            if (problemId == null || problemId.isBlank() || selectedIds.contains(problemId)) {
+                continue;
+            }
+            if (!canAddCandidate(candidate, coreTagCounts, stretchCount, hardCount, lowFreqCenteredCount)) {
+                continue;
+            }
+            String intent = normalizeIntent(null, candidate.selectionIntentHint());
+            String reason = buildFallbackReason(candidate, intent);
+            selected.add(new SelectedRecommendation(problemId, reason, intent, "FALLBACK"));
+            selectedIds.add(problemId);
+            stretchCount += "STRETCH".equals(intent) ? 1 : 0;
+            hardCount += (candidate.difficultyGap() != null && candidate.difficultyGap() >= 2) ? 1 : 0;
+            lowFreqCenteredCount += isLowFreqCentered(candidate.tags()) ? 1 : 0;
+            positivePracticalityCount += calculatePracticalityScore(candidate.tags()) > 0 ? 1 : 0;
+            incrementCoreTagCount(coreTagCounts, candidate);
+        }
+
+        ensureWeaknessRepair(selected, selectedIds, candidateMap, rankedCandidates);
+        if (selected.size() < TARGET_RECOMMENDATION_COUNT) {
+            for (CandidateProblemDto candidate : rankedCandidates) {
+                if (selected.size() >= TARGET_RECOMMENDATION_COUNT) {
+                    break;
+                }
+                String problemId = candidate.problemId();
+                if (problemId == null || problemId.isBlank() || selectedIds.contains(problemId)) {
+                    continue;
+                }
+                String intent = normalizeIntent(null, candidate.selectionIntentHint());
+                selected.add(new SelectedRecommendation(problemId, buildFallbackReason(candidate, intent), intent, "FALLBACK"));
+                selectedIds.add(problemId);
+                lowFreqCenteredCount += isLowFreqCentered(candidate.tags()) ? 1 : 0;
+                positivePracticalityCount += calculatePracticalityScore(candidate.tags()) > 0 ? 1 : 0;
+            }
+        }
+
+        enforcePracticalityMinimum(selected, selectedIds, rankedCandidates, candidateMap, positivePracticalityCount);
+
+        List<SelectedRecommendation> finalSelected = selected.stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .toList();
+
+        List<RecommendedProblem> mapped = finalSelected.stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .map(selectedRecommendation -> {
+                    CandidateProblemDto candidate = candidateMap.get(selectedRecommendation.problemId());
+                    if (candidate == null) {
+                        return null;
+                    }
+                    return mapCandidateToRecommendedProblem(candidate, selectedRecommendation.reason());
+                })
+                .filter(java.util.Objects::nonNull)
                 .toList();
 
         return new RecommendationResponse(mapped);
     }
 
-    private RecommendedProblem mapToRecommendedProblem(AiApiResponse.AiRecommendedProblem aiProblem) {
-        // 티어 파싱: "Gold 4" -> type="gold", level=4
-        String fullTier = aiProblem.tier() != null ? aiProblem.tier() : "Bronze 5";
+    private void applyPendingFeedbackIfNeeded(User user, LocalDate today) {
+        Long userId = user.getId();
+        LocalDate latestRecommendationDate = user.getLastRecommendedDate();
+        if (latestRecommendationDate == null || !latestRecommendationDate.isBefore(today)) {
+            return;
+        }
+
+        long solvedCount = recommendProblemRepository.countByUserIdAndSolvedTrue(userId);
+        int solveDeltaX10;
+        if (solvedCount >= 3) {
+            solveDeltaX10 = SOLVED_ALL_DELTA_X10;
+        } else if (solvedCount == 2) {
+            solveDeltaX10 = SOLVED_TWO_DELTA_X10;
+        } else {
+            solveDeltaX10 = SOLVED_ZERO_OR_ONE_DELTA_X10;
+        }
+
+        List<RecommendFeedback> feedbacks = recommendFeedbackRepository.findAllByUserId(userId);
+        int feedbackDeltaX10 = feedbacks.stream()
+                .map(RecommendFeedback::getFeedback)
+                .mapToInt(this::toDeltaX10)
+                .sum();
+        int totalDeltaX10 = solveDeltaX10 + feedbackDeltaX10;
+
+        if (totalDeltaX10 != 0) {
+            int nextLevel = sanitizeRecLevelX10(user.getRecLevelX10() + totalDeltaX10);
+            user.updateRecLevelX10(nextLevel);
+            log.info(
+                    "추천 난이도 보정 적용 userId={} date={} solvedCount={} solveDeltaX10={} feedbackDeltaX10={} totalDeltaX10={} nextRecLevelX10={}",
+                    userId, latestRecommendationDate, solvedCount, solveDeltaX10, feedbackDeltaX10, totalDeltaX10, nextLevel
+            );
+        }
+
+        recommendFeedbackRepository.deleteAllByUserId(userId);
+    }
+
+    private boolean canAddCandidate(
+            CandidateProblemDto candidate,
+            Map<String, Integer> coreTagCounts,
+            int stretchCount,
+            int hardCount,
+            int lowFreqCenteredCount
+    ) {
+        String intent = normalizeIntent(candidate.selectionIntentHint(), candidate.selectionIntentHint());
+        if ("STRETCH".equals(intent) && stretchCount >= 1) {
+            return false;
+        }
+        if (candidate.difficultyGap() != null && candidate.difficultyGap() >= 2 && hardCount >= 1) {
+            return false;
+        }
+        if (isLowFreqCentered(candidate.tags()) && lowFreqCenteredCount >= MAX_LOW_FREQ_CENTERED_IN_SET) {
+            return false;
+        }
+        String coreTag = extractCoreTag(candidate);
+        if (coreTag != null && coreTagCounts.getOrDefault(coreTag, 0) >= 2) {
+            return false;
+        }
+        return true;
+    }
+
+    private void incrementCoreTagCount(Map<String, Integer> coreTagCounts, CandidateProblemDto candidate) {
+        String coreTag = extractCoreTag(candidate);
+        if (coreTag == null) {
+            return;
+        }
+        coreTagCounts.put(coreTag, coreTagCounts.getOrDefault(coreTag, 0) + 1);
+    }
+
+    private String extractCoreTag(CandidateProblemDto candidate) {
+        if (candidate.tags() == null || candidate.tags().isEmpty()) {
+            return null;
+        }
+        String first = candidate.tags().get(0);
+        if (first == null || first.isBlank()) {
+            return null;
+        }
+        return first.trim();
+    }
+
+    private String normalizeIntent(String aiIntent, String fallbackIntent) {
+        String intent = aiIntent != null ? aiIntent.trim().toUpperCase() : "";
+        if (!Set.of("WEAKNESS_REPAIR", "STABLE_FIT", "STRETCH", "REVIEW").contains(intent)) {
+            intent = fallbackIntent != null ? fallbackIntent.trim().toUpperCase() : "STABLE_FIT";
+        }
+        if (!Set.of("WEAKNESS_REPAIR", "STABLE_FIT", "STRETCH", "REVIEW").contains(intent)) {
+            return "STABLE_FIT";
+        }
+        return intent;
+    }
+
+    private String normalizeReason(String reason, CandidateProblemDto candidate, String intent) {
+        if (reason == null || reason.isBlank()) {
+            return buildFallbackReason(candidate, intent);
+        }
+        return reason.trim();
+    }
+
+    private void ensureWeaknessRepair(
+            List<SelectedRecommendation> selected,
+            Set<String> selectedIds,
+            Map<String, CandidateProblemDto> candidateMap,
+            List<CandidateProblemDto> rankedCandidates
+    ) {
+        boolean hasWeakness = selected.stream()
+                .anyMatch(item -> "WEAKNESS_REPAIR".equals(normalizeIntent(item.intent(), item.intent())));
+        if (hasWeakness) {
+            return;
+        }
+
+        CandidateProblemDto weaknessCandidate = rankedCandidates.stream()
+                .filter(candidate -> candidate.problemId() != null && !selectedIds.contains(candidate.problemId()))
+                .filter(candidate -> "WEAKNESS_REPAIR".equals(normalizeIntent(candidate.selectionIntentHint(), candidate.selectionIntentHint())))
+                .findFirst()
+                .orElse(null);
+
+        if (weaknessCandidate == null) {
+            return;
+        }
+
+        SelectedRecommendation weaknessRecommendation = new SelectedRecommendation(
+                weaknessCandidate.problemId(),
+                buildFallbackReason(weaknessCandidate, "WEAKNESS_REPAIR"),
+                "WEAKNESS_REPAIR",
+                "RULE_BASED"
+        );
+
+        if (selected.size() < TARGET_RECOMMENDATION_COUNT) {
+            selected.add(weaknessRecommendation);
+            selectedIds.add(weaknessCandidate.problemId());
+            return;
+        }
+
+        int replaceIndex = -1;
+        for (int i = selected.size() - 1; i >= 0; i--) {
+            SelectedRecommendation item = selected.get(i);
+            if (!"WEAKNESS_REPAIR".equals(normalizeIntent(item.intent(), item.intent()))) {
+                replaceIndex = i;
+                break;
+            }
+        }
+        if (replaceIndex >= 0) {
+            String removedId = selected.get(replaceIndex).problemId();
+            selected.set(replaceIndex, weaknessRecommendation);
+            selectedIds.remove(removedId);
+            selectedIds.add(weaknessCandidate.problemId());
+        }
+    }
+
+    private void enforcePracticalityMinimum(
+            List<SelectedRecommendation> selected,
+            Set<String> selectedIds,
+            List<CandidateProblemDto> rankedCandidates,
+            Map<String, CandidateProblemDto> candidateMap,
+            int currentPositiveCount
+    ) {
+        if (selected.isEmpty() || currentPositiveCount >= MIN_POSITIVE_PRACTICALITY_COUNT) {
+            return;
+        }
+
+        int positiveCount = currentPositiveCount;
+        for (CandidateProblemDto replacementCandidate : rankedCandidates) {
+            if (positiveCount >= MIN_POSITIVE_PRACTICALITY_COUNT) {
+                break;
+            }
+            if (replacementCandidate.problemId() == null || selectedIds.contains(replacementCandidate.problemId())) {
+                continue;
+            }
+            if (calculatePracticalityScore(replacementCandidate.tags()) <= 0) {
+                continue;
+            }
+
+            int replaceIndex = findReplaceableNonPracticalIndex(selected, candidateMap);
+            if (replaceIndex < 0) {
+                break;
+            }
+
+            SelectedRecommendation old = selected.get(replaceIndex);
+            selected.set(
+                    replaceIndex,
+                    new SelectedRecommendation(
+                            replacementCandidate.problemId(),
+                            buildFallbackReason(replacementCandidate, replacementCandidate.selectionIntentHint()),
+                            normalizeIntent(replacementCandidate.selectionIntentHint(), "STABLE_FIT"),
+                            "RULE_BASED"
+                    )
+            );
+            selectedIds.remove(old.problemId());
+            selectedIds.add(replacementCandidate.problemId());
+            positiveCount++;
+        }
+    }
+
+    private int findReplaceableNonPracticalIndex(
+            List<SelectedRecommendation> selected,
+            Map<String, CandidateProblemDto> candidateMap
+    ) {
+        for (int i = selected.size() - 1; i >= 0; i--) {
+            CandidateProblemDto candidate = candidateMap.get(selected.get(i).problemId());
+            if (candidate == null) {
+                continue;
+            }
+            if (calculatePracticalityScore(candidate.tags()) <= 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int toDeltaX10(RecommendationFeedbackType feedbackType) {
+        if (feedbackType == null) {
+            return 0;
+        }
+        return switch (feedbackType) {
+            case TOO_EASY -> FEEDBACK_TOO_EASY_DELTA_X10;
+            case TOO_HARD -> FEEDBACK_TOO_HARD_DELTA_X10;
+            case JUST_RIGHT -> 0;
+        };
+    }
+
+    private List<RecommendedProblem> loadTodayRecommendations(User user, LocalDate today) {
+        if (!today.equals(user.getLastRecommendedDate())) {
+            return List.of();
+        }
+
+        List<RecommendProblem> todayRows = recommendProblemRepository.findAllByUserIdOrderByOrderIndexAsc(user.getId());
+        if (todayRows.isEmpty()) {
+            return List.of();
+        }
+
+        List<RecommendedProblem> mapped = todayRows.stream()
+                .map(this::mapFromRecommendProblem)
+                .toList();
+        return mapped;
+    }
+
+    private void saveTodayRecommendations(User user, List<RecommendedProblem> recommendations, LocalDate today) {
+        Long userId = user.getId();
+        List<RecommendedProblem> limitedRecommendations = recommendations.stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .toList();
+
+        List<String> externalIds = limitedRecommendations.stream()
+                .map(RecommendedProblem::id)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+
+        Map<String, Problem> problemMap = problemRepository
+                .findBySourceAndLanguageAndExternalIdInWithTags("BOJ", "ko", externalIds)
+                .stream()
+                .collect(Collectors.toMap(Problem::getExternalId, Function.identity(), (left, right) -> left));
+
+        List<RecommendProblem> existingRows = recommendProblemRepository.findAllByUserIdOrderByOrderIndexAsc(userId);
+        Map<Integer, RecommendProblem> existingByOrder = existingRows.stream()
+                .filter(row -> row.getOrderIndex() != null)
+                .collect(Collectors.toMap(RecommendProblem::getOrderIndex, Function.identity(), (left, right) -> left));
+
+        List<RecommendProblem> upsertRows = new ArrayList<>();
+        Set<Integer> usedOrders = new HashSet<>();
+
+        for (int index = 0; index < limitedRecommendations.size(); index++) {
+            RecommendedProblem rec = limitedRecommendations.get(index);
+            Problem problem = problemMap.get(rec.id());
+            if (problem == null) {
+                continue;
+            }
+
+            RecommendProblem row = existingByOrder.get(index);
+            if (row == null) {
+                row = RecommendProblem.create(user, problem, rec.reason(), index);
+            } else {
+                row.updateRecommendation(problem, rec.reason(), index);
+            }
+
+            upsertRows.add(row);
+            usedOrders.add(index);
+        }
+
+        List<RecommendProblem> toDelete = existingRows.stream()
+                .filter(row -> row.getOrderIndex() == null || !usedOrders.contains(row.getOrderIndex()))
+                .toList();
+        if (!toDelete.isEmpty()) {
+            recommendProblemRepository.deleteAll(toDelete);
+        }
+
+        if (!upsertRows.isEmpty()) {
+            user.updateLastRecommendedDate(today);
+            recommendProblemRepository.saveAll(upsertRows);
+        }
+    }
+
+    private RecommendedProblem mapFromRecommendProblem(RecommendProblem recommendProblem) {
+        Problem problem = recommendProblem.getProblem();
+        String tier = problem.getTier();
+        String[] parts = tier != null ? tier.split(" ") : new String[0];
+        String tierType = parts.length >= 1 ? parts[0].toLowerCase() : "bronze";
+        Integer tierLevel = 5;
+        if (parts.length >= 2) {
+            try {
+                tierLevel = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
+                tierLevel = parseRoman(parts[1]);
+            }
+        }
+
+        List<String> tags = problem.getTags().stream()
+                .map(Tag::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
+
+        return new RecommendedProblem(
+                problem.getExternalId(),
+                problem.getTitle(),
+                tierType,
+                tierLevel,
+                tags,
+                recommendProblem.getReason() != null ? recommendProblem.getReason() : "추천 문제입니다.",
+                Boolean.TRUE.equals(recommendProblem.getSolved())
+        );
+    }
+
+    private RecommendedProblem mapCandidateToRecommendedProblem(CandidateProblemDto candidate, String reason) {
+        String fullTier = candidate.tier() != null ? candidate.tier() : "Bronze 5";
         String[] parts = fullTier.split(" ");
-        
         String tierType = "bronze";
         Integer tierLevel = 5;
 
@@ -115,30 +655,20 @@ public class RecommendationService {
         }
         if (parts.length >= 2) {
             try {
-                // 숫자인 경우 (4) 처리
                 tierLevel = Integer.parseInt(parts[1]);
             } catch (NumberFormatException e) {
-                // 로마자인 경우 (IV) 처리 로직 (필요시 추가)
                 tierLevel = parseRoman(parts[1]);
             }
         }
 
-        // 태그 파싱: "구현, 그리디" -> ["구현", "그리디"]
-        List<String> tags = List.of();
-        if (aiProblem.tags() != null && !aiProblem.tags().isEmpty()) {
-            tags = java.util.Arrays.stream(aiProblem.tags().split("[,|]"))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .toList();
-        }
-
         return new RecommendedProblem(
-                aiProblem.problemId(),
-                aiProblem.title(),
+                candidate.problemId(),
+                candidate.title(),
                 tierType,
                 tierLevel,
-                tags,
-                aiProblem.reason()
+                candidate.tags() == null ? List.of() : candidate.tags(),
+                reason != null && !reason.isBlank() ? reason : buildFallbackReason(candidate, candidate.selectionIntentHint()),
+                false
         );
     }
 
@@ -158,107 +688,445 @@ public class RecommendationService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 최근 제출 기록 조회 (유저의 모든 제출, 최신순 정렬)
-        List<SubmissionLog> logs = logRepository.findAllByUserIdOrderBySubmittedAtAsc(userId);
-        
-        // 최근 20개만 사용
-        List<SubmissionLog> recentLogs = logs.stream()
-                .sorted((a, b) -> b.getSubmittedAt().compareTo(a.getSubmittedAt()))
-                .limit(20)
+        LocalDateTime now = LocalDateTime.now(KST);
+        LocalDateTime longWindowStart = now.minusDays(LONG_WINDOW_DAYS);
+        LocalDateTime shortWindowStart = now.minusDays(SHORT_WINDOW_DAYS);
+        LocalDateTime noveltyWindowStart = now.minusDays(NOVELTY_WINDOW_DAYS);
+
+        List<SubmissionLog> longWindowLogs = logRepository
+                .findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(userId, longWindowStart, now);
+
+        List<SubmissionLog> shortWindowLogs = longWindowLogs.stream()
+                .filter(log -> log.getSubmittedAt() != null && !log.getSubmittedAt().isBefore(shortWindowStart))
                 .toList();
 
-        // 성공한 문제 제목 추출 (isSuccess 기반)
-        List<String> solvedTitles = recentLogs.stream()
+        List<SubmissionLog> noveltyWindowLogs = longWindowLogs.stream()
+                .filter(log -> log.getSubmittedAt() != null && !log.getSubmittedAt().isBefore(noveltyWindowStart))
+                .toList();
+
+        List<String> solvedTitles = shortWindowLogs.stream()
                 .filter(log -> Boolean.TRUE.equals(log.getIsSuccess()))
                 .map(SubmissionLog::getProblemTitle)
                 .filter(java.util.Objects::nonNull)
                 .distinct()
+                .limit(RECENT_HINT_LIMIT)
                 .toList();
 
-        // 실패한 문제 제목 추출 (isSuccess 기반)
-        List<String> failedTitles = recentLogs.stream()
+        List<String> failedTitles = shortWindowLogs.stream()
                 .filter(log -> Boolean.FALSE.equals(log.getIsSuccess()))
                 .map(SubmissionLog::getProblemTitle)
                 .filter(java.util.Objects::nonNull)
                 .distinct()
+                .limit(RECENT_HINT_LIMIT)
                 .toList();
 
-        // 태그별 통계 생성 (isSuccess 기반 정답률 계산)
-        List<TagStatDto> tagStatDtos = recentLogs.stream()
-                .filter(log -> log.getTag() != null)
-                .collect(java.util.stream.Collectors.groupingBy(SubmissionLog::getTag))
-                .entrySet().stream()
+        Map<String, int[]> tagStatsMap = new HashMap<>();
+        for (SubmissionLog log : longWindowLogs) {
+            Set<Tag> tags = log.getProblem() != null ? log.getProblem().getTags() : Set.of();
+            for (Tag tag : tags) {
+                String tagKey = extractTagKey(tag);
+                if (tagKey == null) {
+                    continue;
+                }
+                int[] stat = tagStatsMap.computeIfAbsent(tagKey, key -> new int[2]);
+                stat[0] += 1;
+                if (Boolean.TRUE.equals(log.getIsSuccess())) {
+                    stat[1] += 1;
+                }
+            }
+        }
+
+        List<TagStatDto> tagStatDtos = tagStatsMap.entrySet().stream()
                 .map(entry -> {
                     String tagName = entry.getKey();
-                    List<SubmissionLog> tagLogs = entry.getValue();
-                    long totalCount = tagLogs.size();
-                    long successCount = tagLogs.stream()
-                            .filter(log -> Boolean.TRUE.equals(log.getIsSuccess()))
-                            .count();
+                    int totalCount = entry.getValue()[0];
+                    int successCount = entry.getValue()[1];
                     double accuracyRate = totalCount > 0 ? (double) successCount / totalCount : 0.0;
-                    return new TagStatDto(tagName, accuracyRate, (int) totalCount);
+                    return new TagStatDto(tagName, accuracyRate, totalCount);
                 })
                 .toList();
 
-        // 최근 성공한 문제들의 평균 티어 계산
-        List<Integer> solvedLevels = recentLogs.stream()
-                .filter(log -> Boolean.TRUE.equals(log.getIsSuccess()))
-                .map(log -> calculateTierLevel(log.getProblemTier()))
-                .filter(level -> level > 0)
-                .toList();
+        Set<String> strongTags = tagStatDtos.stream()
+                .filter(stat -> stat.attemptCount() >= 3)
+                .filter(stat -> stat.accuracyRate() >= 0.7)
+                .map(TagStatDto::tagName)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
 
-        String currentTier;
-        if (solvedLevels.isEmpty()) {
-            // 풀이 기록이 없는 경우 브론즈 5 ~ 골드 1 사이에서 랜덤 배정 (1~15 레벨)
-            int randomLevel = (int) (Math.random() * 15) + 1;
-            currentTier = SolvedAcLevelUtil.convertLevelToTier(randomLevel);
-        } else {
-            double averageLevel = solvedLevels.stream()
-                    .mapToInt(Integer::intValue)
-                    .average()
-                    .orElse(0.0);
-            currentTier = SolvedAcLevelUtil.convertLevelToTier((int) Math.round(averageLevel));
-        }
+        Set<String> weakTags = tagStatDtos.stream()
+                .filter(stat -> stat.attemptCount() >= 3)
+                .filter(stat -> stat.accuracyRate() < 0.4)
+                .map(TagStatDto::tagName)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+
+        Set<String> solvedRecent30Tags = longWindowLogs.stream()
+                .filter(log -> Boolean.TRUE.equals(log.getIsSuccess()))
+                .flatMap(log -> (log.getProblem() == null ? Set.<Tag>of() : log.getProblem().getTags()).stream())
+                .map(this::extractTagKey)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+
+        Set<String> solvedBefore30Tags = logRepository.findDistinctSolvedTagKeysBefore(userId, longWindowStart)
+                .stream()
+                .filter(tag -> tag != null && !tag.isBlank())
+                .map(String::trim)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+
+        Set<String> staleTags = new java.util.LinkedHashSet<>(solvedBefore30Tags);
+        staleTags.removeAll(solvedRecent30Tags);
+
+        Set<String> recentInteractionTags = noveltyWindowLogs.stream()
+                .flatMap(log -> (log.getProblem() == null ? Set.<Tag>of() : log.getProblem().getTags()).stream())
+                .map(this::extractTagKey)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+
+        int recLevelX10 = sanitizeRecLevelX10(user.getRecLevelX10());
+        int recLevel = Math.max(1, Math.min(30, recLevelX10 / 10));
+        String currentTier = SolvedAcLevelUtil.convertLevelToTier(recLevel);
+        int targetLevel = recLevelX10 / 10;
+        int attemptSignal = longWindowLogs.size();
+        boolean isColdStart = attemptSignal < 5;
+        List<CandidateProblemDto> candidateProblems = fetchCandidateProblems(
+                userId,
+                recLevel,
+                targetLevel,
+                strongTags,
+                weakTags,
+                staleTags,
+                recentInteractionTags,
+                isColdStart,
+                LocalDate.now(KST)
+        );
+        String tone = isColdStart ? "시작용/적응용" : "성장/보완";
 
         return new UserActivityRequest(
                 solvedTitles,
                 failedTitles,
                 tagStatDtos,
-                currentTier
+                currentTier,
+                recLevelX10,
+                tone,
+                List.copyOf(strongTags),
+                List.copyOf(weakTags),
+                List.copyOf(staleTags),
+                candidateProblems
         );
 
     }
 
-    private int calculateTierLevel(String tier) {
-        if (tier == null || tier.equals("Unrated") || tier.equals("Unknown")) return 0;
-        
-        try {
-            String[] parts = tier.split(" ");
-            if (parts.length < 2) return 0;
-            
-            String rank = parts[0];
-            int step;
-            try {
-                step = Integer.parseInt(parts[1]);
-            } catch (NumberFormatException e) {
-                step = parseRoman(parts[1]);
-            }
-            
-            int base = 0;
-            switch(rank) {
-                case "Bronze": base = 0; break;
-                case "Silver": base = 5; break;
-                case "Gold": base = 10; break;
-                case "Platinum": base = 15; break;
-                case "Diamond": base = 20; break;
-                case "Ruby": base = 25; break;
-                default: return 0;
-            }
-            
-            return base + (6 - step);
-        } catch (Exception e) {
-            return 0;
+    private List<CandidateProblemDto> fetchCandidateProblems(
+            Long userId,
+            int baseLevel,
+            int targetLevel,
+            Set<String> strongTags,
+            Set<String> weakTags,
+            Set<String> staleTags,
+            Set<String> recentInteractionTags,
+            boolean isColdStart,
+            LocalDate today
+    ) {
+        int minLevel = Math.max(1, baseLevel - 2);
+        int maxLevel = Math.min(30, baseLevel + 2);
+
+        List<String> externalIds = problemRepository
+                .findRecommendationCandidateExternalIds(userId, minLevel, maxLevel, PageRequest.of(0, CANDIDATE_POOL_SIZE))
+                .getContent();
+
+        if (externalIds.isEmpty()) {
+            return List.of();
         }
+
+        Map<String, Problem> problemMap = problemRepository
+                .findBySourceAndLanguageAndExternalIdInWithTags("BOJ", "ko", externalIds)
+                .stream()
+                .collect(Collectors.toMap(Problem::getExternalId, Function.identity(), (left, right) -> left));
+
+        Set<String> recentlyRecommendedIds = recommendProblemRepository.findAllByUserIdOrderByOrderIndexAsc(userId)
+                .stream()
+                .map(recommendProblem -> recommendProblem.getProblem() != null ? recommendProblem.getProblem().getExternalId() : null)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Set<String> strictCooldownIds = fetchRecentRecommendedProblemIds(userId, today, RECOMMEND_COOLDOWN_DAYS);
+        List<String> candidateExternalIds = externalIds.stream()
+                .filter(externalId -> !strictCooldownIds.contains(externalId))
+                .toList();
+
+        if (candidateExternalIds.size() < AI_CANDIDATE_LIMIT) {
+            Set<String> relaxedCooldownIds = fetchRecentRecommendedProblemIds(userId, today, RELAXED_COOLDOWN_DAYS);
+            candidateExternalIds = externalIds.stream()
+                    .filter(externalId -> !relaxedCooldownIds.contains(externalId))
+                    .toList();
+        }
+
+        if (candidateExternalIds.size() < AI_CANDIDATE_LIMIT / 2) {
+            candidateExternalIds = externalIds;
+        }
+
+        return candidateExternalIds.stream()
+                .map(problemMap::get)
+                .filter(java.util.Objects::nonNull)
+                .map(problem -> {
+                    List<String> tags = problem.getTags().stream()
+                            .map(this::extractTagKey)
+                            .filter(java.util.Objects::nonNull)
+                            .distinct()
+                            .toList();
+                    if (isColdStart && containsSpecialLowFreq(tags)) {
+                        return null;
+                    }
+                    int difficultyGap = (problem.getLevel() == null ? 0 : problem.getLevel()) - targetLevel;
+                    int weakTagMatchCount = (int) tags.stream().filter(weakTags::contains).count();
+                    int strongTagMatchCount = (int) tags.stream().filter(strongTags::contains).count();
+                    int staleTagMatchCount = (int) tags.stream().filter(staleTags::contains).count();
+                    boolean recentlyRecommended = recentlyRecommendedIds.contains(problem.getExternalId());
+                    double popularityScore = normalizePopularity(problem.getAcceptedUserCount());
+                    double noveltyScore = calculateNoveltyScore(tags, recentInteractionTags);
+                    double practicalityScore = calculatePracticalityScore(tags);
+                    String selectionIntentHint = decideSelectionIntentHint(
+                            weakTagMatchCount,
+                            strongTagMatchCount,
+                            staleTagMatchCount,
+                            difficultyGap
+                    );
+                    double candidateScore = scoreCandidate(
+                            difficultyGap,
+                            weakTagMatchCount,
+                            strongTagMatchCount,
+                            staleTagMatchCount,
+                            recentlyRecommended,
+                            popularityScore,
+                            noveltyScore,
+                            practicalityScore
+                    );
+                    return new CandidateProblemDto(
+                            problem.getExternalId(),
+                            problem.getTitle(),
+                            problem.getTier(),
+                            problem.getLevel(),
+                            tags,
+                            difficultyGap,
+                            weakTagMatchCount,
+                            strongTagMatchCount,
+                            staleTagMatchCount,
+                            recentlyRecommended,
+                            candidateScore,
+                            selectionIntentHint,
+                            popularityScore,
+                            noveltyScore
+                    );
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted(Comparator.comparing(
+                        (CandidateProblemDto candidate) -> candidate.candidateScore() == null ? 0.0 : candidate.candidateScore()
+                ).reversed())
+                .limit(AI_CANDIDATE_LIMIT)
+                .toList();
+    }
+
+    private String extractTagKey(Tag tag) {
+        if (tag == null) {
+            return null;
+        }
+        if (tag.getKey() != null && !tag.getKey().isBlank()) {
+            return tag.getKey().trim();
+        }
+        if (tag.getName() != null && !tag.getName().isBlank()) {
+            return tag.getName().trim();
+        }
+        return null;
+    }
+
+    private double scoreCandidate(
+            int difficultyGap,
+            int weakTagMatchCount,
+            int strongTagMatchCount,
+            int staleTagMatchCount,
+            boolean recentlyRecommended,
+            double popularityScore,
+            double noveltyScore,
+            double practicalityScore
+    ) {
+        double score = 0.0;
+        score += difficultyFitScore(difficultyGap) * DIFFICULTY_WEIGHT;
+        score += weakTagMatchCount * WEAK_WEIGHT;
+        score += strongTagMatchCount * STRONG_WEIGHT;
+        score += staleTagMatchCount * STALE_WEIGHT;
+        if (recentlyRecommended) {
+            score -= RECENTLY_RECOMMENDED_PENALTY;
+        }
+        if (difficultyGap <= -3 || difficultyGap >= 3) {
+            score -= OUT_OF_RANGE_PENALTY;
+        }
+        score += popularityScore * POPULARITY_WEIGHT;
+        score += noveltyScore * NOVELTY_WEIGHT;
+        score += practicalityScore * PRACTICALITY_WEIGHT;
+        return score;
+    }
+
+    private double difficultyFitScore(int difficultyGap) {
+        return switch (difficultyGap) {
+            case 0 -> 1.0;
+            case -1, 1 -> 0.85;
+            case -2, 2 -> 0.65;
+            default -> 0.2;
+        };
+    }
+
+    private String decideSelectionIntentHint(
+            int weakTagMatchCount,
+            int strongTagMatchCount,
+            int staleTagMatchCount,
+            int difficultyGap
+    ) {
+        if (weakTagMatchCount > 0) {
+            return "WEAKNESS_REPAIR";
+        }
+        if (strongTagMatchCount > 0 && difficultyGap >= 1) {
+            return "STRETCH";
+        }
+        if (staleTagMatchCount > 0) {
+            return "REVIEW";
+        }
+        return "STABLE_FIT";
+    }
+
+    private double normalizePopularity(Integer acceptedUserCount) {
+        int safeCount = acceptedUserCount == null ? 0 : Math.max(0, acceptedUserCount);
+        return Math.log1p(safeCount) / POPULARITY_NORMALIZER;
+    }
+
+    private Set<String> fetchRecentRecommendedProblemIds(Long userId, LocalDate today, int cooldownDays) {
+        return Set.of();
+    }
+
+    private PracticalTagCategory categoryOf(String rawTag) {
+        if (rawTag == null || rawTag.isBlank()) {
+            return PracticalTagCategory.AUXILIARY;
+        }
+        String tag = rawTag.trim().toLowerCase();
+        if (PRACTICAL_CORE_TAGS.contains(tag)) {
+            return PracticalTagCategory.PRACTICAL_CORE;
+        }
+        if (PRACTICAL_MID_TAGS.contains(tag)) {
+            return PracticalTagCategory.PRACTICAL_MID;
+        }
+        if (BASIC_MATH_TAGS.contains(tag)) {
+            return PracticalTagCategory.MATH_BASIC;
+        }
+        if (SPECIAL_MATH_TAGS.contains(tag)) {
+            return PracticalTagCategory.MATH_SPECIAL;
+        }
+        if (SPECIAL_LOW_FREQ_TAGS.contains(tag)) {
+            return PracticalTagCategory.SPECIAL_LOW_FREQ;
+        }
+        if (AUXILIARY_TAGS.contains(tag)) {
+            return PracticalTagCategory.AUXILIARY;
+        }
+        return PracticalTagCategory.AUXILIARY;
+    }
+
+    private boolean containsSpecialLowFreq(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return false;
+        }
+        return tags.stream().anyMatch(tag -> categoryOf(tag) == PracticalTagCategory.SPECIAL_LOW_FREQ);
+    }
+
+    private boolean isLowFreqCentered(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return false;
+        }
+        long coreCount = tags.stream().filter(tag -> categoryOf(tag) == PracticalTagCategory.PRACTICAL_CORE).count();
+        long midCount = tags.stream().filter(tag -> categoryOf(tag) == PracticalTagCategory.PRACTICAL_MID).count();
+        long specialMathCount = tags.stream().filter(tag -> categoryOf(tag) == PracticalTagCategory.MATH_SPECIAL).count();
+        long specialLowFreqCount = tags.stream().filter(tag -> categoryOf(tag) == PracticalTagCategory.SPECIAL_LOW_FREQ).count();
+        long specialCount = specialMathCount + specialLowFreqCount;
+        return specialCount > 0 && specialCount >= (coreCount + midCount);
+    }
+
+    private double calculatePracticalityScore(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return 0.0;
+        }
+
+        double score = 0.0;
+        boolean hasCore = false;
+        boolean hasSpecialMath = false;
+        boolean hasSpecialLowFreq = false;
+        int basicMathCount = 0;
+
+        for (String tag : tags) {
+            PracticalTagCategory category = categoryOf(tag);
+            switch (category) {
+                case PRACTICAL_CORE -> {
+                    score += 1.0;
+                    hasCore = true;
+                }
+                case PRACTICAL_MID -> score += 0.45;
+                case MATH_BASIC -> {
+                    score -= 0.10;
+                    basicMathCount++;
+                }
+                case MATH_SPECIAL -> {
+                    score -= 0.90;
+                    hasSpecialMath = true;
+                }
+                case SPECIAL_LOW_FREQ -> {
+                    score -= 1.00;
+                    hasSpecialLowFreq = true;
+                }
+                case AUXILIARY -> score += 0.05;
+            }
+        }
+
+        if (hasCore) {
+            score += basicMathCount * 0.15;
+        }
+        if (hasSpecialMath && hasSpecialLowFreq) {
+            score -= 0.8;
+        }
+        if (!hasCore && (hasSpecialMath || hasSpecialLowFreq)) {
+            score -= 0.6;
+        }
+        return score;
+    }
+
+    private double calculateNoveltyScore(List<String> candidateTags, Set<String> recentInteractionTags) {
+        if (candidateTags == null || candidateTags.isEmpty()) {
+            return 0.5;
+        }
+        if (recentInteractionTags == null || recentInteractionTags.isEmpty()) {
+            return 1.0;
+        }
+        long overlap = candidateTags.stream().filter(recentInteractionTags::contains).count();
+        double overlapRatio = (double) overlap / (double) candidateTags.size();
+        return Math.max(0.0, 1.0 - overlapRatio);
+    }
+
+    private String buildFallbackReason(CandidateProblemDto candidate, String intent) {
+        String normalizedIntent = normalizeIntent(intent, candidate.selectionIntentHint());
+        return switch (normalizedIntent) {
+            case "WEAKNESS_REPAIR" -> "최근 약한 유형을 보완하는 데 적절한 문제예요.";
+            case "STRETCH" -> "익숙한 유형을 한 단계 높은 난이도로 확장해 보기 좋은 문제예요.";
+            case "REVIEW" -> "한동안 손이 닿지 않았던 유형 감각을 다시 살리기 좋은 문제예요.";
+            default -> "현재 추천 난이도에 맞춰 안정적으로 풀기 좋은 문제예요.";
+        };
+    }
+
+    private record SelectedRecommendation(
+            String problemId,
+            String reason,
+            String intent,
+            String selectedBy
+    ) {
+    }
+
+    private int sanitizeRecLevelX10(Integer recLevelX10) {
+        if (recLevelX10 == null) {
+            return MIN_REC_LEVEL_X10;
+        }
+        return Math.max(MIN_REC_LEVEL_X10, Math.min(MAX_REC_LEVEL_X10, recLevelX10));
     }
 
 }

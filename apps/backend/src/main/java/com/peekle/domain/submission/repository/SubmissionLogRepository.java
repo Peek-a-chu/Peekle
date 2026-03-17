@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -55,6 +56,9 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
         // 유저의 모든 제출 기록 조회 (스트릭 계산용, 오래된 순)
         List<SubmissionLog> findAllByUserIdOrderBySubmittedAtAsc(Long userId);
 
+        @Query("SELECT DISTINCT s.externalId FROM SubmissionLog s WHERE s.user.id = :userId AND s.externalId IS NOT NULL")
+        List<String> findDistinctExternalIdsByUserId(@Param("userId") Long userId);
+
         // [New] 특정 유저의 특정 일자(범위) 제출 기록 조회
         List<SubmissionLog> findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
                         Long userId,
@@ -63,4 +67,14 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
 
         // [New] 유저의 전체 제출 기록 조회 (페이징)
         Page<SubmissionLog> findAllByUserIdOrderBySubmittedAtDesc(Long userId, Pageable pageable);
+
+        @Query("SELECT DISTINCT t.key FROM SubmissionLog s " +
+                        "JOIN s.problem p " +
+                        "JOIN p.tags t " +
+                        "WHERE s.user.id = :userId " +
+                        "AND s.isSuccess = true " +
+                        "AND s.submittedAt < :cutoff")
+        List<String> findDistinctSolvedTagKeysBefore(
+                        @Param("userId") Long userId,
+                        @Param("cutoff") java.time.LocalDateTime cutoff);
 }

@@ -15,6 +15,47 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: peekle-postgres-vector
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-peekle}
+      POSTGRES_USER: ${POSTGRES_USER:-peekle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-peekle-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-vector-data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-peekle} -d ${POSTGRES_DB:-peekle}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-server:
+    build:
+      context: ../apps/ai-server
+      dockerfile: Dockerfile
+    container_name: peekle-ai-server
+    env_file:
+      - ../apps/ai-server/.env
+    environment:
+      - PGVECTOR_HOST=postgres-vector
+      - PGVECTOR_PORT=5432
+      - PGVECTOR_DB=${POSTGRES_DB:-peekle}
+      - PGVECTOR_USER=${POSTGRES_USER:-peekle}
+      - PGVECTOR_PASSWORD=${POSTGRES_PASSWORD:-peekle-password}
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-vector:
+        condition: service_healthy
+    restart: unless-stopped
+
   livekit:
     image: livekit/livekit-server:latest
     container_name: peekle-livekit-local
@@ -47,4 +88,6 @@ services:
 
 volumes:
   redis-data:
+    driver: local
+  postgres-vector-data:
     driver: local

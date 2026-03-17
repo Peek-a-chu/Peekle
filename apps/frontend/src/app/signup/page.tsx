@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { signup as signupApi } from '@/api/authApi';
+import { signup as signupApi, type PreferredRecTier } from '@/api/authApi';
 import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi } from '@/api/userApi';
 
 interface NicknameValidation {
@@ -27,6 +27,7 @@ function SignupForm() {
 
   const [nickname, setNickname] = useState('');
   const [bojId, setBojId] = useState('');
+  const [preferredRecTier, setPreferredRecTier] = useState<PreferredRecTier>('BRONZE');
   const [validation, setValidation] = useState<NicknameValidation>({
     status: 'idle',
     message: '',
@@ -155,7 +156,7 @@ function SignupForm() {
     setIsSubmitting(true);
 
     try {
-      const data = await signupApi(token, nickname, bojId);
+      const data = await signupApi(token, nickname, bojId, preferredRecTier);
 
       if (data.success) {
         router.push('/home');
@@ -272,6 +273,39 @@ function SignupForm() {
                   {bojValidation.message}
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground/80 mb-2">
+                추천받고 싶은 문제 티어를 골라주세요
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'BRONZE', label: '브론즈' },
+                  { value: 'SILVER', label: '실버' },
+                  { value: 'GOLD', label: '골드' },
+                  { value: 'PLATINUM', label: '플래티넘' },
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`h-11 flex items-center justify-center rounded-xl border text-sm font-medium cursor-pointer transition-all ${
+                      preferredRecTier === option.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-foreground/80 hover:border-primary/40'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="preferredRecTier"
+                      value={option.value}
+                      checked={preferredRecTier === option.value}
+                      onChange={(e) => setPreferredRecTier(e.target.value as PreferredRecTier)}
+                      className="sr-only"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
             </div>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}

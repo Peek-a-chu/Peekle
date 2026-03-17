@@ -20,12 +20,36 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
                      @Param("source") String source,
                      @Param("externalIds") List<String> externalIds);
 
+       @Query("SELECT DISTINCT p FROM Problem p " +
+                     "LEFT JOIN FETCH p.tags t " +
+                     "WHERE p.source = :source AND p.language = :language AND p.externalId IN :externalIds")
+       List<Problem> findBySourceAndLanguageAndExternalIdInWithTags(
+                     @Param("source") String source,
+                     @Param("language") String language,
+                     @Param("externalIds") List<String> externalIds);
+
        Page<Problem> findBySource(String source, Pageable pageable);
 
        long countBySource(String source);
 
        @Query("SELECT p.externalId FROM Problem p WHERE p.source = :source ORDER BY p.id ASC")
        List<String> findExternalIdsBySource(@Param("source") String source);
+
+       @Query("SELECT p.externalId FROM Problem p " +
+                     "WHERE p.source = 'BOJ' " +
+                     "AND p.language = 'ko' " +
+                     "AND p.level BETWEEN :minLevel AND :maxLevel " +
+                     "AND p.level > 0 " +
+                     "AND NOT EXISTS (" +
+                     "    SELECT 1 FROM SubmissionLog s " +
+                     "    WHERE s.user.id = :userId AND s.problem.id = p.id" +
+                     ") " +
+                     "ORDER BY p.acceptedUserCount DESC, p.id ASC")
+       org.springframework.data.domain.Page<String> findRecommendationCandidateExternalIds(
+                     @Param("userId") Long userId,
+                     @Param("minLevel") Integer minLevel,
+                     @Param("maxLevel") Integer maxLevel,
+                     Pageable pageable);
 
        /**
         * title 또는 externalId로 문제 검색
@@ -57,14 +81,14 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
         * 특정 레벨 범위 내에서 무작위로 N개의 문제를 가져옵니다.
         * MySQL의 ORDER BY RAND()를 사용합니다.
         */
-       @Query(nativeQuery = true, value = "SELECT id, source, external_id, title, tier, url FROM problems p " +
+       @Query(nativeQuery = true, value = "SELECT id, source, external_id, title, tier, url, accepted_user_count, level, language FROM problems p " +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
                      "AND p.title REGEXP '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
                      "ORDER BY RAND() LIMIT :limit")
        List<Problem> findRandomProblemsByTiers(@Param("tiers") List<String> tiers, @Param("limit") int limit);
 
-       @Query(nativeQuery = true, value = "SELECT p.id, p.source, p.external_id, p.title, p.tier, p.url FROM problems p "
+       @Query(nativeQuery = true, value = "SELECT p.id, p.source, p.external_id, p.title, p.tier, p.url, p.accepted_user_count, p.level, p.language FROM problems p "
                      +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
