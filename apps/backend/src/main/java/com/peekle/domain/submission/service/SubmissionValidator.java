@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
@@ -19,31 +21,63 @@ public class SubmissionValidator {
 
     private static final String BOJ_STATUS_URL = "https://www.acmicpc.net/status?problem_id=%s&user_id=%s"; // 모든 결과 조회
     private static final int LENGTH_TOLERANCE = 10; // 허용 오차 (Bytes)
+    private static final int VALIDATION_MAX_RETRY = 5;
+    private static final long VALIDATION_RETRY_DELAY_MS = 700L;
 
     public void validateSubmission(String problemId, String userId, String submitId, String code) {
         String url = String.format(BOJ_STATUS_URL, problemId, userId);
+        String normalizedSubmitId = submitId == null ? "" : submitId.trim();
+        if (normalizedSubmitId.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "제출 ID가 비어 있어 검증할 수 없습니다.");
+        }
 
         try {
-            Document doc = Jsoup.connect(url)
-                    .userAgent(
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .get();
-
             Element targetRow = null;
-            Elements rows = doc.select("table#status-table tbody tr");
+            List<String> lastParsedRows = new ArrayList<>();
+            int lastRowCount = 0;
+            for (int attempt = 1; attempt <= VALIDATION_MAX_RETRY; attempt++) {
+                Document doc = Jsoup.connect(url)
+                        .userAgent(
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        .timeout(5000)
+                        .get();
 
-            for (Element row : rows) {
-                String rowSubmitId = row.select("td").first().text();
-                if (rowSubmitId.equals(submitId)) {
-                    targetRow = row;
+                Elements rows = doc.select("table#status-table tbody tr");
+                lastRowCount = rows.size();
+                lastParsedRows = summarizeRows(rows);
+                for (Element row : rows) {
+                    Element firstCol = row.select("td").first();
+                    if (firstCol == null) {
+                        continue;
+                    }
+                    String rowSubmitId = firstCol.text() == null ? "" : firstCol.text().trim();
+                    if (rowSubmitId.equals(normalizedSubmitId)) {
+                        targetRow = row;
+                        break;
+                    }
+                }
+
+                if (targetRow != null) {
                     break;
+                }
+
+                if (attempt < VALIDATION_MAX_RETRY) {
+                    try {
+                        Thread.sleep(VALIDATION_RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new BusinessException(ErrorCode.BAEKJOON_CONNECTION_ERROR, "검증 재시도 중 인터럽트가 발생했습니다.");
+                    }
                 }
             }
 
             if (targetRow == null) {
                 System.out.println("❌ Validation Failed: 제출 기록 없음 (Problem: " + problemId + ", User: " + userId + ")");
+                log.warn(
+                        "Validation miss: submitId={} problemId={} userId={} url={} rowCount={} sampledRows={}",
+                        normalizedSubmitId, problemId, userId, url, lastRowCount, lastParsedRows);
                 throw new BusinessException(ErrorCode.BAEKJOON_SUBMISSION_NOT_FOUND,
-                        "백준 채점 현황에서 해당 제출 기록을 찾을 수 없습니다. (ID: " + submitId + ")");
+                        "백준 채점 현황에서 해당 제출 기록을 찾을 수 없습니다. (ID: " + normalizedSubmitId + ")");
             }
 
             // 결과(Result) 검증: "맞았습니다!!" 또는 "100점" 등 성공 여부 확인
@@ -75,7 +109,7 @@ public class SubmissionValidator {
             if (code != null) {
                 submittedLength = code.getBytes(StandardCharsets.UTF_8).length;
             } else {
-                log.warn("제출된 코드가 null입니다. 길이 검증을 건너뛰거나 실패 처리합니다. (ID: {})", submitId);
+                log.warn("제출된 코드가 null입니다. 길이 검증을 건너뛰거나 실패 처리합니다. (ID: {})", normalizedSubmitId);
                 // 코드가 없으면 길이 비교 불가.
                 // 하지만 500 에러보다는 "검증 실패" 예외를 던지는 게 나음.
                 // 일단은 길이 0으로 처리해서 diff가 발생하게 둠 (bojLength가 0이 아니면 실패할 것임)
@@ -98,7 +132,7 @@ public class SubmissionValidator {
             }
 
             System.out.println("✅ Validation Passed! (User: " + userId + ", Problem: " + problemId + ")");
-            log.info("Submission Validated! ID: {}, Diff: {}B", submitId, diff);
+            log.info("Submission Validated! ID: {}, Diff: {}B", normalizedSubmitId, diff);
 
         } catch (IOException e) {
             log.error("BOJ Validation Failed (Network Error)", e);
@@ -106,5 +140,32 @@ public class SubmissionValidator {
             // "일시적 오류"라고 알려주고 재시도 유도하는 게 안전함
             throw new BusinessException(ErrorCode.BAEKJOON_CONNECTION_ERROR);
         }
+    }
+
+    private List<String> summarizeRows(Elements rows) {
+        List<String> samples = new ArrayList<>();
+        int limit = Math.min(10, rows.size());
+        for (int i = 0; i < limit; i++) {
+            Element row = rows.get(i);
+            Elements cols = row.select("td");
+            if (cols.isEmpty()) {
+                continue;
+            }
+
+            String sid = colText(cols, 0);
+            String result = colText(cols, 3);
+            String user = colText(cols, 1);
+            String prob = colText(cols, 2);
+            samples.add(String.format("id=%s,user=%s,problem=%s,result=%s", sid, user, prob, result));
+        }
+        return samples;
+    }
+
+    private String colText(Elements cols, int idx) {
+        if (idx < 0 || idx >= cols.size()) {
+            return "";
+        }
+        String text = cols.get(idx).text();
+        return text == null ? "" : text.trim();
     }
 }
