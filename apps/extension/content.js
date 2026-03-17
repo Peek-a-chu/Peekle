@@ -117,10 +117,6 @@ function scanForSuccess() {
         // Only process submissions that we were actively monitoring
         if (wasPending) {
 
-            // [Fix] Immediately remove processing toast regardless of result
-            const procToast = document.getElementById(`peekle-processing-${submitId}`);
-            if (procToast) procToast.remove();
-
             // Mark as sent IMMEDIATELY to prevent dupes
             sentSubmissions.add(submitId);
 
@@ -134,6 +130,7 @@ function scanForSuccess() {
             // [Fix] If failed, show toast IMMEDIATELY (Local Feedback)
             // This ensures instant response without waiting for backend round-trip
             if (!isSuccess) {
+                clearProcessingToast(submitId, { immediate: true });
                 showFailedToast({
                     message: resultText,
                     // Minimal data sufficient for failed toast
@@ -378,6 +375,37 @@ function showProcessingToast(submitId) {
     document.body.appendChild(container);
 }
 
+function clearProcessingToast(submitId, options = {}) {
+    const { immediate = false, onDone } = options;
+    if (!submitId) {
+        if (typeof onDone === 'function') onDone();
+        return;
+    }
+
+    const toast = document.getElementById(`peekle-processing-${submitId}`);
+    if (!toast) {
+        if (typeof onDone === 'function') onDone();
+        return;
+    }
+
+    if (immediate) {
+        toast.remove();
+        if (typeof onDone === 'function') onDone();
+        return;
+    }
+
+    if (toast.dataset.closing === 'true') return;
+    toast.dataset.closing = 'true';
+    toast.style.transition = 'opacity 180ms ease, transform 180ms ease';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+
+    window.setTimeout(() => {
+        toast.remove();
+        if (typeof onDone === 'function') onDone();
+    }, 190);
+}
+
 // --- Feedback Toast Logic ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'SHOW_FEEDBACK') {
@@ -395,98 +423,103 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 function showToast(data) {
-    // data structure: { success, isFirstSolve, earnedPoints, totalPoints, currentRank, message }
+    // data structure:
+    // {
+    //   success, firstSolve|isFirstSolve, alreadySolved, earnedPoints,
+    //   totalPoints, currentRank, message, ...
+    // }
 
-    // [Fix] Remove processing toast immediately (Cleanup for ALL feedback types)
-    // This ensures loading screen disappears even for errors/failures
+    const renderFeedbackToast = () => {
+        // If it's a success, show the Premium Toast (The "Wow" factor)
+        if (data.success) {
+            showSuccessToast(data);
+            return;
+        }
+
+        // If it's a failed submission (WA, RTE, TLE, etc.), show Failed Toast
+        if (data.message && (data.message.includes('틀렸습니다') || data.message.includes('런타임') || data.message.includes('시간') || data.message.includes('메모리') || data.message.includes('출력'))) {
+            showFailedToast(data);
+            return;
+        }
+
+        // Fallback for Errors / Others (Simple Toast)
+        const toastId = 'peekle-toast-' + Date.now();
+        const toast = document.createElement('div');
+        toast.id = toastId;
+
+        let bgColor = '#e74c3c'; // Red (Error)
+        let icon = '🚨';
+
+        // If successful but not first solve (duplicate), it might fall here if we treat "success" specifically as "points gained"
+        // But typically data.success is true even for duplicates in this logic, 
+        // unless the user wants ONLY high-fanfare for points.
+        // However, the user said "success", so we handled all success in showSuccessToast.
+        // If for some reason we end up here:
+        if (!data.success) {
+            // Validation errors, server errors
+            bgColor = '#e74c3c';
+            icon = '🚨';
+        }
+
+        Object.assign(toast.style, {
+            position: 'fixed',
+            top: '80px',
+            right: '25px',
+            backgroundColor: bgColor,
+            color: 'white',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            zIndex: '2147483647',
+            fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
+            fontSize: '14px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            animation: 'peekleSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.1)'
+        });
+
+        toast.innerHTML = `<span style="font-size: 18px;">${icon}</span> <span>${data.message}</span>`;
+
+        // Inject keyframes if not present
+        if (!document.getElementById('peekle-keyframes')) {
+            const styleSheet = document.createElement("style");
+            styleSheet.id = 'peekle-keyframes';
+            styleSheet.innerText = `
+                @keyframes peekleSlideIn {
+                    from { transform: translateX(120%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes peekleSlideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(120%); opacity: 0; }
+                }
+                @font-face {
+                    font-family: 'Pretendard';
+                    src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff') format('woff');
+                    font-weight: 400;
+                    font-style: normal;
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.animation = 'peekleSlideOut 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+            setTimeout(() => toast.remove(), 5000);
+        }, 4000);
+    };
+
     if (data.submitId) {
-        const procToast = document.getElementById(`peekle-processing-${data.submitId}`);
-        if (procToast) procToast.remove();
+        clearProcessingToast(data.submitId, { onDone: renderFeedbackToast });
+    } else {
+        renderFeedbackToast();
     }
-
-    // If it's a success, show the Premium Toast (The "Wow" factor)
-    if (data.success) {
-        showSuccessToast(data);
-        return;
-    }
-
-    // If it's a failed submission (WA, RTE, TLE, etc.), show Failed Toast
-    if (data.message && (data.message.includes('틀렸습니다') || data.message.includes('런타임') || data.message.includes('시간') || data.message.includes('메모리') || data.message.includes('출력'))) {
-        showFailedToast(data);
-        return;
-    }
-
-    // Fallback for Errors / Others (Simple Toast)
-    const toastId = 'peekle-toast-' + Date.now();
-    const toast = document.createElement('div');
-    toast.id = toastId;
-
-    let bgColor = '#e74c3c'; // Red (Error)
-    let icon = '🚨';
-
-    // If successful but not first solve (duplicate), it might fall here if we treat "success" specifically as "points gained"
-    // But typically data.success is true even for duplicates in this logic, 
-    // unless the user wants ONLY high-fanfare for points.
-    // However, the user said "success", so we handled all success in showSuccessToast.
-    // If for some reason we end up here:
-    if (!data.success) {
-        // Validation errors, server errors
-        bgColor = '#e74c3c';
-        icon = '🚨';
-    }
-
-    Object.assign(toast.style, {
-        position: 'fixed',
-        top: '80px',
-        right: '25px',
-        backgroundColor: bgColor,
-        color: 'white',
-        padding: '16px 24px',
-        borderRadius: '12px',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-        zIndex: '2147483647',
-        fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
-        fontSize: '14px',
-        fontWeight: '500',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        animation: 'peekleSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255,255,255,0.1)'
-    });
-
-    toast.innerHTML = `<span style="font-size: 18px;">${icon}</span> <span>${data.message}</span>`;
-
-    // Inject keyframes if not present
-    if (!document.getElementById('peekle-keyframes')) {
-        const styleSheet = document.createElement("style");
-        styleSheet.id = 'peekle-keyframes';
-        styleSheet.innerText = `
-            @keyframes peekleSlideIn {
-                from { transform: translateX(120%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes peekleSlideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(120%); opacity: 0; }
-            }
-            @font-face {
-                font-family: 'Pretendard';
-                src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff') format('woff');
-                font-weight: 400;
-                font-style: normal;
-            }
-        `;
-        document.head.appendChild(styleSheet);
-    }
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.animation = 'peekleSlideOut 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards';
-        setTimeout(() => toast.remove(), 5000);
-    }, 4000);
 }
 
 // Helper function to render status badge text
@@ -743,6 +776,23 @@ async function showSuccessToast(data) {
 
     container.className = 'peekle-toast-container';
 
+    const isAlreadySolved = data.alreadySolved === true;
+    const isFirstSolve = (data.firstSolve === true) || (data.isFirstSolve === true);
+    const earnedPoints = Number(data.earnedPoints || 0);
+    const easterEggMessage = typeof data.easterEggMessage === 'string' && data.easterEggMessage.trim().length > 0
+        ? data.easterEggMessage.trim()
+        : null;
+    const isProblemSpecificEasterEgg = Boolean(easterEggMessage) && isFirstSolve && !isAlreadySolved;
+    const isZeroPointEasterEgg = isFirstSolve && !isAlreadySolved && earnedPoints === 0;
+
+    const scoreRowMarkup = isAlreadySolved
+        ? `<span style="font-size:12px; color:#A1A1AA; font-weight:700;">이미 푼 문제입니다</span>`
+        : isProblemSpecificEasterEgg
+            ? `<span style="font-size:12px; color:${primaryColor}; font-weight:800;">${easterEggMessage}</span>`
+        : isZeroPointEasterEgg
+            ? `<span style="font-size:12px; color:${primaryColor}; font-weight:800;">🥚 번외문제 클리어! +0</span>`
+            : `<span class="peekle-points">+${earnedPoints}</span> <span class="peekle-points-label">Points</span>`;
+
     // HTML Structure
     container.innerHTML = `
         <div class="peekle-header-line"></div>
@@ -761,10 +811,7 @@ async function showSuccessToast(data) {
             <div class="peekle-text-col">
                 <h3 class="peekle-title">Problem Solved!</h3>
                 <div class="peekle-score-row">
-                    ${(data.firstSolve || data.isFirstSolve)
-            ? `<span class="peekle-points">+${data.earnedPoints || 0}</span> <span class="peekle-points-label">Points</span>`
-            : `<span style="font-size:12px; color:#A1A1AA; font-weight:700;">이미 푼 문제입니다</span>`
-        }
+                    ${scoreRowMarkup}
                 </div>
                 
                 <div class="peekle-timer-badge">

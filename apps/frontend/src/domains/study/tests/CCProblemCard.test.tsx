@@ -64,6 +64,30 @@ describe('CCProblemCard', () => {
     }
   });
 
+  it('calls onSelect when shortcut external link is clicked', () => {
+    const postMessageSpy = vi.spyOn(window, 'postMessage').mockImplementation(() => undefined);
+    render(<CCProblemCard {...defaultProps} />);
+
+    const externalLinkButton = screen.getByRole('button', { name: /바로가기 새 탭/i });
+    fireEvent.click(externalLinkButton);
+
+    expect(defaultProps.onSelect).toHaveBeenCalled();
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'PEEKLE_WINDOW_SPLIT',
+        payload: expect.objectContaining({
+          context: expect.objectContaining({
+            sourceType: 'STUDY',
+            externalId: 1001,
+            studyProblemId: 101,
+          }),
+        }),
+      }),
+      '*',
+    );
+    postMessageSpy.mockRestore();
+  });
+
   it('displays solved count', () => {
     render(<CCProblemCard {...defaultProps} />);
     expect(screen.getByText(/해결 2\/4/)).toBeInTheDocument();

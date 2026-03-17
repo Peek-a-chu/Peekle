@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useExtensionCheck } from '@/hooks/useExtensionCheck';
-import { useExtensionVersionCheck } from '@/hooks/useExtensionVersionCheck';
 import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { cn } from '@/lib/utils';
@@ -61,14 +60,10 @@ export const CCPreJoinModal = ({
   const isBojLinked = !!user?.bojId;
 
   // Extension Check State
-  const { isInstalled, extensionVersion, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
+  const { isInstalled, extensionToken, isChecking, checkInstallation } = useExtensionCheck();
+  const DOWNLOAD_URL = 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
 
-  // Version Check from R2
-  const { versionInfo, isLoading: isVersionLoading } = useExtensionVersionCheck();
-  const REQUIRED_VERSION = versionInfo?.latestVersion || '0.0.9';
-  const DOWNLOAD_URL = versionInfo?.downloadUrl || 'https://pub-09a6ac9bff27427fabb6a07fc05033c0.r2.dev/extension/peekle-extension.zip';
-
-  type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING' | 'VERSION_MISMATCH';
+  type ExtensionStatus = 'NOT_INSTALLED' | 'INSTALLED' | 'LINKED' | 'MISMATCH' | 'LOADING';
   const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>('LOADING');
   const [isLinking, setIsLinking] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
@@ -76,24 +71,6 @@ export const CCPreJoinModal = ({
   // Polling State for Installation Check
   const [isPolling, setIsPolling] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Helper: Compare versions (SemVer)
-  // Returns:
-  // -1 if v1 < v2
-  //  0 if v1 == v2
-  //  1 if v1 > v2
-  const compareVersions = (v1: string, v2: string) => {
-    const parts1 = v1.split('.').map(Number);
-    const parts2 = v2.split('.').map(Number);
-
-    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-      const num1 = parts1[i] || 0;
-      const num2 = parts2[i] || 0;
-      if (num1 > num2) return 1;
-      if (num1 < num2) return -1;
-    }
-    return 0;
-  };
 
   useEffect(() => {
     if (!user) {
@@ -147,7 +124,7 @@ export const CCPreJoinModal = ({
       return;
     }
 
-    if (isChecking || isVersionLoading) {
+    if (isChecking) {
       setExtensionStatus('LOADING');
       return;
     }
@@ -172,12 +149,7 @@ export const CCPreJoinModal = ({
         const json = await res.json();
 
         if (json.data?.valid) {
-          // Check version if linked
-          if (extensionVersion && compareVersions(extensionVersion, REQUIRED_VERSION) < 0) {
-            setExtensionStatus('VERSION_MISMATCH');
-          } else {
-            setExtensionStatus('LINKED');
-          }
+          setExtensionStatus('LINKED');
         } else {
           setExtensionStatus('MISMATCH');
         }
@@ -190,16 +162,11 @@ export const CCPreJoinModal = ({
     if (extensionToken && user) {
       void checkTokenValidity(extensionToken);
     } else if (isInstalled) {
-      // Even if not linked (or user not logged in), check version if installed
-      if (extensionVersion && compareVersions(extensionVersion, REQUIRED_VERSION) < 0) {
-        setExtensionStatus('VERSION_MISMATCH');
-      } else {
-        setExtensionStatus('INSTALLED'); // Installed but not linked or not logged in
-      }
+      setExtensionStatus('INSTALLED'); // Installed but not linked or not logged in
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isAuthLoading, isInstalled, extensionToken, extensionVersion, isChecking, isVersionLoading, REQUIRED_VERSION]);
+  }, [user, isAuthLoading, isInstalled, extensionToken, isChecking]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
@@ -794,14 +761,6 @@ export const CCPreJoinModal = ({
                       </div>
                       <div className="w-3 h-3 bg-blue-600 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
                     </div>
-                  ) : extensionStatus === 'VERSION_MISMATCH' ? (
-                    <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
-                      <div className="bg-red-600 text-white text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
-                        <AlertCircle size={14} />
-                        확장 프로그램 업데이트가 필요합니다! ({extensionVersion} → {REQUIRED_VERSION})
-                      </div>
-                      <div className="w-3 h-3 bg-red-600 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1.5" />
-                    </div>
                   ) : !isBojLinked ? (
                     <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
                       <div className="bg-primary text-primary-foreground text-[13px] font-bold py-2.5 px-4 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2">
@@ -862,16 +821,6 @@ export const CCPreJoinModal = ({
                     확장 프로그램 설치
                   </Button>
                 </div>
-              ) : extensionStatus === 'VERSION_MISMATCH' ? (
-                <Button
-                  onClick={() => {
-                    window.open('https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb', '_blank');
-                  }}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold h-11 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <AlertCircle size={18} className="mr-2" />
-                  스토어에서 업데이트하기
-                </Button>
               ) : !isBojLinked ? (
                 <Button
                   onClick={() => router.push(`/profile/${user?.nickname}`)}
