@@ -83,7 +83,7 @@ export default function HomeClient({
                         </div>
                         {/* AI 추천 & 주간 점수 */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <AIRecommendation />
+                            <AIRecommendation initialData={initialRecommendations} />
                             <div className="relative min-h-[600px]">
                                 <div className="h-full md:absolute md:inset-0">
                                     <CCWeeklyScore selectedDate={selectedDate || undefined} />

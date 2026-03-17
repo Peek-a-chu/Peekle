@@ -20,6 +20,7 @@ import { formatDate } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { useWhiteboardSocket } from '@/domains/study/hooks/useWhiteboardSocket';
 import { SocketProvider } from '@/domains/study/context/SocketContext';
+import { useSocketContext } from '@/domains/study/context/SocketContext';
 import { useAuthStore } from '@/store/auth-store';
 import {
   useStudySocketActions,
@@ -58,13 +59,20 @@ function StudyRoomContent({
   studyId,
   initialLastStudyProblemId,
   initialLastProblemDate,
+  aiRecommendationExternalId,
+  aiRecommendationTitle,
+  aiRecommendationRequestId,
 }: {
   studyId: number;
   initialLastStudyProblemId: number | null;
   initialLastProblemDate: string | null;
+  aiRecommendationExternalId: number | null;
+  aiRecommendationTitle: string | null;
+  aiRecommendationRequestId: string | null;
 }) {
   const router = useRouter();
   const { user } = useAuthStore();
+  const { connected } = useSocketContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   useStudyPresenceSync();
 
@@ -290,6 +298,35 @@ function StudyRoomContent({
   const [hintedStudyProblemId, setHintedStudyProblemId] = useState<number | null>(null);
   const lastProblemFallbackRequestedRef = useRef(false);
   const initialHintAppliedRef = useRef(false);
+  const aiRecommendationAddTriedRef = useRef(false);
+  const aiRecommendationCompletedRef = useRef(false);
+  const aiRecommendationLinkOpenedRef = useRef(false);
+  const aiRecommendationCleanedRef = useRef(false);
+  const getAiActionKey = (action: 'add' | 'open') => {
+    if (aiRecommendationRequestId) return `ai-rec:${action}:${aiRecommendationRequestId}`;
+    if (aiRecommendationExternalId) return `ai-rec:${action}:${studyId}:${aiRecommendationExternalId}`;
+    return null;
+  };
+  const markAiActionDone = (action: 'add' | 'open') => {
+    if (typeof window === 'undefined') return;
+    const key = getAiActionKey(action);
+    if (!key) return;
+    try {
+      window.sessionStorage.setItem(key, '1');
+    } catch {
+      // Ignore storage errors
+    }
+  };
+  const isAiActionDone = (action: 'add' | 'open') => {
+    if (typeof window === 'undefined') return false;
+    const key = getAiActionKey(action);
+    if (!key) return false;
+    try {
+      return window.sessionStorage.getItem(key) === '1';
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     // Reset selected problem and view mode when mounting study room
@@ -387,7 +424,7 @@ function StudyRoomContent({
   ]);
 
   // API Hooks
-  const { problems, isLoading: isProblemsLoading, addProblem, deleteProblem } = useProblems(
+  const { problems, isLoading: isProblemsLoading, addProblem, deleteProblem, refetch } = useProblems(
     studyId,
     format(selectedDate, 'yyyy-MM-dd'),
   );
@@ -680,6 +717,109 @@ function StudyRoomContent({
     handleSelectProblem,
   ]);
 
+  useEffect(() => {
+    aiRecommendationAddTriedRef.current = false;
+    aiRecommendationCompletedRef.current = false;
+    aiRecommendationLinkOpenedRef.current = false;
+    aiRecommendationCleanedRef.current = false;
+  }, [studyId, aiRecommendationExternalId, aiRecommendationRequestId]);
+
+  useEffect(() => {
+    if (!aiRecommendationExternalId || aiRecommendationExternalId <= 0) return;
+    setSelectedDate(new Date());
+  }, [aiRecommendationExternalId]);
+
+  useEffect(() => {
+    if (!aiRecommendationExternalId || aiRecommendationExternalId <= 0) return;
+    if (aiRecommendationCompletedRef.current) return;
+
+    const targetExternalId = String(aiRecommendationExternalId);
+    const matchedProblem = problems.find((problem: any) => {
+      const externalId = String(problem.externalId ?? problem.number ?? '').replace(/[^0-9]/g, '');
+      const fallbackId = String(problem.problemId ?? '').replace(/[^0-9]/g, '');
+      return externalId === targetExternalId || fallbackId === targetExternalId;
+    });
+
+    if (matchedProblem) {
+      handleSelectProblem(matchedProblem);
+      aiRecommendationCompletedRef.current = true;
+
+      if (
+        !aiRecommendationLinkOpenedRef.current &&
+        typeof window !== 'undefined' &&
+        !isAiActionDone('open')
+      ) {
+        aiRecommendationLinkOpenedRef.current = true;
+        markAiActionDone('open');
+        const targetUrl = `https://www.acmicpc.net/problem/${targetExternalId}`;
+        const screenAvailWidth = window.screen.availWidth;
+        const screenAvailHeight = window.screen.availHeight;
+        const halfWidth = Math.floor(screenAvailWidth / 2);
+        const screenLeft = (window.screen as any).availLeft || 0;
+        const screenTop = (window.screen as any).availTop || 0;
+
+        setIsLeftPanelFolded(true);
+        setIsRightPanelFolded(true);
+        window.postMessage(
+          {
+            type: 'PEEKLE_WINDOW_SPLIT',
+            payload: {
+              url: targetUrl,
+              leftWindow: {
+                left: screenLeft,
+                top: screenTop,
+                width: halfWidth,
+                height: screenAvailHeight,
+              },
+              rightWindow: {
+                left: screenLeft + halfWidth,
+                top: screenTop,
+                width: halfWidth,
+                height: screenAvailHeight,
+              },
+            },
+          },
+          '*',
+        );
+      }
+
+      if (!aiRecommendationCleanedRef.current) {
+        aiRecommendationCleanedRef.current = true;
+        router.replace(`/study/${studyId}`);
+      }
+      return;
+    }
+
+    if (!connected || aiRecommendationAddTriedRef.current || isAiActionDone('add')) return;
+    aiRecommendationAddTriedRef.current = true;
+    markAiActionDone('add');
+
+    void (async () => {
+      try {
+        await addProblem(
+          aiRecommendationTitle || `AI 추천 문제 ${targetExternalId}`,
+          Number(targetExternalId),
+        );
+      } catch (error) {
+        console.error('[AI Recommendation] Failed to add study problem:', error);
+      } finally {
+        window.setTimeout(() => {
+          void refetch();
+        }, 800);
+      }
+    })();
+  }, [
+    aiRecommendationExternalId,
+    aiRecommendationTitle,
+    connected,
+    problems,
+    addProblem,
+    refetch,
+    handleSelectProblem,
+    router,
+    studyId,
+  ]);
+
 
 
   return (
@@ -784,6 +924,17 @@ export function CCStudyRoomClient(): React.ReactNode {
   const preJoined = searchParams.get('prejoined') === 'true';
   const paramMic = searchParams.get('mic') === 'true';
   const paramCam = searchParams.get('cam') === 'true';
+  const fromAiRecommendation = searchParams.get('fromAiRecommendation') === 'true';
+  const aiExternalIdRaw = searchParams.get('aiExternalId');
+  const aiProblemTitleRaw = searchParams.get('aiProblemTitle');
+  const aiRequestIdRaw = searchParams.get('aiRequestId');
+  const parsedAiExternalId = Number(String(aiExternalIdRaw || '').replace(/[^0-9]/g, ''));
+  const aiRecommendationExternalId =
+    fromAiRecommendation && Number.isFinite(parsedAiExternalId) && parsedAiExternalId > 0
+      ? parsedAiExternalId
+      : null;
+  const aiRecommendationTitle = fromAiRecommendation ? aiProblemTitleRaw : null;
+  const aiRecommendationRequestId = fromAiRecommendation ? aiRequestIdRaw : null;
 
   const [isJoined, setIsJoined] = useState(preJoined);
   const roomTitle = useRoomStore((state) => state.roomTitle);
@@ -829,6 +980,9 @@ export function CCStudyRoomClient(): React.ReactNode {
           studyId={studyId}
           initialLastStudyProblemId={initialLastStudyProblemId}
           initialLastProblemDate={initialLastProblemDate}
+          aiRecommendationExternalId={aiRecommendationExternalId}
+          aiRecommendationTitle={aiRecommendationTitle}
+          aiRecommendationRequestId={aiRecommendationRequestId}
         />
       </CCLiveKitWrapper>
     </SocketProvider>

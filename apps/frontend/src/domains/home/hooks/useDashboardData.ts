@@ -4,7 +4,6 @@ import {
   MOCK_LEAGUE_PROGRESS,
   MOCK_ACTIVITY_STREAK,
   MOCK_TIMELINE,
-  MOCK_AI_RECOMMENDATIONS,
   LeagueProgressData,
   ActivityStreakData,
   TimelineItemData,
@@ -182,16 +181,17 @@ export const useAIRecommendations = (options?: {
             tierLevel: item.tierLevel || 1,
             tags: item.tags || [],
             reason: item.reason || 'AI 추천 문제',
+            solved: !!item.solved,
           }));
 
           setData(mappedData);
         } else {
           console.warn('AI Recommendation API failed:', response.error);
-          setData(MOCK_AI_RECOMMENDATIONS);
+          setData([]);
         }
       } catch (e) {
         console.error('Failed to fetch AI recommendations:', e);
-        setData(MOCK_AI_RECOMMENDATIONS);
+        setData([]);
       } finally {
         setIsLoading(false);
       }

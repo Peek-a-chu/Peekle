@@ -205,6 +205,7 @@ export interface AIRecommendationData {
   tierLevel: BojTierLevel;
   tags: string[];
   reason: string;
+  solved: boolean;
 }
 
 export const MOCK_AI_RECOMMENDATIONS: AIRecommendationData[] = [
@@ -216,6 +217,7 @@ export const MOCK_AI_RECOMMENDATIONS: AIRecommendationData[] = [
     tags: ['다이나믹프로그래밍', 'BFS'],
     reason:
       '최근 DP 문제의 배열을 많이 틀렸던 경험을 가졌고, 이를 해결하기 위해 DP의 배열에 대해 친숙해지고 싶습니다.',
+    solved: false,
   },
   {
     problemId: '#2178',
@@ -224,6 +226,7 @@ export const MOCK_AI_RECOMMENDATIONS: AIRecommendationData[] = [
     tierLevel: 1,
     tags: ['그래프탐색', 'BFS'],
     reason: '최근 BFS가 특히 취약하다고 느껴져서 이를 재학습 기회로 다시 공부하는 것을 권장합니다.',
+    solved: false,
   },
   {
     problemId: '#11053',
@@ -232,6 +235,7 @@ export const MOCK_AI_RECOMMENDATIONS: AIRecommendationData[] = [
     tierLevel: 2,
     tags: ['다이나믹프로그래밍'],
     reason: 'LIS 알고리즘에 대한 이해도를 높이면 각종 시퀀스 문제에서 도움이 될 것입니다.',
+    solved: false,
   },
 ];
 
