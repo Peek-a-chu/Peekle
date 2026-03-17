@@ -9,10 +9,13 @@ export interface ApiResponse<T> {
   };
 }
 
+export type PreferredRecTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+
 export async function signup(
   token: string,
   nickname: string,
   bojId?: string | null,
+  preferredRecTier: PreferredRecTier = 'BRONZE',
 ): Promise<ApiResponse<null>> {
   const res = await fetch(`/api/auth/signup`, {
     method: 'POST',
@@ -21,6 +24,7 @@ export async function signup(
       token,
       nickname: nickname.trim(),
       bojId: bojId?.trim() || null,
+      preferredRecTier,
     }),
   });
   return res.json() as Promise<ApiResponse<null>>;
