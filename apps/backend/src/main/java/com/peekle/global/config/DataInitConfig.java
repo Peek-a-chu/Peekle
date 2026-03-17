@@ -68,7 +68,7 @@ public class DataInitConfig {
         Tag tSort = new Tag("sorting", "정렬");
         Tag tDP = new Tag("dp", "다이나믹 프로그래밍");
 
-        Problem p1 = new Problem("BOJ", "1000", "A+B", "Bronze V", "https://www.acmicpc.net/problem/1000");
+        Problem p1 = new Problem("BOJ", "1000", "A+B", "Bronze 5", "https://www.acmicpc.net/problem/1000");
         p1.setLevel(1);
         p1.setAcceptedUserCount(366256);
         p1.setLanguage("ko");
@@ -76,20 +76,20 @@ public class DataInitConfig {
         p1.getTags().add(tImpl);
         p1.getTags().add(tArith);
 
-        Problem p2 = new Problem("BOJ", "2557", "Hello World", "Bronze V", "https://www.acmicpc.net/problem/2557");
+        Problem p2 = new Problem("BOJ", "2557", "Hello World", "Bronze 5", "https://www.acmicpc.net/problem/2557");
         p2.setLevel(1);
         p2.setAcceptedUserCount(300000);
         p2.setLanguage("en");
         p2.getTags().add(tImpl);
 
-        Problem p3 = new Problem("BOJ", "1920", "수 찾기", "Silver IV", "https://www.acmicpc.net/problem/1920");
+        Problem p3 = new Problem("BOJ", "1920", "수 찾기", "Silver 4", "https://www.acmicpc.net/problem/1920");
         p3.setLevel(7);
         p3.setAcceptedUserCount(230000);
         p3.setLanguage("ko");
         p3.getTags().add(tBinSearch);
         p3.getTags().add(tSort);
 
-        Problem p4 = new Problem("BOJ", "1149", "RGB거리", "Silver I", "https://www.acmicpc.net/problem/1149");
+        Problem p4 = new Problem("BOJ", "1149", "RGB거리", "Silver 1", "https://www.acmicpc.net/problem/1149");
         p4.setLevel(10);
         p4.setAcceptedUserCount(140000);
         p4.setLanguage("ko");
@@ -121,34 +121,34 @@ public class DataInitConfig {
         Problem p1149 = findProblemOrFallback(problems, "1149");
 
         SubmissionLog l1 = SubmissionLog.create(
-                targetUser, p1000, SourceType.EXTENSION, "A+B", "Bronze V",
+                targetUser, p1000, SourceType.EXTENSION, "A+B", "Bronze 5",
                 "1000", null, "맞았습니다", true,
                 "a, b = map(int, input().split())\\nprint(a+b)", 31120, 40,
                 "Python", LocalDateTime.now().minusDays(5));
 
         SubmissionLog l2 = SubmissionLog.create(
-                targetUser, p2557, SourceType.STUDY, "Hello World", "Bronze V",
+                targetUser, p2557, SourceType.STUDY, "Hello World", "Bronze 5",
                 "2557", "알고리즘 스터디", "맞았습니다", true,
                 "#include <iostream>\\nusing namespace std;\\nint main() { cout << \"Hello World!\"; return 0; }",
                 2020, 0, "C++", LocalDateTime.now().minusDays(3));
         l2.setRoomId(101L);
 
         SubmissionLog l3 = SubmissionLog.create(
-                targetUser, p1920, SourceType.GAME, "수 찾기", "Silver IV", "1920",
+                targetUser, p1920, SourceType.GAME, "수 찾기", "Silver 4", "1920",
                 "개인전", "맞았습니다", true,
                 "import java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        // Solution...\\n    }\\n}",
                 128000, 1200, "Java", LocalDateTime.now().minusDays(1));
         l3.setRoomId(201L);
 
         SubmissionLog l4 = SubmissionLog.create(
-                targetUser, p1149, SourceType.GAME, "RGB거리", "Silver I", "1149",
+                targetUser, p1149, SourceType.GAME, "RGB거리", "Silver 1", "1149",
                 "팀전", "틀렸습니다", false,
                 "import java.io.*;\\n// Wrong Solution...", 14536, 120, "Java",
                 LocalDateTime.now().minusHours(1));
         l4.setRoomId(202L);
 
         SubmissionLog l5 = SubmissionLog.create(
-                targetUser, p1920, SourceType.EXTENSION, "수 찾기", "Silver IV",
+                targetUser, p1920, SourceType.EXTENSION, "수 찾기", "Silver 4",
                 "1920", null, "맞았습니다", true,
                 "// Personal Solution\\nimport java.util.*;\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        // ...\\n}",
                 130000, 500, "Java", LocalDateTime.now().minusDays(2));
