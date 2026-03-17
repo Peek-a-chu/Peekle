@@ -38,6 +38,7 @@ export function CCProblemCard({
   const setIsLeftPanelFolded = useRoomStore((state) => state.setIsLeftPanelFolded);
   const setIsRightPanelFolded = useRoomStore((state) => state.setIsRightPanelFolded);
   const myRole = useRoomStore((state) => state.myRole);
+  const roomId = useRoomStore((state) => state.roomId);
 
   const isCustom = problem.type === 'CUSTOM' || (!problem.problemId && !problem.externalId);
   const problemUrl =
@@ -62,12 +63,34 @@ export function CCProblemCard({
     setIsLeftPanelFolded(true);
     setIsRightPanelFolded(true);
 
+    const contextExternalId = Number(
+      String(problem.externalId ?? problem.problemId ?? '').replace(/[^0-9]/g, ''),
+    );
+    const contextStudyProblemId = Number(
+      String((problem as any).studyProblemId ?? (problem as any).id ?? '').replace(/[^0-9]/g, ''),
+    );
+    const contextStudyId = Number(String(roomId ?? '').replace(/[^0-9]/g, ''));
+
+    const studyContext =
+      Number.isFinite(contextExternalId) && contextExternalId > 0
+        ? {
+          sourceType: 'STUDY',
+          externalId: contextExternalId,
+          studyProblemId:
+            Number.isFinite(contextStudyProblemId) && contextStudyProblemId > 0
+              ? contextStudyProblemId
+              : undefined,
+          studyId: Number.isFinite(contextStudyId) && contextStudyId > 0 ? contextStudyId : undefined,
+        }
+        : undefined;
+
     window.postMessage({
       type: 'PEEKLE_WINDOW_SPLIT',
       payload: {
         url: problemUrl,
         leftWindow: { left: screenLeft, top: screenTop, width: halfWidth, height: screenAvailHeight },
-        rightWindow: { left: screenLeft + halfWidth, top: screenTop, width: halfWidth, height: screenAvailHeight }
+        rightWindow: { left: screenLeft + halfWidth, top: screenTop, width: halfWidth, height: screenAvailHeight },
+        context: studyContext,
       }
     }, '*');
   };
@@ -108,6 +131,7 @@ export function CCProblemCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onSelect?.();
                 handleOpenExternal();
               }}
               className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"

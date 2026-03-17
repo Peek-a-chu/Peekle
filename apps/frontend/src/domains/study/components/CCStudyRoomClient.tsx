@@ -760,6 +760,33 @@ function StudyRoomContent({
 
         setIsLeftPanelFolded(true);
         setIsRightPanelFolded(true);
+
+        const matchedExternalId = Number(
+          String((matchedProblem as any).externalId ?? (matchedProblem as any).problemId ?? '').replace(
+            /[^0-9]/g,
+            '',
+          ),
+        );
+        const matchedStudyProblemId = Number(
+          String((matchedProblem as any).studyProblemId ?? (matchedProblem as any).id ?? '').replace(
+            /[^0-9]/g,
+            '',
+          ),
+        );
+        const numericStudyId = Number(String(studyId).replace(/[^0-9]/g, ''));
+        const splitContext =
+          Number.isFinite(matchedExternalId) && matchedExternalId > 0
+            ? {
+                sourceType: 'STUDY',
+                externalId: matchedExternalId,
+                studyProblemId:
+                  Number.isFinite(matchedStudyProblemId) && matchedStudyProblemId > 0
+                    ? matchedStudyProblemId
+                    : undefined,
+                studyId: Number.isFinite(numericStudyId) && numericStudyId > 0 ? numericStudyId : undefined,
+              }
+            : undefined;
+
         window.postMessage(
           {
             type: 'PEEKLE_WINDOW_SPLIT',
@@ -777,6 +804,7 @@ function StudyRoomContent({
                 width: halfWidth,
                 height: screenAvailHeight,
               },
+              context: splitContext,
             },
           },
           '*',

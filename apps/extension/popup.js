@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper: Check Context (Study/Game/Extension)
     function checkContextStatus() {
-        chrome.storage.local.get(['pending_submission'], (result) => {
+        chrome.storage.local.get(['pending_submission', 'peekle_study_split_context'], (result) => {
             const contextEl = document.getElementById('context-status');
             if (contextEl && result.pending_submission) {
                 const task = result.pending_submission;
@@ -317,6 +317,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (task.consumed) {
                     contextEl.innerText += ' (제출 대기)';
                 }
+            } else if (contextEl && result.peekle_study_split_context) {
+                contextEl.innerText = '📚 스터디 진행 중 (수동 제출 모드)';
+                contextEl.style.color = 'var(--primary)';
             } else if (contextEl) {
                 contextEl.innerText = '대기 중인 작업 없음';
                 contextEl.style.color = 'var(--muted-foreground)';
