@@ -6,7 +6,6 @@ import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import GoogleAnalyticsTracker from '@/components/common/GoogleAnalyticsTracker';
-import { GameSocketProvider } from '@/domains/game/context/GameSocketContext';
 import { ClientSessionManager } from '@/components/providers/ClientSessionManager';
 
 export const metadata: Metadata = {
@@ -98,15 +97,13 @@ export default function RootLayout({
           </>
         )}
         <QueryProvider>
-          <GameSocketProvider>
-            <ThemeProvider>
-              <ClientSessionManager />
-              {children}
-              <GoogleAnalyticsTracker />
-              <SettingsModal isGlobal={true} />
-            </ThemeProvider>
-            <Toaster />
-          </GameSocketProvider>
+          <ThemeProvider>
+            <ClientSessionManager />
+            {children}
+            <GoogleAnalyticsTracker />
+            <SettingsModal isGlobal={true} />
+          </ThemeProvider>
+          <Toaster />
         </QueryProvider>
       </body>
     </html>
