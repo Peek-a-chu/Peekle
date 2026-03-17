@@ -11,6 +11,8 @@ public class SubmissionResponse {
     private Long submissionId;
     private boolean success; // 검증/저장 성공 여부
     private boolean firstSolve; // 처음 풀었는지 여부
+    private boolean alreadySolved; // 이미 해결했던 문제인지 여부
+    private String easterEggMessage; // 이스터에그 메시지 (문제별)
     private int earnedPoints; // 획득한 포인트
     private int totalPoints; // 현재 내 총 포인트
     private LeagueTier currentLeague;

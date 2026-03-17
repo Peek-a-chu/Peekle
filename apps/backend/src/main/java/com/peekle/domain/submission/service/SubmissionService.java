@@ -27,11 +27,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubmissionService {
+
+    private static final Map<String, String> EASTER_EGG_MESSAGE_BY_EXTERNAL_ID = Map.ofEntries(
+            Map.entry("1237", "우주를 정ㅋ벅ㅋ 하셨습니다"),
+            Map.entry("2555", "Baekjoon Online Judge는 2010년 3월 19일부터 운영을 시작한 온라인 저지 입니다."),
+            Map.entry("9073", "두려움은 분노를, 분노는 증오를, 증오는 고통을 낳지."),
+            Map.entry("9999", "+9999"),
+            Map.entry("10946", "제작자의 최고점수는 14.64점입니다"),
+            Map.entry("11506", "+占쏙옙"),
+            Map.entry("15641", "몇번 시도했나요?"),
+            Map.entry("15643", "Yee"),
+            Map.entry("15802", "살아남았나요?"),
+            Map.entry("18825", "무슨 문제였나요? 제작자는 A+B를 풀었습니다"),
+            Map.entry("27899", "제작자는 76번 시도했습니다"));
 
     private final SubmissionLogRepository submissionLogRepository;
     private final ProblemRepository problemRepository;
@@ -230,6 +244,15 @@ public class SubmissionService {
         boolean isAC = request.getIsSuccess() != null && request.getIsSuccess();
 
         if (isAC) {
+            long solvedCount = submissionLogRepository.countByUserIdAndProblemIdAndIsSuccessTrue(user.getId(),
+                    problem.getId());
+            boolean isFirstSolve = solvedCount == 1;
+            boolean isAlreadySolved = solvedCount > 1;
+            boolean isZeroPointFirstSolve = isFirstSolve && earnedPoints == 0;
+            String easterEggMessage = isFirstSolve
+                    ? EASTER_EGG_MESSAGE_BY_EXTERNAL_ID.get(problem.getExternalId())
+                    : null;
+
             // 유저가 게임 중이라면 점수 반영
             try {
                 String userGameKey = String.format(RedisKeyConst.USER_CURRENT_GAME, user.getId());
@@ -248,7 +271,9 @@ public class SubmissionService {
             return SubmissionResponse.builder()
                     .success(true)
                     .submissionId(log.getId())
-                    .firstSolve(earnedPoints > 0)
+                    .firstSolve(isFirstSolve)
+                    .alreadySolved(isAlreadySolved)
+                    .easterEggMessage(easterEggMessage)
                     .earnedPoints(earnedPoints)
                     .totalPoints(user.getLeaguePoint())
                     .currentRank(statusDto.getGroupRank())
@@ -256,7 +281,13 @@ public class SubmissionService {
                     .leagueStatus(statusDto.getLeagueStatus())
                     .pointsToPromotion(statusDto.getPointsToPromotion())
                     .pointsToMaintenance(statusDto.getPointsToMaintenance())
-                    .message(earnedPoints > 0 ? "Problem Solved! (+" + earnedPoints + ")" : "Already Solved.")
+                    .message(isAlreadySolved
+                            ? "Already Solved."
+                            : (easterEggMessage != null
+                                    ? easterEggMessage
+                            : (isZeroPointFirstSolve
+                                    ? "Easter Egg Unlocked! (+0)"
+                                    : "Problem Solved! (+" + earnedPoints + ")")))
                     .build();
         } else {
             // WA, RTE, TLE, MLE, OLE 등 - 저장만 하고 포인트 없음
