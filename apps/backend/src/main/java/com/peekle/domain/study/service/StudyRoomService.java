@@ -353,7 +353,10 @@ public class StudyRoomService {
 
                         // 스터디 점수 업데이트 (Transactional)
                         if (response.getEarnedPoints() > 0) {
-                                StudyRoom studyRoom = studyProblem.getStudy(); // 이미 조회한 StudyProblem에서 가져옴
+                                // LAZY proxy(StudyProblem.study) 접근으로 인한 no-session 이슈를 피하기 위해
+                                // StudyRoom을 명시적으로 다시 조회한다.
+                                StudyRoom studyRoom = studyRoomRepository.findById(studyId)
+                                                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_ROOM_NOT_FOUND));
                                 studyRoom.addRankingPoint(response.getEarnedPoints());
                                 System.out.println("[StudyRoomService] Updated ranking point for study " + studyId
                                                 + ": +" + response.getEarnedPoints());
