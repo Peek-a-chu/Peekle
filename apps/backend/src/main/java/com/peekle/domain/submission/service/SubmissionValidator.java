@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
@@ -20,9 +21,11 @@ import com.peekle.global.exception.ErrorCode;
 public class SubmissionValidator {
 
     private static final String BOJ_STATUS_URL = "https://www.acmicpc.net/status?problem_id=%s&user_id=%s"; // 모든 결과 조회
+    private static final String BOJ_GLOBAL_STATUS_URL = "https://www.acmicpc.net/status";
     private static final int LENGTH_TOLERANCE = 10; // 허용 오차 (Bytes)
     private static final int VALIDATION_MAX_RETRY = 5;
     private static final long VALIDATION_RETRY_DELAY_MS = 700L;
+    private static final int DEBUG_GLOBAL_SCAN_PAGES = 12;
 
     public void validateSubmission(String problemId, String userId, String submitId, String code) {
         String url = String.format(BOJ_STATUS_URL, problemId, userId);
@@ -76,6 +79,19 @@ public class SubmissionValidator {
                 log.warn(
                         "Validation miss: submitId={} problemId={} userId={} url={} rowCount={} sampledRows={}",
                         normalizedSubmitId, problemId, userId, url, lastRowCount, lastParsedRows);
+
+                Optional<SubmissionSnapshot> globalMatch = findInGlobalStatus(normalizedSubmitId);
+                if (globalMatch.isPresent()) {
+                    SubmissionSnapshot snapshot = globalMatch.get();
+                    log.warn(
+                            "Validation miss detail: submitId={} expectedUser={} actualUser={} expectedProblem={} actualProblem={} actualResult={} pageUrl={}",
+                            normalizedSubmitId, userId, snapshot.userId, problemId, snapshot.problemId, snapshot.result,
+                            snapshot.pageUrl);
+                    String mismatchDetail = buildMismatchMessage(problemId, userId, snapshot);
+                    throw new BusinessException(ErrorCode.BAEKJOON_SUBMISSION_NOT_FOUND,
+                            mismatchDetail + " (ID: " + normalizedSubmitId + ")");
+                }
+
                 throw new BusinessException(ErrorCode.BAEKJOON_SUBMISSION_NOT_FOUND,
                         "백준 채점 현황에서 해당 제출 기록을 찾을 수 없습니다. (ID: " + normalizedSubmitId + ")");
             }
@@ -167,5 +183,101 @@ public class SubmissionValidator {
         }
         String text = cols.get(idx).text();
         return text == null ? "" : text.trim();
+    }
+
+    private Optional<SubmissionSnapshot> findInGlobalStatus(String submitId) {
+        String top = null;
+
+        for (int page = 0; page < DEBUG_GLOBAL_SCAN_PAGES; page++) {
+            String pageUrl = top == null ? BOJ_GLOBAL_STATUS_URL : BOJ_GLOBAL_STATUS_URL + "?top=" + top;
+
+            try {
+                Document doc = Jsoup.connect(pageUrl)
+                        .userAgent(
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        .timeout(5000)
+                        .get();
+
+                Elements rows = doc.select("table#status-table tbody tr");
+                if (rows.isEmpty()) {
+                    return Optional.empty();
+                }
+
+                for (Element row : rows) {
+                    Elements cols = row.select("td");
+                    if (cols.isEmpty()) {
+                        continue;
+                    }
+
+                    String rowSubmitId = colText(cols, 0);
+                    if (!submitId.equals(rowSubmitId)) {
+                        continue;
+                    }
+
+                    SubmissionSnapshot snapshot = new SubmissionSnapshot(
+                            rowSubmitId,
+                            colText(cols, 1),
+                            colText(cols, 2),
+                            colText(cols, 3),
+                            pageUrl);
+                    return Optional.of(snapshot);
+                }
+
+                String lastSubmitId = colText(rows.get(rows.size() - 1).select("td"), 0);
+                if (lastSubmitId.isBlank() || lastSubmitId.equals(top)) {
+                    return Optional.empty();
+                }
+                top = lastSubmitId;
+
+            } catch (IOException e) {
+                log.debug("Global status debug scan failed: pageUrl={}", pageUrl, e);
+                return Optional.empty();
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private String buildMismatchMessage(String expectedProblemId, String expectedUserId, SubmissionSnapshot snapshot) {
+        boolean userMismatch = !expectedUserId.equals(snapshot.userId);
+        boolean problemMismatch = !expectedProblemId.equals(snapshot.problemId);
+
+        if (userMismatch && problemMismatch) {
+            return String.format(
+                    "실제 제출 유저와 문제 번호가 다릅니다. expected(user=%s,problem=%s), actual(user=%s,problem=%s,result=%s)",
+                    expectedUserId, expectedProblemId, snapshot.userId, snapshot.problemId, snapshot.result);
+        }
+
+        if (userMismatch) {
+            return String.format(
+                    "실제 제출 유저가 다릅니다. expected(user=%s), actual(user=%s,problem=%s,result=%s)",
+                    expectedUserId, snapshot.userId, snapshot.problemId, snapshot.result);
+        }
+
+        if (problemMismatch) {
+            return String.format(
+                    "실제 제출 문제 번호가 다릅니다. expected(problem=%s), actual(user=%s,problem=%s,result=%s)",
+                    expectedProblemId, snapshot.userId, snapshot.problemId, snapshot.result);
+        }
+
+        return String.format(
+                "제출 ID는 존재하지만 조회 조건과 다릅니다. expected(user=%s,problem=%s), actual(user=%s,problem=%s,result=%s)",
+                expectedUserId, expectedProblemId, snapshot.userId, snapshot.problemId, snapshot.result);
+    }
+
+    private static class SubmissionSnapshot {
+        private final String submitId;
+        private final String userId;
+        private final String problemId;
+        private final String result;
+        private final String pageUrl;
+
+        private SubmissionSnapshot(String submitId, String userId, String problemId, String result, String pageUrl) {
+            this.submitId = submitId;
+            this.userId = userId;
+            this.problemId = problemId;
+            this.result = result;
+            this.pageUrl = pageUrl;
+        }
     }
 }
