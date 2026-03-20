@@ -22,6 +22,7 @@ import { AddToWorkbookModal } from '@/domains/workbook/components/AddToWorkbookM
 import { fetchMyStudies } from '@/domains/study/api/studyApi';
 import type { StudyListContent } from '@/domains/study/types';
 import { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface AIRecommendationProps {
   initialData?: AIRecommendationData[];
@@ -29,6 +30,7 @@ interface AIRecommendationProps {
 
 const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const hasInitialData = Array.isArray(initialData) && initialData.length > 0;
   const [refreshKey, setRefreshKey] = useState(0);
   const { data: fetchedData, isLoading } = useAIRecommendations({
@@ -202,6 +204,18 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
     window.open(`https://www.acmicpc.net/problem/${externalId}`, '_blank', 'noopener,noreferrer');
   };
 
+  const handleSolveClick = async (problemId: string, title: string) => {
+    const externalId = String(problemId || '').replace(/[^0-9]/g, '');
+    if (!externalId) {
+      toast.error('문제 번호를 확인할 수 없어 스터디에 추가할 수 없습니다.');
+      return;
+    }
+
+    setSelectedStudyProblem({ externalId, title });
+    setIsStudyModalOpen(true);
+    await loadStudies();
+  };
+
   const handleSelectStudy = (studyId: number) => {
     if (!selectedStudyProblem) return;
     setIsStudyModalOpen(false);
@@ -350,10 +364,14 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
                 <div className="flex flex-col items-stretch gap-2">
                   <Button
                     className="h-8 w-full px-2.5 text-xs gap-1 bg-primary hover:bg-primary"
-                    onClick={() => handleOpenProblemLink(item.problemId)}
+                    onClick={() =>
+                      isMobile
+                        ? handleOpenProblemLink(item.problemId)
+                        : void handleSolveClick(item.problemId, item.title)
+                    }
                   >
                     <ExternalLink className="w-3 h-3" />
-                    문제 보러가기
+                    {isMobile ? '문제 보러가기' : '풀러가기'}
                   </Button>
                   <Button
                     variant="outline"
