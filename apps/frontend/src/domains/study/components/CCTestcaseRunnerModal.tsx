@@ -47,6 +47,11 @@ interface CCTestcaseRunnerModalProps {
     onClose: () => void;
 }
 
+interface SaveTestcaseOptions {
+    showSuccessToast?: boolean;
+    showErrorToast?: boolean;
+}
+
 export function CCTestcaseRunnerModal({
     roomId,
     studyProblemId,
@@ -122,8 +127,14 @@ export function CCTestcaseRunnerModal({
         setTestcases(prev => [...prev, { id: newId, input: '', expectedOutput: '' }]);
     };
 
-    const handleSaveTestcase = async () => {
-        if (!roomId || !studyProblemId || testcases.length === 0) return;
+    const saveTestcases = useCallback(async ({
+        showSuccessToast = true,
+        showErrorToast = true
+    }: SaveTestcaseOptions = {}) => {
+        if (!roomId || !studyProblemId || testcases.length === 0) {
+            return false;
+        }
+
         try {
             const response = await apiFetch(`/api/studies/${roomId}/problems/${studyProblemId}/testcases`, {
                 method: 'POST',
@@ -131,13 +142,26 @@ export function CCTestcaseRunnerModal({
             });
 
             if (response.success) {
-                toast.success('테스트 케이스가 저장되었습니다.');
+                if (showSuccessToast) {
+                    toast.success('테스트 케이스가 저장되었습니다.');
+                }
+                return true;
             } else {
-                toast.error(response.error?.message || '테스트 케이스 저장에 실패했습니다.');
+                if (showErrorToast) {
+                    toast.error(response.error?.message || '테스트 케이스 저장에 실패했습니다.');
+                }
+                return false;
             }
-        } catch (error) {
-            toast.error('테스트 케이스 저장 중 오류가 발생했습니다.');
+        } catch {
+            if (showErrorToast) {
+                toast.error('테스트 케이스 저장 중 오류가 발생했습니다.');
+            }
+            return false;
         }
+    }, [roomId, studyProblemId, testcases]);
+
+    const handleSaveTestcase = async () => {
+        await saveTestcases();
     };
 
     const handleDeleteTestcase = (id: string) => {
@@ -155,6 +179,13 @@ export function CCTestcaseRunnerModal({
 
     const runAllTestcases = async () => {
         if (testcases.length === 0) return;
+
+        if (roomId && studyProblemId) {
+            void saveTestcases({
+                showSuccessToast: false,
+                showErrorToast: false
+            });
+        }
 
         // 1. Request current code from IDE
         let currentCode = '';
