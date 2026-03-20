@@ -64,13 +64,13 @@ export function WorkbooksFilter({
   return (
     <div className={cn('space-y-4', className)}>
       {/* 탭 */}
-      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
+      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full overflow-x-auto no-scrollbar lg:w-fit">
         {TAB_OPTIONS.map((option) => (
           <button
             key={option.value}
             onClick={() => onTabChange(option.value)}
             className={cn(
-              'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+              'flex shrink-0 items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors lg:px-4',
               tab === option.value
                 ? 'bg-background text-primary shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
@@ -91,9 +91,9 @@ export function WorkbooksFilter({
       </div>
 
       {/* 검색 + 정렬 */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* 검색바 */}
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="문제집 검색..."
@@ -104,10 +104,10 @@ export function WorkbooksFilter({
         </div>
 
         {/* 정렬 드롭다운 */}
-        <div ref={sortRef} className="relative">
+        <div ref={sortRef} className="relative w-full sm:w-auto">
           <button
             onClick={() => setIsSortOpen(!isSortOpen)}
-            className="flex items-center gap-1 px-4 py-2 rounded-md bg-primary hover:bg-primary text-white text-sm font-medium transition-colors"
+            className="flex w-full items-center justify-between gap-1 px-4 py-2 rounded-md bg-primary hover:bg-primary text-white text-sm font-medium transition-colors sm:w-auto"
           >
             {currentSortLabel}
             <ChevronDown
@@ -116,7 +116,7 @@ export function WorkbooksFilter({
           </button>
 
           {isSortOpen && (
-            <div className="absolute right-0 top-full mt-1 w-32 bg-popover border border-border rounded-md shadow-lg z-10">
+            <div className="absolute right-0 top-full mt-1 w-full sm:w-32 bg-popover border border-border rounded-md shadow-lg z-10">
               {SORT_OPTIONS.map((option) => (
                 <button
                   key={option.value}

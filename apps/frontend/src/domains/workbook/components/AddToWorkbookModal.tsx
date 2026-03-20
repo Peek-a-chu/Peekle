@@ -21,6 +21,7 @@ import {
 import { searchBojProblems, getProblemIdByExternalId } from '../api/problemApi';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface AddToWorkbookModalProps {
     isOpen: boolean;
@@ -35,6 +36,7 @@ export function AddToWorkbookModal({
     problemBojId,
     problemTitle,
 }: AddToWorkbookModalProps) {
+    const isMobile = useIsMobile();
     const [workbooks, setWorkbooks] = useState<WorkbookListResponse[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isAdding, setIsAdding] = useState<number | null>(null);
@@ -141,11 +143,18 @@ export function AddToWorkbookModal({
 
     return (
         <ShadcnDialog open={isOpen} onOpenChange={onClose}>
-            <ShadcnDialogContent className="sm:max-w-[420px] bg-card border-border shadow-2xl rounded-3xl p-6 flex flex-col gap-0 max-h-[85vh]">
+            <ShadcnDialogContent
+                className={cn(
+                    'bg-card border-border shadow-2xl flex flex-col gap-0',
+                    isMobile
+                        ? 'w-[calc(100vw-1rem)] max-w-none h-[calc(100vh-1.5rem)] max-h-[calc(100vh-1.5rem)] rounded-2xl top-3 translate-y-0 p-4 overflow-hidden'
+                        : 'sm:max-w-[420px] rounded-3xl p-6 max-h-[85vh]'
+                )}
+            >
 
                 {/* 1. Header Area */}
-                <ShadcnDialogHeader className="space-y-1.5 pb-4 border-b shrink-0">
-                    <ShadcnDialogTitle className="text-xl font-bold flex items-center gap-2">
+                <ShadcnDialogHeader className={cn('space-y-1.5 border-b shrink-0', isMobile ? 'pb-3' : 'pb-4')}>
+                    <ShadcnDialogTitle className={cn('font-bold flex items-center gap-2', isMobile ? 'text-lg' : 'text-xl')}>
                         문제집에 추가
                     </ShadcnDialogTitle>
                     <ShadcnDialogDescription className="text-sm font-medium">
@@ -155,7 +164,7 @@ export function AddToWorkbookModal({
                 </ShadcnDialogHeader>
 
                 {/* 2. Body Area */}
-                <div className="flex-1 overflow-y-auto py-4 space-y-4 min-h-[250px] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-1">
+                <div className={cn('flex-1 overflow-y-auto py-4 space-y-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-1', isMobile ? 'min-h-0' : 'min-h-[250px]')}>
                     {/* Search Bar */}
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-foreground transition-colors" />
@@ -270,13 +279,23 @@ export function AddToWorkbookModal({
                 </div>
 
                 {/* 3. Footer Area */}
-                <ShadcnDialogFooter className="pt-4 border-t shrink-0 flex flex-row items-center justify-between sm:justify-between gap-2 mt-0">
+                <ShadcnDialogFooter
+                    className={cn(
+                        'border-t shrink-0 flex items-center gap-2 mt-0',
+                        isMobile
+                            ? 'pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex-row justify-between'
+                            : 'pt-4 flex-row justify-between sm:justify-between',
+                    )}
+                >
                     <Button
                         variant="ghost"
                         onClick={() => {
                             onClose();
                         }}
-                        className="text-muted-foreground hover:text-foreground rounded-xl flex-1 sm:flex-none border border-transparent hover:border-border h-11"
+                        className={cn(
+                            'text-muted-foreground hover:text-foreground rounded-xl border border-transparent hover:border-border h-11',
+                            isMobile ? 'flex-1' : 'flex-1 sm:flex-none',
+                        )}
                     >
                         취소
                     </Button>
@@ -287,7 +306,7 @@ export function AddToWorkbookModal({
                             }
                         }}
                         disabled={!selectedWorkbookId || isAdding !== null || isCreating || isLoading}
-                        className="font-bold px-8 rounded-xl h-11 flex-1 sm:flex-none"
+                        className={cn('font-bold rounded-xl h-11', isMobile ? 'flex-1' : 'px-8 flex-1 sm:flex-none')}
                     >
                         {isAdding !== null ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                         추가

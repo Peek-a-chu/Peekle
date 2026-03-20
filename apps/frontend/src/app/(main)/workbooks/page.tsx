@@ -11,10 +11,13 @@ import {
 } from '@/domains/workbook/layout';
 import { WorkbookModal } from '@/domains/workbook/components/WorkbookModal';
 import type { WorkbookProblemItem } from '@/domains/workbook/types';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { cn } from '@/lib/utils';
 
 function WorkbooksContent() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get('id');
+  const isMobile = useIsMobile();
 
   const {
     tab,
@@ -73,7 +76,10 @@ function WorkbooksContent() {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-200">
         <div
-          className={`h-full flex flex-col transition-all duration-200 ${selectedWorkbook ? 'pr-[476px]' : ''}`}
+          className={cn(
+            'h-full flex flex-col transition-all duration-200',
+            selectedWorkbook && !isMobile && 'pr-[476px]',
+          )}
         >
           {/* 헤더 */}
           <WorkbooksHeader onCreateClick={handleCreateClick} className="mb-4" />
@@ -101,20 +107,38 @@ function WorkbooksContent() {
               hasMore={hasMore}
               isLoading={isLoading}
               onLoadMore={loadMore}
+              isMobile={isMobile}
             />
           </div>
         </div>
 
         {/* 우측 패널 - 전체 높이 */}
         {selectedWorkbook && (
-          <WorkbooksRightPanel
-            workbook={selectedWorkbook}
-            problems={selectedProblems}
-            onClose={handleClosePanel}
-            onEdit={handleEditClick}
-            onDelete={() => selectedId && deleteWorkbook(selectedId)}
-            className="fixed top-0 right-0 bottom-0"
-          />
+          <>
+            {isMobile && (
+              <button
+                type="button"
+                className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[59] bg-black/35"
+                onClick={handleClosePanel}
+                aria-label="문제집 상세 닫기"
+              />
+            )}
+            <WorkbooksRightPanel
+              workbook={selectedWorkbook}
+              problems={selectedProblems}
+              onClose={handleClosePanel}
+              onEdit={isMobile ? undefined : handleEditClick}
+              onDelete={isMobile ? undefined : () => selectedId && deleteWorkbook(selectedId)}
+              allowManage={!isMobile}
+              isMobile={isMobile}
+              className={cn(
+                'fixed z-[60]',
+                isMobile
+                  ? 'inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] w-auto border-l-0 border-t-0 rounded-none'
+                  : 'top-0 right-0 bottom-0',
+              )}
+            />
+          </>
         )}
 
         {/* 문제집 생성/수정 모달 */}
