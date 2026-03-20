@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
-import { CCWorkbookRow } from '../components';
+import { CCWorkbookCard, CCWorkbookRow } from '../components';
 import type { Workbook } from '../types';
 
 interface WorkbooksLeftPanelProps {
@@ -15,6 +15,7 @@ interface WorkbooksLeftPanelProps {
   hasMore: boolean;
   isLoading: boolean;
   onLoadMore: () => void;
+  isMobile?: boolean;
   className?: string;
 }
 
@@ -27,6 +28,7 @@ export function WorkbooksLeftPanel({
   hasMore,
   isLoading,
   onLoadMore,
+  isMobile = false,
   className,
 }: WorkbooksLeftPanelProps) {
   const observerRef = useRef<HTMLDivElement>(null);
@@ -64,30 +66,47 @@ export function WorkbooksLeftPanel({
       className={cn('flex-1 border rounded-xl bg-card overflow-hidden flex flex-col', className)}
     >
       {/* 헤더 */}
-      <div className="flex items-center gap-4 px-4 py-3 border-b bg-muted/50 text-xs font-medium text-muted-foreground shrink-0">
-        <div className="shrink-0 w-8 text-center">#</div>
-        <div className="flex-1">
+      {isMobile ? (
+        <div className="px-4 py-3 border-b bg-muted/50 text-xs font-medium text-muted-foreground shrink-0">
           문제집
           <span className="ml-2 text-muted-foreground/70">({totalCount})</span>
         </div>
-        <div className="shrink-0 w-24 text-center">진행률</div>
-        <div className="shrink-0 w-20 text-center">만든 사람</div>
-        <div className="shrink-0 w-14 text-center">즐겨찾기</div>
-        <div className="shrink-0 w-4" />
-      </div>
+      ) : (
+        <div className="flex items-center gap-4 px-4 py-3 border-b bg-muted/50 text-xs font-medium text-muted-foreground shrink-0">
+          <div className="shrink-0 w-8 text-center">#</div>
+          <div className="flex-1">
+            문제집
+            <span className="ml-2 text-muted-foreground/70">({totalCount})</span>
+          </div>
+          <div className="shrink-0 w-24 text-center">진행률</div>
+          <div className="shrink-0 w-20 text-center">만든 사람</div>
+          <div className="shrink-0 w-14 text-center">즐겨찾기</div>
+          <div className="shrink-0 w-4" />
+        </div>
+      )}
 
       {/* 리스트 - 스크롤 영역 */}
-      <div className="flex-1 overflow-y-auto">
-        {workbooks.map((workbook, index) => (
-          <CCWorkbookRow
-            key={workbook.id}
-            workbook={workbook}
-            isSelected={selectedId === workbook.id}
-            onSelect={() => onSelect(workbook.id)}
-            onToggleBookmark={onToggleBookmark}
-            className={index !== workbooks.length - 1 ? 'border-b border-border/50' : ''}
-          />
-        ))}
+      <div className={cn('flex-1 overflow-y-auto', isMobile && 'p-3 space-y-3')}>
+        {workbooks.map((workbook, index) =>
+          isMobile ? (
+            <CCWorkbookCard
+              key={workbook.id}
+              workbook={workbook}
+              isSelected={selectedId === workbook.id}
+              onSelect={() => onSelect(workbook.id)}
+              onToggleBookmark={onToggleBookmark}
+            />
+          ) : (
+            <CCWorkbookRow
+              key={workbook.id}
+              workbook={workbook}
+              isSelected={selectedId === workbook.id}
+              onSelect={() => onSelect(workbook.id)}
+              onToggleBookmark={onToggleBookmark}
+              className={index !== workbooks.length - 1 ? 'border-b border-border/50' : ''}
+            />
+          ),
+        )}
 
         {/* 로딩 인디케이터 & Observer 타겟 */}
         <div ref={observerRef} className="py-4 flex justify-center">

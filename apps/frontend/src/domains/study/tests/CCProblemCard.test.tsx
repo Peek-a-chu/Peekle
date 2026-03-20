@@ -64,28 +64,20 @@ describe('CCProblemCard', () => {
     }
   });
 
-  it('calls onSelect when shortcut external link is clicked', () => {
-    const postMessageSpy = vi.spyOn(window, 'postMessage').mockImplementation(() => undefined);
+  it('opens problem site when title link is clicked', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     render(<CCProblemCard {...defaultProps} />);
 
-    const externalLinkButton = screen.getByRole('button', { name: /바로가기 새 탭/i });
-    fireEvent.click(externalLinkButton);
+    const titleButton = screen.getByRole('button', { name: /^Test Problem$/i });
+    fireEvent.click(titleButton);
 
-    expect(defaultProps.onSelect).toHaveBeenCalled();
-    expect(postMessageSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'PEEKLE_WINDOW_SPLIT',
-        payload: expect.objectContaining({
-          context: expect.objectContaining({
-            sourceType: 'STUDY',
-            externalId: 1001,
-            studyProblemId: 101,
-          }),
-        }),
-      }),
-      '*',
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.acmicpc.net/problem/1001',
+      '_blank',
+      'noopener,noreferrer',
     );
-    postMessageSpy.mockRestore();
+    expect(defaultProps.onSelect).not.toHaveBeenCalled();
+    openSpy.mockRestore();
   });
 
   it('displays solved count', () => {

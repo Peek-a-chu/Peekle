@@ -9,6 +9,7 @@ import { CCJoinStudyModal } from '@/domains/study/components/CCJoinStudyModal';
 import { CCCreateStudyModal } from '@/domains/study/components/CCCreateStudyModal';
 import type { StudyListContent, StudyRoomDetail } from '@/domains/study/types';
 import { useRouter } from 'next/navigation';
+import { CCMainPageHeader } from '@/components/common/CCMainPageHeader';
 
 export function CCStudyListPage() {
   const router = useRouter();
@@ -44,18 +45,30 @@ export function CCStudyListPage() {
     <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* Header with Action Buttons */}
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">나의 스터디</h1>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setJoinModalOpen(true)} className="gap-2">
-              <LogIn className="h-4 w-4" />
-              참여하기
-            </Button>
-            <Button onClick={() => setCreateModalOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />방 만들기
-            </Button>
-          </div>
-        </div>
+        <CCMainPageHeader
+          title="나의 스터디"
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setJoinModalOpen(true)}
+                className="gap-1.5 px-3 sm:gap-2 sm:px-4"
+              >
+                <LogIn className="h-4 w-4" />
+                참여하기
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setCreateModalOpen(true)}
+                className="gap-1.5 px-3 sm:gap-2 sm:px-4"
+              >
+                <Plus className="h-4 w-4" />
+                방 만들기
+              </Button>
+            </>
+          }
+        />
 
         {/* Search Bar */}
         <div className="mb-6">
@@ -100,7 +113,7 @@ export function CCStudyListPage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-4 grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {studies.map((study, index) => (
               <CCStudyCard
                 key={study.id}

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { type ReactNode } from 'react';
@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface CCCenterPanelProps {
   ideContent?: ReactNode;
@@ -53,6 +54,8 @@ export function CCCenterPanel({
   onSettingsClick,
   className,
 }: CCCenterPanelProps) {
+  const isMobile = useIsMobile();
+
   const getTemplateCode = (languageValue: string): string => {
     const normalized = languageValue.toLowerCase();
 
@@ -132,6 +135,8 @@ print("Hello World!")`;
     viewMode === 'SPLIT_REALTIME' ? viewingUser : null,
   );
   const roomId = useRoomStore((state) => state.roomId);
+  const mobileTab = useRoomStore((state) => state.mobileTab);
+  const setMobileTab = useRoomStore((state) => state.setMobileTab);
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
@@ -140,6 +145,7 @@ print("Hello World!")`;
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
   const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
+  const setIsLeftPanelFolded = useRoomStore((state) => state.setIsLeftPanelFolded);
   const setIsRightPanelFolded = useRoomStore((state) => state.setIsRightPanelFolded);
   const targetSubmissionId = targetSubmission?.submissionId;
 
@@ -200,6 +206,22 @@ print("Hello World!")`;
     setFontSize(newSize);
     localStorage.setItem('ide-font-size', newSize.toString());
   };
+
+  useEffect(() => {
+    if (isMobile) {
+      setVideoGridHeight(420);
+    } else {
+      setVideoGridHeight(240);
+      setMobileTab('video');
+    }
+  }, [isMobile, setMobileTab]);
+
+  // Auto-switch to code view on mobile when opening a code block
+  useEffect(() => {
+    if (isMobile && (viewMode === 'SPLIT_REALTIME' || viewMode === 'SPLIT_SAVED')) {
+      setMobileTab('code');
+    }
+  }, [isMobile, viewMode, setMobileTab]);
 
   const formatCommentDate = useCallback((value?: string): string => {
     if (!value) return '';
@@ -1299,6 +1321,11 @@ print("Hello World!")`;
 
   // Show right panel when viewing other's code OR whiteboard is open
   const showRightPanel = isViewingOther || isWhiteboardVisible;
+  const showVideoSection = !isMobile || mobileTab === 'video';
+  const showProblemSection = !isMobile || mobileTab === 'code';
+  const isVideoGridCollapsed = !isMobile && isVideoGridFolded;
+  const showMyIdePanel = !isMobile || !showRightPanel;
+  const showViewerPanel = showRightPanel;
   const myProblemLabel = selectedProblemTitle
     ? `${selectedProblemExternalId ? `[${selectedProblemExternalId}] ` : ''}${selectedProblemTitle}`
     : '문제 선택 중';
@@ -1326,6 +1353,64 @@ print("Hello World!")`;
           : '';
         return `${externalPrefix}${title}${languageSuffix}`;
       })();
+  const normalizedProblemExternalId = String(selectedProblemExternalId ?? '').replace(/[^0-9]/g, '');
+  const canSplitOpenProblem =
+    !isMobile &&
+    !isViewingOther &&
+    normalizedProblemExternalId.length > 0 &&
+    Number(normalizedProblemExternalId) > 0;
+
+  const handleOpenProblemSplit = useCallback(() => {
+    const externalId = Number(normalizedProblemExternalId);
+    if (!Number.isFinite(externalId) || externalId <= 0) {
+      toast.error('분할로 열 수 있는 문제 링크가 없습니다.');
+      return;
+    }
+
+    const screenAvailWidth = window.screen.availWidth;
+    const screenAvailHeight = window.screen.availHeight;
+    const halfWidth = Math.floor(screenAvailWidth / 2);
+    const screenLeft = (window.screen as any).availLeft || 0;
+    const screenTop = (window.screen as any).availTop || 0;
+
+    setIsLeftPanelFolded(true);
+    setIsRightPanelFolded(true);
+
+    const studyProblemIdValue = Number(selectedStudyProblemId);
+    const studyIdValue = Number(roomId);
+
+    window.postMessage(
+      {
+        type: 'PEEKLE_WINDOW_SPLIT',
+        payload: {
+          url: `https://www.acmicpc.net/problem/${externalId}`,
+          leftWindow: { left: screenLeft, top: screenTop, width: halfWidth, height: screenAvailHeight },
+          rightWindow: {
+            left: screenLeft + halfWidth,
+            top: screenTop,
+            width: halfWidth,
+            height: screenAvailHeight,
+          },
+          context: {
+            sourceType: 'STUDY',
+            externalId,
+            studyProblemId:
+              Number.isFinite(studyProblemIdValue) && studyProblemIdValue > 0
+                ? studyProblemIdValue
+                : undefined,
+            studyId: Number.isFinite(studyIdValue) && studyIdValue > 0 ? studyIdValue : undefined,
+          },
+        },
+      },
+      '*',
+    );
+  }, [
+    normalizedProblemExternalId,
+    selectedStudyProblemId,
+    roomId,
+    setIsLeftPanelFolded,
+    setIsRightPanelFolded,
+  ]);
 
   // Track my latest code to respond to pull requests
   const myLatestCodeRef = useRef<string>('');
@@ -1677,43 +1762,61 @@ print("Hello World!")`;
 
   return (
     <div className={cn('flex h-full flex-col min-w-0 min-h-0', className)}>
-      {/* Video Grid Header */}
-      <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
-        <span className="text-sm font-medium">화상 타일</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={toggleVideoGrid}
-          title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
-        >
-          {isVideoGridFolded ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronUp className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
 
-      {/* Video Grid */}
-      {!isVideoGridFolded && (
+      {showVideoSection && (
         <>
-          <div style={{ height: videoGridHeight }} className="shrink-0 relative transition-none">
-            <VideoGrid onWhiteboardClick={onWhiteboardClick} className="h-full" />
+          {/* Video Grid Header */}
+          <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0">
+            <span className="text-sm font-medium">화상 타일</span>
+            {!isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={toggleVideoGrid}
+                title={isVideoGridFolded ? '화상 타일 펼치기' : '화상 타일 접기'}
+              >
+                {isVideoGridFolded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </Button>
+            )}
           </div>
-          {/* Resize Handle */}
-          <div
-            className="h-1 cursor-row-resize bg-border/50 hover:bg-primary/50 active:bg-primary transition-colors shrink-0 z-10"
-            onMouseDown={startResizingVideo}
-          />
+
+          {/* Video Grid */}
+          {!isVideoGridCollapsed && (
+            <>
+              <div
+                style={
+                  isMobile && mobileTab === 'video' ? undefined : { height: videoGridHeight }
+                }
+                className={cn(
+                  'relative transition-none',
+                  isMobile && mobileTab === 'video' ? 'flex-1 min-h-0' : 'shrink-0',
+                )}
+              >
+                <VideoGrid onWhiteboardClick={onWhiteboardClick} className="h-full" />
+              </div>
+              {/* Resize Handle */}
+              {!isMobile && (
+                <div
+                  className="h-1 cursor-row-resize bg-border/50 hover:bg-primary/50 active:bg-primary transition-colors shrink-0 z-10"
+                  onMouseDown={startResizingVideo}
+                />
+              )}
+            </>
+          )}
         </>
       )}
 
       {/* IDE Area */}
-      <div
-        className="relative flex min-h-0 flex-1 flex-col min-w-0 bg-background"
-        data-tour="ide-panel"
-      >
+      {showProblemSection && (
+        <div
+          className="relative flex min-h-0 flex-1 flex-col min-w-0 bg-background"
+          data-tour="ide-panel"
+        >
         {/* Header Row: Always show toolbar for Left IDE.  
             If isViewingOther, the toolbar layout adapts to show View Mode Banner on left and Tools on right. */}
         <div className="flex h-14 shrink-0 border-b border-border bg-card">
@@ -1810,7 +1913,7 @@ print("Hello World!")`;
                 void handleSubmit();
               }}
               // New Props for Execute
-              showExecute={!isViewingOther}
+              showExecute={!isViewingOther && !isMobile}
               isExecuting={isExecuting}
               onToggleConsole={() => setIsConsoleOpen((prev) => !prev)}
               onExecute={() => {
@@ -1819,82 +1922,103 @@ print("Hello World!")`;
                 window.dispatchEvent(new CustomEvent('study-ide-execute-trigger'));
               }}
               // Toggles
-              showSubmit={!isViewingOther}
-              showChatRef={true}
-              showThemeToggle={true}
+              showSubmit={!isViewingOther && !isMobile}
+              showChatRef={!isMobile}
+              showThemeToggle={!isMobile}
+              showProblemSplit={canSplitOpenProblem}
+              onOpenProblemSplit={handleOpenProblemSplit}
             />
           </div>
         </div>
+
+
 
         {/* Editor Body Row */}
         <div className="flex min-h-0 flex-1 min-w-0 relative flex-col">
           <div className="flex min-h-0 flex-1 min-w-0 relative">
             {/* Left IDE Panel (My Code) */}
-            <div
-              className={cn(
-                'flex flex-1 min-w-0 flex-col',
-                showRightPanel && 'border-r border-border',
-              )}
-            >
-              <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
-                <div className="flex h-full items-center gap-2">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <span className="shrink-0">내 문제</span>
-                  <span className="truncate text-foreground/90" title={myProblemLabel}>
-                    {myProblemLabel}
-                  </span>
+            {showMyIdePanel && (
+              <div
+                className={cn(
+                  'flex flex-1 min-w-0 flex-col',
+                  !isMobile && showRightPanel && 'border-r border-border',
+                )}
+              >
+                <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
+                  <div className="flex h-full items-center gap-2">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="shrink-0">내 문제</span>
+                    <span className="truncate text-foreground/90" title={myProblemLabel}>
+                      {myProblemLabel}
+                    </span>
+                  </div>
+                </div>
+                <div className="relative min-h-0 flex-1">
+                  {ideContent ?? (
+                    <IDEPanel
+                      ref={leftPanelRef}
+                      editorId="my-editor"
+                      language={language}
+                      onLanguageChange={handleLanguageChange}
+                      theme={theme}
+                      fontSize={fontSize}
+                      hideToolbar // Pass this so it doesn't render double toolbar
+                      onFontSizeChange={handleFontSizeChange}
+                      onCodeChange={handleCodeChange}
+                      restoredCode={restoredCode}
+                      restoreVersion={restoreVersion}
+                    />
+                  )}
+
+                  {isHydratingDraft && !!selectedStudyProblemId && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+                      <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
+                    </div>
+                  )}
+
+                  {/* [New] Overlay if no problem is selected and not viewing other */}
+                  {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
+                      <Lock className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        좌측 목록에서 문제를 선택해주세요
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="relative min-h-0 flex-1">
-                {ideContent ?? (
-                  <IDEPanel
-                    ref={leftPanelRef}
-                    editorId="my-editor"
-                    language={language}
-                    onLanguageChange={handleLanguageChange}
-                    theme={theme}
-                    fontSize={fontSize}
-                    hideToolbar // Pass this so it doesn't render double toolbar
-                    onFontSizeChange={handleFontSizeChange}
-                    onCodeChange={handleCodeChange}
-                    restoredCode={restoredCode}
-                    restoreVersion={restoreVersion}
-                  />
-                )}
-
-                {isHydratingDraft && !!selectedStudyProblemId && (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
-                    <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
-                  </div>
-                )}
-
-                {/* [New] Overlay if no problem is selected and not viewing other */}
-                {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
-                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
-                    <Lock className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium text-muted-foreground">
-                      좌측 목록에서 문제를 선택해주세요
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
             {/* Right Panel: Whiteboard OR Other's Code */}
-            {showRightPanel && (
+            {showViewerPanel && (
               <div className="flex min-w-0 flex-1 flex-col">
                 {isWhiteboardVisible ? (
                   <WhiteboardPanel className="border-l-2 border-rose-400" />
                 ) : (
                   <>
                     <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
-                      <div className="flex h-full items-center gap-2">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
-                        <span className="shrink-0">
-                          {viewMode === 'SPLIT_SAVED' ? savedCodePanelLabel : '상대 문제'}
-                        </span>
-                        <span className="truncate text-foreground/90" title={otherProblemLabel}>
-                          {otherProblemLabel}
-                        </span>
+                      <div className="flex h-full items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
+                          <span className="shrink-0">
+                            {viewMode === 'SPLIT_SAVED' ? savedCodePanelLabel : '상대 문제'}
+                          </span>
+                          <span className="truncate text-foreground/90" title={otherProblemLabel}>
+                            {otherProblemLabel}
+                          </span>
+                        </div>
+                        {isMobile && isViewingOther && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 shrink-0 px-2 text-[11px]"
+                            onClick={() => {
+                              resetToOnlyMine();
+                              setMobileTab('code');
+                            }}
+                          >
+                            내 코드로 돌아가기
+                          </Button>
+                        )}
                       </div>
                     </div>
                     {viewMode === 'SPLIT_SAVED' ? (
@@ -1966,7 +2090,7 @@ print("Hello World!")`;
           </div>
 
           {/* Console Overlay Drawer */}
-          {!isViewingOther && (
+          {!isViewingOther && !isMobile && (
             <div
               style={{ height: isConsoleOpen ? consoleHeight : 0, opacity: isConsoleOpen ? 1 : 0 }}
               className={cn(
@@ -1991,6 +2115,7 @@ print("Hello World!")`;
           )}
         </div>
       </div>
+      )}
 
       {/* Control Bar */}
       <ControlBar

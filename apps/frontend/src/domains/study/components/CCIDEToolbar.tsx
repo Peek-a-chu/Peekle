@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText, Minus, Plus, Play, TerminalSquare, Share2 } from 'lucide-react';
+import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText, Minus, Plus, Play, TerminalSquare, Share2, Columns2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   type ViewMode,
   type Participant,
@@ -33,7 +34,9 @@ export interface CCIDEToolbarProps {
   onSubmit?: () => void;
   onExecute?: () => void;
   onToggleConsole?: () => void;
+  onOpenProblemSplit?: () => void;
   disabled?: boolean;
+  showProblemSplit?: boolean;
 
   // View Mode Props
   viewingUser?: Participant | null;
@@ -61,16 +64,21 @@ export function CCIDEToolbar({
   onSubmit,
   onExecute,
   onToggleConsole,
+  onOpenProblemSplit,
   viewingUser,
   viewMode,
   targetSubmission,
   onResetView,
   disabled = false,
+  showProblemSplit = false,
   problemExternalId,
 }: CCIDEToolbarProps) {
+  const isMobile = useIsMobile();
   const isRealtime = viewMode === 'SPLIT_REALTIME';
   const isSaved = viewMode === 'SPLIT_SAVED';
   const isViewingOther = viewMode !== 'ONLY_MINE';
+  const shouldShowLanguageSelect = !isViewingOther;
+  const [isSplitSizedWindow, setIsSplitSizedWindow] = useState(false);
 
   // Use local state for the input field to allow users to clear it while typing
   const [inputValue, setInputValue] = useState<string>(fontSize.toString());
@@ -79,6 +87,28 @@ export function CCIDEToolbar({
   useEffect(() => {
     setInputValue(fontSize.toString());
   }, [fontSize]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateWindowSplitState = () => {
+      const availWidth = window.screen?.availWidth || window.innerWidth;
+      const currentWidth = window.outerWidth || window.innerWidth;
+      const widthRatio = currentWidth / Math.max(availWidth, 1);
+
+      // Split windows are usually near half width; keep tolerance for OS/browser chrome.
+      setIsSplitSizedWindow(widthRatio <= 0.67);
+    };
+
+    updateWindowSplitState();
+    window.addEventListener('resize', updateWindowSplitState);
+    return () => window.removeEventListener('resize', updateWindowSplitState);
+  }, []);
+
+  const problemSplitButtonLabel = isSplitSizedWindow ? '좌측 문제 열기' : '분할해서 열기';
+  const problemSplitTooltipLabel = isSplitSizedWindow
+    ? '좌측 창에 현재 문제 열기'
+    : '현재 문제를 분할 화면으로 열기';
 
   const handleDecreaseFont = () => {
     if (onFontSizeChange && fontSize > 5) {
@@ -126,25 +156,27 @@ export function CCIDEToolbar({
     <TooltipProvider>
       <div className="flex bg-card items-center justify-between border-b border-border px-4 h-14 shrink-0 w-full">
         <div className="flex items-center gap-3 min-w-0">
-          {/* Language Select - Always Visible */}
-          <select
-            value={language}
-            onChange={(e) => onLanguageChange?.(e.target.value)}
-            disabled={disabled}
-            className={cn(
-              'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring text-strong font-medium',
-              disabled && 'opacity-50 cursor-not-allowed',
-            )}
-          >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.value} value={lang.value}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
+          {/* Language Select - Show on desktop and mobile(my code only) */}
+          {shouldShowLanguageSelect && (
+            <select
+              value={language}
+              onChange={(e) => onLanguageChange?.(e.target.value)}
+              disabled={disabled}
+              className={cn(
+                'h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring text-strong font-medium',
+                disabled && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.value} value={lang.value}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* View Mode Banner - Conditional (Next to Select) */}
-          {isViewingOther && (
+          {isViewingOther && !isMobile && (
             <div
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold animate-in fade-in slide-in-from-left-2 duration-300 shadow-sm border',
@@ -286,6 +318,25 @@ export function CCIDEToolbar({
           {/* Standard Tools (Hidden when Viewing Other) */}
           {!isViewingOther && (
             <>
+              {/* Desktop-only Split Open */}
+              {showProblemSplit && !isMobile && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onOpenProblemSplit}
+                      disabled={disabled}
+                      className="ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 px-3 h-10 text-muted-foreground hover:text-foreground"
+                    >
+                      <Columns2 className="h-[18px] w-[18px]" />
+                      <span className="font-semibold text-sm">{problemSplitButtonLabel}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{problemSplitTooltipLabel}</TooltipContent>
+                </Tooltip>
+              )}
+
               {/* Console Toggle */}
               {showExecute && (
                 <Tooltip>
@@ -345,7 +396,7 @@ export function CCIDEToolbar({
           )}
 
           {/* View Only Mine Button (Visible only when Viewing Other) */}
-          {isViewingOther && (
+          {isViewingOther && !isMobile && (
             <Button
               size="sm"
               variant="secondary"

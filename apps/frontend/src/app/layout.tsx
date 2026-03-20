@@ -1,12 +1,12 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
 import SettingsModal from '@/domains/settings/components/SettingsModal';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import GoogleAnalyticsTracker from '@/components/common/GoogleAnalyticsTracker';
 import { ClientSessionManager } from '@/components/providers/ClientSessionManager';
+import { ResponsiveToaster } from '@/components/providers/ResponsiveToaster';
 
 export const metadata: Metadata = {
   title: 'Peekle',
@@ -103,7 +103,7 @@ export default function RootLayout({
             <GoogleAnalyticsTracker />
             <SettingsModal isGlobal={true} />
           </ThemeProvider>
-          <Toaster />
+          <ResponsiveToaster />
         </QueryProvider>
       </body>
     </html>

@@ -8,6 +8,7 @@ import { useSearch, MIN_SEARCH_LENGTH } from '@/hooks/useSearch';
 import { Search, AlertCircle, Loader2, Filter, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SearchCategory, SearchResultItem as SearchResultItemType } from '@/api/searchApi';
+import { CCMainPageHeader } from '@/components/common/CCMainPageHeader';
 
 // Import extracted modules
 import { SearchResultSection } from './components/SearchResultSection';
@@ -166,7 +167,7 @@ function SearchPageContent() {
     <SearchErrorBoundary>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-200">
-          <h1 className="mb-6 text-2xl font-bold text-foreground">검색</h1>
+          <CCMainPageHeader title="검색" />
 
           <div className="mb-8">
             <GlobalSearchBar

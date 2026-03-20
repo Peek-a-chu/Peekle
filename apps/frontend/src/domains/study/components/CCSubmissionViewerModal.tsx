@@ -69,7 +69,7 @@ export function CCSubmissionViewerModal({
       onClick={onClose}
     >
       <div
-        className="bg-background rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]"
+        className="bg-background rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[80vh] md:max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between p-6 pb-2">
@@ -96,7 +96,7 @@ export function CCSubmissionViewerModal({
         </div>
 
         <div className="p-6 pt-2 flex flex-col gap-6 flex-1 overflow-hidden">
-          <div className="bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border p-5 shadow-sm space-y-4">
+          <div className="hidden md:block bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border p-5 shadow-sm space-y-4">
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
               <p className="text-sm text-foreground font-medium">
@@ -153,17 +153,17 @@ export function CCSubmissionViewerModal({
                         className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/30 group"
                       >
                         <div className="flex flex-col gap-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <CheckCircle2 className="h-4 w-4 text-green-500 fill-green-100 shrink-0" />
-                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide shrink-0">
                               {sub.language || '-'}
                             </span>
                             {sub.submittedAt && (
-                              <span className="text-xs text-muted-foreground truncate">{sub.submittedAt}</span>
+                              <span className="text-xs text-muted-foreground shrink-0">{sub.submittedAt}</span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mt-0.5">
                             <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300">
                               <HardDrive className="h-3 w-3" />
                               <span>{sub.memory ? (sub.memory / 1024).toFixed(1) : '0.0'}MB</span>
@@ -176,12 +176,13 @@ export function CCSubmissionViewerModal({
                         </div>
 
                         <Button
-                          className="h-8 px-3 rounded-full border border-primary bg-white dark:bg-slate-900/60 text-primary hover:bg-primary/10 hover:border-primary/20 shadow-sm transition-all text-xs font-medium group-hover:bg-primary group-hover:text-white group-hover:border-primary disabled:opacity-50 dark:group-hover:bg-primary"
+                          className="h-8 w-8 p-0 sm:w-auto sm:px-3 rounded-full border border-primary bg-white dark:bg-slate-900/60 text-primary hover:bg-primary/10 hover:border-primary/20 shadow-sm transition-all text-xs font-medium group-hover:bg-primary group-hover:text-white group-hover:border-primary disabled:opacity-50 dark:group-hover:bg-primary shrink-0 ml-2"
                           disabled={!sub.submissionId}
                           onClick={() => sub.submissionId && onViewCode(sub.submissionId)}
+                          title="코드 확인하기"
                         >
-                          <FileCode2 className="h-3.5 w-3.5 mr-1.5" />
-                          코드 확인하기
+                          <FileCode2 className="h-3.5 w-3.5 sm:mr-1.5" />
+                          <span className="hidden sm:inline">코드 확인</span>
                         </Button>
                       </div>
                     ))}

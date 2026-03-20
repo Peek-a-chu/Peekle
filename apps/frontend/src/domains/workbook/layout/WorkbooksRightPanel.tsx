@@ -30,6 +30,8 @@ interface WorkbooksRightPanelProps {
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  allowManage?: boolean;
+  isMobile?: boolean;
   className?: string;
 }
 
@@ -39,6 +41,8 @@ export function WorkbooksRightPanel({
   onClose,
   onEdit,
   onDelete,
+  allowManage = true,
+  isMobile = false,
   className,
 }: WorkbooksRightPanelProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -53,8 +57,9 @@ export function WorkbooksRightPanel({
   return (
     <div
       className={cn(
-        'w-[460px] flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200',
-        'border-l bg-card shadow-lg',
+        'flex flex-col overflow-hidden animate-in duration-200',
+        isMobile ? 'w-full slide-in-from-bottom-4' : 'w-[460px] slide-in-from-right-4',
+        isMobile ? 'border-0 bg-card shadow-none' : 'border-l bg-card shadow-lg',
         className,
       )}
     >
@@ -77,7 +82,7 @@ export function WorkbooksRightPanel({
         {/* 문제집 이름 */}
         <div className="flex items-center gap-1 mb-3">
           <h2 className="font-bold text-xl text-foreground leading-tight">{workbook.title}</h2>
-          {workbook.isOwner && (
+          {workbook.isOwner && allowManage && (
             <>
               {onEdit && (
                 <button

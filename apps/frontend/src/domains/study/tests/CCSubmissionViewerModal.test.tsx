@@ -63,7 +63,7 @@ describe('CCSubmissionViewerModal', () => {
 
   it('calls onViewCode when code check button is clicked', () => {
     render(<CCSubmissionViewerModal {...defaultProps} />);
-    const checkButtons = screen.getAllByRole('button', { name: /코드 확인하기/i });
+    const checkButtons = screen.getAllByRole('button', { name: /코드 확인/i });
     fireEvent.click(checkButtons[0]);
     expect(defaultProps.onViewCode).toHaveBeenCalledWith(mockSubmissions[0].submissionId);
   });

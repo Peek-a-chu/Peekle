@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -23,6 +23,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { createPortal } from 'react-dom';
 import type { WorkbookProblemItem, Workbook, WorkbookProblem } from '../types';
 import { searchBojProblems, type BojProblemResponse } from '../api/problemApi';
 
@@ -90,6 +92,7 @@ export function WorkbookModal({
   problems = [],
   onSubmit,
 }: WorkbookModalProps) {
+  const isMobile = useIsMobile();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [problemList, setProblemList] = useState<WorkbookProblemItem[]>([]);
@@ -161,6 +164,7 @@ export function WorkbookModal({
   // 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (isMobile) return;
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node) &&
@@ -173,7 +177,16 @@ export function WorkbookModal({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isMobile, open]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -213,18 +226,184 @@ export function WorkbookModal({
     onOpenChange(false);
   };
 
+  const searchSection = (
+    <div className={cn('overflow-visible min-w-0', isMobile ? 'px-4 py-3 border-b shrink-0' : 'p-5 flex-1')}>
+      <label className="text-sm font-medium block mb-2">문제 검색</label>
+      <div className="relative min-w-0">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          ref={searchInputRef}
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setIsDropdownOpen(true);
+          }}
+          onFocus={() => searchQuery && setIsDropdownOpen(true)}
+          placeholder="번호 또는 제목 검색"
+          className={cn('pl-9 pr-9', isMobile && 'h-9')}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setSearchResults([]);
+              setIsDropdownOpen(false);
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+
+        {isDropdownOpen && searchQuery && (
+          <div
+            ref={dropdownRef}
+            className="absolute z-[100] top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-xl"
+          >
+            {isSearching ? (
+              <div className="px-3 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>검색 중...</span>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className={cn('py-1 overflow-y-auto', isMobile ? 'max-h-[180px]' : 'max-h-[240px]')}>
+                {searchResults.map((problem) => (
+                  <button
+                    key={problem.id}
+                    type="button"
+                    onClick={() => handleAddProblem(problem)}
+                    className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm transition-colors min-w-0"
+                  >
+                    <span className="font-medium text-primary w-12 shrink-0">{problem.externalId}</span>
+                    <span className="truncate flex-1 min-w-0">{problem.title}</span>
+                    <span className={cn('text-xs text-muted-foreground shrink-0', isMobile && 'hidden')}>
+                      {problem.tier}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                검색 결과가 없습니다
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {!isMobile && <p className="text-xs text-muted-foreground mt-2">클릭하면 우측 목록에 추가됩니다</p>}
+    </div>
+  );
+
+  const problemListSection = (
+    <div className={cn('flex-1 flex flex-col min-w-0 bg-muted/20', isMobile && 'min-h-0')}>
+      <div
+        className={cn(
+          'border-b bg-background flex items-center justify-between shrink-0',
+          isMobile ? 'px-4 py-2.5' : 'px-5 py-3',
+        )}
+      >
+        <span className="text-sm font-medium">문제 목록</span>
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+          {problemList.length}개
+        </span>
+      </div>
+
+      <div className={cn('flex-1 overflow-y-auto', isMobile ? 'p-3' : 'p-4')}>
+        {problemList.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center text-muted-foreground">
+              <p className="text-sm">추가된 문제가 없습니다</p>
+            </div>
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={problemList.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-1.5">
+                {problemList.map((item, index) => (
+                  <SortableProblemItem
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    onRemove={handleRemoveProblem}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    if (!open) return null;
+
+    return createPortal(
+      <div
+        className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[70] bg-background flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === 'create' ? '새 문제집 만들기' : '문제집 수정'}
+      >
+        <div className="border-b shrink-0 px-4 py-3">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
+            {mode === 'create' ? '새 문제집 만들기' : '문제집 수정'}
+          </h2>
+        </div>
+
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="px-4 py-4 border-b space-y-4 shrink-0">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">제목</label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="문제집 제목"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-muted-foreground">설명 (선택)</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="문제집 설명"
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+              />
+            </div>
+          </div>
+          {searchSection}
+          {problemListSection}
+        </div>
+
+        <div className="border-t flex gap-2 shrink-0 bg-background px-4 py-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+            취소
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!title.trim()}
+            className="bg-primary hover:bg-primary text-white flex-1"
+          >
+            {mode === 'create' ? '만들기' : '저장'}
+          </Button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[800px] h-[560px] flex flex-col p-0 gap-0 overflow-visible">
-        <DialogHeader className="px-6 py-4 border-b shrink-0">
+      <DialogContent className="flex flex-col p-0 gap-0 max-w-[800px] h-[560px] overflow-visible">
+        <DialogHeader className="border-b shrink-0 px-6 py-4">
           <DialogTitle>{mode === 'create' ? '새 문제집 만들기' : '문제집 수정'}</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 flex min-h-0">
-          {/* 좌측 패널 */}
-          <div className="w-[320px] border-r flex flex-col shrink-0">
-            {/* 제목 & 설명 */}
-            <div className="p-5 space-y-4 border-b">
+          <div className="flex flex-col shrink-0 min-w-0 w-[320px] border-r">
+            <div className="space-y-4 border-b p-5">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">제목</label>
                 <Input
@@ -244,125 +423,12 @@ export function WorkbookModal({
                 />
               </div>
             </div>
-
-            {/* 검색 영역 */}
-            <div className="p-5 flex-1 overflow-visible">
-              <label className="text-sm font-medium block mb-2">문제 검색</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  ref={searchInputRef}
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setIsDropdownOpen(true);
-                  }}
-                  onFocus={() => searchQuery && setIsDropdownOpen(true)}
-                  placeholder="번호 또는 제목 검색"
-                  className="pl-9 pr-9"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSearchResults([]);
-                      setIsDropdownOpen(false);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-
-                {/* 드롭다운 */}
-                {isDropdownOpen && searchQuery && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute z-[100] top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-xl"
-                  >
-                    {isSearching ? (
-                      <div className="px-3 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>검색 중...</span>
-                      </div>
-                    ) : searchResults.length > 0 ? (
-                      <div className="py-1 max-h-[240px] overflow-y-auto">
-                        {searchResults.map((problem) => (
-                          <button
-                            key={problem.id}
-                            type="button"
-                            onClick={() => handleAddProblem(problem)}
-                            className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 text-sm transition-colors"
-                          >
-                            <span className="font-medium text-primary w-12">
-                              {problem.externalId}
-                            </span>
-                            <span className="truncate flex-1">{problem.title}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {problem.tier}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                        검색 결과가 없습니다
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">클릭하면 우측 목록에 추가됩니다</p>
-            </div>
+            {searchSection}
           </div>
-
-          {/* 우측 패널 - 문제 목록 */}
-          <div className="flex-1 flex flex-col min-w-0 bg-muted/20">
-            <div className="px-5 py-3 border-b bg-background flex items-center justify-between shrink-0">
-              <span className="text-sm font-medium">문제 목록</span>
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                {problemList.length}개
-              </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              {problemList.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <p className="text-sm">추가된 문제가 없습니다</p>
-                    <p className="text-xs mt-1">좌측에서 문제를 검색해 추가하세요</p>
-                  </div>
-                </div>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={problemList.map((p) => p.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="space-y-1.5">
-                      {problemList.map((item, index) => (
-                        <SortableProblemItem
-                          key={item.id}
-                          item={item}
-                          index={index}
-                          onRemove={handleRemoveProblem}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              )}
-            </div>
-          </div>
+          {problemListSection}
         </div>
 
-        {/* 하단 버튼 */}
-        <div className="px-6 py-4 border-t flex justify-end gap-2 shrink-0 bg-background">
+        <div className="border-t flex gap-2 shrink-0 bg-background px-6 py-4 justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             취소
           </Button>

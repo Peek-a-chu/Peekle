@@ -199,21 +199,21 @@ export function CCStudyHeader({
   const totalSteps = guideSteps.length || 1;
 
   return (
-    <div className={cn('flex h-14 items-center justify-between px-4', className)}>
+    <div className={cn('flex h-14 items-center justify-between px-3 lg:px-4', className)}>
       {/* Left Section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 min-w-0">
         <Button variant="ghost" size="icon" onClick={onBack} aria-label="뒤로 가기">
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
-        <h1 className="text-lg font-semibold">{roomTitle}</h1>
+        <h1 className="text-base lg:text-lg font-semibold truncate">{roomTitle}</h1>
 
-        <div className="mx-2 h-6 w-px bg-border" />
+        <div className="mx-2 h-6 w-px bg-border hidden lg:block" />
 
         <Button
           variant="ghost"
           size="sm"
-          className="gap-2 text-muted-foreground hover:text-foreground"
+          className="hidden lg:inline-flex gap-2 text-muted-foreground hover:text-foreground"
           onClick={() => setIsGuideOpen(true)}
           data-tour="manual-button"
         >
@@ -232,7 +232,7 @@ export function CCStudyHeader({
       )}
 
       {/* Right Section */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 lg:gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -241,7 +241,7 @@ export function CCStudyHeader({
           data-tour="invite-button"
         >
           <Copy className="h-4 w-4" />
-          초대하기
+          <span className="hidden lg:inline">초대하기</span>
         </Button>
 
         {isOwner && (
@@ -249,7 +249,7 @@ export function CCStudyHeader({
             variant="outline"
             size="sm"
             onClick={onSettings}
-            className="gap-2 font-normal"
+            className="hidden lg:inline-flex gap-2 font-normal"
             title="스터디 설정"
             data-tour="settings-button"
           >
