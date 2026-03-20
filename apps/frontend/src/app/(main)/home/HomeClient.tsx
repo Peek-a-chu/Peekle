@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { LeagueProgressData, WeeklyPointSummary } from '@/domains/league/types';
 import {
@@ -10,6 +11,8 @@ import {
   AIRecommendationData,
 } from '@/domains/home/mocks/dashboardMocks';
 import { LeagueRankingData } from '@/domains/league/types';
+import { CalendarDays, Sparkles, Trophy } from 'lucide-react';
+import { LEAGUE_NAMES } from '@/components/LeagueIcon';
 
 // Dynamic Imports with loading skeletons
 const LeagueProgressChart = dynamic(() => import('@/domains/home/components/LeagueProgressChart'), {
@@ -56,11 +59,64 @@ export default function HomeClient({
 }: HomeClientProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(initialDate);
   const user = useAuthStore((state) => state.user);
+  const formattedDate = (() => {
+    const [year, month, day] = initialDate.split('-');
+    return `${year}.${month}.${day}`;
+  })();
+  const leagueLabel = LEAGUE_NAMES[initialLeagueRanking.myLeague] || '스톤';
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 bg-background text-foreground transition-colors duration-300">
+      <section className="xl:hidden mb-5 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">오늘도 반가워요</p>
+            <h2 className="mt-1 text-lg font-bold text-foreground">
+              {user?.nickname ? `${user.nickname}님` : 'Peekler'}의 학습 대시보드
+            </h2>
+          </div>
+          <div className="rounded-full bg-card/80 px-2.5 py-1 text-xs font-semibold text-primary shadow-sm">
+            <Sparkles className="mr-1 inline h-3.5 w-3.5" />
+            Mobile
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <CalendarDays className="h-3.5 w-3.5" />
+          {formattedDate}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-border bg-card/90 p-2.5">
+            <p className="text-[11px] text-muted-foreground">이번 주 포인트</p>
+            <p className="mt-1 text-base font-bold text-foreground">
+              {initialWeeklyScore?.totalScore?.toLocaleString() ?? 0}점
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-card/90 p-2.5">
+            <p className="text-[11px] text-muted-foreground">현재 리그</p>
+            <p className="mt-1 text-base font-bold text-foreground">
+              <Trophy className="mr-1 inline h-3.5 w-3.5 text-yellow-500" />
+              {leagueLabel}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Link
+            href="/study"
+            className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-center text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+          >
+            스터디 바로가기
+          </Link>
+          <Link
+            href="/search"
+            className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            문제 검색
+          </Link>
+        </div>
+      </section>
+
       <div>
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] xl:gap-10 gap-6 pt-2">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] xl:gap-10 gap-6 pt-0 xl:pt-2">
           {/* 왼쪽 메인 영역 */}
           <div className="space-y-6 order-1 xl:order-1 min-w-0">
             {/* 리그 변화 추이 */}

@@ -193,16 +193,13 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
     }
   };
 
-  const handleSolveClick = async (problemId: string, title: string) => {
+  const handleOpenProblemLink = (problemId: string) => {
     const externalId = String(problemId || '').replace(/[^0-9]/g, '');
     if (!externalId) {
-      toast.error('문제 번호를 확인할 수 없어 스터디에 추가할 수 없습니다.');
+      toast.error('문제 번호를 확인할 수 없어 이동할 수 없습니다.');
       return;
     }
-
-    setSelectedStudyProblem({ externalId, title });
-    setIsStudyModalOpen(true);
-    await loadStudies();
+    window.open(`https://www.acmicpc.net/problem/${externalId}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleSelectStudy = (studyId: number) => {
@@ -353,10 +350,10 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
                 <div className="flex flex-col items-stretch gap-2">
                   <Button
                     className="h-8 w-full px-2.5 text-xs gap-1 bg-primary hover:bg-primary"
-                    onClick={() => void handleSolveClick(item.problemId, item.title)}
+                    onClick={() => handleOpenProblemLink(item.problemId)}
                   >
                     <ExternalLink className="w-3 h-3" />
-                    풀러가기
+                    문제 보러가기
                   </Button>
                   <Button
                     variant="outline"

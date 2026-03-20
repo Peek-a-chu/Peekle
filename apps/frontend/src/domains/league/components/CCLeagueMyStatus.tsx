@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trophy, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import LeagueIcon, { LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { useLeagueRanking, useWeeklyScore } from '@/domains/home/hooks/useDashboardData';
 import LeagueRuleModal from './LeagueRuleModal';
@@ -182,11 +182,8 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 mb-2">
-          <Trophy className="w-5 h-5 text-yellow-500" />
-          <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-600 to-yellow-400">
-            리그
-          </h2>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-2xl font-bold text-foreground">리그</h2>
           <LeagueRuleModal
             myLeague={rankingData.myLeague}
             myPercentile={rankingData.myPercentile}
@@ -195,7 +192,7 @@ const CCLeagueMyStatus = ({ initialLeagueRanking, initialWeeklyScore }: CCLeague
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground -mt-4 mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         매주 점수를 쌓아 상위 리그로 승급하세요
       </p>
 

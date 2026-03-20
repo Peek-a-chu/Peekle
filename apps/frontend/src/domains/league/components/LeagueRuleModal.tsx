@@ -123,37 +123,37 @@ const LeagueRuleModal = ({
         </button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-3xl p-0 overflow-hidden bg-card border-border">
-        <div className="flex h-[500px]">
-          {' '}
-          {/* 높이 줄임 */}
-          {/* [좌측] 리그 목록 */}
-          <div className="w-56 border-r border-border bg-muted/10 p-4 space-y-1 overflow-y-auto custom-scrollbar">
-            <div className="text-xs font-bold text-muted-foreground mb-3 px-2">리그 선택</div>
-            {LEAGUE_ORDER.map((league) => (
-              <button
-                key={league}
-                onClick={() => setSelectedLeague(league)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                  selectedLeague === league
-                    ? 'bg-primary/10 text-foreground shadow-sm ring-1 ring-border'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-                )}
-              >
-                <LeagueIcon league={league} size={18} />
-                <span>{LEAGUE_NAMES[league]}</span>
-              </button>
-            ))}
+      <DialogContent className="w-[95vw] max-w-3xl p-0 overflow-hidden bg-card border-border">
+        <div className="flex flex-col sm:flex-row h-[82dvh] sm:h-[500px]">
+          {/* [좌측/상단] 리그 목록 */}
+          <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-border bg-muted/10 p-3 sm:p-4">
+            <div className="text-xs font-bold text-muted-foreground mb-2 px-1 sm:px-2">리그 선택</div>
+            <div className="flex sm:flex-col gap-1 sm:space-y-1 overflow-x-auto sm:overflow-y-auto custom-scrollbar">
+              {LEAGUE_ORDER.map((league) => (
+                <button
+                  key={league}
+                  onClick={() => setSelectedLeague(league)}
+                  className={cn(
+                    'shrink-0 sm:w-full flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all',
+                    selectedLeague === league
+                      ? 'bg-primary/10 text-foreground shadow-sm ring-1 ring-border'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  <LeagueIcon league={league} size={16} />
+                  <span>{LEAGUE_NAMES[league]}</span>
+                </button>
+              ))}
+            </div>
           </div>
           {/* [우측] 상세 내용 */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* 헤더 (Compact) */}
-            <div className="flex items-center justify-between p-6 border-b border-border/50">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border/50">
               <div className="flex items-center gap-3">
                 <LeagueIcon league={selectedLeague} size={36} />
                 <div>
-                  <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+                  <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 text-foreground">
                     <span>{LEAGUE_NAMES[selectedLeague]}</span>
                     {displayPercentileText !== '' && (
                       <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 text-[10px] px-1.5 py-0 h-5 font-normal shadow-none">
@@ -167,7 +167,7 @@ const LeagueRuleModal = ({
 
             {/* 탭 컨텐츠 */}
             <Tabs defaultValue="grade" className="flex-1 flex flex-col overflow-hidden">
-              <div className="px-6 pt-4">
+              <div className="px-4 sm:px-6 pt-3 sm:pt-4">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="grade">승급/강등 규칙</TabsTrigger>
                   <TabsTrigger value="score">점수 획득 방법</TabsTrigger>
@@ -177,11 +177,11 @@ const LeagueRuleModal = ({
               {/* 1. 승급/강등 탭 */}
               <TabsContent
                 value="grade"
-                className="flex-1 p-6 pt-4 overflow-y-auto space-y-3 custom-scrollbar"
+                className="flex-1 p-4 sm:p-6 pt-3 sm:pt-4 overflow-y-auto space-y-3 custom-scrollbar"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                   <span className="text-xs font-bold text-muted-foreground">구간 정보</span>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-start sm:items-end gap-1">
                     <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded">
                       * 인원은 올림(Ceiling) 처리
                     </span>
@@ -262,7 +262,7 @@ const LeagueRuleModal = ({
               {/* 2. 점수 획득 탭 (Compact List) */}
               <TabsContent
                 value="score"
-                className="flex-1 p-6 pt-4 overflow-y-auto custom-scrollbar"
+                className="flex-1 p-4 sm:p-6 pt-3 sm:pt-4 overflow-y-auto custom-scrollbar"
               >
                 <div className="space-y-2">
                   {SCORE_RULES.map((rule, idx) => (
@@ -270,8 +270,8 @@ const LeagueRuleModal = ({
                       key={idx}
                       className={`p-3 rounded-lg border transition-colors ${rule.style}`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <div className={`p-1.5 rounded-md border shadow-sm ${rule.iconStyle}`}>
                             <rule.icon className="w-4 h-4" />
                           </div>
@@ -291,8 +291,8 @@ const LeagueRuleModal = ({
                 </div>
                 {/* 팀전 규칙 카드 - Unified Theme */}
                 <div className="group p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors mt-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className="p-1.5 rounded-md bg-background border border-primary/20 shadow-sm">
                         <Users className="w-4 h-4 text-primary" />
                       </div>
