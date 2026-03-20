@@ -97,9 +97,8 @@ export function CCProblemCard({
 
   const getBadgeText = () => {
     if (problem.type === 'BOJ') return '[BOJ]';
-    if (problem.type === 'PGS') return '[PGS]';
     if (problem.type === 'CUSTOM') return '[Custom]';
-    return '[BOJ]'; // fallback
+    return '[Custom]'; // fallback
   };
 
   return (

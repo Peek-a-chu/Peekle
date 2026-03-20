@@ -32,7 +32,7 @@ interface CCAddProblemModalProps {
     problemId?: number,
     date?: string,
     customLink?: string,
-    problemType?: 'BOJ' | 'PGS' | 'CUSTOM',
+    problemType?: 'BOJ' | 'CUSTOM',
   ) => Promise<void>;
   onRemove: (problemId: number, studyProblemId?: number) => Promise<void>;
   currentProblems?: StudyProblem[]; // 현재 스터디에 추가된 문제 목록
@@ -55,7 +55,7 @@ export function CCAddProblemModal({
   // Custom Problem State
   const [customTitle, setCustomTitle] = useState('');
   const [customLink, setCustomLink] = useState('');
-  const [customType, setCustomType] = useState<'BOJ' | 'PGS' | 'CUSTOM'>('PGS');
+  const [customType, setCustomType] = useState<'BOJ' | 'CUSTOM'>('CUSTOM');
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -96,7 +96,7 @@ export function CCAddProblemModal({
       setSelectedWorkbookProblemIds(new Set());
       setCustomTitle('');
       setCustomLink('');
-      setCustomType('PGS');
+      setCustomType('CUSTOM');
     }
   }, [isOpen]);
 
@@ -198,7 +198,7 @@ export function CCAddProblemModal({
         await onAdd(customTitle, null, [], undefined, undefined, customLink, customType); // Pass customType
         setCustomTitle('');
         setCustomLink('');
-        setCustomType('PGS');
+        setCustomType('CUSTOM');
         onClose();
       } catch (error) {
         console.error(error);
@@ -582,7 +582,7 @@ export function CCAddProblemModal({
                 <input
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
-                  placeholder="예: 프로그래머스 - 신고 결과 받기"
+                  placeholder="예: LeetCode - Two Sum"
                   className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
@@ -590,10 +590,9 @@ export function CCAddProblemModal({
                 <label className="text-sm font-medium">문제 출처</label>
                 <select
                   value={customType}
-                  onChange={(e) => setCustomType(e.target.value as 'BOJ' | 'PGS' | 'CUSTOM')}
+                  onChange={(e) => setCustomType(e.target.value as 'BOJ' | 'CUSTOM')}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
                 >
-                  <option value="PGS">프로그래머스</option>
                   <option value="BOJ">백준</option>
                   <option value="CUSTOM">기타</option>
                 </select>
@@ -606,11 +605,11 @@ export function CCAddProblemModal({
                 <input
                   value={customLink}
                   onChange={(e) => setCustomLink(e.target.value)}
-                  placeholder="https://school.programmers.co.kr/..."
+                  placeholder="https://www.acmicpc.net/problem/1000"
                   className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
                 <p className="text-xs text-muted-foreground">
-                  프로그래머스 등 외부 문제 링크를 입력해주세요.
+                  외부 문제 링크를 입력해주세요.
                 </p>
               </div>
             </div>
