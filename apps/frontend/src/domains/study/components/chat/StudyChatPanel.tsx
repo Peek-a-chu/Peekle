@@ -101,7 +101,11 @@ export function StudyChatPanel() {
           </div>
         )}
         {messages.map((msg) => (
-          <div key={msg.id} data-msg-id={msg.id}>
+          <div
+            key={msg.id}
+            data-msg-id={msg.id}
+            className={msg.senderId === currentUserId ? 'flex justify-end' : 'flex justify-start'}
+          >
             <ChatMessageItem message={msg} isMine={msg.senderId === currentUserId} />
           </div>
         ))}

@@ -39,6 +39,7 @@ export interface CCProblemListPanelProps {
   onFetchSubmissions?: (studyProblemId: number) => void;
   historyDates?: Date[];
   showFoldButton?: boolean;
+  allowProblemManage?: boolean;
 }
 
 export function CCProblemListPanel({
@@ -56,6 +57,7 @@ export function CCProblemListPanel({
   onFetchSubmissions,
   historyDates,
   showFoldButton = true,
+  allowProblemManage = true,
 }: CCProblemListPanelProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
@@ -240,22 +242,24 @@ export function CCProblemListPanel({
         <div className="flex items-center gap-2">
 
 
-          <Button
-            onClick={() => setAddProblemModalOpen(true)}
-            className={cn(
-              "bg-primary hover:bg-primary/90 text-white h-8 text-xs shadow-sm",
-              isCompact ? "px-2" : "px-3"
-            )}
-            title={isCompact ? "문제 추가" : undefined}
-          >
-            <Plus className={cn("h-3 w-3", !isCompact && "mr-1")} />
-            {!isCompact && "문제 추가"}
-          </Button>
+          {allowProblemManage && (
+            <Button
+              onClick={() => setAddProblemModalOpen(true)}
+              className={cn(
+                'bg-primary hover:bg-primary/90 text-white h-8 text-xs shadow-sm',
+                isCompact ? 'px-2' : 'px-3',
+              )}
+              title={isCompact ? '문제 추가' : undefined}
+            >
+              <Plus className={cn('h-3 w-3', !isCompact && 'mr-1')} />
+              {!isCompact && '문제 추가'}
+            </Button>
+          )}
           {showFoldButton && (
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground hover:text-foreground p-0 h-8 gap-4"
+              className="hidden md:inline-flex text-muted-foreground hover:text-foreground p-0 h-8 gap-4"
               onClick={onToggleFold}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -323,13 +327,15 @@ export function CCProblemListPanel({
         onViewCode={handleViewCode}
       />
 
-      <CCAddProblemModal
-        isOpen={addProblemModalOpen}
-        onClose={() => setAddProblemModalOpen(false)}
-        onAdd={handleAddProblem}
-        onRemove={handleRemoveProblem}
-        currentProblems={problems}
-      />
+      {allowProblemManage && (
+        <CCAddProblemModal
+          isOpen={addProblemModalOpen}
+          onClose={() => setAddProblemModalOpen(false)}
+          onAdd={handleAddProblem}
+          onRemove={handleRemoveProblem}
+          currentProblems={problems}
+        />
+      )}
     </div>
   );
 }

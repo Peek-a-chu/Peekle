@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
 import { cn } from '@/lib/utils';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 // ----------------------------------------------------------------------
 // 타입 및 상수 정의
@@ -102,6 +103,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const [internalLanguage, setInternalLanguage] = useState<string>('python');
     const [internalTheme, setInternalTheme] = useState<'light' | 'vs-dark'>('light');
     const params = useParams();
+    const isMobile = useIsMobile(768);
     const studyId = params.id as string;
     const language = propLanguage || internalLanguage;
     const theme = propTheme || internalTheme;
@@ -638,8 +640,10 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
               fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
               fontSize: fontSize,
               minimap: { enabled: false },
-              glyphMargin: true,
-              lineDecorationsWidth: 22,
+              glyphMargin: !isMobile,
+              lineDecorationsWidth: isMobile ? 8 : 22,
+              lineNumbersMinChars: isMobile ? 3 : 5,
+              folding: !isMobile,
               wordWrap: 'on',
               automaticLayout: true,
               scrollBeyondLastLine: false,

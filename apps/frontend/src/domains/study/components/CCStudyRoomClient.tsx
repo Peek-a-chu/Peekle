@@ -8,9 +8,9 @@ import { Loader2 } from 'lucide-react';
 import { CCStudyHeader as StudyHeader } from './CCStudyHeader';
 import { CCProblemListPanel as ProblemListPanel } from './CCProblemListPanel';
 import { CCCenterPanel as CenterPanel } from './CCCenterPanel';
-import { CCVideoGrid as VideoGrid } from './CCVideoGrid';
 import { CCRightPanel as RightPanel } from './CCRightPanel';
 import { StudyLayoutContent } from './StudyLayoutContent';
+import { CCStudyRoomMobileLayout } from './CCStudyRoomMobileLayout';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 import type { StudyProblem as Problem } from '@/domains/study/types';
@@ -33,6 +33,7 @@ import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 import { useStudyPresenceSync } from '@/domains/study/hooks/useStudyPresenceSync';
 import { useProblemDates } from '@/domains/study/hooks/useProblemDates';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -71,6 +72,7 @@ function StudyRoomContent({
   aiRecommendationRequestId: string | null;
 }) {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const { user } = useAuthStore();
   const { connected } = useSocketContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
@@ -103,10 +105,6 @@ function StudyRoomContent({
   const updateParticipant = useRoomStore((state) => state.updateParticipant);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
-  const openSettingsModal = useSettingsStore((state) => state.openModal);
-
-  // [Fix] Move device settings modal open logic to after successful join or remove auto-open if causing issues on redirect.
-  const [isJoined, setIsJoined] = useState(false);
 
   // Whiteboard State
   const setIsWhiteboardActive = useRoomStore((state) => state.setIsWhiteboardActive);
@@ -295,6 +293,7 @@ function StudyRoomContent({
   const selectedStudyProblemId = useRoomStore((state) => state.selectedStudyProblemId);
   const setSelectedProblem = useRoomStore((state) => state.setSelectedProblem);
   const resetToOnlyMine = useRoomStore((state) => state.resetToOnlyMine);
+  const setMobileTab = useRoomStore((state) => state.setMobileTab);
   const [hintedStudyProblemId, setHintedStudyProblemId] = useState<number | null>(null);
   const lastProblemFallbackRequestedRef = useRef(false);
   const initialHintAppliedRef = useRef(false);
@@ -616,6 +615,9 @@ function StudyRoomContent({
       problem.title,
       problem.externalId || String((problem as any).number || 'Custom'),
     );
+    if (isMobile) {
+      setMobileTab('code');
+    }
     if (studyProblemId) setHintedStudyProblemId(Number(studyProblemId));
   };
 
@@ -656,6 +658,7 @@ function StudyRoomContent({
       onFetchSubmissions={(problemId) => void loadSubmissions(problemId)}
       historyDates={historyDates}
       showFoldButton={true}
+      allowProblemManage={!isMobile}
     />
   );
 
@@ -847,39 +850,62 @@ function StudyRoomContent({
     router,
     studyId,
   ]);
-
-
-
   return (
     <>
       <SettingsModal />
-      <StudyLayoutContent
-        header={
-          <StudyHeader
-            onBack={handleBack}
-            onAddProblem={handleAddProblem}
-            onInvite={handleInvite}
-            onSettings={handleSettings}
-            selectedDate={selectedDate}
-            onDateChange={handleDateChange}
-          />
-        }
-        leftPanel={problemList}
-        centerPanel={
-          <CenterPanel
-            onWhiteboardClick={handleWhiteboardClick}
-            onMicToggle={handleMicToggle}
-            onVideoToggle={handleVideoToggle}
-            onWhiteboardToggle={handleWhiteboardToggle}
-            onSettingsClick={handleSettings}
-          />
-        }
-        rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
-        isLeftPanelFolded={isLeftPanelFolded}
-        onUnfoldLeftPanel={handleToggleLeftPanel}
-        isRightPanelFolded={isRightPanelFolded}
-        onUnfoldRightPanel={handleToggleRightPanel}
-      />
+      {isMobile ? (
+        <CCStudyRoomMobileLayout
+          header={
+            <StudyHeader
+              onBack={handleBack}
+              onAddProblem={handleAddProblem}
+              onInvite={handleInvite}
+              onSettings={handleSettings}
+              selectedDate={selectedDate}
+              onDateChange={handleDateChange}
+            />
+          }
+          centerPanel={
+            <CenterPanel
+              onWhiteboardClick={handleWhiteboardClick}
+              onMicToggle={handleMicToggle}
+              onVideoToggle={handleVideoToggle}
+              onWhiteboardToggle={handleWhiteboardToggle}
+              onSettingsClick={handleSettings}
+            />
+          }
+          problemPanel={problemList}
+          chatPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
+        />
+      ) : (
+        <StudyLayoutContent
+          header={
+            <StudyHeader
+              onBack={handleBack}
+              onAddProblem={handleAddProblem}
+              onInvite={handleInvite}
+              onSettings={handleSettings}
+              selectedDate={selectedDate}
+              onDateChange={handleDateChange}
+            />
+          }
+          leftPanel={problemList}
+          centerPanel={
+            <CenterPanel
+              onWhiteboardClick={handleWhiteboardClick}
+              onMicToggle={handleMicToggle}
+              onVideoToggle={handleVideoToggle}
+              onWhiteboardToggle={handleWhiteboardToggle}
+              onSettingsClick={handleSettings}
+            />
+          }
+          rightPanel={<RightPanel onFold={() => setIsRightPanelFolded(true)} />}
+          isLeftPanelFolded={isLeftPanelFolded}
+          onUnfoldLeftPanel={handleToggleLeftPanel}
+          isRightPanelFolded={isRightPanelFolded}
+          onUnfoldRightPanel={handleToggleRightPanel}
+        />
+      )}
     </>
   );
 }
@@ -888,6 +914,7 @@ function StudyRoomContent({
 export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
   const studyId = Number(params.id) || 0;
   const router = useRouter();
   const currentUserId = useRoomStore((state) => state.currentUserId);
@@ -992,8 +1019,10 @@ export function CCStudyRoomClient(): React.ReactNode {
     return null;
   }
 
-  if (!isJoined) {
-    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} />;
+  const shouldShowPreJoin = !isMobile && !isJoined;
+
+  if (shouldShowPreJoin) {
+    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} skipExtensionCheck={isMobile} />;
   }
 
   return (

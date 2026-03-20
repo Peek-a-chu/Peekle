@@ -45,6 +45,7 @@ interface CCPreJoinModalProps {
   onCancel?: () => void;
   joinLabel?: string;
   isLoading?: boolean;
+  skipExtensionCheck?: boolean;
 }
 
 export const CCPreJoinModal = ({
@@ -54,6 +55,7 @@ export const CCPreJoinModal = ({
   onCancel,
   joinLabel,
   isLoading = false,
+  skipExtensionCheck = false,
 }: CCPreJoinModalProps) => {
   const router = useRouter();
   const { user, checkAuth, isLoading: isAuthLoading } = useAuthStore();
@@ -67,6 +69,7 @@ export const CCPreJoinModal = ({
   const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>('LOADING');
   const [isLinking, setIsLinking] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const isExtensionBypassed = skipExtensionCheck;
 
   // Polling State for Installation Check
   const [isPolling, setIsPolling] = useState(false);
@@ -119,6 +122,11 @@ export const CCPreJoinModal = ({
 
   // Check Extension Logic
   useEffect(() => {
+    if (isExtensionBypassed) {
+      setExtensionStatus('LINKED');
+      return;
+    }
+
     if (isAuthLoading) {
       setExtensionStatus('LOADING');
       return;
@@ -166,7 +174,7 @@ export const CCPreJoinModal = ({
     } else {
       setExtensionStatus('NOT_INSTALLED');
     }
-  }, [user, isAuthLoading, isInstalled, extensionToken, isChecking]);
+  }, [user, isAuthLoading, isInstalled, extensionToken, isChecking, isExtensionBypassed]);
 
   const handleLinkAccount = async () => {
     setIsLinking(true);
@@ -499,6 +507,7 @@ export const CCPreJoinModal = ({
   const handleJoinClick = () => {
     onJoin(isMicOn, isCamOn);
   };
+  const showExtensionGuide = !isExtensionBypassed;
 
   return (
     <TooltipProvider>
@@ -751,7 +760,7 @@ export const CCPreJoinModal = ({
             {/* Right: Actions */}
             <div className="flex items-center gap-3 relative">
               {/* Speech Bubble (말풍선) 안내 - Priority Fixed */}
-              {extensionStatus === 'LOADING' ? null : (
+              {showExtensionGuide && (extensionStatus === 'LOADING' ? null : (
                 <>
                   {extensionStatus === 'NOT_INSTALLED' ? (
                     <div className="absolute bottom-full right-0 mb-4 animate-bounce-subtle">
@@ -781,7 +790,7 @@ export const CCPreJoinModal = ({
                     )
                   )}
                 </>
-              )}
+              ))}
 
               <Button
                 variant="ghost"
@@ -792,7 +801,18 @@ export const CCPreJoinModal = ({
               </Button>
 
               {/* Dynamic Action Button based on Extension Status */}
-              {extensionStatus === 'LOADING' ? (
+              {isExtensionBypassed ? (
+                <Button
+                  onClick={handleJoinClick}
+                  disabled={isLoading}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11 px-8 rounded-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  {joinLabel || '미팅 시작'}
+                </Button>
+              ) : extensionStatus === 'LOADING' ? (
                 <Button
                   disabled
                   className="bg-zinc-800 text-zinc-500 h-11 px-8 rounded-lg border border-zinc-700 w-[160px]"

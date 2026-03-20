@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useRoomStore, type Participant as StoreParticipant } from '@/domains/study/hooks/useRoomStore';
 import { CCVideoTile } from '@/domains/study/components/CCVideoTile';
@@ -156,7 +156,9 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
       onWheel={handleWheelScroll}
       data-tour="video-grid"
       className={cn(
-        'flex gap-2 overflow-x-auto overflow-y-hidden border-b border-border bg-card p-3 pb-2',
+        'border-b border-border bg-card p-3 pb-2 gap-2 content-start',
+        'grid grid-cols-2 overflow-y-auto overflow-x-hidden',
+        'md:flex md:flex-row md:flex-nowrap md:overflow-x-auto md:overflow-y-hidden md:content-stretch',
         className,
       )}
     >
@@ -213,7 +215,8 @@ function CCOfflineTile({
   return (
     <div
       className={cn(
-        'relative h-full w-auto aspect-[4/3] shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+        'relative aspect-[4/3] shrink-0 overflow-hidden rounded-lg border border-border bg-muted',
+        'w-full h-auto md:h-full md:w-auto',
         'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all',
         isCurrentUser && 'ring-2 ring-primary',
         className,

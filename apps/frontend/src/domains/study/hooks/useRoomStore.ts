@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { ChatType } from '../types/chat';
 
 export type ViewMode = 'ONLY_MINE' | 'SPLIT_REALTIME' | 'SPLIT_SAVED';
+export type MobileTab = 'video' | 'code' | 'problems' | 'chat';
 
 export interface Participant {
   id: number;
@@ -52,6 +53,7 @@ export interface RoomState {
   isSettingsOpen: boolean;
 
   // Layout State (migrated from other stores/components)
+  mobileTab: MobileTab;
   rightPanelActiveTab: string;
   isWhiteboardActive: boolean;
   whiteboardOpenedBy: string | null;
@@ -126,6 +128,7 @@ export interface RoomActions {
   setSettingsOpen: (isOpen: boolean) => void;
 
   // Layout Actions
+  setMobileTab: (tab: MobileTab) => void;
   setRightPanelActiveTab: (tab: string) => void;
   setIsWhiteboardActive: (isActive: boolean) => void;
   setWhiteboardOpenedBy: (user: string | null) => void;
@@ -193,6 +196,7 @@ const initialState: RoomState = {
   isInviteModalOpen: false,
   isSettingsOpen: false,
 
+  mobileTab: 'video',
   rightPanelActiveTab: 'chat',
   isWhiteboardActive: false,
   whiteboardOpenedBy: null,
@@ -260,6 +264,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
   setInviteModalOpen: (isOpen): void => set({ isInviteModalOpen: isOpen }),
   setSettingsOpen: (isOpen): void => set({ isSettingsOpen: isOpen }),
 
+  setMobileTab: (tab): void => set({ mobileTab: tab }),
   setRightPanelActiveTab: (tab): void => set({ rightPanelActiveTab: tab }),
   setIsWhiteboardActive: (isActive): void => set({ isWhiteboardActive: isActive }),
   setWhiteboardOpenedBy: (user: string | null): void => set({ whiteboardOpenedBy: user }),
