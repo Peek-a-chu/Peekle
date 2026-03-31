@@ -13,12 +13,16 @@ export default async function MainLayout({
   const user = await getMyProfile();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-[100dvh] min-h-screen overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible">
       <Sidebar user={user} />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 lg:px-8 py-0 pb-20 lg:pb-0 lg:ml-[240px]">
-        {children}
-      </main>
-      <MobileBottomNav />
+      <div className="flex min-w-0 flex-1 flex-col lg:ml-[240px]">
+        <main className="flex-1 min-h-0 w-full max-w-7xl mx-auto overflow-y-auto px-4 py-0 lg:px-8 lg:overflow-visible">
+          {children}
+        </main>
+        <div className="shrink-0 lg:hidden">
+          <MobileBottomNav />
+        </div>
+      </div>
       <LeagueResultModal />
     </div>
   );

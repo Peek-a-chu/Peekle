@@ -21,8 +21,8 @@ export default function MobileBottomNav() {
   };
 
   return (
-    <div className="lg:hidden fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <nav className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-2 py-2 no-scrollbar">
+    <div className="lg:hidden border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      <nav className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] no-scrollbar">
         {MOBILE_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = isItemActive(item.href);
