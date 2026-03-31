@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, MessageSquare, Send, Eye, Archive, FileText, Minus, Plus, Play, TerminalSquare, Share2, Columns2 } from 'lucide-react';
+import { Copy, Moon, Sun, Send, Eye, Archive, Minus, Plus, Play, TerminalSquare, Share2, Columns2, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useIsMobile } from '@/hooks/useIsMobile';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useIsTouchMobile } from '@/hooks/useIsMobile';
 import {
   type ViewMode,
   type Participant,
@@ -73,7 +74,7 @@ export function CCIDEToolbar({
   showProblemSplit = false,
   problemExternalId,
 }: CCIDEToolbarProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsTouchMobile();
   const isRealtime = viewMode === 'SPLIT_REALTIME';
   const isSaved = viewMode === 'SPLIT_SAVED';
   const isViewingOther = viewMode !== 'ONLY_MINE';
@@ -92,12 +93,13 @@ export function CCIDEToolbar({
     if (typeof window === 'undefined') return;
 
     const updateWindowSplitState = () => {
-      const availWidth = window.screen?.availWidth || window.innerWidth;
-      const currentWidth = window.outerWidth || window.innerWidth;
+      const currentInnerWidth = window.innerWidth;
+      const availWidth = window.screen?.availWidth || currentInnerWidth;
+      const currentWidth = window.outerWidth || currentInnerWidth;
       const widthRatio = currentWidth / Math.max(availWidth, 1);
 
-      // Split windows are usually near half width; keep tolerance for OS/browser chrome.
-      setIsSplitSizedWindow(widthRatio <= 0.67);
+      // Some environments report screen/outer sizes inconsistently, so we also use innerWidth.
+      setIsSplitSizedWindow(widthRatio <= 0.8 || currentInnerWidth <= 1360);
     };
 
     updateWindowSplitState();
@@ -109,6 +111,7 @@ export function CCIDEToolbar({
   const problemSplitTooltipLabel = isSplitSizedWindow
     ? '좌측 창에 현재 문제 열기'
     : '현재 문제를 분할 화면으로 열기';
+  const isCompactToolbar = isSplitSizedWindow && !isMobile;
 
   const handleDecreaseFont = () => {
     if (onFontSizeChange && fontSize > 5) {
@@ -212,114 +215,216 @@ export function CCIDEToolbar({
 
         <div className="flex items-center gap-2">
           {/* Font Size Control */}
-          <div className="flex items-center gap-1 mr-2 bg-muted/50 rounded-md p-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleDecreaseFont}
-                  disabled={disabled || fontSize <= 5}
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>폰트 작게</TooltipContent>
-            </Tooltip>
+          {!isCompactToolbar && (
+            <>
+              <div className="flex items-center gap-1 mr-2 bg-muted/50 rounded-md p-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDecreaseFont}
+                      disabled={disabled || fontSize <= 5}
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>폰트 작게</TooltipContent>
+                </Tooltip>
 
-            <input
-              type="number"
-              value={inputValue}
-              onChange={handleInputChange}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDownInput}
-              disabled={disabled}
-              className="w-10 text-center text-xs font-mono text-muted-foreground bg-transparent border-none focus:outline-none focus:text-foreground appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              min={5}
-              max={40}
-            />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleIncreaseFont}
-                  disabled={disabled || fontSize >= 40}
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>폰트 크게</TooltipContent>
-            </Tooltip>
-          </div>
-
-          <div className="w-px h-4 bg-border mx-1" />
-
-          {showThemeToggle && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onThemeToggle}
+                <input
+                  type="number"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  onKeyDown={handleKeyDownInput}
                   disabled={disabled}
-                  className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
-                >
-                  {theme === 'light' ? (
-                    <Moon className="h-[22px] w-[22px] stroke-[2px]" />
-                  ) : (
-                    <Sun className="h-[22px] w-[22px] stroke-[2px]" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>테마 변경</TooltipContent>
-            </Tooltip>
+                  className="w-10 text-center text-xs font-mono text-muted-foreground bg-transparent border-none focus:outline-none focus:text-foreground appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min={5}
+                  max={40}
+                />
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleIncreaseFont}
+                      disabled={disabled || fontSize >= 40}
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-background/80"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>폰트 크게</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className="w-px h-4 bg-border mx-1" />
+
+              {showThemeToggle && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onThemeToggle}
+                      disabled={disabled}
+                      className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                    >
+                      {theme === 'light' ? (
+                        <Moon className="h-[22px] w-[22px] stroke-[2px]" />
+                      ) : (
+                        <Sun className="h-[22px] w-[22px] stroke-[2px]" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>테마 변경</TooltipContent>
+                </Tooltip>
+              )}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onCopy}
+                    disabled={disabled}
+                    className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                  >
+                    <Copy className="h-[22px] w-[22px] stroke-[2px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  코드 복사 <span className="ml-1 opacity-60 text-xs">Ctrl+C</span>
+                </TooltipContent>
+              </Tooltip>
+
+              {showChatRef && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onRefChat}
+                      disabled={disabled}
+                      className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                    >
+                      <Share2 className="h-[20px] w-[20px] stroke-[2.5px]" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>내 풀이 채팅에 공유</TooltipContent>
+                </Tooltip>
+              )}
+            </>
           )}
 
-          {/* Copy */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onCopy}
-                disabled={disabled}
-                className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
-              >
-                <Copy className="h-[22px] w-[22px] stroke-[2px]" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              코드 복사 <span className="ml-1 opacity-60 text-xs">Ctrl+C</span>
-            </TooltipContent>
-          </Tooltip>
+          {isCompactToolbar && (
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={disabled}
+                      className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                    >
+                      <MoreHorizontal className="h-[20px] w-[20px] stroke-[2.2px]" />
+                    </Button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent>추가 도구</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="end" className="w-56 p-2">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between rounded-md border px-2 py-1.5">
+                    <span className="text-xs text-muted-foreground">폰트</span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDecreaseFont}
+                        disabled={disabled || fontSize <= 5}
+                        className="h-7 w-7"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-8 text-center text-xs font-mono text-muted-foreground">
+                        {fontSize}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleIncreaseFont}
+                        disabled={disabled || fontSize >= 40}
+                        className="h-7 w-7"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
 
-          {/* Code Reference - Always available if enabled */}
-          {showChatRef && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onRefChat}
-                  disabled={disabled}
-                  className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
-                >
-                  <Share2 className="h-[20px] w-[20px] stroke-[2.5px]" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>내 풀이 채팅에 공유</TooltipContent>
-            </Tooltip>
+                  {showThemeToggle && (
+                    <Button
+                      variant="ghost"
+                      onClick={onThemeToggle}
+                      disabled={disabled}
+                      className="h-9 justify-start gap-2"
+                    >
+                      {theme === 'light' ? (
+                        <Moon className="h-4 w-4" />
+                      ) : (
+                        <Sun className="h-4 w-4" />
+                      )}
+                      <span className="text-sm">테마 변경</span>
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    onClick={onCopy}
+                    disabled={disabled}
+                    className="h-9 justify-start gap-2"
+                  >
+                    <Copy className="h-4 w-4" />
+                    <span className="text-sm">코드 복사</span>
+                  </Button>
+
+                  {showChatRef && (
+                    <Button
+                      variant="ghost"
+                      onClick={onRefChat}
+                      disabled={disabled}
+                      className="h-9 justify-start gap-2"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      <span className="text-sm">채팅에 공유</span>
+                    </Button>
+                  )}
+
+                  {showProblemSplit && !isViewingOther && !isMobile && (
+                    <Button
+                      variant="ghost"
+                      onClick={onOpenProblemSplit}
+                      disabled={disabled}
+                      className="h-9 justify-start gap-2"
+                    >
+                      <Columns2 className="h-4 w-4" />
+                      <span className="text-sm">{problemSplitButtonLabel}</span>
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
 
           {/* Standard Tools (Hidden when Viewing Other) */}
           {!isViewingOther && (
             <>
               {/* Desktop-only Split Open */}
-              {showProblemSplit && !isMobile && (
+              {showProblemSplit && !isMobile && !isCompactToolbar && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -346,10 +451,13 @@ export function CCIDEToolbar({
                       variant="ghost"
                       onClick={onToggleConsole}
                       disabled={disabled}
-                      className="ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 px-3 h-10 text-muted-foreground hover:text-foreground"
+                      className={cn(
+                        'ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 h-10 text-muted-foreground hover:text-foreground',
+                        isCompactToolbar ? 'w-10 px-0' : 'px-3',
+                      )}
                     >
                       <TerminalSquare className="h-[18px] w-[18px]" />
-                      <span className="font-semibold text-sm">테스트 케이스</span>
+                      {!isCompactToolbar && <span className="font-semibold text-sm">테스트 케이스</span>}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>테스트 케이스 편집</TooltipContent>
@@ -365,7 +473,10 @@ export function CCIDEToolbar({
                       variant="secondary"
                       onClick={onExecute}
                       disabled={disabled || isExecuting}
-                      className="ml-1 gap-1.5 focus:ring-0 shadow-sm transition-all active:scale-95 px-4 h-10 border border-border"
+                      className={cn(
+                        'ml-1 gap-1.5 focus:ring-0 shadow-sm transition-all active:scale-95 h-10 border border-border',
+                        isCompactToolbar ? 'px-3' : 'px-4',
+                      )}
                     >
                       <Play className={cn("h-4 w-4 stroke-[2.5px]", isExecuting && "animate-pulse")} />
                       <span className="font-bold text-sm">{isExecuting ? '실행중' : '실행'}</span>
@@ -383,7 +494,10 @@ export function CCIDEToolbar({
                       size="sm"
                       onClick={onSubmit}
                       disabled={disabled || isExecuting}
-                      className="ml-1 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-95 px-4 h-10 border border-primary-foreground/10"
+                      className={cn(
+                        'ml-1 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-95 h-10 border border-primary-foreground/10',
+                        isCompactToolbar ? 'px-3' : 'px-4',
+                      )}
                     >
                       <Send className="h-4 w-4 stroke-[2.5px]" />
                       <span className="font-bold text-sm">제출</span>

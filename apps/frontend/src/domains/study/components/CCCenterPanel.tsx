@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useIsMobile } from '@/hooks/useIsMobile';
+import { useIsTouchMobile } from '@/hooks/useIsMobile';
 
 interface CCCenterPanelProps {
   ideContent?: ReactNode;
@@ -54,7 +54,7 @@ export function CCCenterPanel({
   onSettingsClick,
   className,
 }: CCCenterPanelProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsTouchMobile();
 
   const getTemplateCode = (languageValue: string): string => {
     const normalized = languageValue.toLowerCase();

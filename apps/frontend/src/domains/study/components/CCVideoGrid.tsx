@@ -5,6 +5,7 @@ import { CCVideoTile } from '@/domains/study/components/CCVideoTile';
 import { CCWhiteboardTile as WhiteboardTile } from '@/domains/study/components/CCWhiteboardTile';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { useIsTouchMobile } from '@/hooks/useIsMobile';
 import { useParticipants } from '@livekit/components-react';
 import { useMemo, useRef, type WheelEvent } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ interface CCVideoGridProps {
 
 export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const isTouchMobile = useIsTouchMobile();
   const roomId = useRoomStore((state) => state.roomId);
   const isWhiteboardActive = useRoomStore((state) => state.isWhiteboardActive);
   const participants = useParticipants();
@@ -141,6 +143,8 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
   };
 
   const handleWheelScroll = (e: WheelEvent<HTMLDivElement>) => {
+    if (isTouchMobile) return;
+
     const scroller = scrollerRef.current;
     if (!scroller) return;
 
@@ -150,6 +154,8 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
     scroller.scrollLeft += e.deltaY;
   };
 
+  const tileSizeClass = isTouchMobile ? 'w-full h-auto' : 'h-full w-auto';
+
   return (
     <div
       ref={scrollerRef}
@@ -157,12 +163,15 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
       data-tour="video-grid"
       className={cn(
         'border-b border-border bg-card p-3 pb-2 gap-2 content-start',
-        'grid grid-cols-2 overflow-y-auto overflow-x-hidden',
-        'md:flex md:flex-row md:flex-nowrap md:overflow-x-auto md:overflow-y-hidden md:content-stretch',
+        isTouchMobile
+          ? 'grid grid-cols-2 overflow-y-auto overflow-x-hidden'
+          : 'flex flex-row flex-nowrap overflow-x-auto overflow-y-hidden content-stretch items-stretch',
         className,
       )}
     >
-      {isWhiteboardActive && selectedProblemTitle && <WhiteboardTile onClick={onWhiteboardClick} />}
+      {isWhiteboardActive && selectedProblemTitle && (
+        <WhiteboardTile onClick={onWhiteboardClick} className={tileSizeClass} />
+      )}
 
       {visibleLiveKitParticipants.map((participant) => {
         let userIdString = participant.identity;
@@ -179,6 +188,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
             isCurrentUser={participant.isLocal}
             displayName={storeParticipant?.nickname}
             onClick={() => void handleTileClick(participant.identity)}
+            className={tileSizeClass}
           />
         );
       })}
@@ -189,6 +199,7 @@ export function CCVideoGrid({ onWhiteboardClick, className }: CCVideoGridProps) 
           participant={p}
           isCurrentUser={p.id === currentUserId}
           onClick={() => void handleTileClick(String(p.id))}
+          className={tileSizeClass}
         />
       ))}
 

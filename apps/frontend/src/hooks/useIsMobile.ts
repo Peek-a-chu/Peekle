@@ -2,22 +2,41 @@
 
 import { useEffect, useState } from 'react';
 
-export function useIsMobile(breakpoint = 768): boolean {
-  const getCurrentIsMobile = () => {
+function useMediaQuery(query: string): boolean {
+  const getMatches = () => {
     if (typeof window === 'undefined') return false;
-    return window.innerWidth < breakpoint;
+    return window.matchMedia(query).matches;
   };
 
-  const [isMobile, setIsMobile] = useState(getCurrentIsMobile);
+  const [matches, setMatches] = useState(getMatches);
 
   useEffect(() => {
-    const update = () => setIsMobile(getCurrentIsMobile());
+    if (typeof window === 'undefined') return;
 
-    update();
-    window.addEventListener('resize', update);
+    const mediaQuery = window.matchMedia(query);
+    const update = (event: MediaQueryListEvent) => setMatches(event.matches);
 
-    return () => window.removeEventListener('resize', update);
-  }, [breakpoint]);
+    setMatches(mediaQuery.matches);
 
-  return isMobile;
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', update);
+      return () => mediaQuery.removeEventListener('change', update);
+    }
+
+    mediaQuery.addListener(update);
+    return () => mediaQuery.removeListener(update);
+  }, [query]);
+
+  return matches;
+}
+
+const getMaxWidthQuery = (breakpoint: number) => `(max-width: ${Math.max(0, breakpoint - 0.02)}px)`;
+
+export function useIsMobile(breakpoint = 768): boolean {
+  return useMediaQuery(getMaxWidthQuery(breakpoint));
+}
+
+export function useIsTouchMobile(breakpoint = 768): boolean {
+  const query = `${getMaxWidthQuery(breakpoint)} and (hover: none) and (pointer: coarse)`;
+  return useMediaQuery(query);
 }
