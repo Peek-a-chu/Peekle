@@ -33,7 +33,7 @@ import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
 import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 import { useStudyPresenceSync } from '@/domains/study/hooks/useStudyPresenceSync';
 import { useProblemDates } from '@/domains/study/hooks/useProblemDates';
-import { useIsMobile } from '@/hooks/useIsMobile';
+import { useIsTouchMobile } from '@/hooks/useIsMobile';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -72,7 +72,7 @@ function StudyRoomContent({
   aiRecommendationRequestId: string | null;
 }) {
   const router = useRouter();
-  const isMobile = useIsMobile();
+  const isMobile = useIsTouchMobile();
   const { user } = useAuthStore();
   const { connected } = useSocketContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
@@ -914,7 +914,7 @@ function StudyRoomContent({
 export function CCStudyRoomClient(): React.ReactNode {
   const params = useParams();
   const searchParams = useSearchParams();
-  const isMobile = useIsMobile();
+  const isTouchMobile = useIsTouchMobile();
   const studyId = Number(params.id) || 0;
   const router = useRouter();
   const currentUserId = useRoomStore((state) => state.currentUserId);
@@ -1019,10 +1019,16 @@ export function CCStudyRoomClient(): React.ReactNode {
     return null;
   }
 
-  const shouldShowPreJoin = !isMobile && !isJoined;
+  const shouldShowPreJoin = !isTouchMobile && !isJoined;
 
   if (shouldShowPreJoin) {
-    return <CCPreJoinModal roomTitle={roomTitle} onJoin={handleJoin} skipExtensionCheck={isMobile} />;
+    return (
+      <CCPreJoinModal
+        roomTitle={roomTitle}
+        onJoin={handleJoin}
+        skipExtensionCheck={isTouchMobile}
+      />
+    );
   }
 
   return (
