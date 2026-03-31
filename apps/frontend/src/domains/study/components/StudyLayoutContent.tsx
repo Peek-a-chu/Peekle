@@ -2,8 +2,6 @@
 
 import { ReactNode, useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 
 export interface StudyLayoutContentProps {
   header: ReactNode | null;
@@ -98,46 +96,17 @@ export function StudyLayoutContent({
   }, []);
 
   return (
-    <div className={cn('flex h-screen flex-col bg-background text-foreground', className)}>
+    <div className={cn('flex h-screen flex-col overflow-hidden bg-background text-foreground', className)}>
       {/* Header */}
-      {header && <header className="shrink-0 border-b border-border">{header}</header>}
+      {header && <header className="shrink-0 border-b border-border/70">{header}</header>}
 
       {/* Main Content */}
-      <div ref={mainContainerRef} className="relative flex min-h-0 flex-1">
+      <div ref={mainContainerRef} className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* NARROW MODE: Hide split panels, show center panel only */}
         {isNarrow ? (
           <>
             {/* Center Panel (full width in narrow mode) */}
             <main className="relative flex min-w-0 flex-1 flex-col">
-              {/* Unfold buttons */}
-              {isLeftPanelFolded && (
-                <div className="absolute left-2 top-2 z-10">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onUnfoldLeftPanel}
-                    className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-                    title="문제 목록 펼치기"
-                  >
-                    <PanelLeftOpen className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              {hasRightPanel && isRightPanelFolded && (
-                <div className="absolute right-2 top-2 z-10">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onUnfoldRightPanel}
-                    className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-                    title="채팅/참여자 펼치기"
-                  >
-                    <PanelRightOpen className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
               {centerPanel}
             </main>
 
@@ -174,7 +143,7 @@ export function StudyLayoutContent({
             <aside
               style={{ width: isLeftPanelFolded ? 0 : leftWidth }}
               className={cn(
-                'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card',
+                'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border/70 bg-card',
                 !isResizingLeft && 'transition-all duration-300 ease-in-out',
                 isLeftPanelFolded && 'border-r-0',
               )}
@@ -193,43 +162,7 @@ export function StudyLayoutContent({
             )}
 
             {/* Center Panel */}
-            <main
-              className={cn(
-                'relative flex min-w-0 flex-1 flex-col transition-all duration-300',
-                isLeftPanelFolded && 'pl-12',
-                hasRightPanel && isRightPanelFolded && 'pr-12',
-              )}
-            >
-              {/* Unfold Left Panel Button */}
-              {isLeftPanelFolded && (
-                <div className="absolute left-2 top-2 z-10">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onUnfoldLeftPanel}
-                    className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-                    title="문제 목록 펼치기"
-                  >
-                    <PanelLeftOpen className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              {/* Unfold Right Panel Button */}
-              {hasRightPanel && isRightPanelFolded && (
-                <div className="absolute right-2 top-2 z-10">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onUnfoldRightPanel}
-                    className="h-8 w-8 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-                    title="채팅/참여자 펼치기"
-                  >
-                    <PanelRightOpen className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
+            <main className="relative flex min-w-0 flex-1 flex-col transition-all duration-300">
               {centerPanel}
             </main>
 
@@ -245,7 +178,7 @@ export function StudyLayoutContent({
               <aside
                 style={{ width: isRightPanelFolded ? 0 : rightWidth }}
                 className={cn(
-                  'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card',
+                  'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border/70 bg-card',
                   !isResizingRight && 'transition-all duration-300 ease-in-out',
                   isRightPanelFolded && 'border-l-0',
                 )}

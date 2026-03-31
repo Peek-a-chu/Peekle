@@ -26,7 +26,11 @@ export function UserIcon({
   // user 객체가 있으면 거기서 정보를 가져옴
   const finalNickname = nickname || user?.nickname;
   const userImage = user?.profileImg || user?.profileImage; // Handle both likely property names if types vary
-  const finalSrc = (src || userImage) as string;
+  const rawSrc = src ?? userImage;
+  const normalizedSrc = typeof rawSrc === 'string' ? rawSrc.trim() : '';
+  const hasValidSrc =
+    normalizedSrc.length > 0 && normalizedSrc !== 'null' && normalizedSrc !== 'undefined';
+  const fallbackLabel = finalNickname?.charAt(0)?.toUpperCase() || '?';
 
   return (
     <div
@@ -36,14 +40,18 @@ export function UserIcon({
       )}
       style={{ width: size, height: size }}
     >
-      <Image
-        src={finalSrc}
-        alt={finalNickname || 'User profile image'}
-        width={size}
-        height={size}
-        className="w-full h-full object-cover"
-        unoptimized={unoptimized}
-      />
+      {hasValidSrc ? (
+        <Image
+          src={normalizedSrc}
+          alt={finalNickname || 'User profile image'}
+          width={size}
+          height={size}
+          className="w-full h-full object-cover"
+          unoptimized={unoptimized}
+        />
+      ) : (
+        <span className="text-xs font-semibold text-muted-foreground">{fallbackLabel}</span>
+      )}
     </div>
   );
 }

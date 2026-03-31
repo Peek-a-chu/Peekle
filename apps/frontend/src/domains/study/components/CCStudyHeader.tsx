@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStudyHeader } from '@/domains/study/hooks/useStudyHeader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, Copy, Settings } from 'lucide-react';
+import { ArrowLeft, Copy, Settings, ListTodo, MessageSquare } from 'lucide-react';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { CCInviteModal } from './CCInviteModal';
 import { CCStudySettingsModal } from './CCStudySettingsModal';
@@ -14,6 +14,11 @@ interface CCStudyHeaderProps {
   onAddProblem?: (title: string, number: number, tags?: string[]) => Promise<void>;
   onInvite?: () => void;
   onSettings?: () => void;
+  isLeftPanelFolded?: boolean;
+  isRightPanelFolded?: boolean;
+  onToggleLeftPanel?: () => void;
+  onToggleRightPanel?: () => void;
+  panelToggleMode?: 'exclusive' | 'independent';
   className?: string;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
@@ -23,6 +28,11 @@ export function CCStudyHeader({
   onBack,
   onInvite,
   onSettings,
+  isLeftPanelFolded,
+  isRightPanelFolded,
+  onToggleLeftPanel,
+  onToggleRightPanel,
+  panelToggleMode = 'exclusive',
   className,
 }: CCStudyHeaderProps): React.ReactElement {
   const { roomTitle, whiteboardMessage, isWhiteboardActive, isOwner } = useStudyHeader();
@@ -197,6 +207,12 @@ export function CCStudyHeader({
 
   const activeStep = guideSteps[guideStepIndex];
   const totalSteps = guideSteps.length || 1;
+  const canTogglePanels =
+    typeof isLeftPanelFolded === 'boolean' &&
+    typeof isRightPanelFolded === 'boolean' &&
+    onToggleLeftPanel &&
+    onToggleRightPanel;
+  const isExclusivePanelToggle = panelToggleMode === 'exclusive';
 
   return (
     <div className={cn('flex h-14 items-center justify-between px-3 lg:px-4', className)}>
@@ -208,16 +224,16 @@ export function CCStudyHeader({
 
         <h1 className="text-base lg:text-lg font-semibold truncate">{roomTitle}</h1>
 
-        <div className="mx-2 h-6 w-px bg-border hidden lg:block" />
+        <div className="mx-2 hidden h-4 w-px bg-border/70 md:block" />
 
         <Button
           variant="ghost"
           size="sm"
-          className="hidden lg:inline-flex gap-2 text-muted-foreground hover:text-foreground"
+          className="hidden md:inline-flex h-8 gap-2 px-2 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
           onClick={() => setIsGuideOpen(true)}
           data-tour="manual-button"
         >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-xs font-semibold">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/70 text-xs font-semibold">
             ?
           </span>
           스터디 매뉴얼
@@ -232,12 +248,80 @@ export function CCStudyHeader({
       )}
 
       {/* Right Section */}
-      <div className="flex items-center gap-1 lg:gap-2">
+      <div className="flex items-center gap-1.5 lg:gap-2">
+        {canTogglePanels &&
+          (isExclusivePanelToggle ? (
+            <div className="flex items-center gap-1 rounded-md border border-border/70 bg-muted/20 px-1 py-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleLeftPanel}
+                className={cn(
+                  'h-8 gap-1.5 px-2 text-xs font-medium',
+                  !isLeftPanelFolded
+                    ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                title={!isLeftPanelFolded ? '문제목록 패널 닫기' : '문제목록 패널 열기'}
+              >
+                <ListTodo className="h-4 w-4" />
+                <span className="hidden xl:inline">문제목록</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleRightPanel}
+                className={cn(
+                  'h-8 gap-1.5 px-2 text-xs font-medium',
+                  !isRightPanelFolded
+                    ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                title={!isRightPanelFolded ? '채팅 패널 닫기' : '채팅 패널 열기'}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden xl:inline">채팅</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleLeftPanel}
+                className={cn(
+                  'h-8 gap-1.5 px-2 text-xs font-medium',
+                  !isLeftPanelFolded
+                    ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                title={!isLeftPanelFolded ? '문제목록 패널 닫기' : '문제목록 패널 열기'}
+              >
+                <ListTodo className="h-4 w-4" />
+                <span className="hidden xl:inline">문제목록</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleRightPanel}
+                className={cn(
+                  'h-8 gap-1.5 px-2 text-xs font-medium',
+                  !isRightPanelFolded
+                    ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                title={!isRightPanelFolded ? '채팅 패널 닫기' : '채팅 패널 열기'}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden xl:inline">채팅</span>
+              </Button>
+            </div>
+          ))}
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={onInvite}
-          className="gap-2 font-normal"
+          className="h-8 gap-1.5 px-2 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
           data-tour="invite-button"
         >
           <Copy className="h-4 w-4" />
@@ -246,10 +330,10 @@ export function CCStudyHeader({
 
         {isOwner && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={onSettings}
-            className="hidden lg:inline-flex gap-2 font-normal"
+            className="hidden h-8 gap-1.5 px-2 text-muted-foreground hover:bg-muted/40 hover:text-foreground lg:inline-flex"
             title="스터디 설정"
             data-tour="settings-button"
           >
