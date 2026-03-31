@@ -23,6 +23,8 @@ export interface CCIDEToolbarProps {
   fontSize?: number;
   showSubmit?: boolean;
   showExecute?: boolean;
+  showConsoleToggle?: boolean;
+  showFontSizeControl?: boolean;
   isExecuting?: boolean;
   showChatRef?: boolean;
   showThemeToggle?: boolean;
@@ -53,6 +55,8 @@ export function CCIDEToolbar({
   fontSize = 14,
   showSubmit = true,
   showExecute = false,
+  showConsoleToggle = true,
+  showFontSizeControl = true,
   isExecuting = false,
   showChatRef = true,
   showThemeToggle = true,
@@ -215,7 +219,7 @@ export function CCIDEToolbar({
 
         <div className="flex items-center gap-2">
           {/* Font Size Control */}
-          {!isCompactToolbar && (
+          {!isCompactToolbar && showFontSizeControl && (
             <>
               <div className="flex items-center gap-1 mr-2 bg-muted/50 rounded-md p-1">
                 <Tooltip>
@@ -262,7 +266,11 @@ export function CCIDEToolbar({
               </div>
 
               <div className="w-px h-4 bg-border mx-1" />
+            </>
+          )}
 
+          {!isCompactToolbar && (
+            <>
               {showThemeToggle && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -443,7 +451,7 @@ export function CCIDEToolbar({
               )}
 
               {/* Console Toggle */}
-              {showExecute && (
+              {showExecute && showConsoleToggle && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

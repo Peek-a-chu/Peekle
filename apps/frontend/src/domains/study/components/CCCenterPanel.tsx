@@ -16,6 +16,7 @@ import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronUp, ChevronDown, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsTouchMobile } from '@/hooks/useIsMobile';
@@ -44,6 +45,8 @@ interface SubmissionCommentItem {
   content: string;
   createdAt: string;
 }
+
+const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 
 export function CCCenterPanel({
   ideContent,
@@ -191,6 +194,8 @@ print("Hello World!")`;
 
   // Font Size State
   const [fontSize, setFontSize] = useState<number>(14);
+  const [fontSizeInput, setFontSizeInput] = useState<string>('14');
+  const [isFontSizeMenuOpen, setIsFontSizeMenuOpen] = useState(false);
 
   // Load font size from local storage on mount
   useEffect(() => {
@@ -206,6 +211,22 @@ print("Hello World!")`;
     setFontSize(newSize);
     localStorage.setItem('ide-font-size', newSize.toString());
   };
+
+  useEffect(() => {
+    setFontSizeInput(fontSize.toString());
+  }, [fontSize]);
+
+  const applyFontSizeInput = useCallback((rawValue: string) => {
+    const parsed = Number.parseInt(rawValue, 10);
+    if (Number.isNaN(parsed)) {
+      setFontSizeInput(fontSize.toString());
+      return;
+    }
+
+    const clamped = Math.max(5, Math.min(40, parsed));
+    handleFontSizeChange(clamped);
+    setFontSizeInput(clamped.toString());
+  }, [fontSize]);
 
   useEffect(() => {
     if (isMobile) {
@@ -1323,6 +1344,7 @@ print("Hello World!")`;
   const showRightPanel = isViewingOther || isWhiteboardVisible;
   const showVideoSection = !isMobile || mobileTab === 'video';
   const showProblemSection = !isMobile || mobileTab === 'code';
+  const showMobileConsoleReplacement = isMobile && isConsoleOpen && !isViewingOther;
   const isVideoGridCollapsed = !isMobile && isVideoGridFolded;
   const showMyIdePanel = !isMobile || !showRightPanel;
   const showViewerPanel = showRightPanel;
@@ -1913,12 +1935,20 @@ print("Hello World!")`;
                 void handleSubmit();
               }}
               // New Props for Execute
-              showExecute={!isViewingOther && !isMobile}
+              showExecute={!isViewingOther}
+              showConsoleToggle={!isMobile}
+              showFontSizeControl={false}
               isExecuting={isExecuting}
               onToggleConsole={() => setIsConsoleOpen((prev) => !prev)}
               onExecute={() => {
+                if (isMobile && !isConsoleOpen) {
+                  setIsConsoleOpen(true);
+                  window.requestAnimationFrame(() => {
+                    window.dispatchEvent(new CustomEvent('study-ide-execute-trigger'));
+                  });
+                  return;
+                }
                 if (!isConsoleOpen) setIsConsoleOpen(true);
-                // Console is now always mounted, so we can dispatch immediately
                 window.dispatchEvent(new CustomEvent('study-ide-execute-trigger'));
               }}
               // Toggles
@@ -1934,195 +1964,282 @@ print("Hello World!")`;
 
 
         {/* Editor Body Row */}
-        <div className="flex min-h-0 flex-1 min-w-0 relative flex-col">
-          <div className="flex min-h-0 flex-1 min-w-0 relative">
-            {/* Left IDE Panel (My Code) */}
-            {showMyIdePanel && (
-              <div
-                className={cn(
-                  'flex flex-1 min-w-0 flex-col',
-                  !isMobile && showRightPanel && 'border-r border-border',
-                )}
-              >
+        {showMobileConsoleReplacement ? (
+          <div className="flex min-h-0 flex-1 min-w-0">
+            <CCConsolePanel
+              roomId={roomId}
+              problemId={selectedStudyProblemId}
+              isOpen={isConsoleOpen}
+              onClose={() => setIsConsoleOpen(false)}
+              onExecute={handleExecuteWrapper}
+              isExecuting={isExecuting}
+              executionResult={executionResult}
+            />
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 min-w-0 relative flex-col">
+            <div className="flex min-h-0 flex-1 min-w-0 relative">
+              {/* Left IDE Panel (My Code) */}
+              {showMyIdePanel && (
+                <div
+                  className={cn(
+                    'flex flex-1 min-w-0 flex-col',
+                    !isMobile && showRightPanel && 'border-r border-border',
+                  )}
+                >
                 <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
-                  <div className="flex h-full items-center gap-2">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="shrink-0">내 문제</span>
-                    <span className="truncate text-foreground/90" title={myProblemLabel}>
-                      {myProblemLabel}
-                    </span>
+                  <div className="flex h-full items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span className="shrink-0">내 문제</span>
+                      <span className="truncate text-foreground/90" title={myProblemLabel}>
+                        {myProblemLabel}
+                      </span>
+                    </div>
+                    <div
+                      className={cn(
+                        'flex shrink-0 items-center overflow-hidden rounded-sm border border-border/80 bg-card',
+                        isMobile ? 'h-5' : 'h-6',
+                      )}
+                    >
+                      <input
+                        inputMode="numeric"
+                        value={fontSizeInput}
+                        onChange={(event) => setFontSizeInput(event.target.value)}
+                        onBlur={(event) => applyFontSizeInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            applyFontSizeInput((event.target as HTMLInputElement).value);
+                            (event.target as HTMLInputElement).blur();
+                          }
+                        }}
+                        className={cn(
+                          'border-r border-border/70 bg-background/60 text-center font-mono text-foreground outline-none',
+                          isMobile ? 'h-full w-8 text-[10px]' : 'h-full w-9 text-xs',
+                        )}
+                      />
+                      <Popover open={isFontSizeMenuOpen} onOpenChange={setIsFontSizeMenuOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              'flex h-full items-center justify-center border-l border-border/60 bg-muted/40 hover:bg-muted/70',
+                              isMobile ? 'w-4' : 'w-5',
+                            )}
+                            aria-label="폰트 크기 목록 열기"
+                          >
+                            <ChevronDown className={cn(isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3')} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="end"
+                          side="bottom"
+                          sideOffset={2}
+                          className={cn('w-[68px] p-1', isMobile && 'w-[62px]')}
+                        >
+                          <div className="max-h-56 overflow-y-auto">
+                            {FONT_SIZE_OPTIONS.map((option) => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => {
+                                  handleFontSizeChange(option);
+                                  setFontSizeInput(String(option));
+                                  setIsFontSizeMenuOpen(false);
+                                }}
+                                className={cn(
+                                  'w-full rounded-sm px-1.5 py-1 text-center font-mono text-xs text-foreground/80 hover:bg-muted',
+                                  fontSize === option && 'bg-muted font-semibold text-foreground',
+                                )}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
                 </div>
-                <div className="relative min-h-0 flex-1">
-                  {ideContent ?? (
-                    <IDEPanel
-                      ref={leftPanelRef}
-                      editorId="my-editor"
-                      language={language}
-                      onLanguageChange={handleLanguageChange}
-                      theme={theme}
-                      fontSize={fontSize}
-                      hideToolbar // Pass this so it doesn't render double toolbar
-                      onFontSizeChange={handleFontSizeChange}
-                      onCodeChange={handleCodeChange}
-                      restoredCode={restoredCode}
-                      restoreVersion={restoreVersion}
-                    />
-                  )}
+                  <div className="relative min-h-0 flex-1">
+                    {ideContent ?? (
+                      <IDEPanel
+                        ref={leftPanelRef}
+                        editorId="my-editor"
+                        language={language}
+                        onLanguageChange={handleLanguageChange}
+                        theme={theme}
+                        fontSize={fontSize}
+                        hideToolbar // Pass this so it doesn't render double toolbar
+                        onFontSizeChange={handleFontSizeChange}
+                        onCodeChange={handleCodeChange}
+                        restoredCode={restoredCode}
+                        restoreVersion={restoreVersion}
+                      />
+                    )}
 
-                  {isHydratingDraft && !!selectedStudyProblemId && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
-                      <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
-                    </div>
-                  )}
-
-                  {/* [New] Overlay if no problem is selected and not viewing other */}
-                  {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
-                      <Lock className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-sm font-medium text-muted-foreground">
-                        좌측 목록에서 문제를 선택해주세요
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            {/* Right Panel: Whiteboard OR Other's Code */}
-            {showViewerPanel && (
-              <div className="flex min-w-0 flex-1 flex-col">
-                {isWhiteboardVisible ? (
-                  <WhiteboardPanel className="border-l-2 border-rose-400" />
-                ) : (
-                  <>
-                    <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
-                      <div className="flex h-full items-center justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
-                          <span className="shrink-0">
-                            {viewMode === 'SPLIT_SAVED' ? savedCodePanelLabel : '상대 문제'}
-                          </span>
-                          <span className="truncate text-foreground/90" title={otherProblemLabel}>
-                            {otherProblemLabel}
-                          </span>
-                        </div>
-                        {isMobile && isViewingOther && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 shrink-0 px-2 text-[11px]"
-                            onClick={() => {
-                              resetToOnlyMine();
-                              setMobileTab('code');
-                            }}
-                          >
-                            내 코드로 돌아가기
-                          </Button>
-                        )}
+                    {isHydratingDraft && !!selectedStudyProblemId && (
+                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+                        <p className="text-sm font-medium text-muted-foreground">Loading problem...</p>
                       </div>
-                    </div>
-                    {viewMode === 'SPLIT_SAVED' ? (
-                      <div className="min-h-0 flex-1 flex flex-col">
-                        <div className="relative min-h-0 flex-1">
-                          <IDEPanel
-                            key={`${viewMode}-${targetSubmissionId || 'none'}`}
-                            editorId="other-editor"
-                            readOnly
-                            hideToolbar
-                            initialCode={targetSubmission?.code}
-                            language={targetSubmission?.language}
-                            theme={theme}
-                            fontSize={fontSize}
-                            onFontSizeChange={handleFontSizeChange}
-                            onEditorMount={handleSavedEditorMount}
-                            borderColorClass="border-indigo-400"
-                          />
-                          {hoveredLineForAdd && (
-                            <button
-                              type="button"
-                              title={`L${hoveredLineForAdd}에 인라인 댓글 추가`}
-                              className="absolute z-[80] flex h-5 w-5 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-md ring-1 ring-primary/30 hover:opacity-90"
-                              style={{ top: hoverAddButtonTop, left: hoverAddButtonLeft }}
-                              onMouseDown={(event) => {
-                                event.stopPropagation();
-                              }}
-                              onMouseEnter={() => {
-                                isHoveringAddButtonRef.current = true;
-                                clearHoverHideTimer();
-                              }}
-                              onMouseLeave={() => {
-                                isHoveringAddButtonRef.current = false;
-                                hideHoverAddButton();
-                              }}
+                    )}
+
+                    {/* [New] Overlay if no problem is selected and not viewing other */}
+                    {!selectedProblemTitle && !isViewingOther && !isWhiteboardVisible && (
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm">
+                        <Lock className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium text-muted-foreground">
+                          좌측 목록에서 문제를 선택해주세요
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* Right Panel: Whiteboard OR Other's Code */}
+              {showViewerPanel && (
+                <div className="flex min-w-0 flex-1 flex-col">
+                  {isWhiteboardVisible ? (
+                    <WhiteboardPanel className="border-l-2 border-rose-400" />
+                  ) : (
+                    <>
+                      <div className="h-8 shrink-0 border-b border-border bg-muted/35 px-3 text-xs text-muted-foreground">
+                        <div className="flex h-full items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
+                            <span className="shrink-0">
+                              {viewMode === 'SPLIT_SAVED' ? savedCodePanelLabel : '상대 문제'}
+                            </span>
+                            <span className="truncate text-foreground/90" title={otherProblemLabel}>
+                              {otherProblemLabel}
+                            </span>
+                          </div>
+                          {isMobile && isViewingOther && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 shrink-0 px-2 text-[11px]"
                               onClick={() => {
-                                setInlineDraftLine(hoveredLineForAdd);
-                                setInlineDraftParentId(null);
-                                setInlineEditingCommentId(null);
-                                setInlineEditingContent('');
-                                focusSavedLine(hoveredLineForAdd);
+                                resetToOnlyMine();
+                                setMobileTab('code');
                               }}
                             >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
+                              내 코드로 돌아가기
+                            </Button>
                           )}
                         </div>
                       </div>
-                    ) : (
-                      <div className="min-h-0 flex-1">
-                        <IDEPanel
-                          key={viewMode}
-                          editorId="other-editor"
-                          readOnly
-                          hideToolbar
-                          initialCode={realtimeCode}
-                          language={realtimeLanguage}
-                          theme={theme}
-                          fontSize={fontSize}
-                          onFontSizeChange={handleFontSizeChange}
-                          borderColorClass="border-pink-400"
-                        />
-                      </div>
-                    )}
-                  </>
+                      {viewMode === 'SPLIT_SAVED' ? (
+                        <div className="min-h-0 flex-1 flex flex-col">
+                          <div className="relative min-h-0 flex-1">
+                            <IDEPanel
+                              key={`${viewMode}-${targetSubmissionId || 'none'}`}
+                              editorId="other-editor"
+                              readOnly
+                              hideToolbar
+                              initialCode={targetSubmission?.code}
+                              language={targetSubmission?.language}
+                              theme={theme}
+                              fontSize={fontSize}
+                              onFontSizeChange={handleFontSizeChange}
+                              onEditorMount={handleSavedEditorMount}
+                              borderColorClass="border-indigo-400"
+                            />
+                            {hoveredLineForAdd && (
+                              <button
+                                type="button"
+                                title={`L${hoveredLineForAdd}에 인라인 댓글 추가`}
+                                className="absolute z-[80] flex h-5 w-5 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-md ring-1 ring-primary/30 hover:opacity-90"
+                                style={{ top: hoverAddButtonTop, left: hoverAddButtonLeft }}
+                                onMouseDown={(event) => {
+                                  event.stopPropagation();
+                                }}
+                                onMouseEnter={() => {
+                                  isHoveringAddButtonRef.current = true;
+                                  clearHoverHideTimer();
+                                }}
+                                onMouseLeave={() => {
+                                  isHoveringAddButtonRef.current = false;
+                                  hideHoverAddButton();
+                                }}
+                                onClick={() => {
+                                  setInlineDraftLine(hoveredLineForAdd);
+                                  setInlineDraftParentId(null);
+                                  setInlineEditingCommentId(null);
+                                  setInlineEditingContent('');
+                                  focusSavedLine(hoveredLineForAdd);
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="min-h-0 flex-1">
+                          <IDEPanel
+                            key={viewMode}
+                            editorId="other-editor"
+                            readOnly
+                            hideToolbar
+                            initialCode={realtimeCode}
+                            language={realtimeLanguage}
+                            theme={theme}
+                            fontSize={fontSize}
+                            onFontSizeChange={handleFontSizeChange}
+                            borderColorClass="border-pink-400"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Console Overlay Drawer (Desktop) */}
+            {!isViewingOther && !isMobile && (
+              <div
+                style={{ height: isConsoleOpen ? consoleHeight : 0, opacity: isConsoleOpen ? 1 : 0 }}
+                className={cn(
+                  "absolute bottom-0 left-0 right-0 z-30 transition-[height,opacity] duration-300 ease-in-out border-t border-border shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] bg-background flex flex-col items-stretch justify-start",
+                  !isConsoleOpen && "pointer-events-none"
                 )}
+              >
+                <div
+                  className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize bg-transparent hover:bg-primary/50 active:bg-primary z-40 transition-colors"
+                  onMouseDown={startResizingConsole}
+                />
+
+                <div className="flex-1 w-full min-h-0 relative h-full">
+                  <CCConsolePanel
+                    roomId={roomId}
+                    problemId={selectedStudyProblemId}
+                    isOpen={isConsoleOpen} // Keep mounted, just manage visibility
+                    onClose={() => setIsConsoleOpen(false)}
+                    onExecute={handleExecuteWrapper}
+                    isExecuting={isExecuting}
+                    executionResult={executionResult}
+                  />
+                </div>
               </div>
             )}
           </div>
-
-          {/* Console Overlay Drawer */}
-          {!isViewingOther && !isMobile && (
-            <div
-              style={{ height: isConsoleOpen ? consoleHeight : 0, opacity: isConsoleOpen ? 1 : 0 }}
-              className={cn(
-                "absolute bottom-0 left-0 right-0 z-30 transition-[height,opacity] duration-300 ease-in-out border-t border-border shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] bg-background flex flex-col items-stretch justify-start",
-                !isConsoleOpen && "pointer-events-none"
-              )}
-            >
-              <div className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize bg-transparent hover:bg-primary/50 active:bg-primary z-40 transition-colors" onMouseDown={startResizingConsole} />
-
-              <div className="flex-1 w-full min-h-0 relative h-full">
-                <CCConsolePanel
-                  roomId={roomId}
-                  problemId={selectedStudyProblemId}
-                  isOpen={isConsoleOpen} // Keep mounted, just manage visibility
-                  onClose={() => setIsConsoleOpen(false)}
-                  onExecute={handleExecuteWrapper}
-                  isExecuting={isExecuting}
-                  executionResult={executionResult}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
       )}
 
       {/* Control Bar */}
+      {isMobile && <div aria-hidden className="h-13 shrink-0" />}
       <ControlBar
         onMicToggle={onMicToggle}
         onVideoToggle={onVideoToggle}
         onWhiteboardToggle={handleWhiteboardToggleWrapper}
         onSettingsClick={onSettingsClick}
+        className={cn(
+          isMobile &&
+            'fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] mb-1 z-[55] shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.4)]',
+        )}
       />
     </div>
   );

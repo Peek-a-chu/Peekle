@@ -174,7 +174,11 @@ function StudyRoomContent({
     if (typeof window === 'undefined') return;
 
     const handleResize = () => {
-      setIsCompact(window.innerWidth < 1200);
+      const availWidth = window.screen?.availWidth || window.innerWidth;
+      const currentWidth = window.outerWidth || window.innerWidth;
+      const widthRatio = currentWidth / Math.max(availWidth, 1);
+      // Split window mode: use window-to-screen width ratio.
+      setIsCompact(widthRatio <= 0.8);
     };
 
     // Initial check
@@ -184,83 +188,13 @@ function StudyRoomContent({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Enforce mutual exclusion when isCompact is true
+  // In split mode, sidebars are mutually exclusive.
   useEffect(() => {
     if (!isCompact) return;
-
-    // If both are open (e.g. from resize), close right panel by default
     if (!isLeftPanelFolded && !isRightPanelFolded) {
       setIsRightPanelFolded(true);
     }
   }, [isCompact, isLeftPanelFolded, isRightPanelFolded, setIsRightPanelFolded]);
-
-  // Listener for Left Panel opening
-  useEffect(() => {
-    if (isCompact && !isLeftPanelFolded && !isRightPanelFolded) {
-      // logic already handled by above effect
-    }
-    // But we need to respond to user action of "Opening Left" -> "Close Right"
-    // The state change happens before effect.
-    // If Left became Open (false), and Right was Open (false) -> the above logic catches it.
-
-    // What if Left becomes Open, and Right IS Open? -> Both Open -> Above catches it.
-    // What if Right becomes Open, and Left IS Open? -> Both Open -> Above catches it.
-
-    // The issue with the previous code was:
-    // useEffect 1: if (!isLeftPanelFolded) setRight(true)
-    // useEffect 2: if (!isRightPanelFolded) setLeft(true)
-
-    // Example: User opens Left. isLeft=false. Effect 1 runs -> setRight(true).
-    // isRight becomes true. Effect 2 checks !isRight (false), does nothing. Safe.
-
-    // Example: User opens Right. isRight=false. Effect 2 runs -> setLeft(true).
-    // isLeft becomes true. Effect 1 checks !isLeft (false), does nothing. Safe.
-
-    // So actually the previous logic was mostly fine, BUT it didn't distinguish *which one* triggered it.
-    // It's better to keep it simple. As long as "Both Open" -> "Close One", we are safe.
-    // BUT user wants "Open Left -> Close Right" AND "Open Right -> Close Left".
-    // "Both Open" state only happens for a split second or on resize.
-
-    // Let's stick to the simple "Both Open" check.
-    // However, we want to know *which one* was specifically opened to close the *other*.
-    // Zustand setters don't tell us who called them.
-    // If we rely on "Both Open", we need a default victim (e.g. Right).
-    // But if user explicitly opens Right, validly dragging it out, we don't want it to immediately close because Left was open.
-    // We want Left to close.
-
-    // To do this reactively without action hooks is hard.
-    // We'd need previous state to know which one changed.
-    // Let's use a ref to track previous values.
-  }, []);
-
-  // Use refs to track previous state for directionality
-  const prevLeftFolded = useRef(isLeftPanelFolded);
-  const prevRightFolded = useRef(isRightPanelFolded);
-
-  useEffect(() => {
-    if (!isCompact) {
-      prevLeftFolded.current = isLeftPanelFolded;
-      prevRightFolded.current = isRightPanelFolded;
-      return;
-    }
-
-    const leftOpened = prevLeftFolded.current && !isLeftPanelFolded;
-    const rightOpened = prevRightFolded.current && !isRightPanelFolded;
-
-    if (leftOpened && !isRightPanelFolded) {
-      setIsRightPanelFolded(true);
-    } else if (rightOpened && !isLeftPanelFolded) {
-      setIsLeftPanelFolded(true);
-    }
-
-    // Just in case both are somehow open (resize), fallback to closing right
-    if (!isLeftPanelFolded && !isRightPanelFolded && !leftOpened && !rightOpened) {
-      setIsRightPanelFolded(true);
-    }
-
-    prevLeftFolded.current = isLeftPanelFolded;
-    prevRightFolded.current = isRightPanelFolded;
-  }, [isCompact, isLeftPanelFolded, isRightPanelFolded, setIsLeftPanelFolded, setIsRightPanelFolded]);
 
   useEffect(() => {
     const handleOpenCommentsPanel = (event: Event) => {
@@ -627,12 +561,14 @@ function StudyRoomContent({
   };
 
   const handleToggleLeftPanel = (): void => {
+    if (isCompact && isLeftPanelFolded && !isRightPanelFolded) {
+      setIsRightPanelFolded(true);
+    }
     setIsLeftPanelFolded(!isLeftPanelFolded);
   };
 
   const handleToggleRightPanel = (): void => {
-    // Close left panel when opening right panel (symmetric to handleToggleLeftPanel behavior)
-    if (isRightPanelFolded && !isLeftPanelFolded) {
+    if (isCompact && isRightPanelFolded && !isLeftPanelFolded) {
       setIsLeftPanelFolded(true);
     }
     setIsRightPanelFolded(!isRightPanelFolded);
@@ -861,6 +797,11 @@ function StudyRoomContent({
               onAddProblem={handleAddProblem}
               onInvite={handleInvite}
               onSettings={handleSettings}
+              isLeftPanelFolded={isLeftPanelFolded}
+              isRightPanelFolded={isRightPanelFolded}
+              onToggleLeftPanel={handleToggleLeftPanel}
+              onToggleRightPanel={handleToggleRightPanel}
+              panelToggleMode="exclusive"
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
             />
@@ -885,6 +826,11 @@ function StudyRoomContent({
               onAddProblem={handleAddProblem}
               onInvite={handleInvite}
               onSettings={handleSettings}
+              isLeftPanelFolded={isLeftPanelFolded}
+              isRightPanelFolded={isRightPanelFolded}
+              onToggleLeftPanel={handleToggleLeftPanel}
+              onToggleRightPanel={handleToggleRightPanel}
+              panelToggleMode={isCompact ? 'exclusive' : 'independent'}
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
             />
