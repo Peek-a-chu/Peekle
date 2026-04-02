@@ -102,91 +102,87 @@ export function StudyLayoutContent({
 
       {/* Main Content */}
       <div ref={mainContainerRef} className="relative flex min-h-0 flex-1 overflow-hidden">
-        {/* NARROW MODE: Hide split panels, show center panel only */}
-        {isNarrow ? (
-          <>
-            {/* Center Panel (full width in narrow mode) */}
-            <main className="relative flex min-w-0 flex-1 flex-col">
-              {centerPanel}
-            </main>
+        {/* Left Panel - keep mounted container stable to avoid center panel remounts */}
+        <aside
+          style={{ width: isNarrow || isLeftPanelFolded ? 0 : leftWidth }}
+          className={cn(
+            'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border/70 bg-card',
+            !isResizingLeft && 'transition-all duration-300 ease-in-out',
+            (isNarrow || isLeftPanelFolded) && 'border-r-0',
+          )}
+        >
+          {!isNarrow && (
+            <div style={{ width: leftWidth }} className="h-full">
+              {leftPanel}
+            </div>
+          )}
+        </aside>
 
-            {/* Left Panel Overlay */}
-            {!isLeftPanelFolded && (
-              <div className="fixed inset-0 z-40 animate-in fade-in duration-200">
-                <div
-                  className="absolute inset-0 bg-black/50"
-                  onClick={onUnfoldLeftPanel}
-                />
-                <div className="absolute left-0 top-0 bottom-0 w-80 bg-card shadow-2xl z-50 animate-in slide-in-from-left duration-300">
-                  {leftPanel}
-                </div>
-              </div>
+        {/* Left Resize Handle */}
+        <div
+          className={cn(
+            'z-20 shrink-0 transition-colors',
+            !isNarrow && !isLeftPanelFolded
+              ? 'w-1 hover:w-1.5 -ml-0.5 cursor-col-resize bg-transparent hover:bg-primary/50 active:bg-primary'
+              : 'w-0 -ml-0 pointer-events-none',
+          )}
+          onMouseDown={!isNarrow && !isLeftPanelFolded ? startResizingLeft : undefined}
+        />
+
+        {/* Center Panel */}
+        <main key="center-panel" className="relative flex min-w-0 flex-1 flex-col transition-all duration-300">
+          {centerPanel}
+        </main>
+
+        {/* Right Resize Handle */}
+        {hasRightPanel && (
+          <div
+            className={cn(
+              'z-20 shrink-0 transition-colors',
+              !isNarrow && !isRightPanelFolded
+                ? 'w-1 hover:w-1.5 -mr-0.5 cursor-col-resize bg-transparent hover:bg-primary/50 active:bg-primary'
+                : 'w-0 -mr-0 pointer-events-none',
             )}
+            onMouseDown={!isNarrow && !isRightPanelFolded ? startResizingRight : undefined}
+          />
+        )}
 
-            {/* Right Panel Overlay */}
-            {hasRightPanel && !isRightPanelFolded && (
-              <div className="fixed inset-0 z-40 animate-in fade-in duration-200">
-                <div
-                  className="absolute inset-0 bg-black/50"
-                  onClick={onUnfoldRightPanel}
-                />
-                <div className="absolute right-0 top-0 bottom-0 w-80 bg-card shadow-2xl z-50 animate-in slide-in-from-right duration-300">
-                  {rightPanel}
-                </div>
-              </div>
+        {hasRightPanel && (
+          <aside
+            style={{ width: isNarrow || isRightPanelFolded ? 0 : rightWidth }}
+            className={cn(
+              'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border/70 bg-card',
+              !isResizingRight && 'transition-all duration-300 ease-in-out',
+              (isNarrow || isRightPanelFolded) && 'border-l-0',
             )}
-          </>
-        ) : (
-          /* WIDE MODE: Traditional split layout */
-          <>
-            {/* Left Panel - Animation handled by width */}
-            <aside
-              style={{ width: isLeftPanelFolded ? 0 : leftWidth }}
-              className={cn(
-                'shrink-0 overflow-y-auto overflow-x-hidden border-r border-border/70 bg-card',
-                !isResizingLeft && 'transition-all duration-300 ease-in-out',
-                isLeftPanelFolded && 'border-r-0',
-              )}
-            >
-              <div style={{ width: leftWidth }} className="h-full">
-                {leftPanel}
-              </div>
-            </aside>
+          >
+            {!isNarrow && <div style={{ width: rightWidth }} className="h-full">{rightPanel}</div>}
+          </aside>
+        )}
 
-            {/* Left Resize Handle */}
-            {!isLeftPanelFolded && (
-              <div
-                className="w-1 hover:w-1.5 -ml-0.5 z-20 cursor-col-resize bg-transparent hover:bg-primary/50 active:bg-primary transition-colors shrink-0"
-                onMouseDown={startResizingLeft}
-              />
-            )}
+        {/* Narrow mode overlays */}
+        {isNarrow && !isLeftPanelFolded && (
+          <div className="fixed inset-0 z-40 animate-in fade-in duration-200">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={onUnfoldLeftPanel}
+            />
+            <div className="absolute left-0 top-0 bottom-0 w-80 bg-card shadow-2xl z-50 animate-in slide-in-from-left duration-300">
+              {leftPanel}
+            </div>
+          </div>
+        )}
 
-            {/* Center Panel */}
-            <main className="relative flex min-w-0 flex-1 flex-col transition-all duration-300">
-              {centerPanel}
-            </main>
-
-            {/* Right Resize Handle */}
-            {hasRightPanel && !isRightPanelFolded && (
-              <div
-                className="w-1 hover:w-1.5 -mr-0.5 z-20 cursor-col-resize bg-transparent hover:bg-primary/50 active:bg-primary transition-colors shrink-0"
-                onMouseDown={startResizingRight}
-              />
-            )}
-
-            {hasRightPanel && (
-              <aside
-                style={{ width: isRightPanelFolded ? 0 : rightWidth }}
-                className={cn(
-                  'shrink-0 overflow-y-auto overflow-x-hidden border-l border-border/70 bg-card',
-                  !isResizingRight && 'transition-all duration-300 ease-in-out',
-                  isRightPanelFolded && 'border-l-0',
-                )}
-              >
-                <div style={{ width: rightWidth }} className="h-full">{rightPanel}</div>
-              </aside>
-            )}
-          </>
+        {isNarrow && hasRightPanel && !isRightPanelFolded && (
+          <div className="fixed inset-0 z-40 animate-in fade-in duration-200">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={onUnfoldRightPanel}
+            />
+            <div className="absolute right-0 top-0 bottom-0 w-80 bg-card shadow-2xl z-50 animate-in slide-in-from-right duration-300">
+              {rightPanel}
+            </div>
+          </div>
         )}
       </div>
     </div>
