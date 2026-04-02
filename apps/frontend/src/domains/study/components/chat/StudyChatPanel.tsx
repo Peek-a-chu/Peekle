@@ -1,14 +1,17 @@
-import { useRef, useEffect, useLayoutEffect } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+
 import { useRoomStore } from '../../hooks/useRoomStore';
 import { useStudyChat } from '../../hooks/useStudyChat';
-import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
-import { Loader2 } from 'lucide-react';
+import { ChatMessageItem } from './ChatMessageItem';
 
 export function StudyChatPanel() {
-  const roomId = useRoomStore((state) => state.roomId); // Revert variable name
+  const roomId = useRoomStore((state) => state.roomId);
   const pendingCodeShare = useRoomStore((state) => state.pendingCodeShare);
   const setPendingCodeShare = useRoomStore((state) => state.setPendingCodeShare);
+  const replyingTo = useRoomStore((state) => state.replyingTo);
+  const setReplyingTo = useRoomStore((state) => state.setReplyingTo);
 
   const {
     messages,
@@ -25,7 +28,16 @@ export function StudyChatPanel() {
   const restoreRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
   const isLoadingOlderRef = useRef(false);
 
-  // Restore scroll position after loading history (layout effect to avoid flicker)
+  const messageLookup = useMemo(
+    () =>
+      Object.fromEntries(
+        messages
+          .filter((message) => Boolean(message.id))
+          .map((message) => [message.id as string, message]),
+      ),
+    [messages],
+  );
+
   useLayoutEffect(() => {
     if (!scrollRef.current) return;
 
@@ -44,6 +56,15 @@ export function StudyChatPanel() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollDebounceRef.current) {
+        clearTimeout(scrollDebounceRef.current);
+        scrollDebounceRef.current = null;
+      }
+    };
+  }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -79,19 +100,26 @@ export function StudyChatPanel() {
     } else {
       sendMessage(text);
     }
+
+    setReplyingTo(null);
   };
 
   const handleCancelShare = () => {
     setPendingCodeShare(null);
   };
 
-  if (!roomId)
-    return <div className="p-4 text-center text-muted-foreground">스터디 룸에 입장해주세요.</div>;
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  if (!roomId) {
+    return <div className="p-4 text-center text-muted-foreground">Join a study room first.</div>;
+  }
 
   return (
-    <div className="flex flex-col h-full ">
+    <div className="flex h-full flex-col">
       <div
-        className="flex-1 overflow-y-auto p-4 flex flex-col relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="relative flex flex-1 flex-col overflow-y-auto p-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         ref={scrollRef}
         onScroll={handleScroll}
       >
@@ -100,13 +128,18 @@ export function StudyChatPanel() {
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         )}
+
         {messages.map((msg) => (
           <div
             key={msg.id}
             data-msg-id={msg.id}
             className={msg.senderId === currentUserId ? 'flex justify-end' : 'flex justify-start'}
           >
-            <ChatMessageItem message={msg} isMine={msg.senderId === currentUserId} />
+            <ChatMessageItem
+              message={msg}
+              isMine={msg.senderId === currentUserId}
+              messageLookup={messageLookup}
+            />
           </div>
         ))}
       </div>
@@ -115,6 +148,8 @@ export function StudyChatPanel() {
         onSend={handleSend}
         pendingCodeShare={pendingCodeShare}
         onCancelShare={handleCancelShare}
+        replyingTo={replyingTo}
+        onCancelReply={handleCancelReply}
       />
     </div>
   );
