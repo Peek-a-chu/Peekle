@@ -1,4 +1,5 @@
 import { ApiResponse } from '@/types/apiUtils';
+import { isPublicE2ERoute } from '@/lib/e2e-routes';
 
 let BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
 
@@ -206,7 +207,8 @@ function isAuthOrPublicRoute(pathname: string): boolean {
   return (
     pathname === '/' ||
     pathname.startsWith('/login') ||
-    pathname.startsWith('/signup')
+    pathname.startsWith('/signup') ||
+    isPublicE2ERoute(pathname)
   );
 }
 
