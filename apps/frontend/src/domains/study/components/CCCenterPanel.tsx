@@ -57,7 +57,13 @@ export function CCCenterPanel({
   onSettingsClick,
   className,
 }: CCCenterPanelProps) {
-  const isMobile = useIsTouchMobile();
+  const isTouchMobile = useIsTouchMobile();
+  const initialLayoutModeRef = useRef<'mobile' | 'desktop'>(
+    isTouchMobile ? 'mobile' : 'desktop',
+  );
+  // Keep center layout mode stable so viewport changes (e.g. opening devtools)
+  // do not unmount IDE sections while the user is typing.
+  const isMobile = initialLayoutModeRef.current === 'mobile';
 
   const getTemplateCode = (languageValue: string): string => {
     const normalized = languageValue.toLowerCase();

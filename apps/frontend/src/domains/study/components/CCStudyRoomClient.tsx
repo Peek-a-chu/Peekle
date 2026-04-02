@@ -72,7 +72,13 @@ function StudyRoomContent({
   aiRecommendationRequestId: string | null;
 }) {
   const router = useRouter();
-  const isMobile = useIsTouchMobile();
+  const isTouchMobile = useIsTouchMobile();
+  const initialLayoutModeRef = useRef<'mobile' | 'desktop'>(
+    isTouchMobile ? 'mobile' : 'desktop',
+  );
+  // Keep the initial layout mode stable to avoid unmounting the IDE tree
+  // when viewport width changes (e.g. opening browser devtools).
+  const isMobile = initialLayoutModeRef.current === 'mobile';
   const { user } = useAuthStore();
   const { connected } = useSocketContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
@@ -169,6 +175,7 @@ function StudyRoomContent({
   // [New] Compact Mode: Mutual exclusion for sidebars
   // If window width is small (e.g. < 1200px), allow only one sidebar to be open at a time.
   const [isCompact, setIsCompact] = useState(false);
+  const wasCompactRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -188,7 +195,16 @@ function StudyRoomContent({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // In split mode, sidebars are mutually exclusive.
+  // When entering compact mode from normal width, close both side panels.
+  useEffect(() => {
+    if (!wasCompactRef.current && isCompact) {
+      setIsLeftPanelFolded(true);
+      setIsRightPanelFolded(true);
+    }
+    wasCompactRef.current = isCompact;
+  }, [isCompact, setIsLeftPanelFolded, setIsRightPanelFolded]);
+
+  // In compact mode, keep sidebars mutually exclusive.
   useEffect(() => {
     if (!isCompact) return;
     if (!isLeftPanelFolded && !isRightPanelFolded) {
