@@ -157,6 +157,8 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
 
     const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+    const monacoRef = useRef<any>(null);
+    const editorDomCleanupRef = useRef<(() => void) | null>(null);
     const readOnlyRef = useRef(readOnly);
     const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
     const setPendingCodeShare = useRoomStore((state) => state.setPendingCodeShare);
@@ -214,20 +216,48 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
       if (!readOnly) return;
 
       const incomingCode = initialCode ?? '';
-      const incomingLanguage = propLanguage ?? internalLanguage;
+      const incomingLanguage = propLanguage ?? language;
       const snapshotKey = `${incomingLanguage}::${incomingCode}`;
 
       if (readOnlySnapshotKeyRef.current === snapshotKey) return;
       readOnlySnapshotKeyRef.current = snapshotKey;
 
-      setInternalLanguage(incomingLanguage);
-      setCode(incomingCode);
+      setInternalLanguage((current) => (current === incomingLanguage ? current : incomingLanguage));
+      setCode((current) => (current === incomingCode ? current : incomingCode));
       originCodeRef.current = incomingCode;
       isDirtyRef.current = false;
 
-      // Force remount to avoid intermittent blank rendering on readonly stream updates.
-      setModelId((prev) => prev + 1);
-    }, [readOnly, initialCode, propLanguage, internalLanguage]);
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      const model = editor?.getModel?.();
+
+      if (model && monaco?.editor?.setModelLanguage) {
+        const nextLanguage = getSafeLanguageKey(incomingLanguage);
+        const currentLanguage = model.getLanguageId?.();
+        if (currentLanguage !== nextLanguage) {
+          monaco.editor.setModelLanguage(model, nextLanguage);
+        }
+      }
+
+      if (editor && editor.getValue() !== incomingCode) {
+        editor.setValue(incomingCode);
+      }
+    }, [readOnly, initialCode, propLanguage, language]);
+
+    useEffect(() => {
+      return () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        if (editorDomCleanupRef.current) {
+          editorDomCleanupRef.current();
+          editorDomCleanupRef.current = null;
+        }
+        editorRef.current = null;
+        monacoRef.current = null;
+      };
+    }, []);
 
     // ----------------------------------------------------------------------
     // 언어 변경 로직
@@ -331,20 +361,20 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
     };
 
     const handleRefChat = (): void => {
-      if (editorRef.current) {
-        const currentCode = editorRef.current.getValue();
-        const { selectedStudyProblemId, selectedProblemTitle, selectedProblemExternalId } =
-          useRoomStore.getState();
-        setPendingCodeShare({
-          code: currentCode,
-          language,
-          ownerName: 'Me',
-          isRealtime: true,
-          problemId: selectedStudyProblemId ?? undefined,
-          externalId: selectedProblemExternalId ?? undefined,
-          problemTitle: selectedProblemTitle ?? undefined,
-        });
-      }
+      const currentCode = editorRef.current?.getValue() ?? code;
+      const { selectedStudyProblemId, selectedProblemTitle, selectedProblemExternalId } =
+        useRoomStore.getState();
+
+      setPendingCodeShare({
+        code: currentCode,
+        language,
+        ownerName: 'Me',
+        isRealtime: true,
+        problemId: selectedStudyProblemId ?? undefined,
+        externalId: selectedProblemExternalId ?? undefined,
+        problemTitle: selectedProblemTitle ?? undefined,
+      });
+
       setRightPanelActiveTab('chat');
       setTimeout(() => {
         const chatInput = document.getElementById('chat-input');
@@ -403,6 +433,7 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
 
     const handleEditorDidMount: OnMount = (editor, monaco): void => {
       editorRef.current = editor;
+      monacoRef.current = monaco;
 
       // [Anti-Cheat] 게임 모드일 때 붙여넣기 금지 (Ctrl+V, Cmd+V)
       if (sourceType === 'GAME') {
@@ -556,11 +587,26 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
         });
       };
 
+      if (editorDomCleanupRef.current) {
+        editorDomCleanupRef.current();
+      }
+
       container.addEventListener('copy', preventClipboard);
       container.addEventListener('cut', preventClipboard);
       container.addEventListener('paste', preventClipboard);
       container.addEventListener('keydown', handleKeyDown as EventListener, true);
-      container.addEventListener('wheel', handleWheel as EventListener, { capture: true, passive: false });
+      container.addEventListener('wheel', handleWheel as EventListener, {
+        capture: true,
+        passive: false,
+      });
+
+      editorDomCleanupRef.current = () => {
+        container.removeEventListener('copy', preventClipboard);
+        container.removeEventListener('cut', preventClipboard);
+        container.removeEventListener('paste', preventClipboard);
+        container.removeEventListener('keydown', handleKeyDown as EventListener, true);
+        container.removeEventListener('wheel', handleWheel as EventListener, true);
+      };
     };
 
     useImperativeHandle(ref, () => ({
@@ -683,4 +729,3 @@ export const CCIDEPanel = forwardRef<CCIDEPanelRef, CCIDEPanelProps>(
 );
 
 CCIDEPanel.displayName = 'CCIDEPanel';
-
