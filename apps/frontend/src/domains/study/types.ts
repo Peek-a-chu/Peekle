@@ -45,13 +45,21 @@ export interface StudyProblem {
 export interface StudyMember {
   userId: number;
   nickname: string;
+  profileImg?: string;
+  role?: 'OWNER' | 'MEMBER';
+  isOnline?: boolean;
+  online?: boolean;
 }
 
 export interface StudyRoomDetail {
   id: number;
   title: string;
+  description?: string;
   role: 'OWNER' | 'MEMBER';
   members: StudyMember[];
+  owner?: {
+    id: number;
+  };
   lastStudyProblemId?: number | null;
   lastStudyProblemDate?: string | null; // yyyy-MM-dd
 }

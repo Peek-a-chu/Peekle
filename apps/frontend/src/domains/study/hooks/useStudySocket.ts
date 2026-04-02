@@ -5,12 +5,15 @@ import { useSocketContext } from '@/domains/study/context/SocketContext';
 import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { fetchStudyRoom, fetchStudyParticipants } from '../api/studyApi';
+import { refreshStudyRoomSnapshot } from '../api/studyApi';
+import {
+  mapStudyMembersToParticipantPatches,
+  mapStudyRoomToParticipantPatches,
+} from '../utils/participantSync';
 
 export const useStudySocketActions = () => {
   const { client, connected, reconnect } = useSocketContext();
   const roomId = useRoomStore((state) => state.roomId);
-  const currentUserId = useRoomStore((state) => state.currentUserId);
 
   const publish = useCallback(
     (destination: string, body: any) => {
@@ -68,7 +71,13 @@ export const useStudySocketActions = () => {
   );
 
   const addProblem = useCallback(
-    (problemId: number | null, date?: string, customTitle?: string, customLink?: string, problemType?: string) => {
+    (
+      problemId: number | null,
+      date?: string,
+      customTitle?: string,
+      customLink?: string,
+      problemType?: string,
+    ) => {
       if (roomId)
         publish('/pub/studies/problems', {
           action: 'ADD',
@@ -84,8 +93,7 @@ export const useStudySocketActions = () => {
 
   const removeProblem = useCallback(
     (problemId: number, studyProblemId?: number) => {
-      if (roomId)
-        publish('/pub/studies/problems', { action: 'REMOVE', problemId, studyProblemId });
+      if (roomId) publish('/pub/studies/problems', { action: 'REMOVE', problemId, studyProblemId });
     },
     [roomId, publish],
   );
@@ -126,13 +134,13 @@ export const useStudySocketSubscription = (studyId: number) => {
   const { client, connected } = useSocketContext();
   const {
     setParticipants,
-    addParticipant,
     removeParticipant,
-    updateParticipant,
+    patchParticipants,
+    replaceParticipantsFromSnapshot,
+    syncParticipantsOnline,
     setRoomInfo,
     setVideoToken,
     currentUserId,
-    participants,
   } = useRoomStore();
 
   // useRef는 컴포넌트 최상위 레벨에서만 호출 가능
@@ -142,7 +150,6 @@ export const useStudySocketSubscription = (studyId: number) => {
   const onlineSyncTimerRef = useRef<number | null>(null);
   const onlineSyncSeenRef = useRef<boolean>(false);
   const onlineSyncAttemptsRef = useRef<number>(0);
-  const sentEnterRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!client || !connected || !studyId) return;
@@ -152,7 +159,10 @@ export const useStudySocketSubscription = (studyId: number) => {
 
     // 1. Enter Study Helper
     const sendEnter = () => {
-      console.log('[StudySocket] Sending ENTER', { studyId, currentUserId: currentUserIdRef.current });
+      console.log('[StudySocket] Sending ENTER', {
+        studyId,
+        currentUserId: currentUserIdRef.current,
+      });
       client.publish({ destination: '/pub/studies/enter', body: JSON.stringify({ studyId }) });
     };
 
@@ -224,6 +234,14 @@ export const useStudySocketSubscription = (studyId: number) => {
           clearOnlineSyncTimer();
         }
       }, 1000);
+    };
+
+    const refreshParticipantsFromRoom = async (replaceMissing = false) => {
+      const room = await refreshStudyRoomSnapshot(studyId);
+      replaceParticipantsFromSnapshot(mapStudyRoomToParticipantPatches(room), {
+        replaceMissing,
+      });
+      return room;
     };
 
     const subscribeToPrivateTopics = () => {
@@ -349,14 +367,23 @@ export const useStudySocketSubscription = (studyId: number) => {
             if (enteredUserId === null) break;
 
             // Optimistic update for immediate feedback
-            updateParticipant(enteredUserId, { isOnline: true });
+            const missingParticipant = !stateParticipants.some((p) => p.id === enteredUserId);
+            patchParticipants([{ id: enteredUserId, isOnline: true }]);
+
+            if (missingParticipant) {
+              void refreshParticipantsFromRoom().catch((error) => {
+                console.error('Failed to hydrate participant after ENTER', error);
+              });
+            }
 
             if (
               enteredUserId !== currentUserIdRef.current &&
               !shouldSkipPresenceToast('ENTER', enteredUserId)
             ) {
               const nickname = getNicknameByUserId(enteredUserId);
-              toast.info(`${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0 \uC785\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`);
+              toast.info(
+                `${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0 \uC785\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`,
+              );
             }
             break;
           }
@@ -364,7 +391,7 @@ export const useStudySocketSubscription = (studyId: number) => {
             const leftUserId = toUserId(data);
             if (leftUserId === null) break;
 
-            updateParticipant(leftUserId, { isOnline: false });
+            patchParticipants([{ id: leftUserId, isOnline: false }]);
             resetRealtimeViewIfTargetLeft(leftUserId);
 
             if (
@@ -372,7 +399,9 @@ export const useStudySocketSubscription = (studyId: number) => {
               !shouldSkipPresenceToast('LEAVE', leftUserId)
             ) {
               const nickname = getNicknameByUserId(leftUserId);
-              toast.info(`${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0\uC11C \uD1F4\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`);
+              toast.info(
+                `${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0\uC11C \uD1F4\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`,
+              );
             }
             break;
           }
@@ -388,19 +417,36 @@ export const useStudySocketSubscription = (studyId: number) => {
               !shouldSkipPresenceToast('LEAVE', quitUserId)
             ) {
               const nickname = getNicknameByUserId(quitUserId);
-              toast.info(`${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0\uC11C \uD1F4\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`);
+              toast.info(
+                `${nickname}\uAC00 \uC2A4\uD130\uB514\uC5D0\uC11C \uD1F4\uC7A5\uD558\uC168\uC2B5\uB2C8\uB2E4.`,
+              );
             }
             break;
           }
           case 'DELEGATE': {
-            const newOwnerId = data;
+            const newOwnerId = toUserId(data);
+            if (newOwnerId === null) break;
             try {
-              const members = await fetchStudyParticipants(studyId);
-              setParticipants(members);
-              const newOwner = members.find((p) => p.id === newOwnerId);
+              patchParticipants([
+                ...stateParticipants.map((participant) => ({
+                  id: participant.id,
+                  isOwner: participant.id === newOwnerId,
+                })),
+                { id: newOwnerId, isOwner: true },
+              ]);
+              const newOwner =
+                stateParticipants.find((participant) => participant.id === newOwnerId) ||
+                useRoomStore
+                  .getState()
+                  .participants.find((participant) => participant.id === newOwnerId);
               if (newOwner) toast.info(`방장이 ${newOwner.nickname}님으로 변경되었습니다.`);
+              if (!newOwner || newOwner.nickname.startsWith('User ')) {
+                void refreshParticipantsFromRoom().catch((error) => {
+                  console.error('Failed to hydrate participant after DELEGATE', error);
+                });
+              }
             } catch (e) {
-              console.error('Failed to refresh on DELEGATE', e);
+              console.error('Failed to patch owner on DELEGATE', e);
             }
             break;
           }
@@ -428,22 +474,11 @@ export const useStudySocketSubscription = (studyId: number) => {
             const { title, description, role, members } = data;
             setRoomInfo({ roomTitle: title, roomDescription: description, myRole: role });
 
-            // [Fix] Sync participants strictly from server info
             if (members && Array.isArray(members)) {
               console.log('[StudySocket] Syncing participants from ROOM_INFO:', members);
-
-              // Map DTO to Store Interface
-              const mappedMembers = members.map((m: any) => ({
-                id: m.userId,
-                nickname: m.nickname,
-                profileImage: m.profileImg,
-                isOwner: m.role === 'OWNER',
-                isOnline: m.online ?? m.isOnline, // Handle both cases
-                isMuted: false,   // Default
-                isVideoOff: false // Default
-              }));
-
-              setParticipants(mappedMembers);
+              replaceParticipantsFromSnapshot(mapStudyMembersToParticipantPatches(members), {
+                replaceMissing: true,
+              });
             }
             break;
           }
@@ -473,29 +508,14 @@ export const useStudySocketSubscription = (studyId: number) => {
               state.participants &&
               onlineIds.some((id) => !state.participants.find((p) => Number(p.id) === id));
 
-            if (!state.participants || state.participants.length === 0 || missingOnline) {
+            syncParticipantsOnline(onlineIds);
+
+            if (missingOnline) {
               try {
-                const members = await fetchStudyParticipants(studyId);
-                setParticipants(
-                  members.map((member) => ({
-                    ...member,
-                    id: Number(member.id),
-                    isOnline: onlineSet.has(Number(member.id)),
-                    isOwner: member.isOwner ?? false,
-                    isMuted: member.isMuted ?? false,
-                    isVideoOff: member.isVideoOff ?? false,
-                  })),
-                );
+                await refreshParticipantsFromRoom();
               } catch (e) {
                 console.error('Failed to sync participants from ONLINE_USERS', e);
               }
-            } else {
-              setParticipants(
-                state.participants.map((p) => ({
-                  ...p,
-                  isOnline: onlineSet.has(Number(p.id)),
-                })),
-              );
             }
             break;
           }
@@ -513,7 +533,7 @@ export const useStudySocketSubscription = (studyId: number) => {
           }
           case 'STATUS': {
             const { userId, isMuted, isVideoOff } = data;
-            updateParticipant(userId, { isMuted, isVideoOff });
+            patchParticipants([{ id: userId, isMuted, isVideoOff }]);
             break;
           }
           case 'MUTE_ALL': {
@@ -728,8 +748,10 @@ export const useStudySocketSubscription = (studyId: number) => {
     studyId,
     router,
     setParticipants,
-    updateParticipant,
     removeParticipant,
+    patchParticipants,
+    replaceParticipantsFromSnapshot,
+    syncParticipantsOnline,
     setRoomInfo,
     setVideoToken,
     currentUserId, // currentUserId를 dependency에 추가하여 변경 시 재실행

@@ -1,0 +1,10 @@
+
+> frontend@0.1.0 start:e2e C:\Users\SSAFY\peekle_github\apps\frontend
+> cross-env NEXT_PUBLIC_ENABLE_E2E_ROUTES=true next start "--port" "3001"
+
+   ▲ Next.js 15.5.9
+   - Local:        http://localhost:3001
+   - Network:      http://100.122.236.1:3001
+
+ ✓ Starting...
+ ✓ Ready in 585ms

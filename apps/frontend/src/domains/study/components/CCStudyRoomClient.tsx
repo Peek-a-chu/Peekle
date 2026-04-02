@@ -14,7 +14,7 @@ import { CCStudyRoomMobileLayout } from './CCStudyRoomMobileLayout';
 import { useProblems } from '@/domains/study/hooks/useProblems';
 import { useSubmissions } from '@/domains/study/hooks/useSubmissions';
 import type { StudyProblem as Problem } from '@/domains/study/types';
-import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
+import { fetchStudyRoom } from '../api/studyApi';
 import { format } from 'date-fns';
 import { formatDate } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
@@ -34,6 +34,7 @@ import { CCLiveKitWrapper } from './CCLiveKitWrapper';
 import { useStudyPresenceSync } from '@/domains/study/hooks/useStudyPresenceSync';
 import { useProblemDates } from '@/domains/study/hooks/useProblemDates';
 import { useIsTouchMobile } from '@/hooks/useIsMobile';
+import { mapStudyRoomToParticipantPatches } from '@/domains/study/utils/participantSync';
 
 function StudySocketInitiator({ studyId }: { studyId: number }) {
   const { user, checkAuth } = useAuthStore();
@@ -73,13 +74,10 @@ function StudyRoomContent({
 }) {
   const router = useRouter();
   const isTouchMobile = useIsTouchMobile();
-  const initialLayoutModeRef = useRef<'mobile' | 'desktop'>(
-    isTouchMobile ? 'mobile' : 'desktop',
-  );
+  const initialLayoutModeRef = useRef<'mobile' | 'desktop'>(isTouchMobile ? 'mobile' : 'desktop');
   // Keep the initial layout mode stable to avoid unmounting the IDE tree
   // when viewport width changes (e.g. opening browser devtools).
   const isMobile = initialLayoutModeRef.current === 'mobile';
-  const { user } = useAuthStore();
   const { connected } = useSocketContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   useStudyPresenceSync();
@@ -105,7 +103,6 @@ function StudyRoomContent({
   }, [studyId, setRoomInfo]);
 
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
-  const setParticipants = useRoomStore((state) => state.setParticipants);
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const updateParticipant = useRoomStore((state) => state.updateParticipant);
@@ -253,7 +250,8 @@ function StudyRoomContent({
   const aiRecommendationCleanedRef = useRef(false);
   const getAiActionKey = (action: 'add' | 'open') => {
     if (aiRecommendationRequestId) return `ai-rec:${action}:${aiRecommendationRequestId}`;
-    if (aiRecommendationExternalId) return `ai-rec:${action}:${studyId}:${aiRecommendationExternalId}`;
+    if (aiRecommendationExternalId)
+      return `ai-rec:${action}:${studyId}:${aiRecommendationExternalId}`;
     return null;
   };
   const markAiActionDone = (action: 'add' | 'open') => {
@@ -356,7 +354,7 @@ function StudyRoomContent({
         storeMuted: me.isMuted,
         realMuted: realIsMuted,
         storeVideo: me.isVideoOff,
-        realVideo: realIsVideoOff
+        realVideo: realIsVideoOff,
       });
       updateParticipant(currentUserId, { isMuted: realIsMuted, isVideoOff: realIsVideoOff });
       // Also notify server via socket
@@ -373,41 +371,21 @@ function StudyRoomContent({
   ]);
 
   // API Hooks
-  const { problems, isLoading: isProblemsLoading, addProblem, deleteProblem, refetch } = useProblems(
-    studyId,
-    format(selectedDate, 'yyyy-MM-dd'),
-  );
+  const {
+    problems,
+    isLoading: isProblemsLoading,
+    addProblem,
+    deleteProblem,
+    refetch,
+  } = useProblems(studyId, format(selectedDate, 'yyyy-MM-dd'));
   const { historyDates } = useProblemDates(studyId, selectedDate);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
-  // Initialize room data (fetch participants only, room info fetched in wrapper)
+  // Initialize room-local date state. Room metadata and participants are hydrated in the wrapper
+  // from the first /api/studies/{id} snapshot to avoid a second bootstrap fetch.
   useEffect(() => {
-    // Access is guaranteed by wrapper
-    // Access is guaranteed by wrapper
-
     setCurrentDate(formatDate(new Date()));
-
-    fetchStudyParticipants(studyId)
-      .then((participants) => {
-        const current = useRoomStore.getState().participants;
-        const currentMap = new Map(current.map((p) => [p.id, p]));
-        setParticipants(
-          participants.map((p) => {
-            const id = Number(p.id);
-            const existing = currentMap.get(id);
-            return {
-              ...p,
-              id,
-              isOwner: p.isOwner ?? existing?.isOwner ?? false,
-              isMuted: existing?.isMuted ?? p.isMuted ?? false,
-              isVideoOff: existing?.isVideoOff ?? p.isVideoOff ?? false,
-              isOnline: Boolean(existing?.isOnline) || Boolean(p.isOnline),
-            };
-          }),
-        );
-      })
-      .catch((err) => console.error('Failed to fetch participants:', err));
-  }, [studyId, setCurrentDate, setParticipants, user]);
+  }, [setCurrentDate]);
 
   const handleBack = (): void => {
     router.push('/study');
@@ -646,7 +624,11 @@ function StudyRoomContent({
         );
         const fallbackStudyProblemId = Number(response.data?.studyProblemId);
         const fallbackProblemDate = response.data?.problemDate;
-        if (!response.success || !Number.isFinite(fallbackStudyProblemId) || fallbackStudyProblemId <= 0) {
+        if (
+          !response.success ||
+          !Number.isFinite(fallbackStudyProblemId) ||
+          fallbackStudyProblemId <= 0
+        ) {
           return;
         }
 
@@ -664,13 +646,7 @@ function StudyRoomContent({
         // Ignore fallback fetch failures
       }
     })();
-  }, [
-    selectedStudyProblemId,
-    problems,
-    hintedStudyProblemId,
-    studyId,
-    handleSelectProblem,
-  ]);
+  }, [selectedStudyProblemId, problems, hintedStudyProblemId, studyId, handleSelectProblem]);
 
   useEffect(() => {
     aiRecommendationAddTriedRef.current = false;
@@ -717,16 +693,14 @@ function StudyRoomContent({
         setIsRightPanelFolded(true);
 
         const matchedExternalId = Number(
-          String((matchedProblem as any).externalId ?? (matchedProblem as any).problemId ?? '').replace(
-            /[^0-9]/g,
-            '',
-          ),
+          String(
+            (matchedProblem as any).externalId ?? (matchedProblem as any).problemId ?? '',
+          ).replace(/[^0-9]/g, ''),
         );
         const matchedStudyProblemId = Number(
-          String((matchedProblem as any).studyProblemId ?? (matchedProblem as any).id ?? '').replace(
-            /[^0-9]/g,
-            '',
-          ),
+          String(
+            (matchedProblem as any).studyProblemId ?? (matchedProblem as any).id ?? '',
+          ).replace(/[^0-9]/g, ''),
         );
         const numericStudyId = Number(String(studyId).replace(/[^0-9]/g, ''));
         const splitContext =
@@ -738,7 +712,10 @@ function StudyRoomContent({
                   Number.isFinite(matchedStudyProblemId) && matchedStudyProblemId > 0
                     ? matchedStudyProblemId
                     : undefined,
-                studyId: Number.isFinite(numericStudyId) && numericStudyId > 0 ? numericStudyId : undefined,
+                studyId:
+                  Number.isFinite(numericStudyId) && numericStudyId > 0
+                    ? numericStudyId
+                    : undefined,
               }
             : undefined;
 
@@ -881,6 +858,9 @@ export function CCStudyRoomClient(): React.ReactNode {
   const router = useRouter();
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
+  const replaceParticipantsFromSnapshot = useRoomStore(
+    (state) => state.replaceParticipantsFromSnapshot,
+  );
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -903,8 +883,10 @@ export function CCStudyRoomClient(): React.ReactNode {
         setRoomInfo({
           roomId: data.id,
           roomTitle: data.title,
+          roomDescription: data.description ?? '',
           myRole: data.role,
         });
+        replaceParticipantsFromSnapshot(mapStudyRoomToParticipantPatches(data));
         setInitialLastStudyProblemId(
           Number.isFinite(lastStudyProblemId) && lastStudyProblemId > 0 ? lastStudyProblemId : null,
         );
@@ -923,7 +905,7 @@ export function CCStudyRoomClient(): React.ReactNode {
       .finally(() => {
         setIsChecking(false);
       });
-  }, [studyId, setRoomInfo, router]);
+  }, [studyId, setRoomInfo, replaceParticipantsFromSnapshot, router]);
 
   // [Fix] Reset Store on Unmount
   // This ensures that when the user leaves the page or navigates away,

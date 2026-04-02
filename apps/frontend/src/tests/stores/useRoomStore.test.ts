@@ -54,5 +54,132 @@ describe('useRoomStore', () => {
       expect(useRoomStore.getState().viewMode).toBe('ONLY_MINE');
       expect(useRoomStore.getState().viewingUser).toBe(null);
     });
+
+    it('patches participants without requiring a full replacement', () => {
+      act(() => {
+        useRoomStore.getState().setParticipants([
+          {
+            id: 1,
+            nickname: 'Alice',
+            isOwner: false,
+            isMuted: false,
+            isVideoOff: false,
+            isOnline: false,
+          },
+        ]);
+        useRoomStore.getState().patchParticipants([
+          { id: 1, isOnline: true },
+          { id: 2, nickname: 'Bob', isOnline: true },
+        ]);
+      });
+
+      expect(useRoomStore.getState().participants).toEqual([
+        {
+          id: 1,
+          nickname: 'Alice',
+          isOwner: false,
+          isMuted: false,
+          isVideoOff: false,
+          isOnline: true,
+        },
+        {
+          id: 2,
+          nickname: 'Bob',
+          isOwner: false,
+          isMuted: false,
+          isVideoOff: false,
+          isOnline: true,
+          profileImage: undefined,
+          lastSpeakingAt: undefined,
+        },
+      ]);
+    });
+
+    it('merges room snapshots while preserving ephemeral media state', () => {
+      act(() => {
+        useRoomStore.getState().setParticipants([
+          {
+            id: 1,
+            nickname: 'Alice',
+            isOwner: false,
+            isMuted: true,
+            isVideoOff: true,
+            isOnline: true,
+          },
+          {
+            id: 2,
+            nickname: 'Bob',
+            isOwner: true,
+            isMuted: false,
+            isVideoOff: false,
+            isOnline: false,
+          },
+        ]);
+        useRoomStore.getState().replaceParticipantsFromSnapshot([
+          { id: 1, nickname: 'Alice', isOwner: true },
+          { id: 3, nickname: 'Charlie', isOnline: true },
+        ]);
+      });
+
+      expect(useRoomStore.getState().participants).toEqual([
+        {
+          id: 1,
+          nickname: 'Alice',
+          isOwner: true,
+          isMuted: true,
+          isVideoOff: true,
+          isOnline: true,
+          profileImage: undefined,
+          lastSpeakingAt: undefined,
+        },
+        {
+          id: 3,
+          nickname: 'Charlie',
+          isOwner: false,
+          isMuted: false,
+          isVideoOff: false,
+          isOnline: true,
+          profileImage: undefined,
+          lastSpeakingAt: undefined,
+        },
+      ]);
+    });
+
+    it('syncs online users and creates placeholders for unseen participants', () => {
+      act(() => {
+        useRoomStore.getState().setParticipants([
+          {
+            id: 1,
+            nickname: 'Alice',
+            isOwner: false,
+            isMuted: false,
+            isVideoOff: false,
+            isOnline: true,
+          },
+        ]);
+        useRoomStore.getState().syncParticipantsOnline([2]);
+      });
+
+      expect(useRoomStore.getState().participants).toEqual([
+        {
+          id: 1,
+          nickname: 'Alice',
+          isOwner: false,
+          isMuted: false,
+          isVideoOff: false,
+          isOnline: false,
+        },
+        {
+          id: 2,
+          nickname: 'User 2',
+          isOwner: false,
+          isMuted: false,
+          isVideoOff: false,
+          isOnline: true,
+          profileImage: undefined,
+          lastSpeakingAt: undefined,
+        },
+      ]);
+    });
   });
 });

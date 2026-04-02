@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useParticipants } from '@livekit/components-react';
 import { useRoomStore } from './useRoomStore';
-import { fetchStudyParticipants } from '@/domains/study/api/studyApi';
+import { refreshStudyRoomSnapshot } from '@/domains/study/api/studyApi';
+import { mapStudyRoomToParticipantPatches } from '@/domains/study/utils/participantSync';
 
 interface LiveKitPresence {
   id: number;
@@ -22,8 +23,10 @@ export function useStudyPresenceSync() {
   const roomId = useRoomStore((state) => state.roomId);
   const currentUserId = useRoomStore((state) => state.currentUserId);
   const roomParticipants = useRoomStore((state) => state.participants);
-  const updateParticipant = useRoomStore((state) => state.updateParticipant);
-  const setParticipants = useRoomStore((state) => state.setParticipants);
+  const patchParticipants = useRoomStore((state) => state.patchParticipants);
+  const replaceParticipantsFromSnapshot = useRoomStore(
+    (state) => state.replaceParticipantsFromSnapshot,
+  );
   const lastSyncRef = useRef(0);
 
   const liveKitPresence = useMemo<LiveKitPresence[]>(() => {
@@ -46,69 +49,72 @@ export function useStudyPresenceSync() {
     return map;
   }, [roomParticipants]);
 
+  const refreshParticipantsFromRoom = useCallback(() => {
+    if (!roomId) {
+      return Promise.resolve();
+    }
+
+    return refreshStudyRoomSnapshot(roomId).then((room) => {
+      replaceParticipantsFromSnapshot(mapStudyRoomToParticipantPatches(room), {
+        replaceMissing: false,
+      });
+    });
+  }, [roomId, replaceParticipantsFromSnapshot]);
+
   useEffect(() => {
-    let shouldSync = false;
-    const liveKitIdSet = new Set(liveKitPresence.map((presence) => presence.id));
-    const liveKitById = new Map(
-      liveKitPresence.map((presence) => [
-        presence.id,
-        { isMuted: presence.isMuted, isVideoOff: presence.isVideoOff },
-      ]),
-    );
+    let shouldRefreshSnapshot = false;
+    const participantPatches: Array<{
+      id: number;
+      isOnline: boolean;
+      isMuted: boolean;
+      isVideoOff: boolean;
+    }> = [];
 
     liveKitPresence.forEach((presence) => {
       // Skip local user - handled by MediaSync in CCStudyRoomClient
       if (currentUserId && presence.id === currentUserId) return;
 
       const existing = roomById.get(presence.id);
-      if (!existing) {
-        shouldSync = true;
-        return;
-      }
       const nextIsOnline = true;
       const nextIsMuted = presence.isMuted;
       const nextIsVideoOff = presence.isVideoOff;
       const needsUpdate =
+        !existing ||
         existing.isOnline !== nextIsOnline ||
         existing.isMuted !== nextIsMuted ||
         existing.isVideoOff !== nextIsVideoOff;
+
       if (needsUpdate) {
-        updateParticipant(presence.id, {
+        participantPatches.push({
+          id: presence.id,
           isOnline: nextIsOnline,
           isMuted: nextIsMuted,
           isVideoOff: nextIsVideoOff,
         });
       }
+
+      if (!existing) {
+        shouldRefreshSnapshot = true;
+      }
     });
 
-    const now = Date.now();
-    if (shouldSync && roomId && now - lastSyncRef.current > 2000) {
-      lastSyncRef.current = now;
-      fetchStudyParticipants(roomId)
-        .then((members) => {
-          const current = useRoomStore.getState().participants;
-          const currentMap = new Map(current.map((p) => [p.id, p]));
-          setParticipants(
-            members.map((member) => {
-              const id = Number(member.id);
-              const existing = currentMap.get(id);
-              const liveKitState = liveKitById.get(id);
-              return {
-                ...member,
-                id,
-                isOwner: member.isOwner ?? existing?.isOwner ?? false,
-                isMuted: liveKitState?.isMuted ?? existing?.isMuted ?? member.isMuted ?? false,
-                isVideoOff:
-                  liveKitState?.isVideoOff ?? existing?.isVideoOff ?? member.isVideoOff ?? false,
-                isOnline:
-                  liveKitIdSet.has(id) ||
-                  Boolean(existing?.isOnline) ||
-                  Boolean(member.isOnline),
-              };
-            }),
-          );
-        })
-        .catch((err) => console.error('Failed to sync participants from LiveKit:', err));
+    if (participantPatches.length > 0) {
+      patchParticipants(participantPatches);
     }
-  }, [liveKitPresence, roomById, updateParticipant, roomId, setParticipants, currentUserId]);
+
+    const now = Date.now();
+    if (shouldRefreshSnapshot && roomId && now - lastSyncRef.current > 2000) {
+      lastSyncRef.current = now;
+      refreshParticipantsFromRoom().catch((err) =>
+        console.error('Failed to sync participants from LiveKit:', err),
+      );
+    }
+  }, [
+    liveKitPresence,
+    roomById,
+    patchParticipants,
+    refreshParticipantsFromRoom,
+    roomId,
+    currentUserId,
+  ]);
 }

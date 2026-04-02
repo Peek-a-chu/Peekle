@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 import type { ChatType } from '../types/chat';
+import {
+  applyParticipantPatches,
+  mergeParticipantsFromSnapshot,
+  syncParticipantsOnlineState,
+  type ParticipantPatch,
+} from '../utils/participantSync';
 
 export type ViewMode = 'ONLY_MINE' | 'SPLIT_REALTIME' | 'SPLIT_SAVED';
 export type MobileTab = 'video' | 'code' | 'problems' | 'chat';
@@ -66,7 +72,7 @@ export interface RoomState {
 
   // Problem State
   selectedStudyProblemId: number | null; // Renamed from selectedProblemId (StudyProblem PK)
-  selectedProblemId: number | null;      // Added: Actual problemId (e.g. 1000)
+  selectedProblemId: number | null; // Added: Actual problemId (e.g. 1000)
   selectedProblemTitle: string | null;
   selectedProblemExternalId: string | null; // Added
 
@@ -116,6 +122,12 @@ export interface RoomActions {
 
   // Participant actions
   setParticipants: (participants: Participant[]) => void;
+  patchParticipants: (patches: ParticipantPatch[]) => void;
+  replaceParticipantsFromSnapshot: (
+    participants: ParticipantPatch[],
+    options?: { replaceMissing?: boolean },
+  ) => void;
+  syncParticipantsOnline: (onlineIds: number[]) => void;
   setVideoToken: (token: string) => void;
   updateParticipant: (id: number, updates: Partial<Participant>) => void;
   addParticipant: (participant: Participant) => void;
@@ -247,6 +259,18 @@ export const useRoomStore = create<RoomState & RoomActions>((set) => ({
     set({ viewMode: 'ONLY_MINE', viewingUser: null, targetSubmission: null }),
 
   setParticipants: (participants): void => set({ participants }),
+  patchParticipants: (patches): void =>
+    set((state) => ({
+      participants: applyParticipantPatches(state.participants, patches),
+    })),
+  replaceParticipantsFromSnapshot: (participants, options): void =>
+    set((state) => ({
+      participants: mergeParticipantsFromSnapshot(state.participants, participants, options),
+    })),
+  syncParticipantsOnline: (onlineIds): void =>
+    set((state) => ({
+      participants: syncParticipantsOnlineState(state.participants, onlineIds),
+    })),
   setVideoToken: (token): void => set({ videoToken: token }),
   updateParticipant: (id, updates): void =>
     set((state) => ({

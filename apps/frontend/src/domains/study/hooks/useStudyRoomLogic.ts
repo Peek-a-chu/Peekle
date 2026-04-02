@@ -7,9 +7,10 @@ import { useStudyLayout } from './useStudyLayout';
 import { useProblems } from './useProblems';
 import { useProblemDates } from './useProblemDates';
 import { useSubmissions } from './useSubmissions';
-import { fetchStudyParticipants, fetchStudyRoom } from '../api/studyApi';
+import { fetchStudyRoom } from '../api/studyApi';
 import { formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
+import { mapStudyRoomToParticipantPatches } from '../utils/participantSync';
 
 export function useStudyRoomLogic() {
   const params = useParams();
@@ -19,7 +20,9 @@ export function useStudyRoomLogic() {
 
   const setRoomInfo = useRoomStore((state) => state.setRoomInfo);
   const setCurrentDate = useRoomStore((state) => state.setCurrentDate);
-  const setParticipants = useRoomStore((state) => state.setParticipants);
+  const replaceParticipantsFromSnapshot = useRoomStore(
+    (state) => state.replaceParticipantsFromSnapshot,
+  );
   const setCurrentUserId = useRoomStore((state) => state.setCurrentUserId);
   const setInviteModalOpen = useRoomStore((state) => state.setInviteModalOpen);
   const setSettingsOpen = useRoomStore((state) => state.setSettingsOpen);
@@ -71,20 +74,26 @@ export function useStudyRoomLogic() {
         setRoomInfo({
           roomId: room.id,
           roomTitle: room.title,
+          roomDescription: room.description ?? '',
+          myRole: room.role,
         });
+        replaceParticipantsFromSnapshot(mapStudyRoomToParticipantPatches(room));
       })
       .catch((err) => console.error('Failed to fetch room info:', err));
 
     setCurrentDate(formatDate(new Date()));
 
-    fetchStudyParticipants(Number(studyId))
-      .then(setParticipants)
-      .catch((err) => console.error('Failed to fetch participants:', err));
-
     if (user) {
       setCurrentUserId(user.id);
     }
-  }, [studyId, setRoomInfo, setCurrentDate, setParticipants, setCurrentUserId, user]);
+  }, [
+    studyId,
+    setRoomInfo,
+    setCurrentDate,
+    replaceParticipantsFromSnapshot,
+    setCurrentUserId,
+    user,
+  ]);
 
   const handleBack = () => {
     router.push('/study');
@@ -102,7 +111,12 @@ export function useStudyRoomLogic() {
 
   const handleSelectProblem = (problem: Problem) => {
     const studyProblemId = (problem as any).id || (problem as any).studyProblemId;
-    setSelectedProblem(studyProblemId, problem.problemId, problem.title, (problem as any).externalId);
+    setSelectedProblem(
+      studyProblemId,
+      problem.problemId,
+      problem.title,
+      (problem as any).externalId,
+    );
     console.log('Selected problem:', problem.title);
   };
 

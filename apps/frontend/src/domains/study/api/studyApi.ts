@@ -1,46 +1,43 @@
-import { ChatMessageResponse, StudyRoomDetail, StudyMember } from '@/domains/study/types';
+import type { Participant as RoomParticipant } from '@/domains/study/hooks/useRoomStore';
+import { ChatMessageResponse, StudyRoomDetail } from '@/domains/study/types';
 import { apiFetch } from '@/lib/api';
+import {
+  mapStudyRoomToParticipantPatches,
+  materializeParticipants,
+} from '@/domains/study/utils/participantSync';
 
-// Re-export specific types if needed by legacy code, or alias them
-export interface Participant extends StudyMember {
-  // Extending StudyMember to keep compatibility with UI components that might expect these
-  // Default values will be used if API doesn't provide them
-  isOwner?: boolean;
-  isMuted?: boolean;
-  isVideoOff?: boolean;
-  isOnline?: boolean;
-}
+export type Participant = RoomParticipant;
 
 export type RoomInfo = StudyRoomDetail;
 
-// 1. Study Detail (Get Members from here)
-export async function fetchStudyParticipants(studyId: number): Promise<any[]> {
-  // Spec: GET /api/studies/{id} returns members list inside
-  const room = await fetchStudyRoom(studyId);
-  const roomData = room as any;
-  const ownerId = roomData.owner?.id;
+const inFlightStudyRoomRefreshes = new Map<number, Promise<RoomInfo>>();
 
-  return roomData.members.map((m: any) => ({
-    ...m,
-    id: m.userId, // Map userId to id for Store
-    // Use role from JSON or fallback to ownerId check
-    isOwner: m.role === 'OWNER' || (ownerId && m.userId === ownerId),
-    isMuted: false,
-    isVideoOff: false,
-    isOnline: m.isOnline, // Use real online status
-  }));
+// 1. Study Detail (Get Members from here)
+export async function fetchStudyParticipants(studyId: number): Promise<Participant[]> {
+  const room = await fetchStudyRoom(studyId);
+  return materializeParticipants(mapStudyRoomToParticipantPatches(room));
 }
 
-export async function fetchStudyRoom(
-  studyId: number,
-): Promise<RoomInfo & { owner?: { id: number } }> {
-  const res = await apiFetch<StudyRoomDetail & { owner?: { id: number } }>(
-    `/api/studies/${studyId}`,
-  );
+export async function fetchStudyRoom(studyId: number): Promise<RoomInfo> {
+  const res = await apiFetch<StudyRoomDetail>(`/api/studies/${studyId}`);
   if (!res.success || !res.data) {
     throw new Error(res.error?.message || 'Failed to fetch study room');
   }
   return res.data;
+}
+
+export async function refreshStudyRoomSnapshot(studyId: number): Promise<RoomInfo> {
+  const existingRequest = inFlightStudyRoomRefreshes.get(studyId);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const request = fetchStudyRoom(studyId).finally(() => {
+    inFlightStudyRoomRefreshes.delete(studyId);
+  });
+
+  inFlightStudyRoomRefreshes.set(studyId, request);
+  return request;
 }
 
 // 2. Chat History
@@ -136,13 +133,8 @@ export async function generateInviteCode(studyId: number): Promise<{ inviteCode:
 }
 
 // 7. Custom Problem Description
-export async function fetchProblemDescription(
-  studyId: number,
-  problemId: number,
-): Promise<string> {
-  const res = await apiFetch<string>(
-    `/api/studies/${studyId}/problems/${problemId}/description`,
-  );
+export async function fetchProblemDescription(studyId: number, problemId: number): Promise<string> {
+  const res = await apiFetch<string>(`/api/studies/${studyId}/problems/${problemId}/description`);
   if (!res.success) {
     // It's possible description is empty or 404, just return empty string
     return '';
@@ -155,11 +147,8 @@ export async function saveProblemDescription(
   problemId: number,
   description: string,
 ): Promise<void> {
-  await apiFetch<void>(
-    `/api/studies/${studyId}/problems/${problemId}/description`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ description }),
-    },
-  );
+  await apiFetch<void>(`/api/studies/${studyId}/problems/${problemId}/description`, {
+    method: 'POST',
+    body: JSON.stringify({ description }),
+  });
 }
