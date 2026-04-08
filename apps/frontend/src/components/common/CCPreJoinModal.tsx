@@ -282,6 +282,24 @@ export const CCPreJoinModal = ({
     return () => navigator.mediaDevices.removeEventListener('devicechange', getDevices);
   }, [getDevices]);
 
+  // Camera selection policy:
+  // - Keep previously selected device if it still exists.
+  // - Otherwise select the first available camera.
+  // - If no camera exists, fall back to 'default'.
+  useEffect(() => {
+    if (videoDevices.length === 0) {
+      if (selectedCameraId !== 'default') {
+        setCamera('default');
+      }
+      return;
+    }
+
+    const hasSelectedCamera = videoDevices.some((device) => device.deviceId === selectedCameraId);
+    if (!hasSelectedCamera) {
+      setCamera(videoDevices[0].deviceId);
+    }
+  }, [videoDevices, selectedCameraId, setCamera]);
+
   // ---------------------------------------------------------------------------
   // 2. Camera Preview Logic
   // ---------------------------------------------------------------------------
@@ -572,9 +590,13 @@ export const CCPreJoinModal = ({
                   </label>
                 </div>
                 {/* 2. Brighter input surface + 3. Stronger border */}
-                <Select value={selectedCameraId} onValueChange={setCamera}>
+                <Select
+                  value={selectedCameraId}
+                  onValueChange={setCamera}
+                  disabled={videoDevices.length === 0}
+                >
                   <SelectTrigger className="w-full bg-zinc-800 border-zinc-600 text-zinc-100 h-10 hover:border-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary/20">
-                    <SelectValue placeholder="카메라 선택" />
+                    <SelectValue placeholder={videoDevices.length === 0 ? '사용 가능한 카메라 없음' : '카메라 선택'} />
                   </SelectTrigger>
                   <SelectContent>
                     {videoDevices.map((d) => (
