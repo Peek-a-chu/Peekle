@@ -16,6 +16,30 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
                         Long studyProblemId,
                         Pageable pageable);
 
+        @Query("""
+                        SELECT s FROM SubmissionLog s
+                        WHERE s.roomId = :roomId
+                          AND s.studyProblemId = :studyProblemId
+                          AND (s.isSuccess = true OR s.isSuccess IS NULL)
+                        ORDER BY s.submittedAt DESC
+                        """)
+        Page<SubmissionLog> findSolvedByRoomIdAndStudyProblemId(
+                        @Param("roomId") Long roomId,
+                        @Param("studyProblemId") Long studyProblemId,
+                        Pageable pageable);
+
+        @Query("""
+                        SELECT s FROM SubmissionLog s
+                        WHERE s.roomId = :roomId
+                          AND s.problem.id = :problemId
+                          AND (s.isSuccess = true OR s.isSuccess IS NULL)
+                        ORDER BY s.submittedAt DESC
+                        """)
+        Page<SubmissionLog> findSolvedByRoomIdAndProblemId(
+                        @Param("roomId") Long roomId,
+                        @Param("problemId") Long problemId,
+                        Pageable pageable);
+
         // 특정 유저가 특정 문제에 대해 제출한 기록 개수 조회 (result 컬럼 없음 = 모두 성공)
         long countByUserIdAndProblemId(Long userId, Long problemId);
 

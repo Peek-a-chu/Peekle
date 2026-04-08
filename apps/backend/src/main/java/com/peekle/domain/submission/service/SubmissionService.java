@@ -4,6 +4,8 @@ import com.peekle.domain.ai.repository.RecommendProblemRepository;
 import com.peekle.domain.league.service.LeagueService;
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
+import com.peekle.domain.study.entity.StudyProblem;
+import com.peekle.domain.study.repository.StudyProblemRepository;
 import com.peekle.domain.submission.dto.SubmissionLogResponse;
 import com.peekle.domain.submission.dto.SubmissionRequest;
 import com.peekle.domain.submission.dto.SubmissionResponse;
@@ -49,6 +51,7 @@ public class SubmissionService {
 
     private final SubmissionLogRepository submissionLogRepository;
     private final ProblemRepository problemRepository;
+    private final StudyProblemRepository studyProblemRepository;
     private final UserRepository userRepository;
     private final LeagueService leagueService;
     private final SubmissionValidator submissionValidator;
@@ -326,8 +329,28 @@ public class SubmissionService {
     public Page<SubmissionLogResponse> getStudyProblemSubmissions(
             Long studyId, Long studyProblemId, Pageable pageable) {
 
-        Page<SubmissionLog> logs = submissionLogRepository
-                .findAllByRoomIdAndStudyProblemIdOrderBySubmittedAtDesc(studyId, studyProblemId, pageable);
+        StudyProblem studyProblem = studyProblemRepository.findById(studyProblemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND));
+
+        if (studyProblem.getStudy() == null || !studyId.equals(studyProblem.getStudy().getId())) {
+            throw new BusinessException(ErrorCode.STUDY_PROBLEM_NOT_FOUND);
+        }
+
+        Page<SubmissionLog> logs;
+        if (studyProblem.getProblemId() != null) {
+            // 같은 BOJ 문제를 다른 날짜에 다시 등록해도 풀이 보관함에서 함께 확인할 수 있게
+            // roomId + problemId 기준으로 조회한다.
+            logs = submissionLogRepository.findSolvedByRoomIdAndProblemId(
+                    studyId,
+                    studyProblem.getProblemId(),
+                    pageable);
+        } else {
+            // 커스텀 문제는 원본 problemId가 없으므로 기존처럼 studyProblemId 기준으로 조회한다.
+            logs = submissionLogRepository.findSolvedByRoomIdAndStudyProblemId(
+                    studyId,
+                    studyProblemId,
+                    pageable);
+        }
 
         return logs.map(SubmissionLogResponse::from);
     }
