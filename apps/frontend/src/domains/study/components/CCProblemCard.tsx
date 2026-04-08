@@ -8,8 +8,6 @@ import { useRoomStore } from '@/domains/study/hooks/useRoomStore';
 import { Button } from '@/components/ui/button';
 import { ActionModal } from '@/components/common/Modal';
 import { Separator } from '@/components/ui/separator';
-import { CCTestcaseRunnerModal } from './CCTestcaseRunnerModal';
-import { CheckSquare } from 'lucide-react';
 
 interface CCProblemCardProps {
   problem: Problem;
@@ -33,7 +31,6 @@ export function CCProblemCard({
   isCompact = false,
 }: CCProblemCardProps) {
   const [showHint, setShowHint] = useState(false);
-  const [isTestcaseModalOpen, setIsTestcaseModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const myRole = useRoomStore((state) => state.myRole);
 
@@ -168,21 +165,6 @@ export function CCProblemCard({
             )}
             onClick={(e) => {
               e.stopPropagation();
-              setIsTestcaseModalOpen(true);
-            }}
-            title="테스트 케이스 검증"
-          >
-            <CheckSquare className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 w-7 p-0",
-              isSelected ? "hover:bg-background" : "hover:bg-accent"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
               onOpenDescription?.();
             }}
             title="메모"
@@ -231,15 +213,6 @@ export function CCProblemCard({
         confirmText="삭제"
         cancelText="취소"
         variant="destructive"
-      />
-
-      {/* Testcase Runner Modal */}
-      <CCTestcaseRunnerModal
-        roomId={useRoomStore.getState().roomId}
-        studyProblemId={(problem as any).studyProblemId || (problem as any).id || null}
-        problemTitle={displayTitle}
-        isOpen={isTestcaseModalOpen}
-        onClose={() => setIsTestcaseModalOpen(false)}
       />
     </div>
   );
