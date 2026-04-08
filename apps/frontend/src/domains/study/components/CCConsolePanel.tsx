@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { X, Plus, Trash2, Settings2, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { X, Plus, Trash2, Settings2, Edit2, CheckCircle2, XCircle, Share2 } from 'lucide-react';
 import type { ExecutionResponse } from '@/domains/study/hooks/useExecution';
+import { apiFetch } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface TestCase {
     id: string;
     name: string;
     input: string;
+}
+
+interface SharedTestCase {
+    input: string;
+    expectedOutput: string;
 }
 
 interface CCConsolePanelProps {
@@ -35,6 +42,7 @@ export function CCConsolePanel({
     ]);
     const [activeTestCaseId, setActiveTestCaseId] = useState<string>('default');
     const [autoNewline, setAutoNewline] = useState<boolean>(true);
+    const [isSharing, setIsSharing] = useState<boolean>(false);
 
     // Load from LocalStorage
     useEffect(() => {
@@ -118,6 +126,85 @@ export function CCConsolePanel({
         }
     };
 
+    const handleShareTestcases = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        if (!roomId || !problemId) {
+            toast.error('문제를 선택한 뒤 테스트케이스를 공유할 수 있습니다.');
+            return;
+        }
+
+        if (testCases.length === 0) {
+            toast.error('공유할 테스트케이스가 없습니다.');
+            return;
+        }
+
+        setIsSharing(true);
+        try {
+            const toShare: SharedTestCase[] = testCases
+                .map((tc) => ({
+                    input: tc.input ?? '',
+                    expectedOutput: '',
+                }))
+                .filter((tc) => tc.input.trim().length > 0);
+
+            if (toShare.length === 0) {
+                toast.error('공유할 입력값이 없습니다.');
+                return;
+            }
+
+            const existingResponse = await apiFetch<SharedTestCase[]>(
+                `/api/studies/${roomId}/problems/${problemId}/testcases`,
+            );
+
+            const existing: SharedTestCase[] =
+                existingResponse.success && Array.isArray(existingResponse.data)
+                    ? existingResponse.data.map((tc) => ({
+                        input: tc.input ?? '',
+                        expectedOutput: tc.expectedOutput ?? '',
+                    }))
+                    : [];
+
+            const existingKeys = new Set(
+                existing.map((tc) => `${tc.input}\u0000${tc.expectedOutput}`),
+            );
+            const uniqueToShare = toShare.filter((tc) => {
+                const key = `${tc.input}\u0000${tc.expectedOutput}`;
+                if (existingKeys.has(key)) return false;
+                existingKeys.add(key);
+                return true;
+            });
+
+            if (uniqueToShare.length === 0) {
+                toast.info('이미 공유된 테스트케이스입니다.');
+                return;
+            }
+
+            const mergedPayload = [...existing, ...uniqueToShare];
+
+            const response = await apiFetch(`/api/studies/${roomId}/problems/${problemId}/testcases`, {
+                method: 'POST',
+                body: JSON.stringify(mergedPayload),
+            });
+
+            if (!response.success) {
+                toast.error(response.error?.message || '테스트케이스 공유에 실패했습니다.');
+                return;
+            }
+
+            toast.success(`테스트케이스 ${uniqueToShare.length}개를 공유했습니다.`);
+            window.dispatchEvent(
+                new CustomEvent('study-testcases-updated', {
+                    detail: { studyId: roomId },
+                }),
+            );
+        } catch {
+            toast.error('테스트케이스 공유 중 오류가 발생했습니다.');
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-background relative w-full overflow-hidden">
             {/* Header - Test Case Chips */}
@@ -195,9 +282,29 @@ export function CCConsolePanel({
                                     {currentTestCase.input.replace(/\n/g, ' ↵ ') || '입력값 없음'}
                                 </span>
                             </div>
-                            <Button variant="ghost" size="sm" className="h-6 px-2.5 text-xs text-muted-foreground font-medium hover:text-foreground hover:bg-background/80 shrink-0 border border-transparent hover:border-border">
-                                <Edit2 className="h-3 w-3 mr-1.5" />입력 편집
-                            </Button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2.5 text-xs text-muted-foreground font-medium hover:text-foreground hover:bg-background/80 border border-transparent hover:border-border"
+                                    onClick={handleShareTestcases}
+                                    disabled={isExecuting || isSharing || !roomId || !problemId || testCases.length === 0}
+                                >
+                                    <Share2 className="h-3 w-3 mr-1.5" />
+                                    {isSharing ? '공유 중...' : '테스트케이스 공유'}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2.5 text-xs text-muted-foreground font-medium hover:text-foreground hover:bg-background/80 border border-transparent hover:border-border"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMode('input');
+                                    }}
+                                >
+                                    <Edit2 className="h-3 w-3 mr-1.5" />입력 편집
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Output area */}

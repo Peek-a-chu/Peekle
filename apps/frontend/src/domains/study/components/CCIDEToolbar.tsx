@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Moon, Sun, Send, Eye, Archive, Minus, Plus, Play, TerminalSquare, Share2, Columns2, MoreHorizontal } from 'lucide-react';
+import { Copy, Moon, Sun, Send, Eye, Archive, Minus, Plus, Play, TerminalSquare, Share2, Columns2, MoreHorizontal, CheckSquare, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -38,8 +38,10 @@ export interface CCIDEToolbarProps {
   onExecute?: () => void;
   onToggleConsole?: () => void;
   onOpenProblemSplit?: () => void;
+  onOpenTestcaseRunner?: () => void;
   disabled?: boolean;
   showProblemSplit?: boolean;
+  showTestcaseRunner?: boolean;
 
   // View Mode Props
   viewingUser?: Participant | null;
@@ -70,12 +72,14 @@ export function CCIDEToolbar({
   onExecute,
   onToggleConsole,
   onOpenProblemSplit,
+  onOpenTestcaseRunner,
   viewingUser,
   viewMode,
   targetSubmission,
   onResetView,
   disabled = false,
   showProblemSplit = false,
+  showTestcaseRunner = false,
   problemExternalId,
 }: CCIDEToolbarProps) {
   const isMobile = useIsTouchMobile();
@@ -84,6 +88,7 @@ export function CCIDEToolbar({
   const isViewingOther = viewMode !== 'ONLY_MINE';
   const shouldShowLanguageSelect = !isViewingOther;
   const [isSplitSizedWindow, setIsSplitSizedWindow] = useState(false);
+  const [isTestToolsOpen, setIsTestToolsOpen] = useState(false);
 
   // Use local state for the input field to allow users to clear it while typing
   const [inputValue, setInputValue] = useState<string>(fontSize.toString());
@@ -116,6 +121,9 @@ export function CCIDEToolbar({
     ? '좌측 창에 현재 문제 열기'
     : '현재 문제를 분할 화면으로 열기';
   const isCompactToolbar = isSplitSizedWindow && !isMobile;
+  const compactProblemSplitButtonLabel = isCompactToolbar ? '문제 열기' : problemSplitButtonLabel;
+  const showConsoleTool = showExecute && showConsoleToggle;
+  const showTestTools = showConsoleTool || showTestcaseRunner;
 
   const handleDecreaseFont = () => {
     if (onFontSizeChange && fontSize > 5) {
@@ -412,17 +420,6 @@ export function CCIDEToolbar({
                     </Button>
                   )}
 
-                  {showProblemSplit && !isViewingOther && !isMobile && (
-                    <Button
-                      variant="ghost"
-                      onClick={onOpenProblemSplit}
-                      disabled={disabled}
-                      className="h-9 justify-start gap-2"
-                    >
-                      <Columns2 className="h-4 w-4" />
-                      <span className="text-sm">{problemSplitButtonLabel}</span>
-                    </Button>
-                  )}
                 </div>
               </PopoverContent>
             </Popover>
@@ -432,7 +429,7 @@ export function CCIDEToolbar({
           {!isViewingOther && (
             <>
               {/* Desktop-only Split Open */}
-              {showProblemSplit && !isMobile && !isCompactToolbar && (
+              {showProblemSplit && !isMobile && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -440,36 +437,91 @@ export function CCIDEToolbar({
                       variant="ghost"
                       onClick={onOpenProblemSplit}
                       disabled={disabled}
-                      className="ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 px-3 h-10 text-muted-foreground hover:text-foreground"
+                      className={cn(
+                        'ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 px-3 h-10',
+                        isCompactToolbar
+                          ? 'text-muted-foreground border border-border/70 hover:text-foreground hover:bg-accent'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
                     >
                       <Columns2 className="h-[18px] w-[18px]" />
-                      <span className="font-semibold text-sm">{problemSplitButtonLabel}</span>
+                      <span className="font-semibold text-sm whitespace-nowrap">
+                        {compactProblemSplitButtonLabel}
+                      </span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{problemSplitTooltipLabel}</TooltipContent>
                 </Tooltip>
               )}
 
-              {/* Console Toggle */}
-              {showExecute && showConsoleToggle && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={onToggleConsole}
-                      disabled={disabled}
-                      className={cn(
-                        'ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 h-10 text-muted-foreground hover:text-foreground',
-                        isCompactToolbar ? 'w-10 px-0' : 'px-3',
+              {/* Test Tools */}
+              {showTestTools && (
+                <Popover open={isTestToolsOpen} onOpenChange={setIsTestToolsOpen}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={disabled}
+                          className={cn(
+                            'ml-1 gap-1.5 focus:ring-0 transition-all active:scale-95 h-10 px-3',
+                            isCompactToolbar
+                              ? 'text-muted-foreground border border-border/70 hover:text-foreground hover:bg-accent'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          <TerminalSquare className="h-[18px] w-[18px]" />
+                          <span className="font-medium text-sm whitespace-nowrap">테스트</span>
+                          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                        </Button>
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>테스트 도구 열기</TooltipContent>
+                  </Tooltip>
+                  <PopoverContent align="end" className="w-72 p-2">
+                    <div className="flex flex-col gap-1">
+                      {showConsoleTool && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            onToggleConsole?.();
+                            setIsTestToolsOpen(false);
+                          }}
+                          disabled={disabled}
+                          className="h-auto items-start justify-start gap-2 px-3 py-2"
+                        >
+                          <TerminalSquare className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div className="flex flex-col items-start text-left">
+                            <span className="text-sm font-semibold leading-5">테스트 케이스 편집</span>
+                            <span className="text-[11px] text-muted-foreground leading-4">
+                              입력값을 수정하고 빠르게 실행합니다.
+                            </span>
+                          </div>
+                        </Button>
                       )}
-                    >
-                      <TerminalSquare className="h-[18px] w-[18px]" />
-                      {!isCompactToolbar && <span className="font-semibold text-sm">테스트 케이스</span>}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>테스트 케이스 편집</TooltipContent>
-                </Tooltip>
+                      {showTestcaseRunner && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            onOpenTestcaseRunner?.();
+                            setIsTestToolsOpen(false);
+                          }}
+                          disabled={disabled}
+                          className="h-auto items-start justify-start gap-2 px-3 py-2"
+                        >
+                          <CheckSquare className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div className="flex flex-col items-start text-left">
+                            <span className="text-sm font-semibold leading-5">전체 케이스 검증</span>
+                            <span className="text-[11px] text-muted-foreground leading-4">
+                              여러 케이스를 저장하고 일괄 비교 실행합니다.
+                            </span>
+                          </div>
+                        </Button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
 
               {/* Execute */}

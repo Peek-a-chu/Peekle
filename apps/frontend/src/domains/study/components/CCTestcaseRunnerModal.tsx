@@ -66,13 +66,33 @@ export function CCTestcaseRunnerModal({
     const [isExecuting, setIsExecuting] = useState(false);
     const [executingId, setExecutingId] = useState<string | null>(null);
 
+    const normalizeFetchedTestcases = useCallback((incoming: any[], prev: TestCase[]): TestCase[] => {
+        if (!Array.isArray(incoming) || incoming.length === 0) {
+            return [{ id: '1', input: '', expectedOutput: '' }];
+        }
+
+        return incoming.map((item, index) => {
+            const fallbackId = prev[index]?.id || `${Date.now()}-${index}`;
+            const rawId = item?.id;
+            const normalizedId = rawId !== undefined && rawId !== null && rawId !== ''
+                ? String(rawId)
+                : fallbackId;
+
+            return {
+                id: normalizedId,
+                input: String(item?.input ?? ''),
+                expectedOutput: String(item?.expectedOutput ?? ''),
+            };
+        });
+    }, []);
+
     // Memoized function to fetch testcases
     const fetchTestcases = useCallback(async () => {
         if (!roomId || !studyProblemId) return;
         try {
             const response = await apiFetch<TestCase[]>(`/api/studies/${roomId}/problems/${studyProblemId}/testcases`);
             if (response.success && response.data && response.data.length > 0) {
-                setTestcases(response.data);
+                setTestcases((prev) => normalizeFetchedTestcases(response.data as any[], prev));
             } else {
                 // Default empty case if none exist
                 setTestcases([{ id: '1', input: '', expectedOutput: '' }]);
@@ -86,41 +106,24 @@ export function CCTestcaseRunnerModal({
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     if (parsed && parsed.length > 0) {
-                        setTestcases(parsed);
+                        setTestcases((prev) => normalizeFetchedTestcases(parsed, prev));
                     }
                 }
             } catch {
                 // ignore
             }
         }
-    }, [roomId, studyProblemId]);
+    }, [roomId, studyProblemId, normalizeFetchedTestcases]);
 
-    // Load from DB when modal opens
+    // Load latest saved testcases only when modal opens.
+    // While the modal is open, do not sync live websocket updates.
     useEffect(() => {
         if (!isOpen || !roomId || !studyProblemId) return;
 
         fetchTestcases();
         // Clear previous results on open
         setResults({});
-
-        // Listen for WebSocket updates from other users
-        const handleTestcasesUpdated = (e: Event) => {
-            const customEvent = e as CustomEvent;
-            // Only update if it's for the current room
-            if (customEvent.detail.studyId === roomId) {
-                // Optionally check if user is not the one who saved, but re-fetching is fine.
-                fetchTestcases();
-            }
-        };
-
-        window.addEventListener('study-testcases-updated', handleTestcasesUpdated);
-
-        return () => {
-            window.removeEventListener('study-testcases-updated', handleTestcasesUpdated);
-        };
     }, [isOpen, roomId, studyProblemId, fetchTestcases]);
-
-    if (!isOpen) return null;
 
     const handleAddTestcase = () => {
         const newId = Date.now().toString();
@@ -160,6 +163,8 @@ export function CCTestcaseRunnerModal({
         }
     }, [roomId, studyProblemId, testcases]);
 
+    if (!isOpen) return null;
+
     const handleSaveTestcase = async () => {
         await saveTestcases();
     };
@@ -177,90 +182,144 @@ export function CCTestcaseRunnerModal({
         setTestcases(prev => prev.map(tc => tc.id === id ? { ...tc, [field]: value } : tc));
     };
 
+    const requestCurrentCode = async (): Promise<{ code: string; language: string } | null> => {
+        const received = await new Promise<{ code: string; language: string } | null>((resolve) => {
+            const timeoutId = window.setTimeout(() => {
+                resolve(null);
+            }, 1000);
+
+            const handleReceiveCode = (e: Event) => {
+                window.clearTimeout(timeoutId);
+                const customEvent = e as CustomEvent;
+                resolve({
+                    code: customEvent.detail?.code || '',
+                    language: customEvent.detail?.language || 'python',
+                });
+            };
+
+            window.addEventListener('receive-ide-code', handleReceiveCode, { once: true });
+            window.dispatchEvent(new Event('request-ide-code'));
+        });
+
+        if (!received?.code || !received.code.trim()) {
+            toast.error('에디터 코드를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.');
+            return null;
+        }
+
+        return received;
+    };
+
+    const executeTestcase = async (
+        testcase: TestCase,
+        currentCode: string,
+        currentLang: string,
+    ): Promise<TestResult> => {
+        try {
+            // Ensure input ends with newline if required, basic normalize
+            let finalInput = testcase.input;
+            if (finalInput && !finalInput.endsWith('\n')) finalInput += '\n';
+
+            const response = await apiFetch<ExecutionResponse>('/api/executions/run', {
+                method: 'POST',
+                body: JSON.stringify({
+                    language: currentLang,
+                    code: currentCode,
+                    input: finalInput
+                }),
+            });
+
+            const data = response.data;
+            const stdoutTrimmed = data?.stdout ? data.stdout.trim() : '';
+            const expectedTrimmed = testcase.expectedOutput ? testcase.expectedOutput.trim() : '';
+
+            let passed: boolean | null = null;
+            if (expectedTrimmed) {
+                passed = (stdoutTrimmed === expectedTrimmed) && data?.exitCode === 0;
+            }
+
+            return {
+                stdout: data?.stdout || '',
+                stderr: data?.stderr || response.error?.message || '',
+                exitCode: data?.exitCode ?? -1,
+                executionTime: data?.executionTime || 0,
+                memoryUsage: data?.memoryUsage || 0,
+                passed
+            };
+        } catch (error) {
+            return {
+                stdout: '',
+                stderr: error instanceof Error ? error.message : 'Execution failed',
+                exitCode: -1,
+                executionTime: 0,
+                memoryUsage: 0,
+                passed: false
+            };
+        }
+    };
+
+    const trySaveBeforeRun = (): void => {
+        if (!roomId || !studyProblemId) return;
+
+        void saveTestcases({
+            showSuccessToast: false,
+            showErrorToast: false
+        }).then((isSaved) => {
+            if (!isSaved) {
+                toast.warning('저장에는 실패했지만 현재 케이스로 실행을 계속합니다.');
+            }
+        });
+    };
+
+    const runSingleTestcase = async (testcaseId: string) => {
+        if (isExecuting) return;
+
+        const normalizedId = String(testcaseId);
+        const testcase = testcases.find((tc) => String(tc.id) === normalizedId);
+        if (!testcase) return;
+
+        trySaveBeforeRun();
+
+        const codeBundle = await requestCurrentCode();
+        if (!codeBundle) return;
+
+        setIsExecuting(true);
+        setExecutingId(normalizedId);
+
+        try {
+            const result = await executeTestcase(testcase, codeBundle.code, codeBundle.language);
+            setResults(prev => ({
+                ...prev,
+                [normalizedId]: result,
+            }));
+        } finally {
+            setExecutingId(null);
+            setIsExecuting(false);
+        }
+    };
+
     const runAllTestcases = async () => {
         if (testcases.length === 0) return;
+        const targetTestcases = testcases.map((tc) => ({ ...tc, id: String(tc.id) }));
 
-        if (roomId && studyProblemId) {
-            void saveTestcases({
-                showSuccessToast: false,
-                showErrorToast: false
-            });
-        }
+        trySaveBeforeRun();
 
-        // 1. Request current code from IDE
-        let currentCode = '';
-        let currentLang = 'python';
-
-        const handleReceiveCode = (e: Event) => {
-            const customEvent = e as CustomEvent;
-            currentCode = customEvent.detail.code;
-            currentLang = customEvent.detail.language;
-        };
-
-        window.addEventListener('receive-ide-code', handleReceiveCode, { once: true });
-        window.dispatchEvent(new Event('request-ide-code'));
-
-        // Wait a tiny bit for the synchronous event to process
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        if (!currentCode || !currentCode.trim()) {
-            alert('에디터에 작성된 코드가 없습니다.');
-            return;
-        }
+        const codeBundle = await requestCurrentCode();
+        if (!codeBundle) return;
 
         setIsExecuting(true);
         setResults({});
 
         const newResults: Record<string, TestResult> = {};
-
-        for (const tc of testcases) {
-            setExecutingId(tc.id);
-            try {
-                // Ensure input ends with newline if required, basic normalize
-                let finalInput = tc.input;
-                if (finalInput && !finalInput.endsWith('\n')) finalInput += '\n';
-
-                const response = await apiFetch<ExecutionResponse>('/api/executions/run', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        language: currentLang,
-                        code: currentCode,
-                        input: finalInput
-                    }),
-                });
-
-                const data = response.data;
-                const stdoutTrimmed = data?.stdout ? data.stdout.trim() : '';
-                const expectedTrimmed = tc.expectedOutput ? tc.expectedOutput.trim() : '';
-
-                let passed: boolean | null = null;
-                if (expectedTrimmed) {
-                    passed = (stdoutTrimmed === expectedTrimmed) && data?.exitCode === 0;
-                }
-
-                newResults[tc.id] = {
-                    stdout: data?.stdout || '',
-                    stderr: data?.stderr || response.error?.message || '',
-                    exitCode: data?.exitCode ?? -1,
-                    executionTime: data?.executionTime || 0,
-                    memoryUsage: data?.memoryUsage || 0,
-                    passed
-                };
-            } catch (error) {
-                newResults[tc.id] = {
-                    stdout: '',
-                    stderr: error instanceof Error ? error.message : 'Execution failed',
-                    exitCode: -1,
-                    executionTime: 0,
-                    memoryUsage: 0,
-                    passed: false
-                };
+        try {
+            for (const tc of targetTestcases) {
+                setExecutingId(tc.id);
+                newResults[tc.id] = await executeTestcase(tc, codeBundle.code, codeBundle.language);
             }
+            setResults(newResults);
+        } finally {
+            setExecutingId(null);
+            setIsExecuting(false);
         }
-
-        setResults(newResults);
-        setExecutingId(null);
-        setIsExecuting(false);
     };
 
     return (
@@ -314,6 +373,16 @@ export function CCTestcaseRunnerModal({
                                         )}
                                     </div>
                                     <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                            onClick={() => runSingleTestcase(tc.id)}
+                                            disabled={isExecuting}
+                                            title="이 케이스만 실행"
+                                        >
+                                            <Play className="h-3.5 w-3.5" />
+                                        </Button>
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={handleSaveTestcase} disabled={isExecuting} title="저장">
                                             <Save className="h-3.5 w-3.5" />
                                         </Button>

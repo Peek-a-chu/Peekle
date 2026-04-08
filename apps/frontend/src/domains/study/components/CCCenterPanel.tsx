@@ -8,6 +8,7 @@ import { CCControlBar as ControlBar } from '@/domains/study/components/CCControl
 import { CCIDEPanel as IDEPanel } from '@/domains/study/components/CCIDEPanel';
 import { CCIDEToolbar as IDEToolbar } from '@/domains/study/components/CCIDEToolbar';
 import { CCConsolePanel } from '@/domains/study/components/CCConsolePanel';
+import { CCTestcaseRunnerModal } from '@/domains/study/components/CCTestcaseRunnerModal';
 import { useExecution } from '@/domains/study/hooks/useExecution';
 import { WhiteboardPanel } from '@/domains/study/components/whiteboard/WhiteboardOverlay';
 import { useRealtimeCode } from '@/domains/study/hooks/useRealtimeCode';
@@ -195,6 +196,7 @@ print("Hello World!")`;
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [consoleHeight, setConsoleHeight] = useState(250);
   const [isResizingConsole, setIsResizingConsole] = useState(false);
+  const [isTestcaseRunnerOpen, setIsTestcaseRunnerOpen] = useState(false);
   const consoleResizeStartY = useRef<number>(0);
   const consoleResizeStartHeight = useRef<number>(0);
 
@@ -233,6 +235,14 @@ print("Hello World!")`;
     handleFontSizeChange(clamped);
     setFontSizeInput(clamped.toString());
   }, [fontSize]);
+
+  const handleOpenTestcaseRunner = useCallback(() => {
+    if (!selectedStudyProblemId || !selectedProblemTitle) {
+      toast.error('문제를 먼저 선택해주세요.');
+      return;
+    }
+    setIsTestcaseRunnerOpen(true);
+  }, [selectedStudyProblemId, selectedProblemTitle]);
 
   useEffect(() => {
     if (isMobile) {
@@ -1946,6 +1956,8 @@ print("Hello World!")`;
               showFontSizeControl={false}
               isExecuting={isExecuting}
               onToggleConsole={() => setIsConsoleOpen((prev) => !prev)}
+              showTestcaseRunner={!isViewingOther}
+              onOpenTestcaseRunner={handleOpenTestcaseRunner}
               onExecute={() => {
                 if (isMobile && !isConsoleOpen) {
                   setIsConsoleOpen(true);
@@ -2246,6 +2258,13 @@ print("Hello World!")`;
           isMobile &&
             'fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] mb-1 z-[55] shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.4)]',
         )}
+      />
+      <CCTestcaseRunnerModal
+        roomId={roomId}
+        studyProblemId={selectedStudyProblemId}
+        problemTitle={selectedProblemTitle || '문제'}
+        isOpen={isTestcaseRunnerOpen}
+        onClose={() => setIsTestcaseRunnerOpen(false)}
       />
     </div>
   );
