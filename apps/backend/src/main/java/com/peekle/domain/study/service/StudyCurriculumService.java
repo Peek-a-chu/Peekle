@@ -247,8 +247,12 @@ public class StudyCurriculumService {
                 List<SubmissionLog> logs = problemIds.isEmpty() ? List.of()
                                 : submissionLogRepository.findAllByRoomIdAndProblemIdIn(studyId, problemIds);
 
+                List<SubmissionLog> solvedLogs = logs.stream()
+                                .filter(log -> !Boolean.FALSE.equals(log.getIsSuccess()))
+                                .collect(Collectors.toList());
+
                 // 4. 문제 ID -> 푼 유저 ID 매핑
-                Map<Long, List<Long>> solvedUserMap = logs.stream()
+                Map<Long, List<Long>> solvedUserMap = solvedLogs.stream()
                                 .collect(Collectors.groupingBy(
                                                 log -> log.getProblem().getId(),
                                                 Collectors.mapping(log -> log.getUser().getId(), Collectors.toList())));
