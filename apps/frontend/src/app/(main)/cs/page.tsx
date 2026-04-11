@@ -54,7 +54,7 @@ export default function CSPage() {
         </p>
         {bootstrapData?.progress ? (
           <div className="mt-4 pt-4 w-full flex flex-col items-center">
-            <LearningMap progress={bootstrapData.progress} />
+            <LearningMap progress={bootstrapData.progress} stages={bootstrapData.stages ?? []} />
           </div>
         ) : (
           <div className="p-8 border border-dashed border-primary/30 rounded-xl bg-primary/5 text-center">
