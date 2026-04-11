@@ -11,9 +11,21 @@
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.0.0",
     "turbo": "^2.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "dompurify": "^3.3.2",
+      "svgo": "^3.3.3",
+      "picomatch": "^4.0.4",
+      "yaml": "^2.8.3",
+      "flatted": "^3.4.2",
+      "ajv": "^6.14.0",
+      "minimatch": "^3.1.4",
+      "brace-expansion": "^1.1.13"
+    }
   },
   "packageManager": "pnpm@10.28.1",
   "lint-staged": {
