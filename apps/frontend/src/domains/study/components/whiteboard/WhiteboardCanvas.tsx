@@ -11,6 +11,7 @@ import React, {
 import { USER_COLORS } from '@/lib/constants';
 import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 import { getDeterministicUserColor, isBlankText } from '@/domains/study/utils/whiteboard';
+import type { Canvas as FabricCanvas } from 'fabric';
 
 export interface WhiteboardCanvasRef {
   add: (objData: any, senderId?: string) => void;
@@ -30,6 +31,23 @@ interface WhiteboardCanvasProps {
   onObjectModified?: (obj: any) => void;
   onObjectRemoved?: (objectId: string) => void;
   onReady?: () => void;
+}
+
+type FabricModuleCompat = typeof import('fabric') & {
+  fabric?: typeof import('fabric');
+  default?: typeof import('fabric');
+};
+
+const resolveFabricModule = (module: typeof import('fabric')): typeof import('fabric') => {
+  const compatModule = module as FabricModuleCompat;
+  return compatModule.fabric ?? compatModule.default ?? module;
+};
+
+declare global {
+  interface Window {
+    fabric?: typeof import('fabric');
+    fabricCanvas?: FabricCanvas;
+  }
 }
 
 export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
@@ -408,7 +426,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
     useEffect(() => {
       if (!canvasEl.current) return;
 
-      let canvas: any;
+      let canvas: FabricCanvas | null = null;
       let isMounted = true;
 
       const initFabric = async () => {
@@ -418,7 +436,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           console.log('[WhiteboardCanvas] Fabric module loaded');
 
           // fabric v5 compatibility: handle different export styles
-          const fabric = mod.fabric || mod.default || mod;
+          const fabric = resolveFabricModule(mod);
 
           if (!isMounted) return;
 
@@ -426,19 +444,22 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
           // [Fix] Ensure fabric is available globally for enlivenObjects to work correctly
           if (typeof window !== 'undefined') {
-            (window as any).fabric = fabric;
+            window.fabric = fabric;
             console.log('[WhiteboardCanvas] Exposing fabricCanvas to window');
           }
 
           // Initialize fabric canvas
-          canvas = new fabric.Canvas(canvasEl.current, {
+          const canvasElement = canvasEl.current;
+          if (!canvasElement) return;
+
+          canvas = new fabric.Canvas(canvasElement, {
             width,
             height,
             backgroundColor: '#ffffff',
           });
 
           if (typeof window !== 'undefined') {
-            (window as any).fabricCanvas = canvas;
+            window.fabricCanvas = canvas;
           }
 
           fabricCanvasRef.current = canvas;
