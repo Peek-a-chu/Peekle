@@ -1,6 +1,7 @@
 package com.peekle.domain.cs.controller;
 
 import com.peekle.domain.cs.dto.request.CsDomainIdRequest;
+import com.peekle.domain.cs.dto.response.CsAttemptStartResponse;
 import com.peekle.domain.cs.dto.response.CsBootstrapResponse;
 import com.peekle.domain.cs.dto.response.CsCurrentDomainChangeResponse;
 import com.peekle.domain.cs.dto.response.CsDomainResponse;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,5 +56,12 @@ public class CsController {
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody CsDomainIdRequest request) {
         return ApiResponse.success(csDomainService.changeCurrentDomain(userId, request.domainId()));
+    }
+
+    @PostMapping("/stages/{stageId}/attempt/start")
+    public ApiResponse<CsAttemptStartResponse> startStageAttempt(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long stageId) {
+        return ApiResponse.success(csDomainService.startStageAttempt(userId, stageId));
     }
 }
