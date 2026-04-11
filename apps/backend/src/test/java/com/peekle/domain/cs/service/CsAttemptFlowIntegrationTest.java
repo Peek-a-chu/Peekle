@@ -8,6 +8,7 @@ import com.peekle.domain.cs.entity.CsDomain;
 import com.peekle.domain.cs.entity.CsDomainTrack;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
+import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsWrongProblem;
 import com.peekle.domain.cs.enums.CsAttemptPhase;
@@ -17,11 +18,14 @@ import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
+import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsWrongProblemRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +34,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -59,6 +64,9 @@ class CsAttemptFlowIntegrationTest {
 
     @Autowired
     private CsQuestionChoiceRepository csQuestionChoiceRepository;
+
+    @Autowired
+    private CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
 
     @Autowired
     private CsWrongProblemRepository csWrongProblemRepository;
@@ -196,6 +204,102 @@ class CsAttemptFlowIntegrationTest {
         assertThat(response.feedback()).contains("해설: 정답은 2번입니다.");
     }
 
+    @Test
+    @DisplayName("단답형 채점은 공백/대소문자/특수문자 정규화 정책을 적용한다")
+    void shortAnswer_grading_appliesNormalizationPolicy() {
+        User user = createUser("short-normalize");
+        CsDomain domain = createDomain(404, "단답형 정규화 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "단답형 정규화 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion firstQuestion = createShortAnswerQuestion(stage, "중복 제거 키워드를 작성하시오.");
+        addShortAnswer(firstQuestion, "DISTINCT", "distinct", true);
+
+        CsQuestion secondQuestion = createShortAnswerQuestion(stage, "깊은 복사 코드를 작성하시오.");
+        addShortAnswer(secondQuestion, "copy.deepcopy(a)", "copy.deepcopy(a)", true);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        CsAttemptAnswerResponse firstAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(firstQuestion.getId(), null, "   diST inCt   "));
+        assertThat(firstAnswer.isCorrect()).isTrue();
+        assertThat(firstAnswer.phase()).isEqualTo(CsAttemptPhase.FIRST_PASS);
+
+        CsAttemptAnswerResponse secondAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(secondQuestion.getId(), null, "COPY DEEPCOPY A"));
+        assertThat(secondAnswer.isCorrect()).isTrue();
+        assertThat(secondAnswer.phase()).isEqualTo(CsAttemptPhase.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("단답형 오답 제출 시 대표 정답을 반환하고 완료 시 오답노트에 저장된다")
+    void shortAnswer_wrongAnswer_returnsPrimaryAnswerAndPersistsWrongProblem() {
+        User user = createUser("short-wrong");
+        CsDomain domain = createDomain(405, "단답형 오답 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "단답형 오답 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion question = createShortAnswerQuestion(stage, "트랜잭션 4대 성질 약어를 작성하시오.");
+        addShortAnswer(question, "ACID", "acid", true);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        CsAttemptAnswerResponse firstAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "BASE"));
+        assertThat(firstAnswer.isCorrect()).isFalse();
+        assertThat(firstAnswer.correctAnswer()).isEqualTo("ACID");
+        assertThat(firstAnswer.feedback()).contains("정답: ACID");
+        assertThat(firstAnswer.phase()).isEqualTo(CsAttemptPhase.RETRY_WRONG);
+
+        CsAttemptAnswerResponse retryAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "acid"));
+        assertThat(retryAnswer.isCorrect()).isTrue();
+        assertThat(retryAnswer.phase()).isEqualTo(CsAttemptPhase.COMPLETED);
+
+        csAttemptService.completeAttempt(user.getId(), stage.getId());
+
+        CsWrongProblem wrongProblem = csWrongProblemRepository
+                .findByUser_IdAndQuestion_Id(user.getId(), question.getId())
+                .orElseThrow();
+        assertThat(wrongProblem.getWrongCount()).isEqualTo(1);
+        assertThat(wrongProblem.getStatus()).isEqualTo(CsWrongProblemStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("단답형 빈값 또는 공백만 입력은 CS_INVALID_ANSWER_PAYLOAD를 반환한다")
+    void shortAnswer_blankInput_throwsInvalidPayload() {
+        User user = createUser("short-blank");
+        CsDomain domain = createDomain(406, "단답형 빈값 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "단답형 빈값 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion question = createShortAnswerQuestion(stage, "정답을 입력하시오.");
+        addShortAnswer(question, "JSON", "json", true);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        assertThatThrownBy(() -> csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "   ")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> {
+                    BusinessException businessException = (BusinessException) exception;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.CS_INVALID_ANSWER_PAYLOAD);
+                });
+    }
+
     private User createUser(String suffix) {
         return userRepository.save(User.builder()
                 .socialId("social-" + suffix)
@@ -252,5 +356,24 @@ class CsAttemptFlowIntegrationTest {
                 .build());
 
         return question;
+    }
+
+    private CsQuestion createShortAnswerQuestion(CsStage stage, String prompt) {
+        return csQuestionRepository.save(CsQuestion.builder()
+                .stage(stage)
+                .questionType(CsQuestionType.SHORT_ANSWER)
+                .prompt(prompt)
+                .explanation("단답형 테스트 해설")
+                .isActive(true)
+                .build());
+    }
+
+    private void addShortAnswer(CsQuestion question, String answerText, String normalizedAnswer, boolean isPrimary) {
+        csQuestionShortAnswerRepository.save(CsQuestionShortAnswer.builder()
+                .question(question)
+                .answerText(answerText)
+                .normalizedAnswer(normalizedAnswer)
+                .isPrimary(isPrimary)
+                .build());
     }
 }
