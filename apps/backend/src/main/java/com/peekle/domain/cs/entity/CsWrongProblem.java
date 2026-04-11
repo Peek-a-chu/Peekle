@@ -40,6 +40,10 @@ public class CsWrongProblem {
     @JoinColumn(name = "question_id", nullable = false)
     private CsQuestion question;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "domain_id", nullable = false)
+    private CsDomain domain;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

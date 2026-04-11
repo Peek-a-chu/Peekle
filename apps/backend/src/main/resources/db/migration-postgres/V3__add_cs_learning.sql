@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS cs_user_domain_progress (
 CREATE TABLE IF NOT EXISTS cs_wrong_problems (
     user_id BIGINT NOT NULL,
     question_id BIGINT NOT NULL,
+    domain_id INT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     review_correct_count INT NOT NULL DEFAULT 0,
     wrong_count INT NOT NULL DEFAULT 1,
@@ -125,6 +126,8 @@ CREATE TABLE IF NOT EXISTS cs_wrong_problems (
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT fk_cs_wrong_problems_question
         FOREIGN KEY (question_id) REFERENCES cs_questions (id) ON DELETE CASCADE,
+    CONSTRAINT fk_cs_wrong_problems_domain
+        FOREIGN KEY (domain_id) REFERENCES cs_domains (id) ON DELETE CASCADE,
     CONSTRAINT chk_cs_wrong_problems_status
         CHECK (status IN ('ACTIVE', 'CLEARED')),
     CONSTRAINT chk_cs_wrong_problems_counts
@@ -151,3 +154,5 @@ CREATE INDEX IF NOT EXISTS idx_cs_wrong_problems_question_id
     ON cs_wrong_problems (question_id);
 CREATE INDEX IF NOT EXISTS idx_cs_wrong_problems_status
     ON cs_wrong_problems (status);
+CREATE INDEX IF NOT EXISTS idx_cs_wrong_problems_user_domain_status_updated_at
+    ON cs_wrong_problems (user_id, domain_id, status, updated_at DESC);
