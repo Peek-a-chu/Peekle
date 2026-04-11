@@ -85,6 +85,8 @@ export interface CSAttemptAnswerResponse {
   phase: CSAttemptPhase;
   isCorrect: boolean;
   feedback: string;
+  correctChoiceNo?: number;
+  correctAnswer?: string;
   isLast: boolean;
   score?: number;
   nextQuestion?: CSQuestionPayload;

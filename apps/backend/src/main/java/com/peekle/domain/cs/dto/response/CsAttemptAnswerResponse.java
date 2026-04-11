@@ -10,6 +10,8 @@ public record CsAttemptAnswerResponse(
         CsAttemptPhase phase,
         Boolean isCorrect,
         String feedback,
+        Integer correctChoiceNo,
+        String correctAnswer,
         Boolean isLast,
         CsQuestionPayloadResponse nextQuestion) {
 }

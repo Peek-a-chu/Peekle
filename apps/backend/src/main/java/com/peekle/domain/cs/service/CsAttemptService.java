@@ -8,6 +8,7 @@ import com.peekle.domain.cs.dto.response.CsAttemptStartResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionChoiceResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionPayloadResponse;
 import com.peekle.domain.cs.entity.CsQuestion;
+import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsWrongProblem;
@@ -102,7 +103,7 @@ public class CsAttemptService {
         csAttemptStore.delete(userId, stageId);
         csAttemptStore.save(session);
 
-        return new CsAttemptStartResponse(stageId, questionSet.size(), toQuestionPayload(questionSet.get(0)));
+        return new CsAttemptStartResponse(stageId, ATTEMPT_QUESTION_COUNT, toQuestionPayload(questionSet.get(0)));
     }
 
     @Transactional
@@ -130,9 +131,11 @@ public class CsAttemptService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_QUESTION_NOT_FOUND));
 
         int currentQuestionNo = currentRoundIndex + 1;
-        int totalQuestionCount = currentRoundQuestionIds.size();
+        int totalQuestionCount = ATTEMPT_QUESTION_COUNT;
 
-        boolean isCorrect = gradeAnswerByMockPolicy(question, request);
+        GradingResult gradingResult = gradeAnswer(question, request);
+        boolean isCorrect = gradingResult.isCorrect();
+
         applyAnswerState(session, question.getId(), isCorrect);
         moveToNextQuestion(session);
 
@@ -155,7 +158,9 @@ public class CsAttemptService {
                 new CsAttemptProgressResponse(currentQuestionNo, totalQuestionCount),
                 session.getPhase(),
                 isCorrect,
-                isCorrect ? "정답입니다." : "오답입니다.",
+                buildFeedback(gradingResult),
+                isCorrect ? null : gradingResult.correctChoiceNo(),
+                isCorrect ? null : gradingResult.correctAnswer(),
                 isLast,
                 nextQuestion);
     }
@@ -251,7 +256,7 @@ public class CsAttemptService {
         session.setCurrentRoundIndex(0);
     }
 
-    private boolean gradeAnswerByMockPolicy(CsQuestion question, CsAttemptAnswerRequest request) {
+    private GradingResult gradeAnswer(CsQuestion question, CsAttemptAnswerRequest request) {
         CsQuestionType questionType = question.getQuestionType();
 
         return switch (questionType) {
@@ -261,16 +266,36 @@ public class CsAttemptService {
                     throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "객관식/OX는 selectedChoiceNo가 필요합니다.");
                 }
 
-                boolean existsChoice = csQuestionChoiceRepository.findByQuestion_IdOrderByChoiceNoAsc(question.getId())
-                        .stream()
-                        .anyMatch(choice -> choice.getChoiceNo() != null
-                                && choice.getChoiceNo().intValue() == selectedChoiceNo);
-                if (!existsChoice) {
+                List<CsQuestionChoice> choices = csQuestionChoiceRepository.findByQuestion_IdOrderByChoiceNoAsc(question.getId());
+                if (choices.isEmpty()) {
+                    throw new BusinessException(ErrorCode.CS_QUESTION_NOT_FOUND, "선택지가 존재하지 않는 문제입니다.");
+                }
+
+                CsQuestionChoice selectedChoice = choices.stream()
+                        .filter(choice -> choice.getChoiceNo() != null
+                                && choice.getChoiceNo().intValue() == selectedChoiceNo)
+                        .findFirst()
+                        .orElse(null);
+                if (selectedChoice == null) {
                     throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "존재하지 않는 선택지입니다.");
                 }
 
-                // #143 단계: 목 채점 정책(1번 선택지를 정답으로 가정)
-                yield selectedChoiceNo == 1;
+                List<CsQuestionChoice> answerChoices = choices.stream()
+                        .filter(choice -> Boolean.TRUE.equals(choice.getIsAnswer()))
+                        .toList();
+                if (answerChoices.size() != 1) {
+                    throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "문제 정답 구성이 올바르지 않습니다.");
+                }
+
+                CsQuestionChoice answerChoice = answerChoices.get(0);
+                boolean isCorrect = answerChoice.getChoiceNo().intValue() == selectedChoiceNo;
+                String correctAnswer = answerChoice.getChoiceNo() + ". " + answerChoice.getContent();
+
+                yield new GradingResult(
+                        isCorrect,
+                        (int) answerChoice.getChoiceNo(),
+                        correctAnswer,
+                        question.getExplanation());
             }
             case SHORT_ANSWER, ESSAY -> {
                 String answerText = request.answerText();
@@ -278,7 +303,11 @@ public class CsAttemptService {
                     throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "서술형/단답형은 answerText가 필요합니다.");
                 }
                 // #143 단계: 목 채점 정책("정답" 포함 텍스트를 정답으로 가정)
-                yield answerText.trim().contains("정답");
+                yield new GradingResult(
+                        answerText.trim().contains("정답"),
+                        null,
+                        null,
+                        question.getExplanation());
             }
         };
     }
@@ -433,6 +462,32 @@ public class CsAttemptService {
                 choices.isEmpty() ? null : choices);
     }
 
+    private String buildFeedback(GradingResult gradingResult) {
+        if (gradingResult.isCorrect()) {
+            return "정답입니다.";
+        }
+
+        StringBuilder feedback = new StringBuilder();
+        if (gradingResult.correctAnswer() != null && !gradingResult.correctAnswer().isBlank()) {
+            feedback.append("정답: ").append(gradingResult.correctAnswer().trim());
+        }
+        if (gradingResult.explanation() != null && !gradingResult.explanation().isBlank()) {
+            if (!feedback.isEmpty()) {
+                feedback.append("\n");
+            }
+            feedback.append("해설: ").append(gradingResult.explanation().trim());
+        }
+
+        return feedback.isEmpty() ? "오답입니다." : feedback.toString();
+    }
+
     private record StreakResult(boolean earnedToday, int currentStreak) {
+    }
+
+    private record GradingResult(
+            boolean isCorrect,
+            Integer correctChoiceNo,
+            String correctAnswer,
+            String explanation) {
     }
 }
