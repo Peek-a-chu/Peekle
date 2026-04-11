@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 
 const MOBILE_ITEMS = NAV_ITEMS.filter((item) =>
-  ['/home', '/study', '/workbooks', '/ranking', '/league', '/search'].includes(item.href),
+  ['/home', '/study', '/workbooks', '/cs', '/ranking', '/league', '/search'].includes(item.href),
 );
 
 export default function MobileBottomNav() {
