@@ -33,4 +33,8 @@ public class CsUserProfile {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_domain_id")
     private CsDomain currentDomain;
+
+    public void updateCurrentDomain(CsDomain currentDomain) {
+        this.currentDomain = currentDomain;
+    }
 }
