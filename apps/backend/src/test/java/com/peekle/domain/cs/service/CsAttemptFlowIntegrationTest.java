@@ -152,6 +152,50 @@ class CsAttemptFlowIntegrationTest {
                 .satisfies(progress -> assertThat(progress.getCurrentStageNo()).isEqualTo((short) 2));
     }
 
+    @Test
+    @DisplayName("객관식 오답 제출 시 실제 정답 번호/내용/해설을 반환하고 is_answer 기준으로 채점한다")
+    void multipleChoice_wrongAnswer_returnsCorrectAnswerAndExplanation() {
+        User user = createUser("attempt-feedback");
+        CsDomain domain = createDomain(403, "피드백 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "피드백 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion question = csQuestionRepository.save(CsQuestion.builder()
+                .stage(stage)
+                .questionType(CsQuestionType.MULTIPLE_CHOICE)
+                .prompt("정답 공개 테스트 문제")
+                .explanation("정답은 2번입니다.")
+                .isActive(true)
+                .build());
+
+        csQuestionChoiceRepository.save(CsQuestionChoice.builder()
+                .question(question)
+                .choiceNo((short) 1)
+                .content("선지 1")
+                .isAnswer(false)
+                .build());
+        csQuestionChoiceRepository.save(CsQuestionChoice.builder()
+                .question(question)
+                .choiceNo((short) 2)
+                .content("선지 2")
+                .isAnswer(true)
+                .build());
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        CsAttemptAnswerResponse response = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 1, null));
+
+        assertThat(response.isCorrect()).isFalse();
+        assertThat(response.correctChoiceNo()).isEqualTo(2);
+        assertThat(response.correctAnswer()).isEqualTo("2. 선지 2");
+        assertThat(response.feedback()).contains("정답: 2. 선지 2");
+        assertThat(response.feedback()).contains("해설: 정답은 2번입니다.");
+    }
+
     private User createUser(String suffix) {
         return userRepository.save(User.builder()
                 .socialId("social-" + suffix)

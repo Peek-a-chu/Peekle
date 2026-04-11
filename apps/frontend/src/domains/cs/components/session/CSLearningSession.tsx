@@ -15,7 +15,7 @@ import {
   CSAttemptAnswerResponse,
 } from '@/domains/cs/api/csApi';
 
-import CSMockProblem from './CSMockProblem';
+import CSQuestionPresenter from './CSQuestionPresenter';
 import CSResultScreen from './CSResultScreen';
 import {
   AlertDialog,
@@ -34,6 +34,55 @@ interface CSLearningSessionProps {
 }
 
 type Phase = 'loading' | 'playing' | 'submitting_complete' | 'result' | 'error';
+
+interface WrongFeedbackContent {
+  answer: string | null;
+  explanation: string | null;
+}
+
+interface AnswerDisplay {
+  number: string | null;
+  text: string;
+}
+
+function parseWrongFeedback(answerResult: CSAttemptAnswerResponse): WrongFeedbackContent {
+  const lines = (answerResult.feedback || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const parsedAnswerLine = lines.find((line) => line.startsWith('정답:'));
+  const explanationStartIndex = lines.findIndex((line) => line.startsWith('해설:'));
+
+  const parsedAnswer = parsedAnswerLine?.replace(/^정답:\s*/, '').trim() || null;
+  let parsedExplanation: string | null = null;
+
+  if (explanationStartIndex >= 0) {
+    const firstLine = lines[explanationStartIndex].replace(/^해설:\s*/, '').trim();
+    const remainLines = lines.slice(explanationStartIndex + 1);
+    const merged = [firstLine, ...remainLines].filter(Boolean).join('\n').trim();
+    parsedExplanation = merged || null;
+  }
+
+  return {
+    answer: answerResult.correctAnswer?.trim() || parsedAnswer,
+    explanation: parsedExplanation,
+  };
+}
+
+function splitAnswerText(answer: string): AnswerDisplay {
+  const normalized = answer.trim();
+  const matched = normalized.match(/^(\d+)\.\s*(.+)$/);
+
+  if (!matched) {
+    return { number: null, text: normalized };
+  }
+
+  return {
+    number: matched[1],
+    text: matched[2].trim(),
+  };
+}
 
 export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const router = useRouter();
@@ -163,7 +212,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   }
 
   return (
-    <div className="flex flex-col w-full animate-in fade-in relative min-h-[80vh] pb-10">
+    <div className="flex flex-col w-full animate-in fade-in relative min-h-[80vh] pb-28">
       <header className="flex items-center justify-between py-4 px-6 bg-background/80 backdrop-blur-md sticky top-0 z-50 border-b border-border/50">
         <div className="flex flex-col">
           <span className="text-sm font-semibold text-muted-foreground">스테이지 {stageId}</span>
@@ -185,7 +234,8 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
 
       <main className="flex-1 flex flex-col justify-center items-center p-4">
         {phase === 'playing' && currentQuestion && (
-          <CSMockProblem
+          <CSQuestionPresenter
+            key={currentQuestion.questionId}
             question={currentQuestion}
             onSubmit={handleAnswerSubmit}
             isSubmitting={isSubmitting}
@@ -221,23 +271,67 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       {/* 피드백 모달 */}
       {answerResult && (
         <div className="fixed inset-0 z-[100] flex animate-in fade-in bg-black/40 items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-auto">
+          {(() => {
+            const wrongFeedback = !answerResult.isCorrect ? parseWrongFeedback(answerResult) : null;
+            const answerDisplay = wrongFeedback?.answer ? splitAnswerText(wrongFeedback.answer) : null;
+            return (
           <div
             className={`w-full sm:max-w-lg p-6 sm:p-8 flex flex-col gap-4 shadow-2xl rounded-t-3xl sm:rounded-2xl ${
-              answerResult.isCorrect ? 'bg-green-50' : 'bg-red-50'
+              answerResult.isCorrect
+                ? 'bg-emerald-50'
+                : 'bg-gradient-to-b from-rose-50 to-red-50'
             } animate-in slide-in-from-bottom sm:slide-in-from-bottom-8 duration-300 pointer-events-auto`}
           >
             <div className="flex flex-col gap-2">
               <h2
                 className={`text-2xl font-black tracking-tight ${
-                  answerResult.isCorrect ? 'text-green-600' : 'text-red-500'
+                  answerResult.isCorrect ? 'text-emerald-600' : 'text-red-500'
                 }`}
               >
                 {answerResult.isCorrect ? '정답입니다!' : '틀렸습니다.'}
               </h2>
-              {answerResult.feedback && (
-                <div className="mt-2 p-4 rounded-xl bg-white/60 text-foreground text-[15px] leading-relaxed whitespace-pre-wrap">
-                  <span className="font-bold block mb-1 text-sm text-muted-foreground">설명</span>
-                  {answerResult.feedback}
+              {!answerResult.isCorrect && (
+                <div className="mt-2 flex flex-col gap-3">
+                  {wrongFeedback?.answer && (
+                    <div className="rounded-xl border-l-4 border-l-red-500 bg-white px-4 pt-2 pb-5 shadow-sm">
+                      <span className="inline-flex rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white">
+                        정답
+                      </span>
+                      {answerDisplay?.number ? (
+                        <div className="mt-3 flex items-end gap-2">
+                          <span className="text-4xl font-black leading-none text-red-600">
+                            {answerDisplay.number}.
+                          </span>
+                          <span className="pb-0.5 text-2xl font-extrabold leading-tight text-red-600">
+                            {answerDisplay.text}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-2xl font-extrabold leading-tight text-red-600">
+                          {wrongFeedback.answer}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {wrongFeedback?.explanation && (
+                    <div className="rounded-xl border-l-4 border-l-slate-300 bg-slate-50/90 px-4 pt-2 pb-4 shadow-sm">
+                      <span className="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
+                        해설
+                      </span>
+                      <p className="mt-3 whitespace-pre-wrap text-[15px] leading-8 text-slate-700">
+                        {wrongFeedback.explanation}
+                      </p>
+                    </div>
+                  )}
+
+                  {!wrongFeedback?.answer && !wrongFeedback?.explanation && answerResult.feedback && (
+                    <div className="rounded-xl border-l-4 border-l-slate-300 bg-slate-50/90 px-4 py-4 shadow-sm">
+                      <p className="whitespace-pre-wrap text-[15px] leading-8 text-slate-700">
+                        {answerResult.feedback}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -252,6 +346,8 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
               계속하기
             </Button>
           </div>
+            );
+          })()}
         </div>
       )}
     </div>
