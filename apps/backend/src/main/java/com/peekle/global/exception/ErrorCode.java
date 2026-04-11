@@ -67,7 +67,22 @@ public enum ErrorCode {
     ALREADY_IN_GAME(HttpStatus.CONFLICT, "GAME_008", "이미 다른 게임에 참여 중입니다."),
     GAME_TEAM_FULL(HttpStatus.CONFLICT, "GAME_009", "해당 팀은 이미 가득 찼습니다."),
     GAME_NOT_HOST(HttpStatus.FORBIDDEN, "GAME_010", "방장만 수행할 수 있는 작업입니다."),
-    GAME_CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "GAME_011", "자기 자신을 강퇴할 수 없습니다.");
+    GAME_CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "GAME_011", "자기 자신을 강퇴할 수 없습니다."),
+
+    // CS
+    CS_DOMAIN_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_001", "도메인을 찾을 수 없습니다."),
+    CS_TRACK_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_002", "트랙을 찾을 수 없습니다."),
+    CS_STAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_003", "스테이지를 찾을 수 없습니다."),
+    CS_QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_004", "문제를 찾을 수 없습니다."),
+    CS_INVALID_QUESTION_TYPE(HttpStatus.BAD_REQUEST, "CS_005", "허용되지 않은 문제 유형입니다."),
+    CS_INVALID_ANSWER_PAYLOAD(HttpStatus.BAD_REQUEST, "CS_006", "답안 요청 형식이 올바르지 않습니다."),
+    CS_ATTEMPT_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_007", "진행 중인 시도를 찾을 수 없습니다."),
+    CS_ATTEMPT_EXPIRED(HttpStatus.GONE, "CS_008", "시도가 만료되었습니다."),
+    CS_DOMAIN_PROGRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_009", "도메인 진행 정보를 찾을 수 없습니다."),
+    CS_FORBIDDEN_STAGE_ACCESS(HttpStatus.FORBIDDEN, "CS_010", "해당 스테이지에 접근할 수 없습니다."),
+    CS_RUBRIC_CONFIG_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "CS_011", "서술형 루브릭 구성이 올바르지 않습니다."),
+    CS_ESSAY_GRADING_FAILED(HttpStatus.BAD_GATEWAY, "CS_012", "서술형 채점에 실패했습니다."),
+    CS_DOMAIN_NOT_STUDYING(HttpStatus.BAD_REQUEST, "CS_013", "학습 중인 도메인이 아닙니다.");
 
     private final HttpStatus status;
     private final String code;

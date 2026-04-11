@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { Home, Users, Gamepad2, BookOpen, Trophy, Medal, Search, Settings } from 'lucide-react';
+import { Home, Users, Gamepad2, BookOpen, Trophy, Medal, Search, Settings, Terminal } from 'lucide-react';
 
 import UserProfileSection from './UserProfileSection';
 import SidebarItem from './SidebarItem';
@@ -17,6 +17,7 @@ export const NAV_ITEMS = [
   { icon: Users, label: '스터디 방', href: '/study' },
   { icon: Gamepad2, label: '게임 방', href: '/game' },
   { icon: BookOpen, label: '문제집', href: '/workbooks' },
+  { icon: Terminal, label: 'CS 학습', href: '/cs' },
   { icon: Trophy, label: '랭킹', href: '/ranking' },
   { icon: Medal, label: '리그', href: '/league' },
   { icon: Search, label: '검색', href: '/search' },
