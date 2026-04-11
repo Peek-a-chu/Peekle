@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { fetchCSBootstrap, CSBootstrapResponse } from '@/domains/cs/api/csApi';
 import DomainSelection from '@/domains/cs/components/DomainSelection';
+import LearningMap from '@/domains/cs/components/LearningMap';
 import { toast } from 'sonner';
 
 export default function CSPage() {
@@ -46,15 +47,20 @@ export default function CSPage() {
 
   return (
     <div className="flex flex-col animate-in fade-in duration-500">
-      <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
+      <div className="bg-card rounded-2xl p-8 shadow-sm">
         <h1 className="text-2xl font-bold mb-2">CS 학습</h1>
         <p className="text-muted-foreground mb-6">
           선택한 도메인: <span className="font-semibold text-primary">{bootstrapData?.currentDomain?.name}</span>
         </p>
-        <div className="p-8 border border-dashed border-primary/30 rounded-xl bg-primary/5 text-center">
-          <p className="text-lg font-medium text-foreground mb-2">학습 맵이 준비 중입니다! 🚀</p>
-          <p className="text-sm text-muted-foreground">금방 추가될 예정이니 조금만 기다려주세요.</p>
-        </div>
+        {bootstrapData?.progress ? (
+          <div className="mt-4 pt-4 w-full flex flex-col items-center">
+            <LearningMap progress={bootstrapData.progress} />
+          </div>
+        ) : (
+          <div className="p-8 border border-dashed border-primary/30 rounded-xl bg-primary/5 text-center">
+            <p className="text-lg font-medium text-foreground mb-2">진행도 정보를 불러올 수 없습니다. 🚨</p>
+          </div>
+        )}
       </div>
     </div>
   );
