@@ -195,7 +195,7 @@ public class CsDomainService {
             throw new BusinessException(ErrorCode.CS_QUESTION_NOT_FOUND, "스테이지에 등록된 문제가 없습니다.");
         }
 
-        return new CsAttemptStartResponse(stage.getId(), toQuestionPayload(questions.get(0)));
+        return new CsAttemptStartResponse(stage.getId(), questions.size(), toQuestionPayload(questions.get(0)));
     }
 
     private CsUserProfile getOrCreateUserProfile(Long userId, User user) {

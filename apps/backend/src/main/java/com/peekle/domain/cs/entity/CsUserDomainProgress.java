@@ -66,4 +66,10 @@ public class CsUserDomainProgress {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void advanceTo(Short trackNo, Short stageNo) {
+        this.currentTrackNo = trackNo;
+        this.currentStageNo = stageNo;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

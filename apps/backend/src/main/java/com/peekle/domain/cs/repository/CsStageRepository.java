@@ -19,4 +19,6 @@ public interface CsStageRepository extends JpaRepository<CsStage, Long> {
     Optional<CsStage> findByIdWithTrackAndDomain(@Param("stageId") Long stageId);
 
     List<CsStage> findByTrack_IdOrderByStageNoAsc(Long trackId);
+
+    Optional<CsStage> findByTrack_IdAndStageNo(Long trackId, Short stageNo);
 }

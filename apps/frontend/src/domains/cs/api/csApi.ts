@@ -7,6 +7,7 @@ export interface CSDomain {
 }
 
 export type CSQuestionType = 'MULTIPLE_CHOICE' | 'SHORT_ANSWER' | 'ESSAY' | 'OX';
+export type CSAttemptPhase = 'FIRST_PASS' | 'RETRY_WRONG' | 'COMPLETED';
 
 export interface CSProgress {
   currentTrackNo: number;
@@ -14,10 +15,20 @@ export interface CSProgress {
   currentStageNo: number;
 }
 
+export type CSStageStatus = 'COMPLETED' | 'IN_PROGRESS' | 'LOCKED';
+
+export interface CSStageStatusItem {
+  stageId: number;
+  stageNo: number;
+  status: CSStageStatus;
+  lockReason: string | null;
+}
+
 export interface CSBootstrapResponse {
   needsDomainSelection: boolean;
   currentDomain: CSDomain | null;
   progress: CSProgress | null;
+  stages: CSStageStatusItem[];
 }
 
 export interface CSMyDomainItem {
@@ -52,6 +63,7 @@ export interface CSQuestionPayload {
 
 export interface CSAttemptStartResponse {
   stageId: number;
+  totalQuestionCount: number;
   firstQuestion: CSQuestionPayload;
 }
 
@@ -70,6 +82,7 @@ export interface CSAttemptAnswerResponse {
   questionId: number;
   questionType: CSQuestionType;
   progress: CSAttemptProgress;
+  phase: CSAttemptPhase;
   isCorrect: boolean;
   feedback: string;
   isLast: boolean;
