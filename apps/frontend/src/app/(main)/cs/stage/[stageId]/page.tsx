@@ -1,7 +1,12 @@
 import CSLearningSession from '@/domains/cs/components/session/CSLearningSession';
 
-export default function CSStagePage({ params }: { params: { stageId: string } }) {
-  const stageId = parseInt(params.stageId, 10);
+interface CSStagePageProps {
+  params: Promise<{ stageId: string }>;
+}
+
+export default async function CSStagePage({ params }: CSStagePageProps) {
+  const { stageId: rawStageId } = await params;
+  const stageId = parseInt(rawStageId, 10);
   
   if (isNaN(stageId)) {
     return (
