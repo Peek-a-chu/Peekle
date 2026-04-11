@@ -57,6 +57,10 @@ export default function CSQuestionPresenter({ question, onSubmit, isSubmitting }
   };
 
   const typeLabel = QUESTION_TYPE_LABEL[question.questionType] || question.questionType;
+  const isChoiceQuestion = question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'OX';
+  const hasTextAnswer = answerText.trim().length > 0;
+  const isAnswerReady = isChoiceQuestion ? selectedChoiceNo !== null : hasTextAnswer;
+  const isSubmitDisabled = isSubmitting || !isAnswerReady;
 
   return (
     <Card className="w-full max-w-2xl mx-auto p-6 md:p-8 flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
@@ -107,8 +111,8 @@ export default function CSQuestionPresenter({ question, onSubmit, isSubmitting }
         <div className="w-full max-w-2xl px-2">
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full font-bold text-lg h-14 rounded-xl shadow-lg"
+            disabled={isSubmitDisabled}
+            className="w-full font-bold text-lg h-14 rounded-xl shadow-lg disabled:bg-gray-300 disabled:text-gray-500 disabled:opacity-100 disabled:shadow-none"
             variant="default"
           >
             {isSubmitting ? '채점 중...' : '제출하기'}

@@ -9,6 +9,7 @@ import com.peekle.domain.cs.dto.response.CsQuestionChoiceResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionPayloadResponse;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
+import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsWrongProblem;
@@ -16,6 +17,7 @@ import com.peekle.domain.cs.enums.CsAttemptPhase;
 import com.peekle.domain.cs.enums.CsQuestionType;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
+import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsWrongProblemRepository;
@@ -34,10 +36,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +60,7 @@ public class CsAttemptService {
     private final CsStageRepository csStageRepository;
     private final CsQuestionRepository csQuestionRepository;
     private final CsQuestionChoiceRepository csQuestionChoiceRepository;
+    private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final CsWrongProblemRepository csWrongProblemRepository;
     private final CsAttemptStore csAttemptStore;
@@ -297,11 +303,45 @@ public class CsAttemptService {
                         correctAnswer,
                         question.getExplanation());
             }
-            case SHORT_ANSWER, ESSAY -> {
+            case SHORT_ANSWER -> {
                 String answerText = request.answerText();
                 if (answerText == null || answerText.isBlank()) {
                     throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "서술형/단답형은 answerText가 필요합니다.");
                 }
+
+                List<CsQuestionShortAnswer> acceptableAnswers = csQuestionShortAnswerRepository
+                        .findByQuestion_IdOrderByIsPrimaryDescIdAsc(question.getId());
+                if (acceptableAnswers.isEmpty()) {
+                    throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "단답형 정답 구성이 올바르지 않습니다.");
+                }
+
+                String submitted = answerText.strip();
+                String strictSubmitted = normalizeStrict(submitted);
+                String relaxedSubmitted = normalizeRelaxed(strictSubmitted);
+
+                Set<String> strictCandidates = new HashSet<>();
+                Set<String> relaxedCandidates = new HashSet<>();
+
+                for (CsQuestionShortAnswer acceptableAnswer : acceptableAnswers) {
+                    addCandidateNormalization(strictCandidates, relaxedCandidates, acceptableAnswer.getNormalizedAnswer());
+                    addCandidateNormalization(strictCandidates, relaxedCandidates, acceptableAnswer.getAnswerText());
+                }
+
+                boolean isCorrect = strictCandidates.contains(strictSubmitted)
+                        || (!relaxedSubmitted.isBlank() && relaxedCandidates.contains(relaxedSubmitted));
+
+                yield new GradingResult(
+                        isCorrect,
+                        null,
+                        isCorrect ? null : resolvePrimaryShortAnswer(acceptableAnswers),
+                        question.getExplanation());
+            }
+            case ESSAY -> {
+                String answerText = request.answerText();
+                if (answerText == null || answerText.isBlank()) {
+                    throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "서술형/단답형은 answerText가 필요합니다.");
+                }
+
                 // #143 단계: 목 채점 정책("정답" 포함 텍스트를 정답으로 가정)
                 yield new GradingResult(
                         answerText.trim().contains("정답"),
@@ -479,6 +519,56 @@ public class CsAttemptService {
         }
 
         return feedback.isEmpty() ? "오답입니다." : feedback.toString();
+    }
+
+    private void addCandidateNormalization(Set<String> strictCandidates, Set<String> relaxedCandidates, String candidate) {
+        String strictCandidate = normalizeStrict(candidate);
+        if (strictCandidate.isBlank()) {
+            return;
+        }
+
+        strictCandidates.add(strictCandidate);
+
+        String relaxedCandidate = normalizeRelaxed(strictCandidate);
+        if (!relaxedCandidate.isBlank()) {
+            relaxedCandidates.add(relaxedCandidate);
+        }
+    }
+
+    private String resolvePrimaryShortAnswer(List<CsQuestionShortAnswer> answers) {
+        return answers.stream()
+                .sorted(Comparator
+                        .comparing((CsQuestionShortAnswer answer) -> !Boolean.TRUE.equals(answer.getIsPrimary()))
+                        .thenComparing(CsQuestionShortAnswer::getId))
+                .map(this::resolveDisplayAnswerText)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String resolveDisplayAnswerText(CsQuestionShortAnswer answer) {
+        if (answer.getAnswerText() != null && !answer.getAnswerText().isBlank()) {
+            return answer.getAnswerText().trim();
+        }
+        if (answer.getNormalizedAnswer() != null && !answer.getNormalizedAnswer().isBlank()) {
+            return answer.getNormalizedAnswer().trim();
+        }
+        return null;
+    }
+
+    private String normalizeStrict(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.strip()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", "");
+    }
+
+    private String normalizeRelaxed(String input) {
+        if (input == null || input.isBlank()) {
+            return "";
+        }
+        return input.replaceAll("[^\\p{L}\\p{N}]", "");
     }
 
     private record StreakResult(boolean earnedToday, int currentStreak) {
