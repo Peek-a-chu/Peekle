@@ -20,6 +20,12 @@ export default function MobileBottomNav() {
     return pathname.startsWith(href);
   };
 
+  const isHiddenRoute = pathname.startsWith('/cs/stage/');
+
+  if (isHiddenRoute) {
+    return null;
+  }
+
   return (
     <div className="lg:hidden border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <nav className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] no-scrollbar">

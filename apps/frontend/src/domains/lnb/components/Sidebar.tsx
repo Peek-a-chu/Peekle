@@ -34,6 +34,12 @@ const Sidebar = ({ user }: SidebarProps) => {
 
   const { openModal, isOpen } = useSettingsStore();
 
+  const isHiddenRoute = pathname.startsWith('/cs/stage/');
+
+  if (isHiddenRoute) {
+    return null;
+  }
+
   return (
     <aside className="hidden lg:flex w-[240px] h-screen bg-card border-r border-border flex-col fixed left-0 top-0 z-50 overflow-y-auto font-sans transition-colors duration-300">
       {/* User Logic Section */}
