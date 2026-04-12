@@ -55,6 +55,7 @@ export async function getMyProfile(): Promise<UserProfile> {
       profileImg: data.profileImg || undefined,
       solvedCount: Number(data.solvedCount),
       isMe: data.me,
+      csProgressList: data.csProgressList,
     };
   } catch (e) {
     console.error('Failed to fetch profile:', e);
@@ -128,6 +129,7 @@ export async function getUserProfile(nickname: string): Promise<UserProfile | nu
       profileImgThumb: data.profileImgThumb || undefined,
       solvedCount: Number(data.solvedCount),
       isMe: data.me,
+      csProgressList: data.csProgressList,
     };
   } catch (e: any) {
     if (e.message && e.message.includes('404')) {
