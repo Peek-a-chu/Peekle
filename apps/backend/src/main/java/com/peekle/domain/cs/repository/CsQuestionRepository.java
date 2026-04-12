@@ -10,4 +10,6 @@ public interface CsQuestionRepository extends JpaRepository<CsQuestion, Long> {
     List<CsQuestion> findByStage_IdAndIsActiveTrueOrderByIdAsc(Long stageId);
 
     Optional<CsQuestion> findByIdAndStage_Id(Long questionId, Long stageId);
+
+    Optional<CsQuestion> findByIdAndIsActiveTrue(Long questionId);
 }
