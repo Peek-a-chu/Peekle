@@ -29,6 +29,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Optional;
+
+import com.peekle.domain.cs.entity.CsUserDomainProgress;
+import com.peekle.domain.cs.entity.CsUserProfile;
+import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
+import com.peekle.domain.cs.repository.CsUserProfileRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +44,8 @@ public class UserService {
     private final SubmissionLogRepository submissionLogRepository;
     private final com.peekle.global.storage.R2StorageService r2StorageService;
     private final LeagueService leagueService;
+    private final CsUserProfileRepository csUserProfileRepository;
+    private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Transactional
@@ -111,7 +119,18 @@ public class UserService {
 
         boolean isMe = currentUserId != null && currentUserId.equals(userId);
 
-        // 4. DTO 반환
+        // 4. CS 상태 조회
+        List<com.peekle.domain.cs.entity.CsUserDomainProgress> progressList = 
+            csUserDomainProgressRepository.findByUser_Id(userId);
+            
+        List<com.peekle.domain.user.dto.UserCsProgressDto> csProgressDtoList = progressList.stream()
+            .map(p -> new com.peekle.domain.user.dto.UserCsProgressDto(
+                p.getDomain().getName(),
+                (int) p.getCurrentTrackNo()
+            ))
+            .toList();
+
+        // 5. DTO 반환
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .nickname(user.getNickname())
@@ -125,6 +144,7 @@ public class UserService {
                 .streakMax(user.getStreakMax())
                 .solvedCount(solvedCount)
                 .me(isMe)
+                .csProgressList(csProgressDtoList)
                 .build();
     }
 

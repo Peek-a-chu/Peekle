@@ -181,4 +181,12 @@ public class RedisKeyConst {
     // Custom Problem Description Topic (Pub/Sub)
     // /topic/studies/rooms/{studyId}/problems/{problemId}/description
     public static final String TOPIC_STUDY_PROBLEM_DESC = "topic/studies/rooms/%d/problems/%d/description";
+
+    // CS learning temporary attempt state (Hash/JSON)
+    // cs:attempt:{userId}:{stageId}
+    public static final String CS_ATTEMPT = "cs:attempt:%d:%d";
+
+    // CS wrong-review temporary state (Hash/JSON)
+    // cs:wrong-review:{userId}:{reviewId}
+    public static final String CS_WRONG_REVIEW = "cs:wrong-review:%d:%s";
 }

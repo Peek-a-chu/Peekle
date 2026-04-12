@@ -1,24 +1,36 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { NAV_ITEMS } from './Sidebar';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 
 const MOBILE_ITEMS = NAV_ITEMS.filter((item) =>
-  ['/home', '/study', '/workbooks', '/ranking', '/league', '/search'].includes(item.href),
+  ['/home', '/study', '/workbooks', '/cs', '/ranking', '/league', '/search'].includes(item.href),
 );
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const openModal = useSettingsStore((state) => state.openModal);
 
   const isItemActive = (href: string) => {
     if (href === '/home') return pathname === '/home';
     return pathname.startsWith(href);
   };
+
+  const isCsAddMode = pathname === '/cs' && searchParams.get('mode') === 'add';
+  const isHiddenRoute =
+    pathname.startsWith('/cs/stage/') ||
+    isCsAddMode ||
+    pathname.startsWith('/cs/wrong-notes/review') ||
+    pathname.startsWith('/cs/wrong-problems/review');
+
+  if (isHiddenRoute) {
+    return null;
+  }
 
   return (
     <div className="lg:hidden border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -52,3 +64,4 @@ export default function MobileBottomNav() {
     </div>
   );
 }
+
