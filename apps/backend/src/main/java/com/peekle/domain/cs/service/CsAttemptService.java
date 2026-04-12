@@ -306,7 +306,7 @@ public class CsAttemptService {
             case SHORT_ANSWER -> {
                 String answerText = request.answerText();
                 if (answerText == null || answerText.isBlank()) {
-                    throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "서술형/단답형은 answerText가 필요합니다.");
+                    throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "단답형은 answerText가 필요합니다.");
                 }
 
                 List<CsQuestionShortAnswer> acceptableAnswers = csQuestionShortAnswerRepository
@@ -334,19 +334,6 @@ public class CsAttemptService {
                         isCorrect,
                         null,
                         isCorrect ? null : resolvePrimaryShortAnswer(acceptableAnswers),
-                        question.getExplanation());
-            }
-            case ESSAY -> {
-                String answerText = request.answerText();
-                if (answerText == null || answerText.isBlank()) {
-                    throw new BusinessException(ErrorCode.CS_INVALID_ANSWER_PAYLOAD, "서술형/단답형은 answerText가 필요합니다.");
-                }
-
-                // #143 단계: 목 채점 정책("정답" 포함 텍스트를 정답으로 가정)
-                yield new GradingResult(
-                        answerText.trim().contains("정답"),
-                        null,
-                        null,
                         question.getExplanation());
             }
         };

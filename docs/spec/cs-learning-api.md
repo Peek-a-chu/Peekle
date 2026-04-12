@@ -72,7 +72,7 @@ CS 탭 MVP에서 아래 항목을 일관되게 처리하기 위한 기준 문서
 - `id BIGINT PK`
 - `stage_id BIGINT FK -> cs_stages.id`
 - `question_type VARCHAR(30)`  
-  허용값: `MULTIPLE_CHOICE`, `SHORT_ANSWER`, `ESSAY`, `OX`
+  허용값: `MULTIPLE_CHOICE`, `SHORT_ANSWER`, `OX`
 - `prompt TEXT NOT NULL`
 - `explanation TEXT`
 - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
@@ -93,27 +93,11 @@ CS 탭 MVP에서 아래 항목을 일관되게 처리하기 위한 기준 문서
 - `is_primary BOOLEAN NOT NULL DEFAULT FALSE`
 - `UNIQUE(question_id, normalized_answer)`
 
-7. `cs_question_rubrics` (서술형 루브릭)
-- `id BIGINT PK`
-- `question_id BIGINT FK -> cs_questions.id`
-- `code VARCHAR(20) NOT NULL` (예: C1, C2)
-- `description TEXT NOT NULL`
-- `weight SMALLINT NOT NULL`
-- `is_essential BOOLEAN NOT NULL DEFAULT FALSE`
-- `UNIQUE(question_id, code)`
-
-8. `cs_question_essay_answers` (서술형 모범답안)
-- `id BIGINT PK`
-- `question_id BIGINT FK -> cs_questions.id`
-- `model_answer TEXT NOT NULL`
-- `key_points JSONB`
-- `UNIQUE(question_id)`
-
-9. `cs_user_profiles`
+7. `cs_user_profiles`
 - `user_id BIGINT PK FK -> users.id`
 - `current_domain_id INT FK -> cs_domains.id (nullable)`
 
-10. `cs_user_domain_progress`
+8. `cs_user_domain_progress`
 - `id BIGINT PK`
 - `user_id BIGINT FK -> users.id`
 - `domain_id INT FK -> cs_domains.id`
@@ -123,7 +107,7 @@ CS 탭 MVP에서 아래 항목을 일관되게 처리하기 위한 기준 문서
 - `UNIQUE(user_id, domain_id)`
 - 행 존재 자체를 "해당 유저가 공부중인 도메인"으로 해석
 
-11. `cs_wrong_problems`
+9. `cs_wrong_problems`
 - `user_id BIGINT FK -> users.id`
 - `question_id BIGINT FK -> cs_questions.id`
 - `domain_id INT FK -> cs_domains.id` (비정규화, 도메인별 오답 조회 최적화)
@@ -157,22 +141,6 @@ CS 탭 MVP에서 아래 항목을 일관되게 처리하기 위한 기준 문서
 
 - 사용자 답안을 정규화 후 `normalized_answer`와 비교
 - 복수 정답/동의어 허용
-
-### 4.3 서술형
-
-- 루브릭 기준 항목별 `full/partial/none` 판정
-- 서버 계산:
-  - `full = weight * 1.0`
-  - `partial = weight * 0.5`
-  - `none = 0`
-- 정답 판정:
-  - `score >= 7`
-  - `fatalMisconception == false`
-- AI 실패 처리:
-  - 1차 채점 타임아웃: 5초
-  - 실패 시 1회 재시도
-  - 재시도 실패 시 `key_points` 기반 fallback 채점 시도
-  - fallback도 불가하면 `CS_012 ESSAY_GRADING_FAILED` 반환
 
 서버 설정값:
 
@@ -386,15 +354,6 @@ Base: `/api/cs`
 }
 ```
 
-요청 예시 (서술형 `ESSAY`):
-
-```json
-{
-  "questionId": 1203,
-  "answerText": "프로세스는 독립 메모리 공간을 가지고, 스레드는 같은 프로세스 자원을 공유합니다."
-}
-```
-
 응답 예시 (단답형):
 
 ```json
@@ -409,28 +368,6 @@ Base: `/api/cs`
     "isLast": false,
     "nextQuestion": {
       "questionId": 1203,
-      "questionType": "ESSAY",
-      "prompt": "프로세스와 스레드의 차이를 설명하시오."
-    }
-  }
-}
-```
-
-응답 예시 (서술형):
-
-```json
-{
-  "success": true,
-  "data": {
-    "questionId": 1203,
-    "questionType": "ESSAY",
-    "progress": { "currentQuestionNo": 3, "totalQuestionCount": 10 },
-    "isCorrect": true,
-    "score": 8,
-    "feedback": "핵심 개념은 맞지만 문맥 전환 비용 설명이 부족합니다.",
-    "isLast": false,
-    "nextQuestion": {
-      "questionId": 1204,
       "questionType": "OX",
       "prompt": "스레드는 독립 메모리 공간을 가진다.",
       "choices": [
@@ -441,11 +378,6 @@ Base: `/api/cs`
   }
 }
 ```
-
-참고:
-
-- 루브릭 상세(`full/partial/none`)와 `fatalMisconception`은 서버 내부 판정용으로 사용
-- FE 응답에는 기본적으로 노출하지 않음
 
 ### 5.8 스테이지 완료/결과 조회
 
@@ -561,8 +493,6 @@ Base: `/api/cs`
 - `CS_008` ATTEMPT_EXPIRED (410)
 - `CS_009` DOMAIN_PROGRESS_NOT_FOUND (404)
 - `CS_010` FORBIDDEN_STAGE_ACCESS (403)
-- `CS_011` RUBRIC_CONFIG_INVALID (500)
-- `CS_012` ESSAY_GRADING_FAILED (502)
 - `CS_013` DOMAIN_NOT_STUDYING (400)
 
 오류 응답 형식:
@@ -583,7 +513,6 @@ Base: `/api/cs`
 2. 공부중 도메인 목록/추가/현재 도메인 전환 API
 3. attempt start/answer/complete API
 4. 오답노트 조회/복습 반영 API
-5. 서술형 LLM 판정 로직 고도화
 
 ## 8. 비고
 
