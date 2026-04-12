@@ -6,6 +6,7 @@ import { useExtensionCheck } from '@/hooks/useExtensionCheck';
 import { UserProfile, ExtensionStatus } from '../types';
 import { CCProfileHeader } from './CCProfileHeader';
 import { CCProfileStatsRow } from './CCProfileStatsRow';
+import { CCProfileCSStatus } from './CCProfileCSStatus';
 import {
   checkNickname as checkNicknameApi,
   checkBojId as checkBojIdApi,
@@ -525,6 +526,9 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
           accept=".jpg,.jpeg,.png,.webp"
           onChange={handleFileChange}
         />
+
+        {/* 2. CS Learning Status */}
+        <CCProfileCSStatus user={optimisticUser} />
 
         {/* 3. Stats Row */}
         <CCProfileStatsRow user={optimisticUser} />

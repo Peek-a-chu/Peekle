@@ -11,6 +11,7 @@ export interface UserProfile {
   profileImgThumb?: string;
   solvedCount: number;
   isMe?: boolean;
+  csProgressList?: { domainName: string; trackNo: number }[];
 }
 
 export interface SubmissionHistory {
