@@ -307,6 +307,63 @@ class CsAttemptFlowIntegrationTest {
                 });
     }
 
+    @Test
+    @DisplayName("같은 문제를 다시 틀려도 오답 레코드는 중복 생성되지 않고 wrongCount만 누적된다")
+    void sameQuestionWrongAgain_updatesSingleWrongProblem() {
+        User user = createUser("wrong-duplicate-check");
+        CsDomain domain = createDomain(407, "중복 검증 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "중복 검증 트랙");
+        CsStage stage = createStage(track, 1);
+        CsQuestion question = createMultipleChoiceQuestion(stage, "중복 검증 문제");
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+
+        // 첫 번째 시도: 1회 오답 후 정답 완료
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+        CsAttemptAnswerResponse firstWrong = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 2, null));
+        assertThat(firstWrong.isCorrect()).isFalse();
+
+        CsAttemptAnswerResponse firstRetryCorrect = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 1, null));
+        assertThat(firstRetryCorrect.isCorrect()).isTrue();
+        assertThat(firstRetryCorrect.isLast()).isTrue();
+        csAttemptService.completeAttempt(user.getId(), stage.getId());
+
+        // 두 번째 시도(예전 스테이지 재도전): 다시 1회 오답 후 정답 완료
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+        CsAttemptAnswerResponse secondWrong = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 2, null));
+        assertThat(secondWrong.isCorrect()).isFalse();
+
+        CsAttemptAnswerResponse secondRetryCorrect = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 1, null));
+        assertThat(secondRetryCorrect.isCorrect()).isTrue();
+        assertThat(secondRetryCorrect.isLast()).isTrue();
+        csAttemptService.completeAttempt(user.getId(), stage.getId());
+
+        long wrongProblemRowCount = csWrongProblemRepository.findAll().stream()
+                .filter(wrongProblem -> wrongProblem.getUser().getId().equals(user.getId()))
+                .filter(wrongProblem -> wrongProblem.getQuestion().getId().equals(question.getId()))
+                .count();
+
+        CsWrongProblem wrongProblem = csWrongProblemRepository
+                .findByUser_IdAndQuestion_Id(user.getId(), question.getId())
+                .orElseThrow();
+
+        assertThat(wrongProblemRowCount).isEqualTo(1L);
+        assertThat(wrongProblem.getWrongCount()).isEqualTo(2);
+        assertThat(wrongProblem.getStatus()).isEqualTo(CsWrongProblemStatus.ACTIVE);
+    }
+
     private User createUser(String suffix) {
         return userRepository.save(User.builder()
                 .socialId("social-" + suffix)

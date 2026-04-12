@@ -108,4 +108,9 @@ public class CsWrongProblem {
         }
         this.updatedAt = now;
     }
+
+    public void increaseWrongCount() {
+        this.wrongCount = (this.wrongCount == null ? 0 : this.wrongCount) + 1;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

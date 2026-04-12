@@ -22,7 +22,11 @@ export default function MobileBottomNav() {
   };
 
   const isCsAddMode = pathname === '/cs' && searchParams.get('mode') === 'add';
-  const isHiddenRoute = pathname.startsWith('/cs/stage/') || isCsAddMode;
+  const isHiddenRoute =
+    pathname.startsWith('/cs/stage/') ||
+    isCsAddMode ||
+    pathname.startsWith('/cs/wrong-notes/review') ||
+    pathname.startsWith('/cs/wrong-problems/review');
 
   if (isHiddenRoute) {
     return null;
@@ -60,3 +64,4 @@ export default function MobileBottomNav() {
     </div>
   );
 }
+

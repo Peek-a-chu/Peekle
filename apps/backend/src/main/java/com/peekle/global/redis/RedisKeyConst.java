@@ -185,4 +185,8 @@ public class RedisKeyConst {
     // CS learning temporary attempt state (Hash/JSON)
     // cs:attempt:{userId}:{stageId}
     public static final String CS_ATTEMPT = "cs:attempt:%d:%d";
+
+    // CS wrong-review temporary state (Hash/JSON)
+    // cs:wrong-review:{userId}:{reviewId}
+    public static final String CS_WRONG_REVIEW = "cs:wrong-review:%d:%s";
 }

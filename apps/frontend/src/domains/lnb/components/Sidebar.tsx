@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Home, Users, Gamepad2, BookOpen, Trophy, Medal, Search, Settings, Terminal } from 'lucide-react';
 
 import UserProfileSection from './UserProfileSection';
@@ -25,6 +25,7 @@ export const NAV_ITEMS = [
 
 const Sidebar = ({ user }: SidebarProps) => {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const isItemActive = (href: string) => {
     if (href === '/home' && pathname === '/home') return true;
@@ -34,7 +35,11 @@ const Sidebar = ({ user }: SidebarProps) => {
 
   const { openModal, isOpen } = useSettingsStore();
 
-  const isHiddenRoute = pathname.startsWith('/cs/stage/');
+  const isCsAddMode = pathname === '/cs' && searchParams?.get('mode') === 'add';
+  const isCsReviewRoute =
+    pathname.startsWith('/cs/wrong-notes/review') ||
+    pathname.startsWith('/cs/wrong-problems/review');
+  const isHiddenRoute = pathname.startsWith('/cs/stage/') || isCsAddMode || isCsReviewRoute;
 
   if (isHiddenRoute) {
     return null;
@@ -69,3 +74,4 @@ const Sidebar = ({ user }: SidebarProps) => {
 };
 
 export default Sidebar;
+

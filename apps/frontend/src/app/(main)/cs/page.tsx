@@ -73,7 +73,6 @@ export default function CSPage() {
 
   return (
     <div className="flex flex-col animate-in fade-in duration-500">
-      {/* ── 상단바 ── */}
       {bootstrapData?.currentDomain && (
         <CSTopBar
           currentDomain={bootstrapData.currentDomain}
@@ -93,6 +92,11 @@ export default function CSPage() {
       )}
 
       <div className="bg-card rounded-2xl p-8 shadow-sm">
+        <h1 className="text-2xl font-bold mb-2">CS 학습</h1>
+
+        <p className="text-muted-foreground mb-6">
+          선택한 도메인: <span className="font-semibold text-primary">{bootstrapData?.currentDomain?.name}</span>
+        </p>
         {bootstrapData?.progress ? (
           <div className="w-full flex flex-col items-center">
             <LearningMap progress={bootstrapData.progress} stages={bootstrapData.stages ?? []} />

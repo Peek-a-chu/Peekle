@@ -8,13 +8,14 @@ export const metadata: Metadata = {
   description: '틀린 CS 문제를 모아 복습하고 약점을 보완하세요.',
 };
 
-export default function CSWrongProblemsPage() {
+export default function CSWrongNotesPage() {
   return (
     <div className="flex flex-col min-h-[80vh] animate-in fade-in duration-300">
+      {/* ── 헤더 ──────────────────────────────────────────────────────────── */}
       <header className="flex items-center gap-3 py-4 pb-6">
         <Link
           href="/cs"
-          id="wrong-problems-back-btn"
+          id="wrong-notes-back-btn"
           className="p-2 rounded-xl hover:bg-muted transition-colors group"
           aria-label="CS 학습으로 돌아가기"
         >
@@ -26,6 +27,7 @@ export default function CSWrongProblemsPage() {
         </div>
       </header>
 
+      {/* ── 목록 컴포넌트 ────────────────────────────────────────────────── */}
       <CSWrongNoteList />
     </div>
   );
