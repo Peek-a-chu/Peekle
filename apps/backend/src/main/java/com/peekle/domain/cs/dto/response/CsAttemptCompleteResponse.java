@@ -9,5 +9,7 @@ public record CsAttemptCompleteResponse(
         String messageCode,
         Boolean streakEarnedToday,
         Integer currentStreak,
+        Integer earnedScore,
+        Integer totalScore,
         Long nextStageId) {
 }

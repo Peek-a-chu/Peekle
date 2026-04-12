@@ -4,7 +4,7 @@ import React from 'react';
 import { CSAttemptCompleteResponse } from '@/domains/cs/api/csApi';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Trophy, Flame, CheckCircle, ArrowRight, RotateCcw } from 'lucide-react';
+import { Trophy, Flame, CheckCircle, ArrowRight, RotateCcw, Coins } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface CSResultScreenProps {
@@ -50,6 +50,17 @@ export default function CSResultScreen({ result }: CSResultScreenProps) {
               <span className="font-bold">오늘 스트릭 획득! (진행 중: {result.currentStreak}일)</span>
             </div>
           )}
+
+          <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 rounded-2xl p-4 flex items-center justify-between gap-3 mb-8">
+            <div className="flex items-center gap-2">
+              <Coins className="w-5 h-5" />
+              <span className="font-bold">이번 세션 점수</span>
+            </div>
+            <div className="text-right">
+              <div className="font-extrabold text-lg">+{result.earnedScore}점</div>
+              <div className="text-xs text-emerald-700/80">누적 {result.totalScore}점</div>
+            </div>
+          </div>
 
           <div className="flex flex-col w-full gap-3">
             {result.isTrackCompleted ? (

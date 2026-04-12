@@ -101,6 +101,8 @@ export interface CSAttemptCompleteResponse {
   messageCode: string;
   streakEarnedToday: boolean;
   currentStreak: number;
+  earnedScore: number;
+  totalScore: number;
   nextStageId: number | null;
 }
 
