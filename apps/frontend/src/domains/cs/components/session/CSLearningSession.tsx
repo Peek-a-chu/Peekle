@@ -10,13 +10,12 @@ import {
   answerCSStageQuestion,
   completeCSStageAttempt,
   CSQuestionPayload,
-  CSAttemptCompleteResponse,
   CSAttemptAnswerRequest,
   CSAttemptAnswerResponse,
 } from '@/domains/cs/api/csApi';
 
 import CSQuestionPresenter from './CSQuestionPresenter';
-import CSResultScreen from './CSResultScreen';
+import { getCSStageResultStorageKey } from '@/domains/cs/utils/stageResultStorage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +32,7 @@ interface CSLearningSessionProps {
   stageId: number;
 }
 
-type Phase = 'loading' | 'playing' | 'submitting_complete' | 'result' | 'error';
+type Phase = 'loading' | 'playing' | 'submitting_complete' | 'error';
 
 interface WrongFeedbackContent {
   answer: string | null;
@@ -91,7 +90,6 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const [currentQuestion, setCurrentQuestion] = useState<CSQuestionPayload | null>(null);
   const [totalQuestionCount, setTotalQuestionCount] = useState(0);
   const [solvedQuestionIds, setSolvedQuestionIds] = useState<number[]>([]);
-  const [resultData, setResultData] = useState<CSAttemptCompleteResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExitAlert, setShowExitAlert] = useState(false);
   const [answerResult, setAnswerResult] = useState<CSAttemptAnswerResponse | null>(null);
@@ -126,8 +124,10 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     try {
       setPhase('submitting_complete');
       const res = await completeCSStageAttempt(stageId);
-      setResultData(res);
-      setPhase('result');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(getCSStageResultStorageKey(stageId), JSON.stringify(res));
+      }
+      router.replace(`/cs/stage/${stageId}/result`);
     } catch (err) {
       console.error(err);
       toast.error('스테이지 결과를 불러오는 데 실패했습니다.');
@@ -205,10 +205,6 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
         <p className="text-muted-foreground font-medium animate-pulse">결과를 집계하고 있습니다...</p>
       </div>
     );
-  }
-
-  if (phase === 'result' && resultData) {
-    return <CSResultScreen result={resultData} />;
   }
 
   return (
