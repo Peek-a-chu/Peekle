@@ -34,7 +34,9 @@ const Sidebar = ({ user }: SidebarProps) => {
 
   const { openModal, isOpen } = useSettingsStore();
 
-  const isHiddenRoute = pathname.startsWith('/cs/stage/');
+  const isHiddenRoute =
+    pathname.startsWith('/cs/stage/') ||
+    pathname.startsWith('/cs/wrong-notes/review');
 
   if (isHiddenRoute) {
     return null;
@@ -69,3 +71,4 @@ const Sidebar = ({ user }: SidebarProps) => {
 };
 
 export default Sidebar;
+

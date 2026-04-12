@@ -20,7 +20,9 @@ export default function MobileBottomNav() {
     return pathname.startsWith(href);
   };
 
-  const isHiddenRoute = pathname.startsWith('/cs/stage/');
+  const isHiddenRoute =
+    pathname.startsWith('/cs/stage/') ||
+    pathname.startsWith('/cs/wrong-notes/review');
 
   if (isHiddenRoute) {
     return null;
@@ -58,3 +60,4 @@ export default function MobileBottomNav() {
     </div>
   );
 }
+

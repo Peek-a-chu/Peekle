@@ -312,16 +312,41 @@ public class CsWrongProblemService {
                 question.getId(),
                 question.getQuestionType(),
                 question.getPrompt(),
+                resolveQuestionAnswerText(question),
                 domain.getId(),
                 domain.getName(),
                 (int) track.getTrackNo(),
                 stage.getId(),
                 (int) stage.getStageNo(),
                 wrongProblem.getStatus(),
-                safeInt(wrongProblem.getWrongCount()),
-                safeInt(wrongProblem.getReviewCorrectCount()),
                 wrongProblem.getLastWrongAt(),
                 wrongProblem.getClearedAt());
+    }
+
+    private String resolveQuestionAnswerText(CsQuestion question) {
+        if (question.getQuestionType() == CsQuestionType.MULTIPLE_CHOICE
+                || question.getQuestionType() == CsQuestionType.OX) {
+            return csQuestionChoiceRepository.findByQuestion_IdOrderByChoiceNoAsc(question.getId())
+                    .stream()
+                    .filter(choice -> Boolean.TRUE.equals(choice.getIsAnswer()))
+                    .findFirst()
+                    .map(choice -> choice.getChoiceNo() + ". " + choice.getContent())
+                    .orElse(null);
+        }
+
+        if (question.getQuestionType() == CsQuestionType.SHORT_ANSWER) {
+            return csQuestionShortAnswerRepository.findByQuestion_IdOrderByIsPrimaryDescIdAsc(question.getId())
+                    .stream()
+                    .sorted(Comparator
+                            .comparing((CsQuestionShortAnswer answer) -> !Boolean.TRUE.equals(answer.getIsPrimary()))
+                            .thenComparing(CsQuestionShortAnswer::getId))
+                    .map(this::resolveDisplayAnswerText)
+                    .filter(answer -> answer != null && !answer.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        return null;
     }
 
     private GradingResult gradeAnswer(CsQuestion question, Integer selectedChoiceNo, String answerText) {

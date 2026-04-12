@@ -9,14 +9,13 @@ public record CsWrongProblemItemResponse(
         Long questionId,
         CsQuestionType questionType,
         String prompt,
+        String correctAnswer,
         Integer domainId,
         String domainName,
         Integer trackNo,
         Long stageId,
         Integer stageNo,
         CsWrongProblemStatus status,
-        Integer wrongCount,
-        Integer reviewCorrectCount,
         LocalDateTime lastWrongAt,
         LocalDateTime clearedAt) {
 }

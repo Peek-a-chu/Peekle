@@ -110,7 +110,17 @@ export type CSWrongProblemStatus = 'ACTIVE' | 'CLEARED';
 
 export interface CSWrongProblemItem {
   questionId: number;
+  questionType: CSQuestionType;
+  prompt: string;
+  correctAnswer?: string;
+  domainId: number;
+  domainName: string;
+  trackNo: number;
+  stageId: number;
+  stageNo: number;
+  status: CSWrongProblemStatus;
   lastWrongAt: string;
+  clearedAt?: string;
 }
 
 export interface CSWrongProblemsResponse {
@@ -118,6 +128,42 @@ export interface CSWrongProblemsResponse {
   page: number;
   size: number;
   totalElements: number;
+}
+
+export interface CSWrongReviewStartRequest {
+  domainId?: number;
+  stageId?: number;
+  questionCount?: number;
+}
+
+export interface CSWrongReviewStartResponse {
+  reviewId: string | null;
+  totalQuestionCount: number;
+  firstQuestion: CSQuestionPayload | null;
+}
+
+export interface CSWrongReviewAnswerResponse {
+  reviewId: string;
+  questionId: number;
+  questionType: CSQuestionType;
+  progress: CSAttemptProgress;
+  isCorrect: boolean;
+  feedback: string;
+  correctChoiceNo?: number;
+  correctAnswer?: string;
+  isLast: boolean;
+  nextQuestion?: CSQuestionPayload;
+}
+
+export interface CSWrongReviewCompleteResponse {
+  reviewId: string;
+  totalQuestionCount: number;
+  correctRate: number;
+  correctCount: number;
+  wrongCount: number;
+  messageCode: string;
+  clearedCount: number;
+  remainedActiveCount: number;
 }
 
 function assertApiData<T>(response: ApiResponse<T>, defaultMessage: string): T {
@@ -241,4 +287,49 @@ export const fetchCSWrongProblems = async (
 
   const response = await apiFetch<CSWrongProblemsResponse>(`/api/cs/wrong-problems?${query.toString()}`);
   return assertApiData(response, '오답노트를 불러오지 못했습니다.');
+};
+
+/**
+ * 오답 복습 세션 시작
+ */
+export const startCSWrongReview = async (
+  payload: CSWrongReviewStartRequest,
+): Promise<CSWrongReviewStartResponse> => {
+  const response = await apiFetch<CSWrongReviewStartResponse>('/api/cs/wrong-problems/review/start', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return assertApiData(response, '오답 복습 세션을 시작하지 못했습니다.');
+};
+
+/**
+ * 오답 복습 문제 제출/채점
+ */
+export const answerCSWrongReviewQuestion = async (
+  reviewId: string,
+  payload: CSAttemptAnswerRequest,
+): Promise<CSWrongReviewAnswerResponse> => {
+  const response = await apiFetch<CSWrongReviewAnswerResponse>(
+    `/api/cs/wrong-problems/review/${reviewId}/answer`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+  return assertApiData(response, '오답 복습 문제 채점에 실패했습니다.');
+};
+
+/**
+ * 오답 복습 완료/결과 조회
+ */
+export const completeCSWrongReview = async (
+  reviewId: string,
+): Promise<CSWrongReviewCompleteResponse> => {
+  const response = await apiFetch<CSWrongReviewCompleteResponse>(
+    `/api/cs/wrong-problems/review/${reviewId}/complete`,
+    {
+      method: 'POST',
+    },
+  );
+  return assertApiData(response, '오답 복습 결과 조회에 실패했습니다.');
 };

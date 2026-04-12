@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, BookX } from 'lucide-react';
 import { fetchCSBootstrap, CSBootstrapResponse } from '@/domains/cs/api/csApi';
 import DomainSelection from '@/domains/cs/components/DomainSelection';
 import LearningMap from '@/domains/cs/components/LearningMap';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 export default function CSPage() {
   const [bootstrapData, setBootstrapData] = useState<CSBootstrapResponse | null>(null);
@@ -48,7 +49,19 @@ export default function CSPage() {
   return (
     <div className="flex flex-col animate-in fade-in duration-500">
       <div className="bg-card rounded-2xl p-8 shadow-sm">
-        <h1 className="text-2xl font-bold mb-2">CS 학습</h1>
+        {/* ── 헤더 영역 ── */}
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h1 className="text-2xl font-bold">CS 학습</h1>
+          <Link
+            href="/cs/wrong-notes"
+            id="cs-wrong-notes-btn"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors group shrink-0"
+          >
+            <BookX className="w-4 h-4 group-hover:text-primary transition-colors" />
+            오답노트
+          </Link>
+        </div>
+
         <p className="text-muted-foreground mb-6">
           선택한 도메인: <span className="font-semibold text-primary">{bootstrapData?.currentDomain?.name}</span>
         </p>
