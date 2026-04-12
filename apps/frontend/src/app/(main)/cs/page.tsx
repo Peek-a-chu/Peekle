@@ -1,21 +1,33 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, BookX } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { fetchCSBootstrap, CSBootstrapResponse } from '@/domains/cs/api/csApi';
 import DomainSelection from '@/domains/cs/components/DomainSelection';
 import LearningMap from '@/domains/cs/components/LearningMap';
+import CSTopBar from '@/domains/cs/components/CSTopBar';
 import { toast } from 'sonner';
-import Link from 'next/link';
 
 export default function CSPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [bootstrapData, setBootstrapData] = useState<CSBootstrapResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const forceSelection = searchParams.get('mode') === 'add';
+
+  const setAddMode = (isAddMode: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (isAddMode) params.set('mode', 'add');
+    else params.delete('mode');
+    const query = params.toString();
+    router.replace(query ? `/cs?${query}` : '/cs', { scroll: false });
+  };
 
   const loadBootstrap = async () => {
     try {
       setLoading(true);
-      console.log('[DEBUG] Fetching CS Bootstrap data...');
+      console.log('[DEBUG] CSPage: fetchCSBootstrap 호출');
       const data = await fetchCSBootstrap();
       setBootstrapData(data);
     } catch (error) {
@@ -39,34 +51,54 @@ export default function CSPage() {
     );
   }
 
-  // API spec #141 says needsDomainSelection, or currentDomain will be null.
-  const needsSelection = bootstrapData?.needsDomainSelection ?? !bootstrapData?.currentDomain;
+  // API spec #141: needsDomainSelection이 true거나 currentDomain이 없으면 선택 화면
+  const needsSelection = forceSelection || (bootstrapData?.needsDomainSelection ?? !bootstrapData?.currentDomain);
 
   if (needsSelection) {
-    return <DomainSelection onSuccess={loadBootstrap} />;
+    return (
+      <DomainSelection
+        isAddMode={forceSelection}
+        onCancel={() => {
+          console.log('[DEBUG] CSPage: 도메인 추가 취소 → 맵 화면 복귀');
+          setAddMode(false);
+        }}
+        onSuccess={() => {
+          console.log('[DEBUG] CSPage: DomainSelection 완료 → bootstrap 재로드');
+          setAddMode(false);
+          loadBootstrap();
+        }}
+      />
+    );
   }
 
   return (
     <div className="flex flex-col animate-in fade-in duration-500">
+      {bootstrapData?.currentDomain && (
+        <CSTopBar
+          currentDomain={bootstrapData.currentDomain}
+          onDomainChanged={() => {
+            console.log('[DEBUG] CSPage: 도메인 변경 완료 → bootstrap 재로드');
+            loadBootstrap();
+          }}
+          onRequestAddDomain={() => {
+            console.log('[DEBUG] CSPage: 도메인 추가 요청 → DomainSelection 표시');
+            setAddMode(true);
+          }}
+          onRequestWrongNote={() => {
+            console.log('[DEBUG] CSPage: 오답 보기 요청 → 오답노트 페이지 이동');
+            router.push('/cs/wrong-problems');
+          }}
+        />
+      )}
+
       <div className="bg-card rounded-2xl p-8 shadow-sm">
-        {/* ── 헤더 영역 ── */}
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <h1 className="text-2xl font-bold">CS 학습</h1>
-          <Link
-            href="/cs/wrong-notes"
-            id="cs-wrong-notes-btn"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors group shrink-0"
-          >
-            <BookX className="w-4 h-4 group-hover:text-primary transition-colors" />
-            오답노트
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold mb-2">CS 학습</h1>
 
         <p className="text-muted-foreground mb-6">
           선택한 도메인: <span className="font-semibold text-primary">{bootstrapData?.currentDomain?.name}</span>
         </p>
         {bootstrapData?.progress ? (
-          <div className="mt-4 pt-4 w-full flex flex-col items-center">
+          <div className="w-full flex flex-col items-center">
             <LearningMap progress={bootstrapData.progress} stages={bootstrapData.stages ?? []} />
           </div>
         ) : (

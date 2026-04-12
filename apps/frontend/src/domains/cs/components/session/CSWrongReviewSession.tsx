@@ -175,7 +175,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
   };
 
   const handleExitConfirm = () => {
-    router.replace('/cs/wrong-notes');
+    router.replace('/cs/wrong-problems');
   };
 
   if (phase === 'error') {
@@ -183,7 +183,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="w-12 h-12 text-destructive" />
         <h2 className="text-xl font-bold">오류가 발생했습니다</h2>
-        <Button onClick={() => router.replace('/cs/wrong-notes')} variant="outline">
+        <Button onClick={() => router.replace('/cs/wrong-problems')} variant="outline">
           돌아가기
         </Button>
       </div>
@@ -204,7 +204,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="w-12 h-12 text-muted-foreground/50" />
         <h2 className="text-xl font-bold">복습할 오답이 없습니다</h2>
-        <Button onClick={() => router.replace('/cs/wrong-notes')} variant="outline">
+        <Button onClick={() => router.replace('/cs/wrong-problems')} variant="outline">
           오답노트로 이동
         </Button>
       </div>
@@ -242,13 +242,13 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
             </div>
 
             <div className="flex flex-col w-full gap-3">
-              <Button className="w-full h-14 text-lg font-bold rounded-2xl" onClick={() => router.replace('/cs/wrong-notes')}>
+              <Button className="w-full h-14 text-lg font-bold rounded-2xl" onClick={() => router.replace('/cs/wrong-problems')}>
                 오답노트로 돌아가기
               </Button>
               <Button
                 variant="outline"
                 className="w-full h-14 text-lg font-bold rounded-2xl"
-                onClick={() => router.replace(`/cs/wrong-notes/review?domainId=${domainId ?? ''}`)}
+                onClick={() => router.replace(`/cs/wrong-problems/review?domainId=${domainId ?? ''}`)}
               >
                 다시 복습하기
               </Button>

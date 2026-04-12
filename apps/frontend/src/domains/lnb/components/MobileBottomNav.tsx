@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { NAV_ITEMS } from './Sidebar';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ const MOBILE_ITEMS = NAV_ITEMS.filter((item) =>
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const openModal = useSettingsStore((state) => state.openModal);
 
   const isItemActive = (href: string) => {
@@ -20,9 +21,12 @@ export default function MobileBottomNav() {
     return pathname.startsWith(href);
   };
 
+  const isCsAddMode = pathname === '/cs' && searchParams.get('mode') === 'add';
   const isHiddenRoute =
     pathname.startsWith('/cs/stage/') ||
-    pathname.startsWith('/cs/wrong-notes/review');
+    isCsAddMode ||
+    pathname.startsWith('/cs/wrong-notes/review') ||
+    pathname.startsWith('/cs/wrong-problems/review');
 
   if (isHiddenRoute) {
     return null;

@@ -159,7 +159,7 @@ export default function CSWrongNoteList() {
       toast.error('먼저 도메인을 선택해주세요.');
       return;
     }
-    router.push(`/cs/wrong-notes/review?domainId=${selectedDomainId}`);
+    router.push(`/cs/wrong-problems/review?domainId=${selectedDomainId}`);
   };
 
   if (!isLoadingDomains && myDomains.length === 0) {
