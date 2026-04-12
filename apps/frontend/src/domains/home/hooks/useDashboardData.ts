@@ -150,13 +150,77 @@ export const useTimeline = (
   return { data, isLoading };
 };
 
+type RecommendationProblemDto = {
+  id: string;
+  title: string;
+  tierType: string;
+  tierLevel: number;
+  tags: string[];
+  reason: string;
+  solved: boolean;
+};
+
+type RecommendationPayloadDto = {
+  recommendations?: RecommendationProblemDto[];
+  refreshType?: string;
+  notice?: string | null;
+  manualRefreshRemaining?: number | null;
+};
+
+export type AIRecommendationMeta = {
+  refreshType: string | null;
+  notice: string | null;
+  manualRefreshRemaining: number | null;
+};
+
+const mapRecommendationProblem = (item: any): AIRecommendationData => ({
+  problemId: `#${item.id}`,
+  title: item.title,
+  tier: item.tierType ? item.tierType.toLowerCase() : 'bronze',
+  tierLevel: item.tierLevel || 1,
+  tags: item.tags || [],
+  reason: item.reason || 'AI 추천 문제',
+  solved: !!item.solved,
+});
+
+const normalizeRecommendationPayload = (
+  raw: any,
+): { recommendations: RecommendationProblemDto[]; meta: AIRecommendationMeta } => {
+  if (Array.isArray(raw)) {
+    return {
+      recommendations: raw,
+      meta: {
+        refreshType: null,
+        notice: null,
+        manualRefreshRemaining: null,
+      },
+    };
+  }
+
+  const payload: RecommendationPayloadDto = raw || {};
+  return {
+    recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : [],
+    meta: {
+      refreshType: payload.refreshType ?? null,
+      notice: payload.notice ?? null,
+      manualRefreshRemaining:
+        typeof payload.manualRefreshRemaining === 'number' ? payload.manualRefreshRemaining : null,
+    },
+  };
+};
+
 // AI 추천 문제 데이터 (토큰 인증 & 데이터 매핑 적용)
 export const useAIRecommendations = (options?: {
   skip?: boolean;
   refreshKey?: number;
-}): { data: AIRecommendationData[]; isLoading: boolean } => {
+}): { data: AIRecommendationData[]; isLoading: boolean; meta: AIRecommendationMeta } => {
   const [data, setData] = useState<AIRecommendationData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [meta, setMeta] = useState<AIRecommendationMeta>({
+    refreshType: null,
+    notice: null,
+    manualRefreshRemaining: null,
+  });
 
   useEffect(() => {
     if (options?.skip) {
@@ -169,29 +233,33 @@ export const useAIRecommendations = (options?: {
         setIsLoading(true);
 
         // apiFetch를 사용하면 Authorization 헤더가 자동으로 붙습니다.
-        const response = await apiFetch<any[]>('/api/recommendations/daily');
+        const response = await apiFetch<any>('/api/recommendations/daily');
 
         if (response.success && response.data) {
-          const list = response.data;
-
-          const mappedData: AIRecommendationData[] = list.map((item: any) => ({
-            problemId: `#${item.id}`,
-            title: item.title,
-            tier: item.tierType ? item.tierType.toLowerCase() : 'bronze',
-            tierLevel: item.tierLevel || 1,
-            tags: item.tags || [],
-            reason: item.reason || 'AI 추천 문제',
-            solved: !!item.solved,
-          }));
+          const normalized = normalizeRecommendationPayload(response.data);
+          const mappedData: AIRecommendationData[] = normalized.recommendations.map(
+            mapRecommendationProblem,
+          );
 
           setData(mappedData);
+          setMeta(normalized.meta);
         } else {
           console.warn('AI Recommendation API failed:', response.error);
           setData([]);
+          setMeta({
+            refreshType: null,
+            notice: response.error?.message || null,
+            manualRefreshRemaining: null,
+          });
         }
       } catch (e) {
         console.error('Failed to fetch AI recommendations:', e);
         setData([]);
+        setMeta({
+          refreshType: null,
+          notice: 'AI 추천을 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
+          manualRefreshRemaining: null,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -200,7 +268,7 @@ export const useAIRecommendations = (options?: {
     fetchData();
   }, [options?.skip, options?.refreshKey]);
 
-  return { data, isLoading };
+  return { data, isLoading, meta };
 };
 
 // 주간 점수 데이터

@@ -4,11 +4,13 @@ import com.peekle.domain.ai.dto.request.TagStatDto;
 import com.peekle.domain.ai.dto.request.UserActivityRequest;
 import com.peekle.domain.ai.dto.request.CandidateProblemDto;
 import com.peekle.domain.ai.dto.response.AiApiResponse;
+import com.peekle.domain.ai.dto.response.DailyRecommendationResponse;
 import com.peekle.domain.ai.dto.response.RecommendationResponse;
 import com.peekle.domain.ai.dto.response.RecommendationResponse.RecommendedProblem;
 import com.peekle.domain.ai.entity.RecommendFeedback;
 import com.peekle.domain.ai.entity.RecommendProblem;
 import com.peekle.domain.ai.enums.RecommendationFeedbackType;
+import com.peekle.domain.ai.enums.RecommendationRefreshType;
 import com.peekle.domain.ai.repository.RecommendFeedbackRepository;
 import com.peekle.domain.ai.repository.RecommendProblemRepository;
 import com.peekle.domain.problem.entity.Problem;
@@ -30,6 +32,7 @@ import com.peekle.global.util.SolvedAcLevelUtil;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -64,7 +67,7 @@ public class RecommendationService {
     private static final int RELAXED_COOLDOWN_DAYS = 1;
     private static final int SOLVED_ALL_DELTA_X10 = 5;
     private static final int SOLVED_TWO_DELTA_X10 = 3;
-    private static final int SOLVED_ZERO_OR_ONE_DELTA_X10 = -2;
+    private static final int SOLVED_NONE_DELTA_X10 = -1;
     private static final int FEEDBACK_TOO_EASY_DELTA_X10 = 3;
     private static final int FEEDBACK_TOO_HARD_DELTA_X10 = -3;
     private static final double DIFFICULTY_WEIGHT = 35.0;
@@ -79,6 +82,8 @@ public class RecommendationService {
     private static final double POPULARITY_NORMALIZER = Math.log1p(1_000_000);
     private static final int MAX_LOW_FREQ_CENTERED_IN_SET = 1;
     private static final int MIN_POSITIVE_PRACTICALITY_COUNT = 2;
+    private static final int MANUAL_REFRESH_DAILY_LIMIT = 2;
+    private static final int DAILY_RESET_HOUR = 6;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private enum PracticalTagCategory {
@@ -158,43 +163,234 @@ public class RecommendationService {
 
     @Transactional
     public List<RecommendedProblem> getOrGenerateRecommendations(Long userId) {
-        log.info("추천 로직 시작 - userId: {}", userId);
-        LocalDate today = LocalDate.now(KST);
+        return getDailyRecommendations(userId).recommendations();
+    }
+
+    @Transactional
+    public DailyRecommendationResponse getDailyRecommendations(Long userId) {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        applyPendingFeedbackIfNeeded(user, today);
+        List<RecommendProblem> currentRows = loadCurrentRecommendationRows(userId);
+        int manualRefreshRemaining = getManualRefreshRemaining(user);
+
+        if (hasCompleteRecommendationSet(currentRows) && !areAllRecommendationsSolved(currentRows)) {
+            log.info("추천 재사용 - userId={} refreshType=REUSED solvedCount={}", userId, countSolved(currentRows));
+            return buildResponseFromRows(
+                    currentRows,
+                    RecommendationRefreshType.REUSED,
+                    null,
+                    manualRefreshRemaining
+            );
+        }
+
+        RecommendationRefreshTrigger trigger = areAllRecommendationsSolved(currentRows)
+                ? RecommendationRefreshTrigger.AUTO
+                : RecommendationRefreshTrigger.INITIAL;
+        return refreshAndBuildResponse(user, currentRows, trigger, manualRefreshRemaining);
+    }
+
+    @Transactional
+    public DailyRecommendationResponse refreshRecommendationsManually(Long userId) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        List<RecommendProblem> currentRows = loadCurrentRecommendationRows(userId);
+
+        LocalDate policyDate = currentManualRefreshPolicyDate();
+        int usedCount = resolveManualRefreshUsedCount(user, policyDate);
+        if (usedCount >= MANUAL_REFRESH_DAILY_LIMIT) {
+            log.info("추천 수동 새로고침 한도 초과 - userId={} policyDate={} usedCount={}", userId, policyDate, usedCount);
+            return buildResponseFromRows(
+                    currentRows,
+                    RecommendationRefreshType.MANUAL_LIMIT_EXCEEDED,
+                    "수동 새로고침은 오전 6시 기준 하루 최대 2회까지 가능합니다.",
+                    0
+            );
+        }
+
+        int nextUsedCount = usedCount + 1;
+        user.updateManualRecRefresh(policyDate, nextUsedCount);
+        int manualRefreshRemaining = Math.max(0, MANUAL_REFRESH_DAILY_LIMIT - nextUsedCount);
+
+        log.info("추천 수동 새로고침 시작 - userId={} policyDate={} usedCount={} remaining={}", userId, policyDate, nextUsedCount, manualRefreshRemaining);
+        return refreshAndBuildResponse(user, currentRows, RecommendationRefreshTrigger.MANUAL, manualRefreshRemaining);
+    }
+
+    private DailyRecommendationResponse refreshAndBuildResponse(
+            User user,
+            List<RecommendProblem> currentRows,
+            RecommendationRefreshTrigger trigger,
+            int manualRefreshRemaining
+    ) {
+        Long userId = user.getId();
+        LocalDate today = LocalDate.now(KST);
 
         try {
-            List<RecommendedProblem> todayFromDb = loadTodayRecommendations(user, today);
-            if (!todayFromDb.isEmpty()) {
-                return todayFromDb;
-            }
-
             UserActivityRequest userActivity = fetchUserActivity(userId);
-            // DB에 오늘 추천이 부족하면 AI 서버 호출
-            RecommendationResponse response = callAiServer(user, today, userActivity);
-
-            if (response == null || response.recommendations().isEmpty()) {
-                log.warn("AI 서버에서 추천 결과를 받지 못했습니다. user: {}", userId);
-                return List.of();
+            RecommendationResponse response = callAiServer(userActivity);
+            if (response == null || response.recommendations() == null || response.recommendations().isEmpty()) {
+                log.warn("추천 갱신 실패(빈 응답) - userId={} trigger={}", userId, trigger);
+                return buildResponseFromRows(
+                        currentRows,
+                        failureTypeFor(trigger),
+                        failureNoticeFor(trigger, currentRows),
+                        manualRefreshRemaining
+                );
             }
 
-            if (response.recommendations().isEmpty()) {
-                log.warn("시도한 문제 제외 후 남은 추천이 없습니다. user: {}", userId);
-                return List.of();
+            boolean saved = saveCurrentRecommendations(user, response.recommendations(), today);
+            if (!saved) {
+                log.warn("추천 갱신 실패(저장 불가) - userId={} trigger={}", userId, trigger);
+                return buildResponseFromRows(
+                        currentRows,
+                        failureTypeFor(trigger),
+                        failureNoticeFor(trigger, currentRows),
+                        manualRefreshRemaining
+                );
+            }
+            if (trigger != RecommendationRefreshTrigger.MANUAL) {
+                applyPendingFeedbackIfNeeded(user, currentRows);
+            } else {
+                log.info("수동 새로고침은 추천 난이도 보정을 적용하지 않습니다. userId={}", userId);
+            }
+            List<RecommendProblem> refreshedRows = loadCurrentRecommendationRows(userId);
+            if (refreshedRows.isEmpty()) {
+                log.warn("추천 갱신 실패(저장 후 비어 있음) - userId={} trigger={}", userId, trigger);
+                return buildResponseFromRows(
+                        currentRows,
+                        failureTypeFor(trigger),
+                        failureNoticeFor(trigger, currentRows),
+                        manualRefreshRemaining
+                );
             }
 
-            saveTodayRecommendations(user, response.recommendations(), today);
-            return loadTodayRecommendations(user, today);
-
+            log.info(
+                    "추천 갱신 성공 - userId={} trigger={} recommendationCount={} solvedCount(before)={}",
+                    userId,
+                    trigger,
+                    refreshedRows.size(),
+                    countSolved(currentRows)
+            );
+            return buildResponseFromRows(
+                    refreshedRows,
+                    successTypeFor(trigger),
+                    successNoticeFor(trigger),
+                    manualRefreshRemaining
+            );
         } catch (Exception e) {
-            log.error("추천 로직 수행 중 오류 발생: {}", e.getMessage());
-            return List.of();
+            log.error("추천 갱신 실패(예외) - userId={} trigger={} reason={}", userId, trigger, e.getMessage(), e);
+            return buildResponseFromRows(
+                    currentRows,
+                    failureTypeFor(trigger),
+                    failureNoticeFor(trigger, currentRows),
+                    manualRefreshRemaining
+            );
         }
     }
 
-    private RecommendationResponse callAiServer(User user, LocalDate today, UserActivityRequest request) {
+    private DailyRecommendationResponse buildResponseFromRows(
+            List<RecommendProblem> rows,
+            RecommendationRefreshType refreshType,
+            String notice,
+            int manualRefreshRemaining
+    ) {
+        List<RecommendedProblem> recommendations = rows.stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .map(this::mapFromRecommendProblem)
+                .toList();
+        return new DailyRecommendationResponse(
+                recommendations,
+                refreshType,
+                notice,
+                manualRefreshRemaining
+        );
+    }
+
+    private RecommendationRefreshType successTypeFor(RecommendationRefreshTrigger trigger) {
+        return switch (trigger) {
+            case INITIAL -> RecommendationRefreshType.INITIAL_REFRESHED;
+            case AUTO -> RecommendationRefreshType.AUTO_REFRESHED;
+            case MANUAL -> RecommendationRefreshType.MANUAL_REFRESHED;
+        };
+    }
+
+    private RecommendationRefreshType failureTypeFor(RecommendationRefreshTrigger trigger) {
+        return switch (trigger) {
+            case INITIAL -> RecommendationRefreshType.INITIAL_REFRESH_FAILED;
+            case AUTO -> RecommendationRefreshType.AUTO_REFRESH_FAILED;
+            case MANUAL -> RecommendationRefreshType.MANUAL_REFRESH_FAILED;
+        };
+    }
+
+    private String successNoticeFor(RecommendationRefreshTrigger trigger) {
+        if (trigger == RecommendationRefreshTrigger.MANUAL) {
+            return "추천 문제를 새로고침했어요.";
+        }
+        return null;
+    }
+
+    private String failureNoticeFor(RecommendationRefreshTrigger trigger, List<RecommendProblem> currentRows) {
+        if (trigger == RecommendationRefreshTrigger.MANUAL || trigger == RecommendationRefreshTrigger.AUTO) {
+            if (!currentRows.isEmpty()) {
+                return "AI 재추천에 실패해 기존 추천 목록을 유지했어요.";
+            }
+        }
+        if (currentRows.isEmpty()) {
+            return "AI 추천 생성에 실패했어요. 잠시 후 다시 시도해주세요.";
+        }
+        return "AI 재추천에 실패해 기존 추천 목록을 유지했어요.";
+    }
+
+    private List<RecommendProblem> loadCurrentRecommendationRows(Long userId) {
+        return recommendProblemRepository.findAllByUserIdOrderByOrderIndexAsc(userId).stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .toList();
+    }
+
+    private boolean hasCompleteRecommendationSet(List<RecommendProblem> rows) {
+        return rows.size() >= TARGET_RECOMMENDATION_COUNT;
+    }
+
+    private boolean areAllRecommendationsSolved(List<RecommendProblem> rows) {
+        if (!hasCompleteRecommendationSet(rows)) {
+            return false;
+        }
+        return rows.stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .allMatch(row -> Boolean.TRUE.equals(row.getSolved()));
+    }
+
+    private long countSolved(List<RecommendProblem> rows) {
+        return rows.stream()
+                .limit(TARGET_RECOMMENDATION_COUNT)
+                .filter(row -> Boolean.TRUE.equals(row.getSolved()))
+                .count();
+    }
+
+    private int getManualRefreshRemaining(User user) {
+        LocalDate policyDate = currentManualRefreshPolicyDate();
+        int usedCount = resolveManualRefreshUsedCount(user, policyDate);
+        return Math.max(0, MANUAL_REFRESH_DAILY_LIMIT - usedCount);
+    }
+
+    private int resolveManualRefreshUsedCount(User user, LocalDate policyDate) {
+        if (user.getManualRecRefreshDate() == null || !policyDate.equals(user.getManualRecRefreshDate())) {
+            return 0;
+        }
+        Integer count = user.getManualRecRefreshCount();
+        return count == null ? 0 : Math.max(0, count);
+    }
+
+    private LocalDate currentManualRefreshPolicyDate() {
+        ZonedDateTime now = ZonedDateTime.now(KST);
+        LocalDate policyDate = now.toLocalDate();
+        if (now.getHour() < DAILY_RESET_HOUR) {
+            return policyDate.minusDays(1);
+        }
+        return policyDate;
+    }
+
+    private RecommendationResponse callAiServer(UserActivityRequest request) {
         List<CandidateProblemDto> candidates = request.candidateProblems() == null
                 ? List.of()
                 : request.candidateProblems();
@@ -218,7 +414,8 @@ public class RecommendationService {
                 aiRecommendations = aiResponse.recommendations();
             }
         } catch (Exception e) {
-            log.warn("AI 서버 응답 실패. score 기반 폴백으로 전환합니다. reason={}", e.getMessage());
+            log.warn("AI 서버 응답 실패로 추천 갱신을 중단합니다. reason={}", e.getMessage());
+            return new RecommendationResponse(List.of());
         }
 
         List<CandidateProblemDto> rankedCandidates = candidates.stream()
@@ -324,21 +521,30 @@ public class RecommendationService {
         return new RecommendationResponse(mapped);
     }
 
-    private void applyPendingFeedbackIfNeeded(User user, LocalDate today) {
+    private enum RecommendationRefreshTrigger {
+        INITIAL,
+        AUTO,
+        MANUAL
+    }
+
+    private void applyPendingFeedbackIfNeeded(User user, List<RecommendProblem> currentRows) {
         Long userId = user.getId();
-        LocalDate latestRecommendationDate = user.getLastRecommendedDate();
-        if (latestRecommendationDate == null || !latestRecommendationDate.isBefore(today)) {
+        if (currentRows == null || currentRows.isEmpty()) {
             return;
         }
 
-        long solvedCount = recommendProblemRepository.countByUserIdAndSolvedTrue(userId);
+        long solvedCount = currentRows.stream()
+                .filter(row -> Boolean.TRUE.equals(row.getSolved()))
+                .count();
         int solveDeltaX10;
         if (solvedCount >= 3) {
             solveDeltaX10 = SOLVED_ALL_DELTA_X10;
         } else if (solvedCount == 2) {
             solveDeltaX10 = SOLVED_TWO_DELTA_X10;
+        } else if (solvedCount == 0) {
+            solveDeltaX10 = SOLVED_NONE_DELTA_X10;
         } else {
-            solveDeltaX10 = SOLVED_ZERO_OR_ONE_DELTA_X10;
+            solveDeltaX10 = 0;
         }
 
         List<RecommendFeedback> feedbacks = recommendFeedbackRepository.findAllByUserId(userId);
@@ -352,8 +558,8 @@ public class RecommendationService {
             int nextLevel = sanitizeRecLevelX10(user.getRecLevelX10() + totalDeltaX10);
             user.updateRecLevelX10(nextLevel);
             log.info(
-                    "추천 난이도 보정 적용 userId={} date={} solvedCount={} solveDeltaX10={} feedbackDeltaX10={} totalDeltaX10={} nextRecLevelX10={}",
-                    userId, latestRecommendationDate, solvedCount, solveDeltaX10, feedbackDeltaX10, totalDeltaX10, nextLevel
+                    "추천 난이도 보정 적용 userId={} solvedCount={} solveDeltaX10={} feedbackDeltaX10={} totalDeltaX10={} nextRecLevelX10={}",
+                    userId, solvedCount, solveDeltaX10, feedbackDeltaX10, totalDeltaX10, nextLevel
             );
         }
 
@@ -543,23 +749,7 @@ public class RecommendationService {
         };
     }
 
-    private List<RecommendedProblem> loadTodayRecommendations(User user, LocalDate today) {
-        if (!today.equals(user.getLastRecommendedDate())) {
-            return List.of();
-        }
-
-        List<RecommendProblem> todayRows = recommendProblemRepository.findAllByUserIdOrderByOrderIndexAsc(user.getId());
-        if (todayRows.isEmpty()) {
-            return List.of();
-        }
-
-        List<RecommendedProblem> mapped = todayRows.stream()
-                .map(this::mapFromRecommendProblem)
-                .toList();
-        return mapped;
-    }
-
-    private void saveTodayRecommendations(User user, List<RecommendedProblem> recommendations, LocalDate today) {
+    private boolean saveCurrentRecommendations(User user, List<RecommendedProblem> recommendations, LocalDate today) {
         Long userId = user.getId();
         List<RecommendedProblem> limitedRecommendations = recommendations.stream()
                 .limit(TARGET_RECOMMENDATION_COUNT)
@@ -601,6 +791,11 @@ public class RecommendationService {
             usedOrders.add(index);
         }
 
+        if (upsertRows.isEmpty()) {
+            log.warn("저장 가능한 추천 문제가 없어 기존 목록을 유지합니다. userId={} requestedCount={}", userId, limitedRecommendations.size());
+            return false;
+        }
+
         List<RecommendProblem> toDelete = existingRows.stream()
                 .filter(row -> row.getOrderIndex() == null || !usedOrders.contains(row.getOrderIndex()))
                 .toList();
@@ -612,6 +807,8 @@ public class RecommendationService {
             user.updateLastRecommendedDate(today);
             recommendProblemRepository.saveAll(upsertRows);
         }
+
+        return true;
     }
 
     private RecommendedProblem mapFromRecommendProblem(RecommendProblem recommendProblem) {

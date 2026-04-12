@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Sparkles, ExternalLink, Plus, Loader2, MessageCircle, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Sparkles, ExternalLink, Plus, Loader2, MessageCircle, ThumbsUp, ThumbsDown, Check, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAIRecommendations } from '../hooks/useDashboardData';
 import { BOJ_TIER_NAMES, BOJ_TIER_COLORS } from '../mocks/dashboardMocks';
@@ -28,19 +28,114 @@ interface AIRecommendationProps {
   initialData?: AIRecommendationData[];
 }
 
+type RecommendationRefreshPayload = {
+  recommendations?: Array<{
+    id: string;
+    title: string;
+    tierType: string;
+    tierLevel: number;
+    tags: string[];
+    reason: string;
+    solved: boolean;
+  }>;
+  refreshType?: string;
+  notice?: string | null;
+  manualRefreshRemaining?: number | null;
+};
+
+const mapRecommendationItem = (item: any): AIRecommendationData => ({
+  problemId: `#${item.id}`,
+  title: item.title,
+  tier: item.tierType ? item.tierType.toLowerCase() : 'bronze',
+  tierLevel: item.tierLevel || 1,
+  tags: item.tags || [],
+  reason: item.reason || 'AI 추천 문제',
+  solved: !!item.solved,
+});
+
+const parseRefreshPayload = (raw: any) => {
+  if (Array.isArray(raw)) {
+    return {
+      recommendations: raw,
+      refreshType: null as string | null,
+      notice: null as string | null,
+      manualRefreshRemaining: null as number | null,
+    };
+  }
+
+  const payload: RecommendationRefreshPayload = raw || {};
+  return {
+    recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : [],
+    refreshType: payload.refreshType ?? null,
+    notice: payload.notice ?? null,
+    manualRefreshRemaining:
+      typeof payload.manualRefreshRemaining === 'number' ? payload.manualRefreshRemaining : null,
+  };
+};
+
+const isFailureRefreshType = (refreshType: string | null) =>
+  refreshType === 'AUTO_REFRESH_FAILED' ||
+  refreshType === 'MANUAL_REFRESH_FAILED' ||
+  refreshType === 'INITIAL_REFRESH_FAILED' ||
+  refreshType === 'MANUAL_LIMIT_EXCEEDED';
+
 const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   const router = useRouter();
   const isMobile = useIsMobile();
   const hasInitialData = Array.isArray(initialData) && initialData.length > 0;
   const [refreshKey, setRefreshKey] = useState(0);
-  const { data: fetchedData, isLoading } = useAIRecommendations({
+  const { data: fetchedData, isLoading, meta } = useAIRecommendations({
     skip: hasInitialData,
     refreshKey,
   });
-  const data = hasInitialData ? initialData : fetchedData || [];
+  const [data, setData] = useState<AIRecommendationData[]>(hasInitialData ? initialData || [] : []);
+  const [manualRefreshRemaining, setManualRefreshRemaining] = useState<number | null>(null);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const latestNoticeKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!hasInitialData) {
+      return;
+    }
+    setData(initialData || []);
+  }, [hasInitialData, initialData]);
+
+  useEffect(() => {
+    if (hasInitialData) {
+      return;
+    }
+    setData(fetchedData || []);
+  }, [fetchedData, hasInitialData]);
+
+  useEffect(() => {
+    if (meta.manualRefreshRemaining === null) {
+      return;
+    }
+    setManualRefreshRemaining(meta.manualRefreshRemaining);
+  }, [meta.manualRefreshRemaining]);
+
+  useEffect(() => {
+    if (!meta.notice) {
+      return;
+    }
+
+    const noticeKey = `${meta.refreshType ?? 'UNKNOWN'}:${meta.notice}`;
+    if (latestNoticeKeyRef.current === noticeKey) {
+      return;
+    }
+    latestNoticeKeyRef.current = noticeKey;
+
+    if (isFailureRefreshType(meta.refreshType)) {
+      toast.error(meta.notice);
+      return;
+    }
+    if (meta.refreshType === 'MANUAL_REFRESHED') {
+      toast.success(meta.notice);
+    }
+  }, [meta.notice, meta.refreshType]);
 
   // 로딩 중이거나 초기 데이터가 없는 경우의 처리
-  const showLoading = !hasInitialData && isLoading;
+  const showLoading = !hasInitialData && isLoading && data.length === 0;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState<{ id: string; title: string } | null>(
@@ -98,6 +193,43 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   const handleRetry = () => {
     setCanRetry(false);
     setRefreshKey(Date.now());
+  };
+
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+
+    try {
+      const response = await apiFetch<any>('/api/recommendations/refresh', {
+        method: 'POST',
+      });
+
+      if (!response.success || !response.data) {
+        toast.error(response.error?.message || '추천 새로고침에 실패했습니다.');
+        return;
+      }
+
+      const payload = parseRefreshPayload(response.data);
+      setData(payload.recommendations.map(mapRecommendationItem));
+      if (payload.manualRefreshRemaining !== null) {
+        setManualRefreshRemaining(payload.manualRefreshRemaining);
+      }
+      if (payload.notice) {
+        if (isFailureRefreshType(payload.refreshType)) {
+          toast.error(payload.notice);
+        } else if (payload.refreshType === 'MANUAL_REFRESHED') {
+          toast.success(payload.notice);
+        }
+      }
+      if (payload.refreshType === 'MANUAL_REFRESHED') {
+        setCurrentFeedback(null);
+        setShowFeedbackOptions(false);
+      }
+    } catch (e) {
+      console.error('Failed to refresh recommendations manually:', e);
+      toast.error('추천 새로고침 중 오류가 발생했습니다.');
+    } finally {
+      setIsManualRefreshing(false);
+    }
   };
 
   const handleOpenModal = (id: string, title: string) => {
@@ -253,16 +385,38 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
   return (
     <div className="bg-card border border-border rounded-2xl p-6 h-full transition-colors duration-300">
       {/* 헤더 */}
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-primary" />
-        <div>
-          <h3 className="font-bold text-foreground">AI 추천 문제</h3>
-          <p className="text-xs text-muted-foreground">나에게 맞는 문제 추천</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary" />
+          <div>
+            <h3 className="font-bold text-foreground">AI 추천 문제</h3>
+            <p className="text-xs text-muted-foreground">나에게 맞는 문제 추천</p>
+          </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={handleManualRefresh}
+          disabled={showLoading || isManualRefreshing}
+        >
+          {isManualRefreshing ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <RotateCcw className="w-3 h-3" />
+          )}
+          새로고침
+          {manualRefreshRemaining !== null ? ` (${manualRefreshRemaining}/2)` : ''}
+        </Button>
       </div>
+      {manualRefreshRemaining !== null && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          수동 새로고침은 오전 6시 기준으로 하루 2회까지 가능해요.
+        </p>
+      )}
 
       {/* 추천 문제 목록 */}
-      <div className="space-y-4 h-full flex flex-col justify-center">
+      <div className="space-y-4 mt-4">
         {showLoading ? (
           <div className="flex flex-col items-center justify-center py-10 gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -400,7 +554,7 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           ) : currentFeedback && !showFeedbackOptions ? (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-muted-foreground">
@@ -431,7 +585,7 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
                 <MessageCircle className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">오늘 추천 난이도는 어땠나요?</span>
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {FEEDBACK_OPTIONS.map((option) => {
                   const Icon = option.icon;
                   const isSelected = currentFeedback === option.type;
@@ -441,7 +595,7 @@ const AIRecommendation = ({ initialData }: AIRecommendationProps) => {
                       variant="outline"
                       size="sm"
                       disabled={isFeedbackSubmitting}
-                      className={`flex-1 h-9 text-xs gap-1.5 transition-all ${
+                      className={`w-full h-9 text-xs gap-1.5 transition-all ${
                         isSelected ? `${option.bgColor} ${option.color} font-semibold` : 'border-border'
                       }`}
                       onClick={() => handleSubmitFeedback(option.type)}
