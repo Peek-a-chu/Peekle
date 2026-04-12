@@ -27,7 +27,7 @@ question_seed AS (
         (10107, 1, 7,  'SHORT_ANSWER', '동일한 입력과 출력을 사용하여 서로 다른 기능들이 모여 있는 경우의 응집도를 무엇이라고 하는가?', '번역에 따라 통신적 응집도 또는 교환적 응집도로 표현한다.'),
         (10108, 1, 8,  'MULTIPLE_CHOICE', '화면 설계 원칙으로 가장 부적절한 것은?', '과도한 정보 노출은 가독성과 사용성을 떨어뜨린다.'),
         (10109, 1, 9,  'SHORT_ANSWER', '사용자가 수행해야 할 시스템 기능 자체를 정의한 요구사항을 무엇이라고 하는가?', '요구사항 분류에서 기능 관점의 핵심 용어를 묻는 문제다.'),
-        (10110, 1, 10, 'SHORT_ANSWER', '화면 구조와 배치를 빠르게 검토하기 위한 초기 화면 설계 산출물을 무엇이라고 하는가?', '초기 설계 산출물의 핵심 용어를 묻는 문제다.'),
+        (10110, 1, 10, 'SHORT_ANSWER', '시스템이 얼마나 빠르고 안정적으로 동작해야 하는지를 정의한 요구사항을 무엇이라고 하는가?', '기능 자체가 아니라 품질 속성을 정의하는 요구사항 용어를 묻는다.'),
 
         -- Domain 2: 데이터 입출력·SQL 기초
         (10201, 2, 1,  'MULTIPLE_CHOICE', '집계 결과에 조건을 적용할 때 사용하는 절은?', 'GROUP BY 후 집계된 결과에 조건을 줄 때 HAVING을 사용한다.'),
@@ -50,7 +50,7 @@ question_seed AS (
         (10306, 3, 6,  'OX', 'HTTP 200 상태 코드는 일반적으로 요청이 정상 처리되었음을 의미한다.', '대표적인 성공 응답 코드다.'),
         (10307, 3, 7,  'SHORT_ANSWER', 'key-value 형태로 데이터를 표현하는 대표적인 경량 텍스트 데이터 교환 형식은?', '웹 API에서 가장 널리 사용되는 포맷이다.'),
         (10308, 3, 8,  'MULTIPLE_CHOICE', '외부 결제 API 장애가 길어질 때 내부 서비스로 장애가 전파되는 것을 줄이기 위한 패턴은?', '연쇄 장애를 줄이기 위해 서킷 브레이커를 사용한다.'),
-        (10309, 3, 9,  'SHORT_ANSWER', '같은 요청을 여러 번 보내도 결과가 동일해야 하는 API의 성질을 무엇이라고 하는가?', '외부 연동 안정성을 위한 핵심 성질을 묻는 문제다.'),
+        (10309, 3, 9,  'SHORT_ANSWER', 'REST API에서 리소스 조회에 일반적으로 사용하는 HTTP 메서드는 무엇인가?', '조회 전용 요청에서 가장 기본이 되는 메서드를 묻는 문제다.'),
         (10310, 3, 10, 'SHORT_ANSWER', '이벤트가 발생했을 때 서버가 등록된 URL로 즉시 알림을 보내는 방식은?', '폴링과 대비되는 푸시 기반 방식의 용어를 묻는 문제다.'),
 
         -- Domain 4: 프로그래밍 기본
@@ -74,7 +74,7 @@ question_seed AS (
         (10806, 8, 6,  'OX', 'HTTPS는 전송 구간 보호를 위해 TLS를 사용한다.', '평문 HTTP보다 보안이 강화된다.'),
         (10807, 8, 7,  'SHORT_ANSWER', '인증된 사용자가 어떤 자원에 접근할 권한이 있는지 판단하는 절차를 무엇이라고 하는가?', '역할(Role)이나 권한(Permission) 검증이 포함된다.'),
         (10808, 8, 8,  'MULTIPLE_CHOICE', '회귀 테스트(Regression Test)의 목적은?', '수정으로 인해 기존 동작이 깨지지 않았는지 확인한다.'),
-        (10809, 8, 9,  'SHORT_ANSWER', '사용자가 누구인지 확인하는 보안 절차를 무엇이라고 하는가?', '보안의 기본 개념 중 신원 확인 절차를 묻는 문제다.'),
+        (10809, 8, 9,  'SHORT_ANSWER', 'SQL Injection을 방지하기 위해 사용자 입력값을 쿼리와 분리해 전달하는 기법을 무엇이라고 하는가?', '동적 SQL 문자열 결합 대신 사용하는 대표적인 방어 기법의 용어를 묻는 문제다.'),
         (10810, 8, 10, 'SHORT_ANSWER', '실제 사용자 흐름을 처음부터 끝까지 검증하는 테스트를 무엇이라고 하는가?', '테스트 수준 중 사용자 시나리오 전체 검증 용어를 묻는 문제다.'),
 
         -- Domain 9: 운영체제·네트워크·인프라·패키징
@@ -87,7 +87,7 @@ question_seed AS (
         (10907, 9, 7,  'SHORT_ANSWER', '애플리케이션과 실행에 필요한 환경을 함께 묶어 어디서나 같은 방식으로 실행되게 하는 기술을 무엇이라고 하는가?', '배포 일관성을 높이는 핵심 개념이다.'),
         (10908, 9, 8,  'MULTIPLE_CHOICE', '로드 밸런서의 주된 역할은?', '가용성과 확장성을 높이기 위해 사용한다.'),
         (10909, 9, 9,  'SHORT_ANSWER', '같은 프로세스의 자원을 공유하며 실행되는 단위를 무엇이라고 하는가?', '프로세스 내부 실행 단위의 핵심 용어를 묻는 문제다.'),
-        (10910, 9, 10, 'SHORT_ANSWER', '호스트 OS 커널을 공유하며 애플리케이션을 격리 실행하는 기술은?', '배포/운영에서 사용하는 경량 가상화 기술 용어를 묻는 문제다.')
+        (10910, 9, 10, 'SHORT_ANSWER', '도메인 이름을 IP 주소로 변환해 주는 시스템을 무엇이라고 하는가?', '네트워크에서 이름 해석을 담당하는 핵심 시스템 용어를 묻는 문제다.')
     ) AS v(id, domain_id, stage_no, question_type, prompt, explanation)
 )
 INSERT INTO cs_questions (id, stage_id, question_type, prompt, explanation, is_active)
@@ -202,15 +202,14 @@ VALUES
 
     (10109, '기능 요구사항', '기능요구사항', TRUE),
     (10109, 'functional requirement', 'functionalrequirement', FALSE),
-    (10110, '와이어프레임', '와이어프레임', TRUE),
-    (10110, 'wireframe', 'wireframe', FALSE),
+    (10110, '비기능 요구사항', '비기능요구사항', TRUE),
+    (10110, 'non-functional requirement', 'nonfunctionalrequirement', FALSE),
 
     (10209, 'HAVING', 'having', TRUE),
     (10210, 'LEFT JOIN', 'leftjoin', TRUE),
     (10210, 'LEFT OUTER JOIN', 'leftouterjoin', FALSE),
 
-    (10309, '멱등성', '멱등성', TRUE),
-    (10309, 'idempotency', 'idempotency', FALSE),
+    (10309, 'GET', 'get', TRUE),
     (10310, '웹훅', '웹훅', TRUE),
     (10310, 'webhook', 'webhook', FALSE),
 
@@ -220,16 +219,16 @@ VALUES
     (10410, '재귀호출', '재귀호출', FALSE),
     (10410, 'recursion', 'recursion', FALSE),
 
-    (10809, '인증', '인증', TRUE),
-    (10809, 'authentication', 'authentication', FALSE),
+    (10809, '파라미터 바인딩', '파라미터바인딩', TRUE),
+    (10809, 'prepared statement', 'preparedstatement', FALSE),
     (10810, 'E2E 테스트', 'e2e테스트', TRUE),
     (10810, 'e2e test', 'e2etest', FALSE),
     (10810, '종단간 테스트', '종단간테스트', FALSE),
 
     (10909, '스레드', '스레드', TRUE),
     (10909, 'thread', 'thread', FALSE),
-    (10910, '컨테이너', '컨테이너', TRUE),
-    (10910, 'container', 'container', FALSE)
+    (10910, 'DNS', 'dns', TRUE),
+    (10910, '도메인 네임 시스템', '도메인네임시스템', FALSE)
 ON CONFLICT (question_id, normalized_answer) DO UPDATE
 SET answer_text = EXCLUDED.answer_text,
     is_primary = EXCLUDED.is_primary;
