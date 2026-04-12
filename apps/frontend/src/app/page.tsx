@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap } from 'lucide-react';
+import { Users, Gamepad2, Trophy, Target, ArrowRight, Code2, Zap, BookOpen } from 'lucide-react';
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://peekle.today';
 
 export const metadata: Metadata = {
@@ -39,6 +39,14 @@ export const metadata: Metadata = {
     description: '실시간 스터디, 게임 모드, AI 추천으로 알고리즘 학습을 더 재미있게.',
   },
 };
+
+type LandingStat = {
+  num: string;
+  label: string;
+};
+
+// NOTE: 랜딩 통계는 검증된 데이터 소스가 연결된 경우에만 채워야 합니다.
+const VERIFIED_LANDING_STATS: LandingStat[] = [];
 
 export default function Home() {
   const websiteJsonLd = {
@@ -109,7 +117,7 @@ export default function Home() {
               <p className="text-[#6B7280] text-lg">알고리즘 학습의 새로운 방법을 제시합니다</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               {[
                 {
                   icon: Users,
@@ -131,6 +139,11 @@ export default function Home() {
                   title: 'AI 문제 추천',
                   desc: '나에게 딱 맞는 문제를 AI가 추천해드려요',
                 },
+                {
+                  icon: BookOpen,
+                  title: 'CS 학습',
+                  desc: '자료구조, 네트워크, 운영체제 등 CS 핵심 개념을 학습하세요.',
+                },
               ].map((item, idx) => (
                 // 카드: bg-card (#FFFFFF), border-card-border (#F7E8F0) 사용
                 <div
@@ -150,22 +163,21 @@ export default function Home() {
         </section>
 
         {/* --- 통계 섹션 --- */}
-        <section className="py-24 border-t border-border bg-background">
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12 text-center px-4">
-            {[
-              { num: '10,000+', label: '활성 사용자' },
-              { num: '500,000+', label: '문제 풀이 수' },
-              { num: '5,000+', label: '스터디 방' },
-            ].map((stat, idx) => (
-              <div key={idx} className="flex flex-col items-center w-full">
-                <span className="text-4xl md:text-5xl font-extrabold text-primary mb-2">
-                  {stat.num}
-                </span>
-                <span className="text-[#6B7280] font-medium tracking-wide">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        {VERIFIED_LANDING_STATS.length > 0 && (
+          <section className="py-24 border-t border-border bg-background">
+            <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12 text-center px-4">
+              {VERIFIED_LANDING_STATS.map((stat, idx) => (
+                <div key={idx} className="flex flex-col items-center w-full">
+                  <span className="text-4xl md:text-5xl font-extrabold text-primary mb-2">
+                    {stat.num}
+                  </span>
+                  <span className="text-[#6B7280] font-medium tracking-wide">{stat.label}</span>
+                </div>
+              ))
+              }
+            </div>
+          </section>
+        )}
 
         {/* --- 하단 CTA (핑크 배경) --- */}
         <section className="bg-primary py-32 text-center px-4 relative overflow-hidden">
