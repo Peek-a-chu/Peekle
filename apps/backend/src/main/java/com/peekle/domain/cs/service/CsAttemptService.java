@@ -187,6 +187,7 @@ public class CsAttemptService {
         int correctRate = totalQuestionCount == 0
                 ? 0
                 : (int) Math.round((correctCount * 100.0) / totalQuestionCount);
+        int earnedScore = correctCount;
 
         persistWrongProblems(user, session);
 
@@ -195,6 +196,10 @@ public class CsAttemptService {
 
         updateDomainProgressIfNeeded(userId, stage, nextStageId);
         StreakResult streak = applyStreak(user);
+        if (earnedScore > 0) {
+            user.addLeaguePoint(earnedScore);
+        }
+        int totalScore = safeInt(user.getLeaguePoint());
 
         csAttemptStore.delete(userId, stageId);
 
@@ -207,6 +212,8 @@ public class CsAttemptService {
                 resolveMessageCode(correctRate),
                 streak.earnedToday(),
                 streak.currentStreak(),
+                earnedScore,
+                totalScore,
                 nextStageId);
     }
 

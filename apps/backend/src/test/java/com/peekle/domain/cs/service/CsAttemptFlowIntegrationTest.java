@@ -124,11 +124,16 @@ class CsAttemptFlowIntegrationTest {
         assertThat(completeResponse.correctCount()).isEqualTo(1);
         assertThat(completeResponse.wrongCount()).isEqualTo(1);
         assertThat(completeResponse.correctRate()).isEqualTo(50);
+        assertThat(completeResponse.earnedScore()).isEqualTo(1);
+        assertThat(completeResponse.totalScore()).isEqualTo(1);
 
         CsWrongProblem wrongProblem = csWrongProblemRepository.findByUser_IdAndQuestion_Id(user.getId(), firstQuestion.getId())
                 .orElseThrow();
         assertThat(wrongProblem.getStatus()).isEqualTo(CsWrongProblemStatus.ACTIVE);
         assertThat(wrongProblem.getWrongCount()).isEqualTo(2);
+        assertThat(userRepository.findById(user.getId()))
+                .get()
+                .satisfies(savedUser -> assertThat(savedUser.getLeaguePoint()).isEqualTo(1));
     }
 
     @Test
@@ -154,6 +159,8 @@ class CsAttemptFlowIntegrationTest {
         CsAttemptCompleteResponse completeResponse = csAttemptService.completeAttempt(user.getId(), stage1.getId());
         assertThat(completeResponse.isTrackCompleted()).isFalse();
         assertThat(completeResponse.nextStageId()).isEqualTo(stage2.getId());
+        assertThat(completeResponse.earnedScore()).isEqualTo(1);
+        assertThat(completeResponse.totalScore()).isEqualTo(1);
 
         assertThat(csUserDomainProgressRepository.findByUser_IdAndDomain_Id(user.getId(), domain.getId()))
                 .get()

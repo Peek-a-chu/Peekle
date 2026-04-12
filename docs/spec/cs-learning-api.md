@@ -389,7 +389,7 @@ Base: `/api/cs`
 - 최종 결과 생성
 - 틀린 문제를 `cs_wrong_problems`에 반영
 - 진행도 갱신 후 Redis 키 삭제
-- 결과창은 "정답률 + 조건부 스트릭 + 랜덤 문구" 중심으로 단순 노출
+- 결과창은 "정답률 + 조건부 스트릭 + 점수 + 랜덤 문구" 중심으로 단순 노출
 
 결과창 표시 규칙:
 
@@ -400,6 +400,11 @@ Base: `/api/cs`
   - `streakEarnedToday=true`일 때만 "오늘 스트릭 +1" 강조 UI 노출
   - `streakEarnedToday=false`이면 스트릭 관련 문구/UI 미노출
   - 스트릭 증감/중복 판정은 서버 권한이며 KST(Asia/Seoul) 06:00 경계 기준
+- 점수:
+  - 세션 완료 시 `FIRST_PASS`에서 맞춘 문제 1개당 `+1점` 적립
+  - 오답 재시도(`RETRY_WRONG`)로 맞춘 문제는 점수 미적립
+  - 같은 문제는 세션 내 최대 1점만 적립
+  - 결과창에 `earnedScore`(이번 세션 획득)와 `totalScore`(적립 후 누적)를 함께 표시
 - 틀린 문제 개별 목록은 결과창에서 미노출(오답노트 화면에서만 조회)
 - CTA:
   - `isTrackCompleted=false`: `다음 스테이지 풀기` + `CS 탭으로 돌아가기`
@@ -422,6 +427,8 @@ Base: `/api/cs`
     "messageCode": "CS_RESULT_GOOD",
     "streakEarnedToday": true,
     "currentStreak": 5,
+    "earnedScore": 7,
+    "totalScore": 128,
     "nextStageId": 13
   }
 }
@@ -441,6 +448,8 @@ Base: `/api/cs`
     "messageCode": "CS_RESULT_EXCELLENT",
     "streakEarnedToday": false,
     "currentStreak": 5,
+    "earnedScore": 8,
+    "totalScore": 136,
     "nextStageId": null
   }
 }
