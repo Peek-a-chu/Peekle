@@ -58,6 +58,7 @@ public class User extends BaseTimeEntity {
         this.profileImgThumb = defaultImg;
         this.profileImgType = ProfileImgType.DEFAULT;
         this.maxLeague = LeagueTier.STONE;
+        this.manualRecRefreshCount = 0;
     }
 
     private String generateDefaultProfileImg(String nickname) {
@@ -117,6 +118,13 @@ public class User extends BaseTimeEntity {
     @Column(name = "last_recommended_date")
     private java.time.LocalDate lastRecommendedDate;
 
+    @Builder.Default
+    @Column(name = "manual_rec_refresh_count", nullable = false)
+    private Integer manualRecRefreshCount = 0;
+
+    @Column(name = "manual_rec_refresh_date")
+    private java.time.LocalDate manualRecRefreshDate;
+
     public void updateStreak(boolean increment, java.time.LocalDate streakDate) {
         if (increment) {
             this.streakCurrent++;
@@ -152,6 +160,11 @@ public class User extends BaseTimeEntity {
 
     public void updateLastRecommendedDate(java.time.LocalDate date) {
         this.lastRecommendedDate = date;
+    }
+
+    public void updateManualRecRefresh(java.time.LocalDate policyDate, int usedCount) {
+        this.manualRecRefreshDate = policyDate;
+        this.manualRecRefreshCount = Math.max(0, usedCount);
     }
 
     public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {

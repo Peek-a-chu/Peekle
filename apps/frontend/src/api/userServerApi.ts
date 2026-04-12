@@ -43,10 +43,16 @@ export async function getTimelineServer(
 }
 
 export async function getAIRecommendationsServer(): Promise<AIRecommendationData[]> {
-  const data = await fetchServer<any[]>('/api/recommendations/daily');
+  const data = await fetchServer<any>('/api/recommendations/daily');
   if (!data) return [];
 
-  return data.map((item: any) => ({
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray(data.recommendations)
+      ? data.recommendations
+      : [];
+
+  return list.map((item: any) => ({
     problemId: `#${item.id}`,
     title: item.title,
     tier: item.tierType ? item.tierType.toLowerCase() : 'bronze',

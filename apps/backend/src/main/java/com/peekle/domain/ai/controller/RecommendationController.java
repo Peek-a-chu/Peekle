@@ -1,7 +1,7 @@
 package com.peekle.domain.ai.controller;
 
 import com.peekle.domain.ai.dto.request.FeedbackRequest;
-import com.peekle.domain.ai.dto.response.RecommendationResponse.RecommendedProblem;
+import com.peekle.domain.ai.dto.response.DailyRecommendationResponse;
 import com.peekle.domain.ai.enums.RecommendationFeedbackType;
 import com.peekle.domain.ai.service.RecommendationService;
 import com.peekle.global.dto.ApiResponse;
@@ -10,8 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/recommendations")
@@ -24,17 +22,28 @@ public class RecommendationController {
     /**
      * 오늘의 추천 문제 조회
      * GET /api/recommendations/daily
-     * 
-     * 1. Redis에 있으면 그거 리턴
-     * 2. 없으면 AI 서버에 요청해서 생성 후 리턴
+     *
+     * 1. 기존 추천 3문제가 남아있고 미해결 상태면 재사용
+     * 2. 3문제 모두 해결했거나 추천이 비어있으면 새 추천 생성 시도
      */
     @GetMapping("/daily")
-    public ApiResponse<List<RecommendedProblem>> getDailyRecommendations(@AuthenticationPrincipal Long userId) {
+    public ApiResponse<DailyRecommendationResponse> getDailyRecommendations(@AuthenticationPrincipal Long userId) {
         log.info("추천 문제 요청 - userId: {}", userId);
-        
-        List<RecommendedProblem> recommendations = recommendationService.getOrGenerateRecommendations(userId);
-        
-        return ApiResponse.success(recommendations);
+
+        DailyRecommendationResponse response = recommendationService.getDailyRecommendations(userId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 수동 새로고침
+     * POST /api/recommendations/refresh
+     */
+    @PostMapping("/refresh")
+    public ApiResponse<DailyRecommendationResponse> refreshRecommendations(@AuthenticationPrincipal Long userId) {
+        log.info("추천 문제 수동 새로고침 요청 - userId: {}", userId);
+
+        DailyRecommendationResponse response = recommendationService.refreshRecommendationsManually(userId);
+        return ApiResponse.success(response);
     }
 
     /**
