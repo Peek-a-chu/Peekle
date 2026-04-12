@@ -3,14 +3,20 @@
 import { useEffect, useState } from 'react';
 import { Loader2, TerminalSquare, CheckCircle2, ChevronRight, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { CSDomain, fetchCSDomains, changeCSDomain } from '../api/csApi';
+import { CSDomain, fetchCSDomains, changeCSDomain, changeCurrentCSDomain } from '../api/csApi';
 import { Button } from '@/components/ui/button';
 
 interface DomainSelectionProps {
   onSuccess: () => void;
+  isAddMode?: boolean;
+  onCancel?: () => void;
 }
 
-export default function DomainSelection({ onSuccess }: DomainSelectionProps) {
+export default function DomainSelection({
+  onSuccess,
+  isAddMode = false,
+  onCancel,
+}: DomainSelectionProps) {
   const [domains, setDomains] = useState<CSDomain[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -40,11 +46,18 @@ export default function DomainSelection({ onSuccess }: DomainSelectionProps) {
     setSubmitting(true);
     try {
       console.log(`[DEBUG] Submitting domain ID ${selectedId}`);
-      await changeCSDomain(selectedId);
-      toast.success('학습 도메인이 설정되었습니다!');
+      const submitResult = await changeCSDomain(selectedId);
+
+      // 도메인 "추가" 모드에서는 현재 도메인이 자동 전환되지 않을 수 있어
+      // 명시적으로 현재 도메인을 선택한 도메인으로 맞춰준다.
+      if (isAddMode && !submitResult.isCurrent) {
+        await changeCurrentCSDomain(selectedId);
+      }
+
+      toast.success(`학습 도메인이 "${submitResult.domain.name}"(으)로 설정되었습니다!`);
       onSuccess();
     } catch (error) {
-      toast.error('도메인 선택 중 오류가 발생했습니다.');
+      toast.error('도메인 설정 중 오류가 발생했습니다.');
       console.error(error);
     } finally {
       setSubmitting(false);
@@ -61,10 +74,16 @@ export default function DomainSelection({ onSuccess }: DomainSelectionProps) {
   }
 
   const safeDomains = Array.isArray(domains) ? domains : [];
+  const titleText = isAddMode
+    ? '추가로 학습할 도메인을 선택하세요'
+    : '무엇을 먼저 학습할까요?';
+  const descriptionText = isAddMode
+    ? '현재 도메인은 유지되고, 선택한 도메인이 학습 목록에 추가됩니다.'
+    : '원하는 도메인을 선택하여 맞춤형 CS 학습 여정을 시작하세요. 선택한 도메인은 언제든 변경할 수 있습니다.';
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 w-full animate-in fade-in zoom-in-95 duration-500">
-      <div className="max-w-3xl w-full space-y-8">
+    <div className="relative w-full min-h-[100dvh] px-4 pt-[max(1.5rem,calc(env(safe-area-inset-top)+1rem))] pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:flex md:flex-col md:items-center md:justify-center md:min-h-[80vh] md:pt-0 md:pb-0 animate-in fade-in zoom-in-95 duration-500">
+      <div className="max-w-3xl w-full space-y-6 md:space-y-8">
         
         {/* Header Section */}
         <div className="text-center space-y-4">
@@ -72,10 +91,10 @@ export default function DomainSelection({ onSuccess }: DomainSelectionProps) {
             <TerminalSquare className="w-12 h-12 text-primary" />
           </div>
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground">
-            무엇을 먼저 학습할까요?
+            {titleText}
           </h1>
           <p className="text-base lg:text-lg text-muted-foreground max-w-xl mx-auto">
-            원하는 도메인을 선택하여 맞춤형 CS 학습 여정을 시작하세요. 선택한 도메인은 언제든 변경할 수 있습니다.
+            {descriptionText}
           </p>
         </div>
 
@@ -119,29 +138,43 @@ export default function DomainSelection({ onSuccess }: DomainSelectionProps) {
         </div>
 
         {/* Action Bottom */}
-        <div className="flex justify-center pt-8">
-          <Button
-            size="lg"
-            disabled={!selectedId || submitting}
-            onClick={handleSubmit}
-            className={`
-              h-14 px-8 text-base font-bold rounded-full gap-2 transition-all duration-300
-              ${selectedId ? 'shadow-lg shadow-primary/25 hover:shadow-primary/40' : ''}
-              min-w-[200px]
-            `}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                적용 중...
-              </>
-            ) : (
-              <>
-                학습 시작하기
-                <ChevronRight className={`w-5 h-5 transition-transform duration-300 ${selectedId ? 'translate-x-1' : ''}`} />
-              </>
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-0">
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-3 md:justify-center md:pt-8">
+            {isAddMode && onCancel && (
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                disabled={submitting}
+                onClick={onCancel}
+                className="h-12 md:h-14 px-6 md:px-8 text-base font-semibold rounded-full flex-1 md:flex-none md:min-w-[140px]"
+              >
+                취소
+              </Button>
             )}
-          </Button>
+            <Button
+              size="lg"
+              disabled={!selectedId || submitting}
+              onClick={handleSubmit}
+              className={`
+                h-12 md:h-14 px-6 md:px-8 text-base font-bold rounded-full gap-2 transition-all duration-300
+                ${selectedId ? 'shadow-lg shadow-primary/25 hover:shadow-primary/40' : ''}
+                ${isAddMode ? 'flex-1' : 'w-full md:w-auto md:min-w-[200px]'}
+              `}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  적용 중...
+                </>
+              ) : (
+                <>
+                  학습 시작하기
+                  <ChevronRight className={`w-5 h-5 transition-transform duration-300 ${selectedId ? 'translate-x-1' : ''}`} />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
       </div>
