@@ -16,6 +16,8 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 게임 대기방(Waiting Room) 관련 Redis 작업을 담당하는 서비스
@@ -309,8 +311,32 @@ public class RedisGameWaitService {
         String status = (String) redisTemplate.opsForValue().get(statusKey);
 
         if ("WAITING".equals(status)) {
-            log.info("🚪 User {} disconnected from lobby (WAITING). Exiting immediately.", userId);
-            exitGameRoom(roomId, userId);
+            log.info("🚪 User {} disconnected from lobby (WAITING). Delaying exit for 5 seconds to handle page transitions.", userId);
+            
+            CompletableFuture.delayedExecutor(5, TimeUnit.SECONDS).execute(() -> {
+                try {
+                    // Check if the user is still assigned to this room in Redis
+                    String currentGameIdStr = (String) redisTemplate.opsForValue()
+                            .get(String.format(RedisKeyConst.USER_CURRENT_GAME, userId));
+                            
+                    if (currentGameIdStr == null || !roomId.equals(Long.parseLong(currentGameIdStr))) {
+                        return; // User has already joined a different room or properly exited
+                    }
+                    
+                    // Check if the user's socket is still offline
+                    String onlineKey = String.format(RedisKeyConst.GAME_ROOM_ONLINE, roomId);
+                    boolean isOnline = Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(onlineKey, userId));
+                    
+                    if (isOnline) {
+                        log.info("🔙 User {} successfully reconnected to Room {}. Ignoring exit.", userId, roomId);
+                    } else {
+                        log.info("🗑️ User {} did not reconnect to Room {} within 5 seconds. Exiting now.", userId, roomId);
+                        exitGameRoom(roomId, userId);
+                    }
+                } catch (Exception e) {
+                    log.error("Error during delayed exit process for user {} in room {}", userId, roomId, e);
+                }
+            });
             return;
         }
 
