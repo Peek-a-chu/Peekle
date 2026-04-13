@@ -10,6 +10,7 @@ import lombok.Setter;
 public class UserUpdateRequest {
     private String nickname;
     private String bojId;
+    private String preferredLanguage;
     private String profileImg;
     private String profileImgThumb;
     private Boolean isProfileImageDeleted;

@@ -2,6 +2,7 @@ export interface UserProfile {
   id: string;
   nickname: string;
   bojId?: string | null;
+  preferredLanguage?: string;
   league?: string; // e.g. "Silver", "Gold"
   leaguePoint: number;
   leagueGroupId?: string | null;

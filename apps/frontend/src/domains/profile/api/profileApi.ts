@@ -113,6 +113,7 @@ export async function fetchUserProfile(nickname: string): Promise<UserProfile> {
     id: String(data.id),
     nickname: data.nickname,
     bojId: data.bojId,
+    preferredLanguage: data.preferredLanguage || 'python',
     league: data.leagueName,
     leaguePoint: Number(data.score),
     streakCurrent: data.streakCurrent,

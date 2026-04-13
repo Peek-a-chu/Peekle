@@ -12,6 +12,7 @@ export interface UserInfo {
   id: number;
   nickname: string;
   bojId?: string;
+  preferredLanguage?: string;
 }
 
 export async function checkNickname(
@@ -75,6 +76,7 @@ export interface UserProfileClient {
   id: number;
   nickname: string;
   bojId: string | null;
+  preferredLanguage?: string;
   leagueName: string;
   score: number;
   streakCurrent: number;

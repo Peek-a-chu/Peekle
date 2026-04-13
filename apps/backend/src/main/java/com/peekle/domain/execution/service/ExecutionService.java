@@ -59,14 +59,20 @@ public class ExecutionService {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         // Language
-        String lang = request.getLanguage();
+        String lang = request.getLanguage() == null ? "" : request.getLanguage().trim().toLowerCase();
         // Convert language names to match TIO standard identifiers
         if ("python".equals(lang) || "python3".equals(lang))
             lang = "python3";
-        else if ("java".equals(lang))
+        else if (lang.contains("java") && !lang.contains("script"))
             lang = "java-openjdk";
-        else if ("cpp".equals(lang))
+        else if ("c".equals(lang)
+                || lang.contains("clang")
+                || lang.contains("c11")
+                || lang.contains("cpp")
+                || lang.contains("c++"))
             lang = "cpp-gcc";
+        else
+            lang = "python3";
 
         baos.write(("Vlang\0" + "1\0" + lang + "\0").getBytes(StandardCharsets.UTF_8));
 

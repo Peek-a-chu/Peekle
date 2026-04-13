@@ -27,6 +27,7 @@ public class AuthService {
     @Transactional
     public User signup(String socialId, String provider, SignupRequest request) {
         User user = new User(socialId, provider, request.nickname());
+        user.updatePreferredLanguage(normalizePreferredLanguage(request.preferredLanguage()));
         user.updateRecLevelX10(resolveInitialRecLevelX10(request.preferredRecTier()));
         if (request.bojId() != null && !request.bojId().isBlank()) {
             user.registerBojId(request.bojId());
@@ -47,5 +48,30 @@ public class AuthService {
             case PLATINUM -> 180;
             case BRONZE -> 30;
         };
+    }
+
+    private String normalizePreferredLanguage(String preferredLanguage) {
+        if (preferredLanguage == null || preferredLanguage.isBlank()) {
+            return "python";
+        }
+
+        String normalized = preferredLanguage.trim().toLowerCase();
+        if (normalized.contains("python") || normalized.contains("pypy")) {
+            return "python";
+        }
+        if (normalized.contains("java") && !normalized.contains("script")) {
+            return "java";
+        }
+        if (normalized.contains("c++") || normalized.contains("cpp")) {
+            return "cpp";
+        }
+        if (normalized.equals("c")
+                || normalized.startsWith("c ")
+                || normalized.contains("clang")
+                || normalized.contains("c11")
+                || normalized.contains("gnu11")) {
+            return "cpp";
+        }
+        return "python";
     }
 }

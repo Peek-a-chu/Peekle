@@ -155,7 +155,12 @@ public class RedisIdeService {
         if (normalized.contains("java") && !normalized.contains("script")) {
             return "java";
         }
-        if (normalized.contains("cpp") || normalized.contains("c++")) {
+        if (normalized.equals("c")
+                || normalized.contains("clang")
+                || normalized.contains("c11")
+                || normalized.contains("gnu11")
+                || normalized.contains("cpp")
+                || normalized.contains("c++")) {
             return "cpp";
         }
         return "python";

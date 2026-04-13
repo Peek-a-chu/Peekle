@@ -50,6 +50,7 @@ export async function getMyProfile(): Promise<UserProfile> {
       league: data.leagueName,
       leaguePoint: Number(data.score),
       leagueGroupId: null, // 추후 구현
+      preferredLanguage: data.preferredLanguage || 'python',
       streakCurrent: data.streakCurrent,
       streakMax: data.streakMax,
       profileImg: data.profileImg || undefined,
@@ -64,6 +65,7 @@ export async function getMyProfile(): Promise<UserProfile> {
       id: '',
       nickname: '알 수 없음',
       bojId: null,
+      preferredLanguage: 'python',
       league: 'Unranked',
       leaguePoint: 0,
       leagueGroupId: null,
@@ -123,6 +125,7 @@ export async function getUserProfile(nickname: string): Promise<UserProfile | nu
       league: data.leagueName,
       leaguePoint: Number(data.score),
       leagueGroupId: null,
+      preferredLanguage: data.preferredLanguage || 'python',
       streakCurrent: data.streakCurrent,
       streakMax: data.streakMax,
       profileImg: data.profileImg || undefined,
