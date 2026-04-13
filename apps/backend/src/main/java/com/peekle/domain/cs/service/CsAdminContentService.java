@@ -40,9 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -51,6 +53,7 @@ import java.util.Set;
 public class CsAdminContentService {
 
     private static final int DEFAULT_STAGE_COUNT_PER_TRACK = 10;
+    private static final int REQUIRED_STAGE_QUESTION_COUNT = 10;
 
     private final CsDomainRepository csDomainRepository;
     private final CsDomainTrackRepository csDomainTrackRepository;
@@ -104,15 +107,7 @@ public class CsAdminContentService {
 
         List<CsDomainTrack> tracks = csDomainTrackRepository.findByDomain_IdOrderByTrackNoAsc(domainId);
         return tracks.stream()
-                .map(track -> new CsAdminTrackResponse(
-                        track.getId(),
-                        track.getDomain().getId(),
-                        (int) track.getTrackNo(),
-                        track.getName(),
-                        csStageRepository.findByTrack_IdOrderByStageNoAsc(track.getId())
-                                .stream()
-                                .map(CsStage::getId)
-                                .toList()))
+                .map(this::toTrackResponse)
                 .toList();
     }
 
@@ -148,6 +143,14 @@ public class CsAdminContentService {
                 stageIds);
     }
 
+    @Transactional
+    public CsAdminTrackResponse renameTrack(Long userId, Long trackId, CsAdminTrackCreateRequest request) {
+        assertAdmin(userId);
+        CsDomainTrack track = getTrack(trackId);
+        track.rename(request.name().trim());
+        return toTrackResponse(track);
+    }
+
     public List<CsAdminQuestionResponse> getStageQuestions(Long userId, Long stageId) {
         assertAdmin(userId);
         getStage(stageId);
@@ -165,6 +168,7 @@ public class CsAdminContentService {
         assertAdmin(userId);
         CsStage stage = getStage(stageId);
         ImportMode mode = ImportMode.from(request.mode());
+        validateImportRequest(mode, request.questions());
 
         int createdCount = 0;
         int updatedCount = 0;
@@ -241,8 +245,7 @@ public class CsAdminContentService {
         }
 
         List<CsAdminQuestionShortAnswerDraft> normalized = validateShortAnswers(request.shortAnswers());
-        csQuestionShortAnswerRepository.deleteByQuestion_Id(questionId);
-        saveShortAnswers(question, normalized);
+        syncShortAnswers(question, normalized);
 
         return toAdminQuestionResponse(question);
     }
@@ -264,7 +267,7 @@ public class CsAdminContentService {
                 .stage(stage)
                 .questionType(draft.questionType())
                 .prompt(draft.prompt().trim())
-                .explanation(trimToNull(draft.explanation()))
+                .explanation(draft.explanation().trim())
                 .isActive(true)
                 .build());
 
@@ -274,14 +277,25 @@ public class CsAdminContentService {
 
     private void updateQuestion(CsQuestion question, CsAdminQuestionDraft draft) {
         validateDraftByType(draft);
+        CsQuestionType previousType = question.getQuestionType();
         question.updateContent(
                 draft.questionType(),
                 draft.prompt().trim(),
-                trimToNull(draft.explanation()));
+                draft.explanation().trim());
 
-        csQuestionChoiceRepository.deleteByQuestion_Id(question.getId());
-        csQuestionShortAnswerRepository.deleteByQuestion_Id(question.getId());
-        saveChildrenByType(question, draft);
+        if (previousType != draft.questionType()) {
+            csQuestionChoiceRepository.deleteByQuestionId(question.getId());
+            csQuestionShortAnswerRepository.deleteByQuestionId(question.getId());
+            saveChildrenByType(question, draft);
+            return;
+        }
+
+        if (draft.questionType() == CsQuestionType.SHORT_ANSWER) {
+            syncShortAnswers(question, validateShortAnswers(draft.shortAnswers()));
+            return;
+        }
+
+        syncChoices(question, draft.choices());
     }
 
     private void saveChildrenByType(CsQuestion question, CsAdminQuestionDraft draft) {
@@ -306,27 +320,99 @@ public class CsAdminContentService {
         }
     }
 
+    private void syncChoices(CsQuestion question, List<CsAdminQuestionChoiceDraft> choices) {
+        List<CsQuestionChoice> existingChoices = csQuestionChoiceRepository.findByQuestion_IdOrderByChoiceNoAsc(question.getId());
+        Map<Integer, CsQuestionChoice> existingByChoiceNo = new HashMap<>();
+        for (CsQuestionChoice existingChoice : existingChoices) {
+            existingByChoiceNo.put((int) existingChoice.getChoiceNo(), existingChoice);
+        }
+
+        List<CsAdminQuestionChoiceDraft> sorted = new ArrayList<>(choices);
+        sorted.sort(Comparator.comparingInt(CsAdminQuestionChoiceDraft::choiceNo));
+
+        for (CsAdminQuestionChoiceDraft choice : sorted) {
+            int choiceNo = choice.choiceNo();
+            CsQuestionChoice existing = existingByChoiceNo.remove(choiceNo);
+            if (existing == null) {
+                csQuestionChoiceRepository.save(CsQuestionChoice.builder()
+                        .question(question)
+                        .choiceNo(choice.choiceNo().shortValue())
+                        .content(choice.content().trim())
+                        .isAnswer(choice.isAnswer())
+                        .build());
+                continue;
+            }
+
+            existing.update(choice.content().trim(), choice.isAnswer());
+        }
+
+        if (!existingByChoiceNo.isEmpty()) {
+            csQuestionChoiceRepository.deleteAllInBatch(existingByChoiceNo.values());
+        }
+    }
+
     private void saveShortAnswers(CsQuestion question, List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
-        boolean hasPrimary = shortAnswers.stream()
-                .anyMatch(answer -> Boolean.TRUE.equals(answer.isPrimary()));
-
-        for (int i = 0; i < shortAnswers.size(); i++) {
-            CsAdminQuestionShortAnswerDraft answer = shortAnswers.get(i);
-            String normalized = normalizeStrict(answer.answerText());
-            boolean isPrimary = hasPrimary
-                    ? Boolean.TRUE.equals(answer.isPrimary())
-                    : i == 0;
-
+        List<CsAdminQuestionShortAnswerDraft> normalizedDrafts = normalizePrimaryShortAnswers(shortAnswers);
+        for (CsAdminQuestionShortAnswerDraft answer : normalizedDrafts) {
             csQuestionShortAnswerRepository.save(CsQuestionShortAnswer.builder()
                     .question(question)
                     .answerText(answer.answerText().trim())
-                    .normalizedAnswer(normalized)
-                    .isPrimary(isPrimary)
+                    .normalizedAnswer(normalizeStrict(answer.answerText()))
+                    .isPrimary(Boolean.TRUE.equals(answer.isPrimary()))
                     .build());
         }
     }
 
+    private void syncShortAnswers(CsQuestion question, List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
+        List<CsAdminQuestionShortAnswerDraft> normalizedDrafts = normalizePrimaryShortAnswers(shortAnswers);
+        List<CsQuestionShortAnswer> existingAnswers = csQuestionShortAnswerRepository
+                .findByQuestion_IdOrderByIsPrimaryDescIdAsc(question.getId());
+
+        Map<String, CsQuestionShortAnswer> existingByNormalized = new HashMap<>();
+        for (CsQuestionShortAnswer existingAnswer : existingAnswers) {
+            existingByNormalized.put(existingAnswer.getNormalizedAnswer(), existingAnswer);
+        }
+
+        for (CsAdminQuestionShortAnswerDraft answer : normalizedDrafts) {
+            String normalized = normalizeStrict(answer.answerText());
+            CsQuestionShortAnswer existing = existingByNormalized.remove(normalized);
+            if (existing == null) {
+                csQuestionShortAnswerRepository.save(CsQuestionShortAnswer.builder()
+                        .question(question)
+                        .answerText(answer.answerText().trim())
+                        .normalizedAnswer(normalized)
+                        .isPrimary(Boolean.TRUE.equals(answer.isPrimary()))
+                        .build());
+                continue;
+            }
+
+            existing.update(
+                    answer.answerText().trim(),
+                    normalized,
+                    Boolean.TRUE.equals(answer.isPrimary()));
+        }
+
+        if (!existingByNormalized.isEmpty()) {
+            csQuestionShortAnswerRepository.deleteAllInBatch(existingByNormalized.values());
+        }
+    }
+
     private void validateDraftByType(CsAdminQuestionDraft draft) {
+        if (draft == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "문제 데이터가 비어 있습니다.");
+        }
+        if (draft.questionType() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "questionType은 필수입니다.");
+        }
+        String prompt = draft.prompt() == null ? "" : draft.prompt().trim();
+        if (prompt.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "prompt는 필수입니다.");
+        }
+        String explanation = draft.explanation() == null ? "" : draft.explanation().trim();
+        if (explanation.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "explanation은 필수입니다.");
+        }
+
         if (draft.questionType() == CsQuestionType.MULTIPLE_CHOICE) {
             validateChoices(draft.choices(), false);
             return;
@@ -352,6 +438,19 @@ public class CsAdminContentService {
         int answerCount = 0;
         Set<Integer> choiceNos = new HashSet<>();
         for (CsAdminQuestionChoiceDraft choice : choices) {
+            if (choice == null) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "choice 항목이 비어 있습니다.");
+            }
+            if (choice.choiceNo() == null || choice.choiceNo() <= 0) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "choiceNo는 1 이상의 값이어야 합니다.");
+            }
+            String content = choice.content() == null ? "" : choice.content().trim();
+            if (content.isBlank()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "선택지 content는 비어 있을 수 없습니다.");
+            }
+            if (choice.isAnswer() == null) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "isAnswer는 필수입니다.");
+            }
             if (!choiceNos.add(choice.choiceNo())) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "choiceNo는 중복될 수 없습니다.");
             }
@@ -385,6 +484,55 @@ public class CsAdminContentService {
             normalized.add(new CsAdminQuestionShortAnswerDraft(trimmed, answer.isPrimary()));
         }
         return normalized;
+    }
+
+    private void validateImportRequest(ImportMode mode, List<CsAdminQuestionDraft> questions) {
+        if (questions == null || questions.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "questions는 최소 1개 이상 필요합니다.");
+        }
+
+        if (mode == ImportMode.REPLACE && questions.size() != REQUIRED_STAGE_QUESTION_COUNT) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "전체 교체(REPLACE)는 문제가 정확히 " + REQUIRED_STAGE_QUESTION_COUNT + "개여야 합니다.");
+        }
+
+        Set<Long> upsertQuestionIds = new HashSet<>();
+        for (int i = 0; i < questions.size(); i++) {
+            CsAdminQuestionDraft draft = questions.get(i);
+            try {
+                validateDraftByType(draft);
+            } catch (BusinessException ex) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        (i + 1) + "번 문제: " + ex.getMessage());
+            }
+
+            if (mode == ImportMode.UPSERT && draft.questionId() != null && !upsertQuestionIds.add(draft.questionId())) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "UPSERT에서는 questionId가 중복될 수 없습니다.");
+            }
+        }
+    }
+
+    private List<CsAdminQuestionShortAnswerDraft> normalizePrimaryShortAnswers(
+            List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
+        List<CsAdminQuestionShortAnswerDraft> normalizedDrafts = new ArrayList<>(shortAnswers.size());
+        boolean hasPrimary = shortAnswers.stream()
+                .anyMatch(answer -> Boolean.TRUE.equals(answer.isPrimary()));
+
+        for (int i = 0; i < shortAnswers.size(); i++) {
+            CsAdminQuestionShortAnswerDraft answer = shortAnswers.get(i);
+            boolean isPrimary = hasPrimary
+                    ? Boolean.TRUE.equals(answer.isPrimary())
+                    : i == 0;
+
+            normalizedDrafts.add(new CsAdminQuestionShortAnswerDraft(
+                    answer.answerText().trim(),
+                    isPrimary));
+        }
+        return normalizedDrafts;
     }
 
     private CsAdminQuestionResponse toAdminQuestionResponse(CsQuestion question) {
@@ -422,9 +570,26 @@ public class CsAdminContentService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_NOT_FOUND));
     }
 
+    private CsDomainTrack getTrack(Long trackId) {
+        return csDomainTrackRepository.findById(trackId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CS_TRACK_NOT_FOUND));
+    }
+
     private CsStage getStage(Long stageId) {
         return csStageRepository.findByIdWithTrackAndDomain(stageId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_STAGE_NOT_FOUND));
+    }
+
+    private CsAdminTrackResponse toTrackResponse(CsDomainTrack track) {
+        return new CsAdminTrackResponse(
+                track.getId(),
+                track.getDomain().getId(),
+                (int) track.getTrackNo(),
+                track.getName(),
+                csStageRepository.findByTrack_IdOrderByStageNoAsc(track.getId())
+                        .stream()
+                        .map(CsStage::getId)
+                        .toList());
     }
 
     private void assertAdmin(Long userId) {
@@ -446,14 +611,6 @@ public class CsAdminContentService {
         return input.strip()
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", "");
-    }
-
-    private String trimToNull(String input) {
-        if (input == null) {
-            return null;
-        }
-        String trimmed = input.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private enum ImportMode {

@@ -76,6 +76,14 @@ public class CsAdminController {
         return ApiResponse.success(csAdminContentService.createTrack(userId, domainId, request));
     }
 
+    @PutMapping("/tracks/{trackId}")
+    public ApiResponse<CsAdminTrackResponse> renameTrack(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long trackId,
+            @Valid @RequestBody CsAdminTrackCreateRequest request) {
+        return ApiResponse.success(csAdminContentService.renameTrack(userId, trackId, request));
+    }
+
     @GetMapping("/stages/{stageId}/questions")
     public ApiResponse<List<CsAdminQuestionResponse>> getStageQuestions(
             @AuthenticationPrincipal Long userId,

@@ -16,6 +16,7 @@ public record CsAdminQuestionDraft(
         @NotBlank(message = "prompt는 필수입니다.")
         String prompt,
 
+        @NotBlank(message = "explanation은 필수입니다.")
         String explanation,
 
         List<@Valid CsAdminQuestionChoiceDraft> choices,

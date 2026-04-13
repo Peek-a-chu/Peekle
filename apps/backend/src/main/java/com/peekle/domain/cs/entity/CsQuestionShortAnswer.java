@@ -46,4 +46,10 @@ public class CsQuestionShortAnswer {
     @Builder.Default
     @Column(name = "is_primary", nullable = false)
     private Boolean isPrimary = false;
+
+    public void update(String answerText, String normalizedAnswer, Boolean isPrimary) {
+        this.answerText = answerText;
+        this.normalizedAnswer = normalizedAnswer;
+        this.isPrimary = isPrimary;
+    }
 }
