@@ -59,6 +59,7 @@ public class User extends BaseTimeEntity {
         this.profileImgType = ProfileImgType.DEFAULT;
         this.maxLeague = LeagueTier.STONE;
         this.manualRecRefreshCount = 0;
+        this.preferredLanguage = "python";
     }
 
     private String generateDefaultProfileImg(String nickname) {
@@ -125,6 +126,10 @@ public class User extends BaseTimeEntity {
     @Column(name = "manual_rec_refresh_date")
     private java.time.LocalDate manualRecRefreshDate;
 
+    @Builder.Default
+    @Column(name = "preferred_language", nullable = false, length = 20)
+    private String preferredLanguage = "python";
+
     public void updateStreak(boolean increment, java.time.LocalDate streakDate) {
         if (increment) {
             this.streakCurrent++;
@@ -165,6 +170,10 @@ public class User extends BaseTimeEntity {
     public void updateManualRecRefresh(java.time.LocalDate policyDate, int usedCount) {
         this.manualRecRefreshDate = policyDate;
         this.manualRecRefreshCount = Math.max(0, usedCount);
+    }
+
+    public void updatePreferredLanguage(String preferredLanguage) {
+        this.preferredLanguage = preferredLanguage;
     }
 
     public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
@@ -233,6 +242,9 @@ public class User extends BaseTimeEntity {
     protected void prePersist() {
         if (this.recLevelX10 == null) {
             this.recLevelX10 = 30;
+        }
+        if (this.preferredLanguage == null || this.preferredLanguage.isBlank()) {
+            this.preferredLanguage = "python";
         }
     }
 }

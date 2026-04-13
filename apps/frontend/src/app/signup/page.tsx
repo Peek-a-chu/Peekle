@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { signup as signupApi, type PreferredRecTier } from '@/api/authApi';
+import { signup as signupApi, type PreferredLanguage, type PreferredRecTier } from '@/api/authApi';
 import { checkNickname as checkNicknameApi, checkBojId as checkBojIdApi } from '@/api/userApi';
 
 interface NicknameValidation {
@@ -27,6 +27,7 @@ function SignupForm() {
 
   const [nickname, setNickname] = useState('');
   const [bojId, setBojId] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage>('python');
   const [preferredRecTier, setPreferredRecTier] = useState<PreferredRecTier>('BRONZE');
   const [validation, setValidation] = useState<NicknameValidation>({
     status: 'idle',
@@ -156,7 +157,7 @@ function SignupForm() {
     setIsSubmitting(true);
 
     try {
-      const data = await signupApi(token, nickname, bojId, preferredRecTier);
+      const data = await signupApi(token, nickname, bojId, preferredLanguage, preferredRecTier);
 
       if (data.success) {
         router.push('/home');
@@ -273,6 +274,38 @@ function SignupForm() {
                   {bojValidation.message}
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground/80 mb-2">
+                주 언어를 골라주세요
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'python', label: 'Python' },
+                  { value: 'java', label: 'Java' },
+                  { value: 'cpp', label: 'C++' },
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`h-11 flex items-center justify-center rounded-xl border text-sm font-medium cursor-pointer transition-all ${
+                      preferredLanguage === option.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-foreground/80 hover:border-primary/40'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="preferredLanguage"
+                      value={option.value}
+                      checked={preferredLanguage === option.value}
+                      onChange={(e) => setPreferredLanguage(e.target.value as PreferredLanguage)}
+                      className="sr-only"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div>

@@ -21,6 +21,8 @@ interface Props {
   };
   editBojId?: string;
   setEditBojId?: (value: string) => void;
+  editPreferredLanguage?: string;
+  setEditPreferredLanguage?: (value: string) => void;
   bojIdValidation?: {
     status: 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
     message: string;
@@ -41,6 +43,8 @@ export function CCProfileHeader({
   nicknameValidation,
   editBojId,
   setEditBojId,
+  editPreferredLanguage,
+  setEditPreferredLanguage,
   bojIdValidation,
 }: Props) {
   const isExtensionLinked = !!user.bojId;
@@ -108,6 +112,14 @@ export function CCProfileHeader({
       default:
         return 'text-slate-400';
     }
+  };
+
+  const getPreferredLanguageLabel = (value?: string) => {
+    const normalized = (value || '').toLowerCase();
+    if (normalized === 'java') return 'Java';
+    if (normalized === 'cpp' || normalized.includes('c++')) return 'C++';
+    if (normalized === 'c' || normalized.includes('c11') || normalized.includes('clang')) return 'C++';
+    return 'Python';
   };
 
   return (
@@ -210,31 +222,49 @@ export function CCProfileHeader({
           )}
 
           {isEditing && setEditBojId ? (
-            <div className="flex items-center gap-2 mt-6 relative">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                BOJ ID:
-              </span>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={editBojId}
-                  onChange={(e) => setEditBojId(e.target.value)}
-                  className={`text-sm bg-transparent border-b text-foreground focus:outline-none w-full max-w-[150px] transition-colors ${getBojInputBorderColor()}`}
-                  placeholder="Baekjoon"
-                />
-                {bojIdValidation && bojIdValidation.message && (
-                  <p
-                    className={`absolute top-full left-0 mt-1 text-xs whitespace-nowrap ${getBojValidationColor()}`}
-                  >
-                    {bojIdValidation.status === 'checking' && (
-                      <span className="inline-block w-2 pb-0.5 align-middle">
-                        <div className="w-2 h-2 border border-slate-300 border-t-slate-500 rounded-full animate-spin"></div>
-                      </span>
-                    )}
-                    {bojIdValidation.message}
-                  </p>
-                )}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center gap-2 relative">
+                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                  BOJ ID:
+                </span>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={editBojId}
+                    onChange={(e) => setEditBojId(e.target.value)}
+                    className={`text-sm bg-transparent border-b text-foreground focus:outline-none w-full max-w-[150px] transition-colors ${getBojInputBorderColor()}`}
+                    placeholder="Baekjoon"
+                  />
+                  {bojIdValidation && bojIdValidation.message && (
+                    <p
+                      className={`absolute top-full left-0 mt-1 text-xs whitespace-nowrap ${getBojValidationColor()}`}
+                    >
+                      {bojIdValidation.status === 'checking' && (
+                        <span className="inline-block w-2 pb-0.5 align-middle">
+                          <div className="w-2 h-2 border border-slate-300 border-t-slate-500 rounded-full animate-spin"></div>
+                        </span>
+                      )}
+                      {bojIdValidation.message}
+                    </p>
+                  )}
+                </div>
               </div>
+              {setEditPreferredLanguage && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                    주 언어:
+                  </span>
+                  <select
+                    value={editPreferredLanguage || 'python'}
+                    onChange={(e) => setEditPreferredLanguage(e.target.value)}
+                    className="h-8 rounded-md border border-muted-foreground/40 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                  </select>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -251,6 +281,11 @@ export function CCProfileHeader({
                   <span>BOJ 연동 안됨</span>
                 </div>
               )}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 text-primary border border-primary/20">
+                <span className="font-medium">주 언어</span>
+                <span className="text-black/20 dark:text-white/20">|</span>
+                <span className="font-bold">{getPreferredLanguageLabel(user.preferredLanguage)}</span>
+              </div>
             </div>
           )}
         </div>

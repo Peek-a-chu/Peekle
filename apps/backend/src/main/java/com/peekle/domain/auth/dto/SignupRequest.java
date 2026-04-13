@@ -7,6 +7,7 @@ public record SignupRequest(
         @NotBlank String token,
         @NotBlank String nickname,
         String bojId,
+        String preferredLanguage,
         PreferredRecTier preferredRecTier
 ) {
 }

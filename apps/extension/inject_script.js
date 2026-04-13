@@ -21,7 +21,13 @@
         const l = lang.toLowerCase();
         if (l.includes('python')) return 'Python 3';
         if (l.includes('java')) return 'Java 11';
-        if (l.includes('cpp') || l.includes('c++')) return 'C++';
+        if (
+            l === 'c' ||
+            l.includes('c11') ||
+            l.includes('clang') ||
+            l.includes('cpp') ||
+            l.includes('c++')
+        ) return 'C++';
         return lang; // fallback
     }
 
@@ -55,6 +61,7 @@
                     langVal = opt.value;
                     if (optText === 'Python 3') break;
                     if (optText === 'Java 11') break;
+                    if (optText === 'C++') break;
                 }
             }
 

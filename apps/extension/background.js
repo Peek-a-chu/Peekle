@@ -467,8 +467,14 @@ async function handleSolvedSubmission(payload, sender) {
             normalizedLang = 'python';
         } else if (normalizedLang.includes('java')) {
             normalizedLang = 'java';
-        } else if (normalizedLang.includes('c++') || normalizedLang.includes('cpp')) {
-            normalizedLang = 'C++';
+        } else if (
+            normalizedLang === 'c' ||
+            normalizedLang.includes('c11') ||
+            normalizedLang.includes('clang') ||
+            normalizedLang.includes('c++') ||
+            normalizedLang.includes('cpp')
+        ) {
+            normalizedLang = 'cpp';
         }
         // Add more if needed (e.g. javascript, kotlin...)
 
@@ -497,7 +503,13 @@ async function handleSolvedSubmission(payload, sender) {
             // Normalize pending language same as handleSolvedSubmission logic
             if (pendingLang.includes('python') || pendingLang.includes('pypy')) pendingLang = 'python';
             else if (pendingLang.includes('java')) pendingLang = 'java';
-            else if (pendingLang.includes('c++') || pendingLang.includes('cpp')) pendingLang = 'C++';
+            else if (
+                pendingLang === 'c' ||
+                pendingLang.includes('c11') ||
+                pendingLang.includes('clang') ||
+                pendingLang.includes('c++') ||
+                pendingLang.includes('cpp')
+            ) pendingLang = 'cpp';
 
             if (normalizedLang !== pendingLang) {
                 console.error(`[Validation Failed] Language mismatch: Submission(${normalizedLang}) vs IDE(${pendingLang})`);

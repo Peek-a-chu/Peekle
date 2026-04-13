@@ -10,11 +10,13 @@ export interface ApiResponse<T> {
 }
 
 export type PreferredRecTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+export type PreferredLanguage = 'python' | 'java' | 'cpp';
 
 export async function signup(
   token: string,
   nickname: string,
   bojId?: string | null,
+  preferredLanguage: PreferredLanguage = 'python',
   preferredRecTier: PreferredRecTier = 'BRONZE',
 ): Promise<ApiResponse<null>> {
   const res = await fetch(`/api/auth/signup`, {
@@ -24,6 +26,7 @@ export async function signup(
       token,
       nickname: nickname.trim(),
       bojId: bojId?.trim() || null,
+      preferredLanguage,
       preferredRecTier,
     }),
   });

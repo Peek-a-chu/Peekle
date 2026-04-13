@@ -72,6 +72,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
   // Text State
   const [editNickname, setEditNickname] = useState(user.nickname);
   const [editBojId, setEditBojId] = useState(user.bojId || '');
+  const [editPreferredLanguage, setEditPreferredLanguage] = useState(user.preferredLanguage || 'python');
   const [isCheckingNickname, setIsCheckingNickname] = useState(false);
   const nickChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [nicknameValidation, setNicknameValidation] = useState<{
@@ -104,6 +105,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
     setThumbToUpload(null);
     setEditNickname(optimisticUser.nickname);
     setEditBojId(optimisticUser.bojId || '');
+    setEditPreferredLanguage(optimisticUser.preferredLanguage || 'python');
     setNicknameValidation({ status: 'idle', message: '' });
     setBojIdValidation({ status: 'idle', message: '' });
   };
@@ -116,6 +118,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
     setIsProfileImageDeleted(false);
     setEditNickname('');
     setEditBojId('');
+    setEditPreferredLanguage(user.preferredLanguage || 'python');
     setNicknameValidation({ status: 'idle', message: '' });
   };
 
@@ -333,6 +336,7 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
         ...optimisticUser,
         nickname: editNickname,
         bojId: editBojId || optimisticUser.bojId,
+        preferredLanguage: editPreferredLanguage,
         profileImg: nextProfileImg,
         // We might want to clear thumb or set it same as profile for preview purposes
         profileImgThumb: nextProfileImg, // for immediate preview, using same img is fine
@@ -401,6 +405,9 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
       }
       if (editBojId !== (user.bojId || '')) {
         updatePayload.bojId = editBojId;
+      }
+      if (editPreferredLanguage !== (user.preferredLanguage || 'python')) {
+        updatePayload.preferredLanguage = editPreferredLanguage;
       }
 
       // Image fields
@@ -516,6 +523,8 @@ export function CCProfileView({ user, isMe, initialStreak, initialTimeline, init
           nicknameValidation={nicknameValidation}
           editBojId={editBojId}
           setEditBojId={setEditBojId}
+          editPreferredLanguage={editPreferredLanguage}
+          setEditPreferredLanguage={setEditPreferredLanguage}
           bojIdValidation={bojIdValidation}
         />
 

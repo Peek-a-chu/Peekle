@@ -9,6 +9,7 @@ interface User {
   bojId: string | null;
   league: string;
   leaguePoint: number;
+  preferredLanguage?: string;
 }
 
 interface AuthState {

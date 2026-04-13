@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ChevronUp, ChevronDown, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsTouchMobile } from '@/hooks/useIsMobile';
+import { useAuthStore } from '@/store/auth-store';
 
 interface CCCenterPanelProps {
   ideContent?: ReactNode;
@@ -82,7 +83,13 @@ public class Main {
 }`;
     }
 
-    if (normalized.includes('cpp') || normalized.includes('c++')) {
+    if (
+      normalized === 'c' ||
+      normalized.includes('c11') ||
+      normalized.includes('clang') ||
+      normalized.includes('cpp') ||
+      normalized.includes('c++')
+    ) {
       return `#include <iostream>
 #include <vector>
 #include <algorithm>
@@ -104,8 +111,14 @@ print("Hello World!")`;
 
   const normalizeLanguage = (languageValue: string): string => {
     const normalized = languageValue.toLowerCase();
+    if (
+      normalized === 'c' ||
+      normalized.includes('c11') ||
+      normalized.includes('clang') ||
+      normalized.includes('cpp') ||
+      normalized.includes('c++')
+    ) return 'cpp';
     if (normalized.includes('java') && !normalized.includes('script')) return 'java';
-    if (normalized.includes('cpp') || normalized.includes('c++')) return 'cpp';
     return 'python';
   };
 
@@ -152,6 +165,11 @@ print("Hello World!")`;
   const selectedProblemId = useRoomStore((state) => state.selectedProblemId);
   const selectedProblemTitle = useRoomStore((state) => state.selectedProblemTitle);
   const selectedProblemExternalId = useRoomStore((state) => state.selectedProblemExternalId);
+  const userPreferredLanguage = useAuthStore((state) => state.user?.preferredLanguage);
+  const normalizedPreferredLanguage = useMemo(
+    () => normalizeLanguage(userPreferredLanguage || 'python'),
+    [userPreferredLanguage],
+  );
   const isWhiteboardOverlayOpen = useRoomStore((state) => state.isWhiteboardOverlayOpen);
   const socket = useSocket(roomId, currentUserId);
   const setRightPanelActiveTab = useRoomStore((state) => state.setRightPanelActiveTab);
@@ -1462,10 +1480,10 @@ print("Hello World!")`;
   } | null>(null);
   const hydratedProblemKeyRef = useRef<string | null>(null);
   const restoreRequestSeqRef = useRef(0);
-  const lastRestoredLanguageRef = useRef<string>('python');
+  const lastRestoredLanguageRef = useRef<string>(normalizedPreferredLanguage);
   const previousSelectionRef = useRef<{ studyProblemId: number | null; language: string }>({
     studyProblemId: null,
-    language: 'python',
+    language: normalizedPreferredLanguage,
   });
   const ideEventTsRef = useRef(0);
 
@@ -1635,7 +1653,7 @@ print("Hello World!")`;
     };
 
     const seedTemplateCode = () => {
-      const defaultLanguage = 'python';
+      const defaultLanguage = normalizedPreferredLanguage;
       const templateCode = getTemplateCode(defaultLanguage);
       applyCode(templateCode, defaultLanguage);
     };
@@ -1659,7 +1677,7 @@ print("Hello World!")`;
         const draftCode = response.data?.code;
         const draftLanguage = response.data?.language
           ? normalizeLanguage(response.data.language)
-          : 'python';
+          : normalizedPreferredLanguage;
 
         if (response.success && typeof draftCode === 'string') {
           applyCode(draftCode, draftLanguage);
@@ -1675,7 +1693,7 @@ print("Hello World!")`;
     };
 
     void hydrateDraft();
-  }, [roomId, selectedStudyProblemId, setLanguage]);
+  }, [roomId, selectedStudyProblemId, setLanguage, normalizedPreferredLanguage]);
 
   useEffect(() => {
     if (!socket || !roomId || !selectedStudyProblemId) return;

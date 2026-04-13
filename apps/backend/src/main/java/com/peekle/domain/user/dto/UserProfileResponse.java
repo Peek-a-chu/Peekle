@@ -15,6 +15,7 @@ public class UserProfileResponse {
     private Integer rank;
     private String profileImg;
     private String profileImgThumb;
+    private String preferredLanguage;
     private Integer streakCurrent;
     private Integer streakMax;
     private Long solvedCount;

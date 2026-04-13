@@ -140,6 +140,7 @@ public class UserService {
                 .rank((int) rank)
                 .profileImg(user.getProfileImg())
                 .profileImgThumb(user.getProfileImgThumb())
+                .preferredLanguage(user.getPreferredLanguage())
                 .streakCurrent(user.getStreakCurrent())
                 .streakMax(user.getStreakMax())
                 .solvedCount(solvedCount)
@@ -168,6 +169,7 @@ public class UserService {
         info.put("bojId", user.getBojId());
         info.put("league", user.getLeague().name());
         info.put("leaguePoint", user.getLeaguePoint());
+        info.put("preferredLanguage", user.getPreferredLanguage());
         return info;
     }
 
@@ -463,6 +465,37 @@ public class UserService {
                     null,
                     null);
         }
+
+        String normalizedPreferredLanguage = normalizePreferredLanguage(request.getPreferredLanguage());
+        if (normalizedPreferredLanguage != null) {
+            user.updatePreferredLanguage(normalizedPreferredLanguage);
+        }
+    }
+
+    private String normalizePreferredLanguage(String preferredLanguage) {
+        if (preferredLanguage == null || preferredLanguage.isBlank()) {
+            return null;
+        }
+
+        String normalized = preferredLanguage.trim().toLowerCase();
+        if (normalized.contains("python") || normalized.contains("pypy")) {
+            return "python";
+        }
+        if (normalized.contains("java") && !normalized.contains("script")) {
+            return "java";
+        }
+        if (normalized.contains("c++") || normalized.contains("cpp")) {
+            return "cpp";
+        }
+        if (normalized.equals("c")
+                || normalized.startsWith("c ")
+                || normalized.contains("clang")
+                || normalized.contains("c11")
+                || normalized.contains("gnu11")) {
+            return "cpp";
+        }
+
+        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
 
     public Map<String, String> getProfileImagePresignedUrl(Long userId, String fileName, String contentType) {
