@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
+import { isPublicE2ERoute } from '@/lib/e2e-routes';
 
 const AUTH_OR_PUBLIC_ROUTES = new Set(['/login', '/signup', '/']);
 
@@ -12,7 +13,7 @@ export function ClientSessionManager() {
   const { checkAuth } = useAuthStore();
 
   useEffect(() => {
-    if (!pathname || AUTH_OR_PUBLIC_ROUTES.has(pathname)) {
+    if (!pathname || AUTH_OR_PUBLIC_ROUTES.has(pathname) || isPublicE2ERoute(pathname)) {
       return;
     }
 

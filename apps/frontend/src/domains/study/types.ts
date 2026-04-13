@@ -86,6 +86,13 @@ export interface ChatMessageResponse {
   content: string;
   type: 'TALK' | 'ENTER' | 'LEAVE' | 'SYSTEM' | 'CODE' | 'SUBMISSION';
   parentId?: number;
+  parentMessage?: {
+    id: string;
+    senderId: number;
+    senderName: string;
+    content: string;
+    type: 'TALK' | 'ENTER' | 'LEAVE' | 'SYSTEM' | 'CODE' | 'SUBMISSION';
+  };
   metadata?: any;
   createdAt: string;
 }

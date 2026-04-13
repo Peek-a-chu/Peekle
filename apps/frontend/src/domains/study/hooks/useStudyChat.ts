@@ -48,7 +48,7 @@ export function useStudyChat(roomId: number) {
         content: msg.content,
         type,
         createdAt: msg.createdAt,
-        parentMessage: undefined,
+        parentMessage: msg.parentMessage || undefined,
         metadata,
       } as ChatMessage;
     },

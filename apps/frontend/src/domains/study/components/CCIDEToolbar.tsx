@@ -320,14 +320,17 @@ export function CCIDEToolbar({
               {showChatRef && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onRefChat}
-                      disabled={disabled}
-                      className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
-                    >
-                      <Share2 className="h-[20px] w-[20px] stroke-[2.5px]" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onRefChat}
+                    disabled={disabled}
+                    title="Share code to chat"
+                    aria-label="Share code to chat"
+                    data-testid="ide-share-code-button"
+                    className="h-10 w-10 text-foreground hover:bg-accent border border-transparent hover:border-border transition-all"
+                  >
+                    <Share2 className="h-[20px] w-[20px] stroke-[2.5px]" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>내 풀이 채팅에 공유</TooltipContent>
@@ -413,6 +416,9 @@ export function CCIDEToolbar({
                       variant="ghost"
                       onClick={onRefChat}
                       disabled={disabled}
+                      title="Share code to chat"
+                      aria-label="Share code to chat"
+                      data-testid="ide-share-code-button"
                       className="h-9 justify-start gap-2"
                     >
                       <Share2 className="h-4 w-4" />

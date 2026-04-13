@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:e2e": "cross-env NEXT_PUBLIC_ENABLE_E2E_ROUTES=true next build",
     "start": "next start",
+    "start:e2e": "cross-env NEXT_PUBLIC_ENABLE_E2E_ROUTES=true next start",
     "test": "vitest",
     "test:e2e": "playwright test",
     "lint": "next lint",
