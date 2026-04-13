@@ -96,7 +96,7 @@ export interface PointActivity {
   description: string;
   amount: number;
   createdAt: string;
-  category?: 'PROBLEM' | 'GAME' | 'STUDY' | string; // Enum from backend
+  category?: 'PROBLEM' | 'GAME' | 'STUDY' | 'CS' | string; // Enum from backend
 }
 
 export interface WeeklyPointSummary {

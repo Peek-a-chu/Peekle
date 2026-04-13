@@ -7,6 +7,7 @@ import {
   Gamepad2,
   Code2,
   Award,
+  GraduationCap,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -93,6 +94,8 @@ export const CCWeeklyScore = ({ initialData, selectedDate: externalDate }: CCWee
       return <Code2 className="w-5 h-5 text-green-500" />;
     if (category === 'STUDY' || description.includes('Study') || description.includes('스터디'))
       return <Users className="w-5 h-5 text-blue-500" />;
+    if (category === 'CS' || description.includes('[CS]') || description.includes('트랙'))
+      return <GraduationCap className="w-5 h-5 text-indigo-500" />;
     if (category === 'LEAGUE' || description.includes('League') || description.includes('리그'))
       return <Award className="w-5 h-5 text-yellow-500" />;
     return <Trophy className="w-5 h-5 text-muted-foreground" />;
