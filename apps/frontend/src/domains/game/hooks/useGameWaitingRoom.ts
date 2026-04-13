@@ -175,6 +175,14 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
       }
     });
 
+    // 4. Send WebSocket ENTER message to register as online in Redis
+    // This is crucial for the backend's disconnect logic to recognize the user is active in the WAITING room
+    console.log('[GameWaitingRoom] Sending WebSocket ENTER to register online status');
+    client.publish({
+      destination: '/pub/games/enter',
+      body: JSON.stringify({ gameId: Number(roomId) })
+    });
+
     return () => {
       roomSub.unsubscribe();
       chatSub.unsubscribe();
