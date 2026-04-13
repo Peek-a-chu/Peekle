@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { isSameDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, FileText, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,7 @@ export function CCProblemListPanel({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
   const [addProblemModalOpen, setAddProblemModalOpen] = useState(false);
+  const [addTargetDate, setAddTargetDate] = useState<string | null>(null);
   const [selectedSubmissionStudyProblemId, setSelectedSubmissionStudyProblemId] = useState<number | null>(
     null,
   );
@@ -176,8 +177,26 @@ export function CCProblemListPanel({
     customLink?: string,
   ) => {
     if (onAddProblem) {
-      await onAddProblem(title, number, tags, problemId, date, customLink);
+      const resolvedDate = date ?? addTargetDate ?? format(selectedDate, 'yyyy-MM-dd');
+      await onAddProblem(title, number, tags, problemId, resolvedDate, customLink);
     }
+  };
+
+  const handleOpenAddProblemModal = () => {
+    const today = new Date();
+    const todayKey = format(today, 'yyyy-MM-dd');
+
+    if (!isSameDay(selectedDate, today)) {
+      onDateChange(today);
+    }
+
+    setAddTargetDate(todayKey);
+    setAddProblemModalOpen(true);
+  };
+
+  const handleCloseAddProblemModal = () => {
+    setAddProblemModalOpen(false);
+    setAddTargetDate(null);
   };
 
   const handleRemoveProblem = async (problemId: number, studyProblemId?: number) => {
@@ -244,7 +263,7 @@ export function CCProblemListPanel({
 
           {allowProblemManage && (
             <Button
-              onClick={() => setAddProblemModalOpen(true)}
+              onClick={handleOpenAddProblemModal}
               className={cn(
                 'bg-primary hover:bg-primary/90 text-white h-8 text-xs shadow-sm',
                 isCompact ? 'px-2' : 'px-3',
@@ -330,7 +349,7 @@ export function CCProblemListPanel({
       {allowProblemManage && (
         <CCAddProblemModal
           isOpen={addProblemModalOpen}
-          onClose={() => setAddProblemModalOpen(false)}
+          onClose={handleCloseAddProblemModal}
           onAdd={handleAddProblem}
           onRemove={handleRemoveProblem}
           currentProblems={problems}
