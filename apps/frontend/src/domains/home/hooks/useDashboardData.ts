@@ -116,12 +116,14 @@ export const useTimeline = (
             // We need to map 'tier' string to BojTier type ('bronze' etc.)
 
             const mappedData: TimelineItemData[] = (json.data || []).map((item: any) => ({
+              timelineKey: item.timelineKey,
+              activityType: item.activityType ? item.activityType.toLowerCase() : 'submission',
               submissionId: item.submissionId,
-              problemId: item.problemId,
-              title: item.title,
+              problemId: item.problemId || item.timelineKey || '',
+              title: item.title || 'CS 학습',
               tier: item.tier ? item.tier.toLowerCase() : 'bronze',
               tierLevel: item.tierLevel,
-              link: item.link,
+              link: item.link || '',
               sources: [], // 백준 태그 제거 (사용자 요청)
               sourceType: item.sourceType ? item.sourceType.toLowerCase() : 'problem',
               tag: item.tag, // 백엔드에서 받은 태그 (null일 수 있음)
@@ -131,6 +133,11 @@ export const useTimeline = (
               result: item.result, // 제출 결과
               isSuccess: item.isSuccess, // 성공 여부 매핑
               submittedAt: item.submittedAt,
+              csDomainName: item.csDomainName,
+              csTrackNo: item.csTrackNo,
+              csStageNo: item.csStageNo,
+              csCorrectCount: item.csCorrectCount,
+              csTotalCount: item.csTotalCount,
             }));
             setData(mappedData);
           } else {

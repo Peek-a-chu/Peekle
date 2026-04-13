@@ -8,7 +8,7 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  CornerDownRight,
+  GraduationCap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { TimelineItemData, BOJ_TIER_NAMES, BOJ_TIER_COLORS } from '../mocks/dashboardMocks';
@@ -29,6 +29,7 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
   // 첫 번째 항목을 메인으로 사용 (가장 최신)
   const mainItem = items[0];
   const { problemId, title, tier, tierLevel, link } = mainItem;
+  const isCsStageActivity = mainItem.activityType === 'cs_stage';
 
   const hasMultiple = items.length > 1;
 
@@ -40,6 +41,42 @@ const TimelineItem = ({ items, onSelect, selectedItemId, isMe = true }: Timeline
   };
 
   const isMainSuccess = mainItem.result?.includes('맞았습니다') ?? false;
+
+  if (isCsStageActivity) {
+    const scoreLabel =
+      typeof mainItem.csCorrectCount === 'number' && typeof mainItem.csTotalCount === 'number'
+        ? `${mainItem.csCorrectCount}/${mainItem.csTotalCount}`
+        : '-';
+
+    return (
+      <div className="border border-border/50 rounded-lg mb-2 overflow-hidden bg-card transition-all hover:border-primary/50">
+        <div className="flex items-center justify-between p-3">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <GraduationCap className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs text-primary font-semibold">CS 학습 완료</div>
+              <div
+                className="font-bold text-foreground truncate"
+                title={mainItem.csDomainName || 'CS 도메인'}
+              >
+                {mainItem.csDomainName || 'CS 도메인'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                트랙 {mainItem.csTrackNo ?? '-'} · 스테이지 {mainItem.csStageNo ?? '-'}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-right shrink-0">
+            <div className="text-sm font-bold text-primary">{scoreLabel}</div>
+            <div className="text-xs text-muted-foreground">{formatDateTime(mainItem.submittedAt)}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border border-border/50 rounded-lg mb-2 overflow-hidden bg-card transition-all hover:border-primary/50">
