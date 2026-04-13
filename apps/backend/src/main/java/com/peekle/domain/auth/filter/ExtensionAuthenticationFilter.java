@@ -9,12 +9,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -40,8 +41,12 @@ public class ExtensionAuthenticationFilter extends OncePerRequestFilter {
                 User user = userService.getUserByExtensionToken(token);
 
                 if (user != null) {
+                    String authority = "ROLE_" + (user.getRole() == null ? "USER" : user.getRole().name());
                     UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(user.getId(), null, Collections.emptyList());
+                            new UsernamePasswordAuthenticationToken(
+                                    user.getId(),
+                                    null,
+                                    List.of(new SimpleGrantedAuthority(authority)));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     log.debug("Authenticated user {} via extension token", user.getNickname());
                 }

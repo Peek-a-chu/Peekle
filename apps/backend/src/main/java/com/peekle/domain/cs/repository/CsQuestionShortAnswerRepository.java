@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface CsQuestionShortAnswerRepository extends JpaRepository<CsQuestionShortAnswer, Long> {
     List<CsQuestionShortAnswer> findByQuestion_IdOrderByIsPrimaryDescIdAsc(Long questionId);
+
+    void deleteByQuestion_Id(Long questionId);
 }

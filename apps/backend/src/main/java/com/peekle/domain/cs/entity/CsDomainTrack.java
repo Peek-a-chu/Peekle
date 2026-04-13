@@ -42,4 +42,8 @@ public class CsDomainTrack {
 
     @Column(nullable = false, length = 150)
     private String name;
+
+    public void rename(String name) {
+        this.name = name;
+    }
 }

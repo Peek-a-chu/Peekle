@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface CsQuestionChoiceRepository extends JpaRepository<CsQuestionChoice, Long> {
     List<CsQuestionChoice> findByQuestion_IdOrderByChoiceNoAsc(Long questionId);
+
+    void deleteByQuestion_Id(Long questionId);
 }
