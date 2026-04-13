@@ -24,12 +24,14 @@ export async function getTimelineServer(
 
   // Map backend response to TimelineItemData
   return data.map((item: any) => ({
+    timelineKey: item.timelineKey,
+    activityType: item.activityType ? item.activityType.toLowerCase() : 'submission',
     submissionId: item.submissionId,
-    problemId: item.problemId,
-    title: item.title,
+    problemId: item.problemId || item.timelineKey || '',
+    title: item.title || 'CS 학습',
     tier: item.tier ? item.tier.toLowerCase() : 'bronze',
     tierLevel: item.tierLevel,
-    link: item.link,
+    link: item.link || '',
     sources: [],
     sourceType: item.sourceType ? item.sourceType.toLowerCase() : 'problem',
     tag: item.tag,
@@ -39,6 +41,11 @@ export async function getTimelineServer(
     result: item.result,
     isSuccess: item.isSuccess,
     submittedAt: item.submittedAt,
+    csDomainName: item.csDomainName,
+    csTrackNo: item.csTrackNo,
+    csStageNo: item.csStageNo,
+    csCorrectCount: item.csCorrectCount,
+    csTotalCount: item.csTotalCount,
   }));
 }
 

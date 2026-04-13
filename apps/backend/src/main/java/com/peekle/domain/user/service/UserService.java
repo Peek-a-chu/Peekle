@@ -33,8 +33,10 @@ import java.util.Optional;
 
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsUserProfile;
+import com.peekle.domain.cs.entity.CsStageAttemptLog;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsUserProfileRepository;
+import com.peekle.domain.cs.repository.CsStageAttemptLogRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +48,7 @@ public class UserService {
     private final LeagueService leagueService;
     private final CsUserProfileRepository csUserProfileRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
+    private final CsStageAttemptLogRepository csStageAttemptLogRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Transactional
@@ -234,64 +237,86 @@ public class UserService {
                 .findAllByUserIdAndSubmittedAtBetweenOrderBySubmittedAtDesc(
                         userId, startOfDay, endOfDay);
 
+        java.util.List<CsStageAttemptLog> csStageLogs = csStageAttemptLogRepository.findMainLearningTimeline(
+                userId,
+                startOfDay,
+                endOfDay);
+
         java.util.List<TimelineItemDto> timeline = new java.util.ArrayList<>();
-        java.util.Set<String> processedKeys = new java.util.HashSet<>();
 
         for (com.peekle.domain.submission.entity.SubmissionLog log : logs) {
             com.peekle.domain.problem.entity.Problem problem = log.getProblem();
 
-            // String tagKey = log.getTag() != null ? log.getTag() : "null";
-            // String uniqueKey = problem.getId() + ":" + tagKey;
+            // Use denormalized fields from SubmissionLog if available to avoid potential
+            // N+1 or extra joins if not fetched.
+            String tierStr = log.getProblemTier() != null ? log.getProblemTier().toLowerCase() : "unknown";
+            String title = log.getProblemTitle() != null ? log.getProblemTitle() : problem.getTitle();
+            String problemIdStr = log.getExternalId() != null ? log.getExternalId() : problem.getExternalId();
+            String problemLink = "https://www.acmicpc.net/problem/" + problemIdStr;
 
-            // if (!processedKeys.contains(uniqueKey)) {
-            // processedKeys.add(uniqueKey);
-            {
+            String tierName = "unknown";
+            int tierLevel = 0;
 
-                // Use denormalized fields from SubmissionLog if available to avoid potential
-                // N+1 or extra joins if not fetched
-                // The entity definition shows problemTitle, problemTier, and now externalId
-                // exist.
-                String tierStr = log.getProblemTier() != null ? log.getProblemTier().toLowerCase() : "unknown";
-                String title = log.getProblemTitle() != null ? log.getProblemTitle() : problem.getTitle();
-                String problemIdStr = log.getExternalId() != null ? log.getExternalId() : problem.getExternalId();
-                // construct URL manually since it's standard BOJ URL pattern
-                String problemLink = "https://www.acmicpc.net/problem/" + problemIdStr;
-
-                String tierName = "unknown";
-                int tierLevel = 0;
-
-                String[] parts = tierStr.split(" ");
-                if (parts.length >= 2) {
-                    tierName = parts[0];
-                    try {
-                        tierLevel = Integer.parseInt(parts[1]);
-                    } catch (NumberFormatException e) {
-                        tierLevel = 0;
-                    }
-                } else {
-                    tierName = tierStr;
+            String[] parts = tierStr.split(" ");
+            if (parts.length >= 2) {
+                tierName = parts[0];
+                try {
+                    tierLevel = Integer.parseInt(parts[1]);
+                } catch (NumberFormatException e) {
+                    tierLevel = 0;
                 }
-
-                timeline.add(TimelineItemDto.builder()
-                        .submissionId(log.getId())
-                        .problemId(problemIdStr)
-                        .title(title)
-                        .tier(tierName)
-                        .tierLevel(tierLevel)
-                        .link(problemLink)
-                        .tag(log.getTag()) // Map tag from log
-                        .sourceType(log.getSourceType() != null ? log.getSourceType().name() : "EXTENSION")
-                        .language(log.getLanguage())
-                        .memory(log.getMemory())
-                        .executionTime(log.getExecutionTime())
-                        .result(log.getResult())
-                        .isSuccess(log.getIsSuccess())
-                        .submittedAt(log.getSubmittedAt().toString())
-                        .build());
+            } else {
+                tierName = tierStr;
             }
+
+            timeline.add(TimelineItemDto.builder()
+                    .timelineKey("SUBMISSION:" + log.getId())
+                    .activityType("SUBMISSION")
+                    .submissionId(log.getId())
+                    .problemId(problemIdStr)
+                    .title(title)
+                    .tier(tierName)
+                    .tierLevel(tierLevel)
+                    .link(problemLink)
+                    .tag(log.getTag())
+                    .sourceType(log.getSourceType() != null ? log.getSourceType().name() : "EXTENSION")
+                    .language(log.getLanguage())
+                    .memory(log.getMemory())
+                    .executionTime(log.getExecutionTime())
+                    .result(log.getResult())
+                    .isSuccess(log.getIsSuccess())
+                    .submittedAt(log.getSubmittedAt().toString())
+                    .build());
         }
 
+        for (CsStageAttemptLog csLog : csStageLogs) {
+            timeline.add(TimelineItemDto.builder()
+                    .timelineKey("CS_STAGE:" + csLog.getId())
+                    .activityType("CS_STAGE")
+                    .sourceType("CS")
+                    .submittedAt(csLog.getCompletedAt().toString())
+                    .csDomainName(csLog.getDomain().getName())
+                    .csTrackNo((int) csLog.getTrackNo())
+                    .csStageNo((int) csLog.getStageNo())
+                    .csCorrectCount(csLog.getCorrectCount())
+                    .csTotalCount(csLog.getTotalCount())
+                    .build());
+        }
+
+        timeline.sort((a, b) -> parseTimelineDateTime(b.getSubmittedAt()).compareTo(parseTimelineDateTime(a.getSubmittedAt())));
         return timeline;
+    }
+
+    private java.time.LocalDateTime parseTimelineDateTime(String value) {
+        if (value == null || value.isBlank()) {
+            return java.time.LocalDateTime.MIN;
+        }
+
+        try {
+            return java.time.LocalDateTime.parse(value);
+        } catch (Exception e) {
+            return java.time.LocalDateTime.MIN;
+        }
     }
 
     @Transactional(readOnly = true)

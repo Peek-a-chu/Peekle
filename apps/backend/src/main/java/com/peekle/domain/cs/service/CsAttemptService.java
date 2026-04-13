@@ -10,6 +10,7 @@ import com.peekle.domain.cs.dto.response.CsQuestionPayloadResponse;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
+import com.peekle.domain.cs.entity.CsStageAttemptLog;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsWrongProblem;
@@ -18,6 +19,7 @@ import com.peekle.domain.cs.enums.CsQuestionType;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
+import com.peekle.domain.cs.repository.CsStageAttemptLogRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsWrongProblemRepository;
@@ -61,6 +63,7 @@ public class CsAttemptService {
     private final CsQuestionRepository csQuestionRepository;
     private final CsQuestionChoiceRepository csQuestionChoiceRepository;
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
+    private final CsStageAttemptLogRepository csStageAttemptLogRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final CsWrongProblemRepository csWrongProblemRepository;
     private final CsAttemptStore csAttemptStore;
@@ -190,6 +193,7 @@ public class CsAttemptService {
         int earnedScore = correctCount;
 
         persistWrongProblems(user, session);
+        persistStageAttemptLog(user, stage, correctCount, totalQuestionCount);
 
         Long nextStageId = resolveNextStageId(stage);
         boolean isTrackCompleted = nextStageId == null;
@@ -215,6 +219,21 @@ public class CsAttemptService {
                 earnedScore,
                 totalScore,
                 nextStageId);
+    }
+
+    private void persistStageAttemptLog(User user, CsStage stage, int correctCount, int totalQuestionCount) {
+        CsStageAttemptLog attemptLog = CsStageAttemptLog.builder()
+                .user(user)
+                .domain(stage.getTrack().getDomain())
+                .trackNo(stage.getTrack().getTrackNo())
+                .stageNo(stage.getStageNo())
+                .correctCount(correctCount)
+                .totalCount(totalQuestionCount)
+                .isReview(false)
+                .completedAt(LocalDateTime.now())
+                .build();
+
+        csStageAttemptLogRepository.save(attemptLog);
     }
 
     private CsAttemptSession getAttemptSession(Long userId, Long stageId) {

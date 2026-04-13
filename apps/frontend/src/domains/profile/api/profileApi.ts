@@ -2,6 +2,8 @@ import { apiFetch } from '@/lib/api';
 import { UserProfile } from '@/domains/profile/types';
 
 export interface TimelineItem {
+  timelineKey?: string;
+  activityType?: 'SUBMISSION' | 'CS_STAGE';
   submissionId: number;
   problemId: string;
   title: string;
@@ -9,11 +11,16 @@ export interface TimelineItem {
   tierLevel?: number;
   link: string;
   tag?: string;
-  sourceType: 'EXTENSION' | 'STUDY' | 'GAME';
+  sourceType: 'EXTENSION' | 'STUDY' | 'GAME' | 'CS';
   language: string;
   memory: number;
   executionTime: number;
   submittedAt: string;
+  csDomainName?: string;
+  csTrackNo?: number;
+  csStageNo?: number;
+  csCorrectCount?: number;
+  csTotalCount?: number;
 }
 
 export interface ActivityStreak {

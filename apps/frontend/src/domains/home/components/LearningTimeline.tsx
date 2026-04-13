@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { useTimeline } from '../hooks/useDashboardData';
-import { TimelineItemData, MOCK_TIMELINE } from '../mocks/dashboardMocks';
+import { TimelineItemData } from '../mocks/dashboardMocks';
 import TimelineItem from './TimelineItem';
 
 interface LearningTimelineProps {
@@ -27,21 +27,32 @@ const LearningTimeline = ({
   const data = rawData;
   const [expanded, setExpanded] = useState(false);
 
-  // 문제 ID별 그룹화 (중복 문제 하나로 합치기)
+  // 문제 제출은 문제 ID 기준으로 그룹화, CS 학습은 건별 카드로 분리
   const groupedDataMap = data.reduce(
-    (acc, item) => {
-      if (!acc[item.problemId]) {
-        acc[item.problemId] = [];
+    (acc, item, index) => {
+      const isCsStageActivity = item.activityType === 'cs_stage';
+      const key = isCsStageActivity
+        ? item.timelineKey || `cs-stage-${item.submittedAt || index}`
+        : `problem-${item.problemId}`;
+
+      if (!acc[key]) {
+        acc[key] = [];
       }
-      acc[item.problemId].push(item);
+      acc[key].push(item);
       return acc;
     },
     {} as Record<string, typeof data>,
   );
 
   // 각 그룹 내에서 정답(AC)을 최우선으로, 그 다음 최신순으로 정렬
-  Object.keys(groupedDataMap).forEach((problemId) => {
-    groupedDataMap[problemId].sort((a, b) => {
+  Object.keys(groupedDataMap).forEach((groupKey) => {
+    groupedDataMap[groupKey].sort((a, b) => {
+      if (a.activityType === 'cs_stage' || b.activityType === 'cs_stage') {
+        const aTime = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+        const bTime = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+        return bTime - aTime;
+      }
+
       // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
       // 1. 정답 여부로 먼저 정렬 (정답이 먼저)
       const aIsSuccess = a.isSuccess ?? false;
@@ -58,7 +69,19 @@ const LearningTimeline = ({
     });
   });
 
-  const groupedKeys = Object.keys(groupedDataMap);
+  const groupedKeys = Object.keys(groupedDataMap).sort((a, b) => {
+    const latestA = groupedDataMap[a].reduce((max, item) => {
+      const t = item.submittedAt ? new Date(item.submittedAt).getTime() : 0;
+      return Math.max(max, t);
+    }, 0);
+
+    const latestB = groupedDataMap[b].reduce((max, item) => {
+      const t = item.submittedAt ? new Date(item.submittedAt).getTime() : 0;
+      return Math.max(max, t);
+    }, 0);
+
+    return latestB - latestA;
+  });
 
   const router = useRouter(); // Added router initialization
 
@@ -87,7 +110,7 @@ const LearningTimeline = ({
           <h3 className="font-bold text-foreground">
             {selectedDate ? `${formatDate(selectedDate)} 학습 타임라인` : '학습 타임라인'}
           </h3>
-          <p className="text-xs text-muted-foreground">총 {data.length}개 문제</p>
+          <p className="text-xs text-muted-foreground">총 {data.length}개 활동</p>
         </div>
 
         {showHistoryLink && nickname && (
@@ -115,7 +138,7 @@ const LearningTimeline = ({
             ))
           ) : (
             <p className="text-center text-muted-foreground py-8">
-              {selectedDate ? '해당 날짜에 풀이한 문제가 없습니다.' : '날짜를 선택해주세요.'}
+              {selectedDate ? '해당 날짜에 학습 활동이 없습니다.' : '날짜를 선택해주세요.'}
             </p>
           )}
         </div>

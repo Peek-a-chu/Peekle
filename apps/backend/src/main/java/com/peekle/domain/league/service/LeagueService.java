@@ -1,6 +1,8 @@
 package com.peekle.domain.league.service;
 
 import com.peekle.domain.league.dto.*;
+import com.peekle.domain.cs.entity.CsStageAttemptLog;
+import com.peekle.domain.cs.repository.CsStageAttemptLogRepository;
 import com.peekle.domain.league.entity.LeagueGroup;
 import com.peekle.domain.league.entity.LeagueHistory;
 import com.peekle.domain.league.enums.LeagueStatus;
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LeagueService {
 
     private final PointLogRepository pointLogRepository;
+    private final CsStageAttemptLogRepository csStageAttemptLogRepository;
     private final SubmissionLogRepository submissionLogRepository;
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;
@@ -377,12 +380,10 @@ public class LeagueService {
 
         List<PointLog> logs = pointLogRepository.findAllByUserIdAndCreatedAtBetweenOrderByCreatedAtDesc(
                 user.getId(), start, end);
+        List<CsStageAttemptLog> csLogs = csStageAttemptLogRepository.findMainLearningTimeline(
+                user.getId(), start, end);
 
-        int totalScore = logs.stream()
-                .mapToInt(PointLog::getAmount)
-                .sum();
-
-        List<PointActivityDto> activities = logs.stream()
+        List<PointActivityDto> pointActivities = logs.stream()
                 .map(log -> PointActivityDto.builder()
                         .description(log.getDescription())
                         .amount(log.getAmount())
@@ -390,6 +391,30 @@ public class LeagueService {
                         .category(log.getCategory())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
+
+        List<PointActivityDto> csActivities = csLogs.stream()
+                .map(log -> PointActivityDto.builder()
+                        .description(String.format(
+                                "[CS] %s 트랙 %d 스테이지 %d (%d/%d)",
+                                log.getDomain().getName(),
+                                (int) log.getTrackNo(),
+                                (int) log.getStageNo(),
+                                log.getCorrectCount(),
+                                log.getTotalCount()))
+                        .amount(log.getCorrectCount())
+                        .createdAt(log.getCompletedAt())
+                        .category(PointCategory.CS)
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        List<PointActivityDto> activities = new ArrayList<>(pointActivities.size() + csActivities.size());
+        activities.addAll(pointActivities);
+        activities.addAll(csActivities);
+        activities.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+
+        int totalScore = activities.stream()
+                .mapToInt(PointActivityDto::getAmount)
+                .sum();
 
         return WeeklyPointSummaryResponse.builder()
                 .totalScore(totalScore)
