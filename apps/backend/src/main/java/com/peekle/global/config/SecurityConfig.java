@@ -75,6 +75,9 @@ public class SecurityConfig {
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                                                 "/api/users/*/timeline")
                                                 .permitAll() // 남의 타임라인 조회
+
+                                                // Admin
+                                                .requestMatchers("/api/cs/admin/**").hasRole("ADMIN")
                                                 // endpoints
 
                                                 // Dev / Test

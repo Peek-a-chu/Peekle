@@ -12,6 +12,26 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
+  // Admin route protection
+  if (pathname.startsWith('/admin')) {
+    if (!accessToken) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    try {
+      const payloadBase64 = accessToken.split('.')[1];
+      const decodedJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
+      const payload = JSON.parse(decodedJson);
+      
+      const role = payload.role || payload.auth || '';
+      if (!role.includes('ADMIN')) {
+        return NextResponse.redirect(new URL('/home', request.url));
+      }
+    } catch {
+      return NextResponse.redirect(new URL('/home', request.url));
+    }
+    return NextResponse.next();
+  }
+
   // Protected routes: allow when access token exists or refresh session marker exists.
   if (isProtectedRoute) {
     if (accessToken || isAuthenticated) {
@@ -46,5 +66,6 @@ export const config = {
     '/settings/:path*',
     '/login',
     '/signup',
+    '/admin/:path*',
   ],
 };

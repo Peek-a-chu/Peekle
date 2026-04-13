@@ -10,6 +10,7 @@ interface User {
   league: string;
   leaguePoint: number;
   preferredLanguage?: string;
+  role?: string;
 }
 
 interface AuthState {

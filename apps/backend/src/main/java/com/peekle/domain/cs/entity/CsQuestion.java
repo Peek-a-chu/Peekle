@@ -46,4 +46,15 @@ public class CsQuestion {
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    public void updateContent(CsQuestionType questionType, String prompt, String explanation) {
+        this.questionType = questionType;
+        this.prompt = prompt;
+        this.explanation = explanation;
+        this.isActive = true;
+    }
+
+    public void deactivate() {
+        this.isActive = false;
+    }
 }

@@ -2,6 +2,7 @@ package com.peekle.domain.user.entity;
 
 import com.peekle.domain.league.enums.LeagueTier;
 import com.peekle.domain.user.enums.ProfileImgType;
+import com.peekle.domain.user.enums.UserRole;
 import com.peekle.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -29,6 +30,11 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private String provider; // KAKAO, NAVER, GOOGLE
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role = UserRole.USER;
+
     @Column(unique = true)
     private String nickname;
 
@@ -45,6 +51,7 @@ public class User extends BaseTimeEntity {
     public User(String socialId, String provider, String nickname) {
         this.socialId = socialId;
         this.provider = provider;
+        this.role = UserRole.USER;
         this.nickname = nickname;
         this.league = LeagueTier.STONE;
         this.leaguePoint = 0;
@@ -176,6 +183,10 @@ public class User extends BaseTimeEntity {
         this.preferredLanguage = preferredLanguage;
     }
 
+    public boolean isAdmin() {
+        return this.role != null && this.role.isAdmin();
+    }
+
     public void updateProfile(String nickname, String bojId, String profileImg, String profileImgThumb) {
         boolean nicknameChanged = false;
         if (nickname != null && !nickname.equals(this.nickname)) {
@@ -240,6 +251,9 @@ public class User extends BaseTimeEntity {
 
     @PrePersist
     protected void prePersist() {
+        if (this.role == null) {
+            this.role = UserRole.USER;
+        }
         if (this.recLevelX10 == null) {
             this.recLevelX10 = 30;
         }

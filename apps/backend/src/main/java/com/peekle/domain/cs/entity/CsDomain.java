@@ -23,4 +23,8 @@ public class CsDomain {
 
     @Column(nullable = false, length = 100)
     private String name;
+
+    public void rename(String name) {
+        this.name = name;
+    }
 }

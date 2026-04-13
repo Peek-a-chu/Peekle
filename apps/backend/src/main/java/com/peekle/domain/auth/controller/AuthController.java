@@ -1,11 +1,14 @@
 package com.peekle.domain.auth.controller;
 
 import com.peekle.domain.user.entity.User;
+import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.domain.auth.dto.SignupRequest;
 import com.peekle.domain.auth.jwt.JwtTokenProvider;
 import com.peekle.domain.auth.service.AuthService;
 import com.peekle.domain.auth.service.RefreshTokenService;
 import com.peekle.global.dto.ApiResponse;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,6 +28,7 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final AuthService authService;
+    private final UserRepository userRepository;
 
     @PostMapping("/refresh")
     public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
@@ -48,8 +52,12 @@ public class AuthController {
             return ApiResponse.error("TOKEN_MISMATCH", "Refresh token does not match stored token");
         }
 
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId);
-        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        String role = user.getRole().name();
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId, role);
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId, role);
 
         refreshTokenService.save(userId, newRefreshToken, jwtTokenProvider.getRefreshTokenExpiry());
 
@@ -98,8 +106,9 @@ public class AuthController {
 
         User user = authService.signup(socialId, provider, signupRequest);
 
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+        String role = user.getRole().name();
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), role);
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), role);
         refreshTokenService.save(user.getId(), refreshToken, jwtTokenProvider.getRefreshTokenExpiry());
 
         int accessExpiry = (int) (jwtTokenProvider.getAccessTokenExpiry() / 1000);

@@ -46,4 +46,9 @@ public class CsQuestionChoice {
     @Builder.Default
     @Column(name = "is_answer", nullable = false)
     private Boolean isAnswer = false;
+
+    public void update(String content, Boolean isAnswer) {
+        this.content = content;
+        this.isAnswer = isAnswer;
+    }
 }
