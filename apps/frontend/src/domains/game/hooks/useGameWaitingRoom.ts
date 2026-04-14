@@ -169,9 +169,14 @@ export function useGameWaitingRoom(roomId: string): UseGameWaitingRoomReturn {
     });
 
     // 3. Error Subscription (User Specific)
-    const errorSub = client.subscribe('/user/queue/errors', (msg) => {
-      if (msg.body) {
-        toast.error(msg.body);
+    const errorSub = client.subscribe(`/topic/games/${roomId}/error/${userId}`, (msg) => {
+      try {
+        const errorEvent = JSON.parse(msg.body);
+        if (errorEvent.type === 'ERROR') {
+          toast.error(errorEvent.data);
+        }
+      } catch (e) {
+        if (msg.body) toast.error(msg.body);
       }
     });
 
