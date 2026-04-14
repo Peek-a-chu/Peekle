@@ -9,6 +9,7 @@ import {
   startCSStageAttempt,
   answerCSStageQuestion,
   completeCSStageAttempt,
+  fetchCSBootstrap,
   CSQuestionPayload,
   CSAttemptAnswerRequest,
   CSAttemptAnswerResponse,
@@ -93,10 +94,28 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExitAlert, setShowExitAlert] = useState(false);
   const [answerResult, setAnswerResult] = useState<CSAttemptAnswerResponse | null>(null);
+  const [trackInfo, setTrackInfo] = useState<{ name: string; trackNo: number; stageNo: number } | null>(null);
 
   const initSession = useCallback(async () => {
     try {
       setPhase('loading');
+
+      try {
+        const bootstrap = await fetchCSBootstrap();
+        if (bootstrap && bootstrap.progress && bootstrap.stages) {
+          const matchedStage = bootstrap.stages.find((s) => s.stageId === stageId);
+          if (matchedStage) {
+            setTrackInfo({
+              name: bootstrap.progress.currentTrackName,
+              trackNo: bootstrap.progress.currentTrackNo,
+              stageNo: matchedStage.stageNo
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch track info:', err);
+      }
+
       const res = await startCSStageAttempt(stageId);
       setCurrentQuestion(res.firstQuestion);
       setTotalQuestionCount(res.totalQuestionCount);
@@ -209,23 +228,35 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
 
   return (
     <div className="flex flex-col w-full animate-in fade-in relative min-h-[80vh] pb-28">
-      <header className="flex items-center justify-between py-4 px-6 bg-background/80 backdrop-blur-md sticky top-0 z-50 border-b border-border/50">
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-muted-foreground">스테이지 {stageId}</span>
-          {phase === 'playing' && totalQuestionCount > 0 && (
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-bold">
+      <header className="flex flex-col py-4 px-6 bg-background/80 backdrop-blur-md sticky top-0 z-50 border-b border-border/50 gap-2">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-muted-foreground">
+              {trackInfo 
+                ? `${trackInfo.name} (${trackInfo.trackNo}-${trackInfo.stageNo})` 
+                : `(트랙 정보 없음) - 스테이지 ${stageId}`}
+            </span>
+            {phase === 'playing' && totalQuestionCount > 0 && (
+              <h1 className="text-lg font-bold mt-0.5">
                 진행도: {solvedQuestionIds.length} / {totalQuestionCount}
               </h1>
-            </div>
-          )}
+            )}
+          </div>
+          <button
+            onClick={() => setShowExitAlert(true)}
+            className="p-2 bg-muted hover:bg-muted/80 rounded-full transition-colors group"
+          >
+            <X className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </button>
         </div>
-        <button
-          onClick={() => setShowExitAlert(true)}
-          className="p-2 bg-muted hover:bg-muted/80 rounded-full transition-colors group"
-        >
-          <X className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
+        {phase === 'playing' && totalQuestionCount > 0 && (
+          <div className="w-full bg-muted rounded-full h-2">
+            <div 
+              className="bg-primary h-2 rounded-full transition-all duration-300 ease-in-out" 
+              style={{ width: `${(solvedQuestionIds.length / totalQuestionCount) * 100}%` }}
+            />
+          </div>
+        )}
       </header>
 
       <main className="flex-1 flex flex-col justify-center items-center p-4">
