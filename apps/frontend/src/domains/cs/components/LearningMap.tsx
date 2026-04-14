@@ -80,7 +80,12 @@ export default function LearningMap({ progress, stages }: LearningMapProps) {
       return;
     }
 
-    router.push(`/cs/stage/${stage.stageId}`);
+    const query = new URLSearchParams({
+      trackName: progress.currentTrackName,
+      trackNo: String(currentTrackNo),
+      stageNo: String(stage.stageNo),
+    });
+    router.push(`/cs/stage/${stage.stageId}?${query.toString()}`);
   };
 
   return (
