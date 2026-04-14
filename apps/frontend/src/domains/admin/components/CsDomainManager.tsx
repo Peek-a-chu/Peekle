@@ -11,6 +11,8 @@ import {
   fetchAdminTracks,
   createAdminTrack,
   renameAdminTrack,
+  deleteAdminTrack,
+  deleteAdminStage,
   CSAdminTrack
 } from '@/domains/cs/api/csAdminApi';
 import { CSDomain } from '@/domains/cs/api/csApi';
@@ -54,8 +56,10 @@ export default function CsDomainManager({
     try {
       const data = await fetchAdminTracks(domainId);
       setTracks(data);
+      return data;
     } catch (err: any) {
       toast({ variant: 'destructive', title: '오류', description: err.message });
+      return [];
     } finally {
       setLoadingTracks(false);
     }
@@ -121,12 +125,22 @@ export default function CsDomainManager({
 
   const handleCreateTrack = async () => {
     if (!selectedDomainId) return;
-    const name = prompt('새 트랙 이름을 입력하세요 (생성 시 10개 스테이지 자동생성)');
+    const name = prompt('새 트랙 이름을 입력하세요');
     if (!name?.trim()) return;
+
+    const stageCountInput = prompt('초기 스테이지 수를 입력하세요 (기본 5, 1~20)', '5');
+    if (stageCountInput === null) return;
+
+    const stageCount = parseInt(stageCountInput, 10);
+    if (Number.isNaN(stageCount) || stageCount < 1 || stageCount > 20) {
+      toast({ variant: 'destructive', title: '오류', description: '스테이지 수는 1~20 사이 숫자여야 합니다.' });
+      return;
+    }
+
     try {
-      const newTrack = await createAdminTrack(selectedDomainId, name.trim());
-      setTracks([...tracks, newTrack]);
-      toast({ title: '트랙 생성 성공 (스테이지 10개 포함)' });
+      const newTrack = await createAdminTrack(selectedDomainId, name.trim(), stageCount);
+      setTracks([...tracks, newTrack].sort((a, b) => a.trackNo - b.trackNo));
+      toast({ title: `트랙 생성 성공 (스테이지 ${stageCount}개)` });
     } catch (err: any) {
       toast({ variant: 'destructive', title: '오류', description: err.message });
     }
@@ -147,6 +161,70 @@ export default function CsDomainManager({
         onSelectTrack(updated);
       }
       toast({ title: '트랙 이름 변경 성공' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: '오류', description: err.message });
+    }
+  };
+
+  const handleDeleteTrack = async (trackId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedDomainId) return;
+    if (!confirm('정말 트랙을 삭제하시겠습니까? 포함된 스테이지/문제가 함께 삭제됩니다.')) return;
+
+    try {
+      await deleteAdminTrack(trackId);
+      const reloadedTracks = await loadTracks(selectedDomainId);
+
+      if (selectedTrack?.trackId === trackId) {
+        onSelectTrack(null);
+        onSelectStage(null);
+      } else if (selectedTrack) {
+        const refreshedSelectedTrack = reloadedTracks.find((track) => track.trackId === selectedTrack.trackId) ?? null;
+        onSelectTrack(refreshedSelectedTrack);
+        if (!refreshedSelectedTrack || !refreshedSelectedTrack.stages.some((stage) => stage.stageId === selectedStageId)) {
+          onSelectStage(null);
+        }
+      }
+
+      toast({ title: '트랙 삭제 성공' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: '오류', description: err.message });
+    }
+  };
+
+  const handleDeleteStage = async (
+    trackId: number,
+    stageId: number,
+    stageNo: number,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    if (!selectedDomainId) return;
+    if (!confirm(`스테이지 ${stageNo}를 삭제하시겠습니까? 포함된 문제가 함께 삭제됩니다.`)) return;
+
+    try {
+      await deleteAdminStage(stageId);
+      const reloadedTracks = await loadTracks(selectedDomainId);
+      const refreshedTrack = reloadedTracks.find((track) => track.trackId === trackId) ?? null;
+
+      if (!refreshedTrack) {
+        onSelectTrack(null);
+        onSelectStage(null);
+        toast({ title: '스테이지 삭제 성공' });
+        return;
+      }
+
+      onSelectTrack(refreshedTrack);
+      if (selectedStageId === stageId) {
+        const preferredStage = refreshedTrack.stages.find((stage) => stage.stageNo === stageNo)
+          ?? refreshedTrack.stages[refreshedTrack.stages.length - 1]
+          ?? null;
+        onSelectStage(preferredStage?.stageId ?? null);
+      } else if (!refreshedTrack.stages.some((stage) => stage.stageId === selectedStageId)) {
+        onSelectStage(null);
+      }
+
+      toast({ title: '스테이지 삭제 성공' });
     } catch (err: any) {
       toast({ variant: 'destructive', title: '오류', description: err.message });
     }
@@ -198,7 +276,7 @@ export default function CsDomainManager({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-md">트랙</CardTitle>
-            <Button variant="ghost" size="icon" onClick={handleCreateTrack}>
+            <Button variant="ghost" size="icon" onClick={handleCreateTrack} disabled={loadingTracks}>
               <Plus className="h-4 w-4" />
             </Button>
           </CardHeader>
@@ -218,18 +296,34 @@ export default function CsDomainManager({
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleRenameTrack(t.trackId, e)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive"
+                        onClick={(e) => handleDeleteTrack(t.trackId, e)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                       <ChevronRight className={`h-4 w-4 transition-transform ${selectedTrack?.trackId === t.trackId ? 'rotate-90' : ''}`} />
                     </div>
                   </div>
                   {selectedTrack?.trackId === t.trackId && (
                     <ul className="bg-muted/30 pl-6 pb-2">
-                      {t.stageIds?.map((stageId, i) => (
+                      {t.stages?.map((stage) => (
                         <li 
-                          key={stageId}
-                          className={`p-2 text-sm cursor-pointer hover:text-primary ${selectedStageId === stageId ? 'text-primary font-bold' : 'text-muted-foreground'}`}
-                          onClick={() => onSelectStage(stageId)}
+                          key={stage.stageId}
+                          className={`p-2 text-sm cursor-pointer hover:text-primary ${selectedStageId === stage.stageId ? 'text-primary font-bold' : 'text-muted-foreground'} flex items-center justify-between`}
+                          onClick={() => onSelectStage(stage.stageId)}
                         >
-                          스테이지 {i + 1}
+                          <span>스테이지 {stage.stageNo}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            onClick={(e) => handleDeleteStage(t.trackId, stage.stageId, stage.stageNo, e)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </li>
                       ))}
                     </ul>

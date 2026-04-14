@@ -12,6 +12,7 @@ export default function CsContentAdminPage() {
   const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<CSAdminTrack | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
+  const selectedStage = selectedTrack?.stages.find((stage) => stage.stageId === selectedStageId) ?? null;
 
   return (
     <div className="container mx-auto py-5">
@@ -38,8 +39,8 @@ export default function CsContentAdminPage() {
               <CardHeader className="px-5 pt-5 pb-3">
                 <CardTitle className="text-xl">스테이지 편집</CardTitle>
                 <CardDescription>
-                  스테이지 {selectedStageId} 문제 편집
-                  (트랙: {selectedTrack?.name})
+                  {selectedTrack?.domainName} / {selectedTrack?.domainId}-{selectedTrack?.trackNo}) {selectedTrack?.name}
+                  {selectedStage ? ` · 스테이지 ${selectedStage.stageNo} 문제 편집` : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-5 pb-5 pt-0">
