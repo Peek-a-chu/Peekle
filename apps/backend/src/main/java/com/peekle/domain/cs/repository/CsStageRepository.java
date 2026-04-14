@@ -21,4 +21,6 @@ public interface CsStageRepository extends JpaRepository<CsStage, Long> {
     List<CsStage> findByTrack_IdOrderByStageNoAsc(Long trackId);
 
     Optional<CsStage> findByTrack_IdAndStageNo(Long trackId, Short stageNo);
+
+    Optional<CsStage> findTopByTrack_IdOrderByStageNoDesc(Long trackId);
 }

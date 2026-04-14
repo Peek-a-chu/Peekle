@@ -39,4 +39,8 @@ public class CsStage {
 
     @Column(name = "stage_no", nullable = false)
     private Short stageNo;
+
+    public void updateStageNo(short stageNo) {
+        this.stageNo = stageNo;
+    }
 }

@@ -84,11 +84,27 @@ public class CsAdminController {
         return ApiResponse.success(csAdminContentService.renameTrack(userId, trackId, request));
     }
 
+    @DeleteMapping("/tracks/{trackId}")
+    public ApiResponse<Void> deleteTrack(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long trackId) {
+        csAdminContentService.deleteTrack(userId, trackId);
+        return ApiResponse.success();
+    }
+
     @GetMapping("/stages/{stageId}/questions")
     public ApiResponse<List<CsAdminQuestionResponse>> getStageQuestions(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long stageId) {
         return ApiResponse.success(csAdminContentService.getStageQuestions(userId, stageId));
+    }
+
+    @DeleteMapping("/stages/{stageId}")
+    public ApiResponse<Void> deleteStage(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long stageId) {
+        csAdminContentService.deleteStage(userId, stageId);
+        return ApiResponse.success();
     }
 
     @PostMapping("/stages/{stageId}/questions/import")

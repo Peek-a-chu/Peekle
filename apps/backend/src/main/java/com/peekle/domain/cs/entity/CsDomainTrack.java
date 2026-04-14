@@ -46,4 +46,8 @@ public class CsDomainTrack {
     public void rename(String name) {
         this.name = name;
     }
+
+    public void updateTrackNo(short trackNo) {
+        this.trackNo = trackNo;
+    }
 }
