@@ -79,27 +79,27 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
 
        /**
         * 특정 레벨 범위 내에서 무작위로 N개의 문제를 가져옵니다.
-        * MySQL의 ORDER BY RAND()를 사용합니다.
+        * PostgreSQL의 ORDER BY RANDOM()을 사용합니다.
         */
        @Query(nativeQuery = true, value = "SELECT id, source, external_id, title, tier, url, accepted_user_count, level, language FROM problems p " +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
-                     "AND p.title REGEXP '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
-                     "ORDER BY RAND() LIMIT :limit")
+                     "AND p.title ~ '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
+                     "ORDER BY RANDOM() LIMIT :limit")
        List<Problem> findRandomProblemsByTiers(@Param("tiers") List<String> tiers, @Param("limit") int limit);
 
        @Query(nativeQuery = true, value = "SELECT p.id, p.source, p.external_id, p.title, p.tier, p.url, p.accepted_user_count, p.level, p.language FROM problems p "
                      +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
-                     "AND p.title REGEXP '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
+                     "AND p.title ~ '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
                      "AND EXISTS (" +
                      "    SELECT 1 FROM problem_tags pt " +
                      "    JOIN tags t ON pt.tag_id = t.id " +
                      "    WHERE pt.problem_id = p.id " +
                      "    AND t.tag_key IN :tags" +
                      ") " +
-                     "ORDER BY RAND() LIMIT :limit")
+                     "ORDER BY RANDOM() LIMIT :limit")
        List<Problem> findRandomProblemsByTiersAndTags(@Param("tiers") List<String> tiers,
                      @Param("tags") List<String> tags, @Param("limit") int limit);
 }
