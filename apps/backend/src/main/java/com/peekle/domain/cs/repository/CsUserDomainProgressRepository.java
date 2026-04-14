@@ -16,4 +16,10 @@ public interface CsUserDomainProgressRepository extends JpaRepository<CsUserDoma
 
     @EntityGraph(attributePaths = "domain")
     Optional<CsUserDomainProgress> findByUser_IdAndDomain_Id(Long userId, Integer domainId);
+
+    @EntityGraph(attributePaths = "domain")
+    List<CsUserDomainProgress> findByDomain_Id(Integer domainId);
+
+    @EntityGraph(attributePaths = "domain")
+    List<CsUserDomainProgress> findByDomain_IdAndCurrentTrackNo(Integer domainId, Short currentTrackNo);
 }

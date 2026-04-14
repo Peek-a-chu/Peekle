@@ -14,6 +14,7 @@ import com.peekle.domain.cs.dto.response.CsAdminQuestionChoiceResponse;
 import com.peekle.domain.cs.dto.response.CsAdminQuestionImportResponse;
 import com.peekle.domain.cs.dto.response.CsAdminQuestionResponse;
 import com.peekle.domain.cs.dto.response.CsAdminQuestionShortAnswerResponse;
+import com.peekle.domain.cs.dto.response.CsAdminStageSummaryResponse;
 import com.peekle.domain.cs.dto.response.CsAdminTrackResponse;
 import com.peekle.domain.cs.dto.response.CsDomainResponse;
 import com.peekle.domain.cs.entity.CsDomain;
@@ -22,6 +23,7 @@ import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
+import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.enums.CsQuestionType;
 import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
@@ -29,6 +31,7 @@ import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
+import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.enums.UserRole;
 import com.peekle.domain.user.repository.UserRepository;
@@ -52,7 +55,8 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class CsAdminContentService {
 
-    private static final int DEFAULT_STAGE_COUNT_PER_TRACK = 10;
+    private static final int DEFAULT_STAGE_COUNT_PER_TRACK = 5;
+    private static final int MAX_STAGE_COUNT_PER_TRACK = 20;
     private static final int REQUIRED_STAGE_QUESTION_COUNT = 10;
 
     private final CsDomainRepository csDomainRepository;
@@ -61,6 +65,7 @@ public class CsAdminContentService {
     private final CsQuestionRepository csQuestionRepository;
     private final CsQuestionChoiceRepository csQuestionChoiceRepository;
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
+    private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final UserRepository userRepository;
 
     public List<CsDomainResponse> getDomains(Long userId) {
@@ -115,6 +120,7 @@ public class CsAdminContentService {
     public CsAdminTrackResponse createTrack(Long userId, Integer domainId, CsAdminTrackCreateRequest request) {
         assertAdmin(userId);
         CsDomain domain = getDomain(domainId);
+        int stageCount = resolveRequestedStageCount(request.stageCount());
 
         short nextTrackNo = (short) (csDomainTrackRepository.findTopByDomain_IdOrderByTrackNoDesc(domainId)
                 .map(track -> (int) track.getTrackNo())
@@ -126,21 +132,22 @@ public class CsAdminContentService {
                 .name(request.name().trim())
                 .build());
 
-        List<Long> stageIds = new ArrayList<>(DEFAULT_STAGE_COUNT_PER_TRACK);
-        for (short stageNo = 1; stageNo <= DEFAULT_STAGE_COUNT_PER_TRACK; stageNo++) {
-            CsStage stage = csStageRepository.save(CsStage.builder()
+        List<CsAdminStageSummaryResponse> stages = new ArrayList<>(stageCount);
+        for (short stageNo = 1; stageNo <= stageCount; stageNo++) {
+            CsStage savedStage = csStageRepository.save(CsStage.builder()
                     .track(track)
                     .stageNo(stageNo)
                     .build());
-            stageIds.add(stage.getId());
+            stages.add(new CsAdminStageSummaryResponse(savedStage.getId(), (int) savedStage.getStageNo()));
         }
 
         return new CsAdminTrackResponse(
                 track.getId(),
                 domainId,
+                domain.getName(),
                 (int) track.getTrackNo(),
                 track.getName(),
-                stageIds);
+                stages);
     }
 
     @Transactional
@@ -149,6 +156,67 @@ public class CsAdminContentService {
         CsDomainTrack track = getTrack(trackId);
         track.rename(request.name().trim());
         return toTrackResponse(track);
+    }
+
+    @Transactional
+    public void deleteTrack(Long userId, Long trackId) {
+        assertAdmin(userId);
+        CsDomainTrack track = getTrack(trackId);
+        Integer domainId = track.getDomain().getId();
+        short deletedTrackNo = track.getTrackNo();
+
+        List<CsDomainTrack> tracks = csDomainTrackRepository.findByDomain_IdOrderByTrackNoAsc(domainId);
+        if (tracks.size() <= 1) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "도메인에는 최소 1개의 트랙이 필요합니다.");
+        }
+
+        csDomainTrackRepository.delete(track);
+
+        List<CsDomainTrack> remainingTracks = csDomainTrackRepository.findByDomain_IdOrderByTrackNoAsc(domainId);
+        resequenceTracks(remainingTracks);
+
+        short maxTrackNo = (short) remainingTracks.size();
+        Map<Short, Short> maxStageNoByTrackNo = resolveMaxStageNoByTrackNo(remainingTracks);
+        List<CsUserDomainProgress> progresses = csUserDomainProgressRepository.findByDomain_Id(domainId);
+        for (CsUserDomainProgress progress : progresses) {
+            short nextTrackNo = resolveTrackNoAfterDeletion(progress.getCurrentTrackNo(), deletedTrackNo, maxTrackNo);
+            short nextStageNo = clampStageNo(
+                    progress.getCurrentStageNo(),
+                    maxStageNoByTrackNo.getOrDefault(nextTrackNo, (short) 1));
+
+            if (progress.getCurrentTrackNo() != nextTrackNo || progress.getCurrentStageNo() != nextStageNo) {
+                progress.advanceTo(nextTrackNo, nextStageNo);
+            }
+        }
+    }
+
+    @Transactional
+    public void deleteStage(Long userId, Long stageId) {
+        assertAdmin(userId);
+        CsStage stage = getStage(stageId);
+        Long trackId = stage.getTrack().getId();
+        Integer domainId = stage.getTrack().getDomain().getId();
+        short trackNo = stage.getTrack().getTrackNo();
+        short deletedStageNo = stage.getStageNo();
+
+        List<CsStage> stages = csStageRepository.findByTrack_IdOrderByStageNoAsc(trackId);
+        if (stages.size() <= 1) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "트랙에는 최소 1개의 스테이지가 필요합니다.");
+        }
+
+        csStageRepository.delete(stage);
+
+        List<CsStage> remainingStages = csStageRepository.findByTrack_IdOrderByStageNoAsc(trackId);
+        resequenceStages(remainingStages);
+
+        short maxStageNo = (short) remainingStages.size();
+        List<CsUserDomainProgress> progresses = csUserDomainProgressRepository.findByDomain_IdAndCurrentTrackNo(domainId, trackNo);
+        for (CsUserDomainProgress progress : progresses) {
+            short nextStageNo = resolveStageNoAfterDeletion(progress.getCurrentStageNo(), deletedStageNo, maxStageNo);
+            if (progress.getCurrentStageNo() != nextStageNo) {
+                progress.advanceTo(progress.getCurrentTrackNo(), nextStageNo);
+            }
+        }
     }
 
     public List<CsAdminQuestionResponse> getStageQuestions(Long userId, Long stageId) {
@@ -581,15 +649,101 @@ public class CsAdminContentService {
     }
 
     private CsAdminTrackResponse toTrackResponse(CsDomainTrack track) {
+        List<CsAdminStageSummaryResponse> stages = csStageRepository.findByTrack_IdOrderByStageNoAsc(track.getId())
+                .stream()
+                .map(stage -> new CsAdminStageSummaryResponse(stage.getId(), (int) stage.getStageNo()))
+                .toList();
+
         return new CsAdminTrackResponse(
                 track.getId(),
                 track.getDomain().getId(),
+                track.getDomain().getName(),
                 (int) track.getTrackNo(),
                 track.getName(),
-                csStageRepository.findByTrack_IdOrderByStageNoAsc(track.getId())
-                        .stream()
-                        .map(CsStage::getId)
-                        .toList());
+                stages);
+    }
+
+    private int resolveRequestedStageCount(Integer requestedStageCount) {
+        if (requestedStageCount == null) {
+            return DEFAULT_STAGE_COUNT_PER_TRACK;
+        }
+        if (requestedStageCount < 1 || requestedStageCount > MAX_STAGE_COUNT_PER_TRACK) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "stageCount는 1 이상 " + MAX_STAGE_COUNT_PER_TRACK + " 이하여야 합니다.");
+        }
+        return requestedStageCount;
+    }
+
+    private void resequenceTracks(List<CsDomainTrack> tracks) {
+        for (int i = 0; i < tracks.size(); i++) {
+            short expectedTrackNo = (short) (i + 1);
+            CsDomainTrack current = tracks.get(i);
+            if (current.getTrackNo() != expectedTrackNo) {
+                current.updateTrackNo(expectedTrackNo);
+            }
+        }
+    }
+
+    private void resequenceStages(List<CsStage> stages) {
+        for (int i = 0; i < stages.size(); i++) {
+            short expectedStageNo = (short) (i + 1);
+            CsStage current = stages.get(i);
+            if (current.getStageNo() != expectedStageNo) {
+                current.updateStageNo(expectedStageNo);
+            }
+        }
+    }
+
+    private Map<Short, Short> resolveMaxStageNoByTrackNo(List<CsDomainTrack> tracks) {
+        Map<Short, Short> maxStageNoByTrackNo = new HashMap<>();
+        for (CsDomainTrack current : tracks) {
+            short maxStageNo = csStageRepository.findTopByTrack_IdOrderByStageNoDesc(current.getId())
+                    .map(CsStage::getStageNo)
+                    .orElse((short) 1);
+            maxStageNoByTrackNo.put(current.getTrackNo(), maxStageNo);
+        }
+        return maxStageNoByTrackNo;
+    }
+
+    private short resolveTrackNoAfterDeletion(short currentTrackNo, short deletedTrackNo, short maxTrackNo) {
+        if (currentTrackNo > deletedTrackNo) {
+            return clampTrackNo((short) (currentTrackNo - 1), maxTrackNo);
+        }
+        if (currentTrackNo == deletedTrackNo) {
+            return clampTrackNo((short) Math.min(deletedTrackNo, maxTrackNo), maxTrackNo);
+        }
+        return clampTrackNo(currentTrackNo, maxTrackNo);
+    }
+
+    private short resolveStageNoAfterDeletion(short currentStageNo, short deletedStageNo, short maxStageNo) {
+        if (currentStageNo > deletedStageNo) {
+            return clampStageNo((short) (currentStageNo - 1), maxStageNo);
+        }
+        if (currentStageNo == deletedStageNo) {
+            return clampStageNo(currentStageNo, maxStageNo);
+        }
+        return clampStageNo(currentStageNo, maxStageNo);
+    }
+
+    private short clampTrackNo(short trackNo, short maxTrackNo) {
+        if (trackNo < 1) {
+            return 1;
+        }
+        if (trackNo > maxTrackNo) {
+            return maxTrackNo;
+        }
+        return trackNo;
+    }
+
+    private short clampStageNo(short stageNo, short maxStageNo) {
+        if (stageNo < 1) {
+            return 1;
+        }
+        if (stageNo > maxStageNo) {
+            return maxStageNo;
+        }
+        return stageNo;
     }
 
     private void assertAdmin(Long userId) {

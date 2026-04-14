@@ -5,9 +5,15 @@ import { CSDomain, CSQuestionType } from './csApi';
 export interface CSAdminTrack {
   trackId: number;
   domainId: number;
+  domainName: string;
   trackNo: number;
   name: string;
-  stageIds: number[];
+  stages: CSAdminStageSummary[];
+}
+
+export interface CSAdminStageSummary {
+  stageId: number;
+  stageNo: number;
 }
 
 export interface CSAdminQuestionChoice {
@@ -94,10 +100,14 @@ export const fetchAdminTracks = async (domainId: number): Promise<CSAdminTrack[]
   return assertApiData(response, '트랙 목록을 불러오지 못했습니다.');
 };
 
-export const createAdminTrack = async (domainId: number, name: string): Promise<CSAdminTrack> => {
+export const createAdminTrack = async (
+  domainId: number,
+  name: string,
+  stageCount?: number
+): Promise<CSAdminTrack> => {
   const response = await apiFetch<CSAdminTrack>(`/api/cs/admin/domains/${domainId}/tracks`, {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, stageCount }),
   });
   return assertApiData(response, '트랙 생성에 실패했습니다.');
 };
@@ -108,6 +118,24 @@ export const renameAdminTrack = async (trackId: number, name: string): Promise<C
     body: JSON.stringify({ name }),
   });
   return assertApiData(response, '트랙 이름 변경에 실패했습니다.');
+};
+
+export const deleteAdminTrack = async (trackId: number): Promise<void> => {
+  const response = await apiFetch<void>(`/api/cs/admin/tracks/${trackId}`, {
+    method: 'DELETE',
+  });
+  if (!response.success) {
+    throw new Error(response.error?.message || '트랙 삭제에 실패했습니다.');
+  }
+};
+
+export const deleteAdminStage = async (stageId: number): Promise<void> => {
+  const response = await apiFetch<void>(`/api/cs/admin/stages/${stageId}`, {
+    method: 'DELETE',
+  });
+  if (!response.success) {
+    throw new Error(response.error?.message || '스테이지 삭제에 실패했습니다.');
+  }
 };
 
 /** Stage/Question Management */

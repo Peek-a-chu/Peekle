@@ -5,7 +5,8 @@ import java.util.List;
 public record CsAdminTrackResponse(
         Long trackId,
         Integer domainId,
+        String domainName,
         Integer trackNo,
         String name,
-        List<Long> stageIds) {
+        List<CsAdminStageSummaryResponse> stages) {
 }
