@@ -91,12 +91,14 @@ export default function CSPage() {
         />
       )}
 
-      <div className="bg-card rounded-2xl p-8 shadow-sm">
-        <h1 className="text-2xl font-bold mb-2">CS 학습</h1>
+      {bootstrapData?.progress?.currentTrackName && (
+        <div className="px-6 pt-5">
+          <p className="text-xs font-semibold text-muted-foreground">현재 트랙</p>
+          <h2 className="text-lg font-bold mt-1">{bootstrapData.progress.currentTrackName}</h2>
+        </div>
+      )}
 
-        <p className="text-muted-foreground mb-6">
-          선택한 도메인: <span className="font-semibold text-primary">{bootstrapData?.currentDomain?.name}</span>
-        </p>
+      <div className="bg-card rounded-2xl p-8 shadow-sm">
         {bootstrapData?.progress ? (
           <div className="w-full flex flex-col items-center">
             <LearningMap progress={bootstrapData.progress} stages={bootstrapData.stages ?? []} />
