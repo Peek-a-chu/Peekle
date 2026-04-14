@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, X, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -86,6 +86,7 @@ function splitAnswerText(answer: string): AnswerDisplay {
 
 export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const router = useRouter();
+  const feedbackAdvanceLockRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [currentQuestion, setCurrentQuestion] = useState<CSQuestionPayload | null>(null);
@@ -173,7 +174,8 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   };
 
   const handleNextAfterFeedback = async () => {
-    if (!answerResult) return;
+    if (!answerResult || feedbackAdvanceLockRef.current) return;
+    feedbackAdvanceLockRef.current = true;
     const { isLast, nextQuestion, isCorrect, questionId } = answerResult;
     
     // 계속하기 버튼을 누른 후 상태 업데이트
@@ -191,6 +193,26 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       setCurrentQuestion(nextQuestion);
     }
   };
+
+  useEffect(() => {
+    if (!answerResult) {
+      feedbackAdvanceLockRef.current = false;
+      return;
+    }
+
+    const handleFeedbackAdvanceKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+
+      event.preventDefault();
+      void handleNextAfterFeedback();
+    };
+
+    window.addEventListener('keydown', handleFeedbackAdvanceKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleFeedbackAdvanceKeyDown);
+    };
+  }, [answerResult, handleNextAfterFeedback]);
 
   const handleExitConfirm = () => {
     router.replace('/cs');
@@ -266,6 +288,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
             question={currentQuestion}
             onSubmit={handleAnswerSubmit}
             isSubmitting={isSubmitting}
+            isInteractionLocked={Boolean(answerResult)}
           />
         )}
       </main>

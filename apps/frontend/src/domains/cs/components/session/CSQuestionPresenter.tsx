@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CSQuestionPayload, CSAttemptAnswerRequest } from '@/domains/cs/api/csApi';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,25 +17,46 @@ interface CSQuestionPresenterProps {
   question: CSQuestionPayload;
   onSubmit: (payload: CSAttemptAnswerRequest) => void;
   isSubmitting: boolean;
+  isInteractionLocked?: boolean;
 }
 
-export default function CSQuestionPresenter({ question, onSubmit, isSubmitting }: CSQuestionPresenterProps) {
+export default function CSQuestionPresenter({
+  question,
+  onSubmit,
+  isSubmitting,
+  isInteractionLocked = false,
+}: CSQuestionPresenterProps) {
   const [answerText, setAnswerText] = useState('');
   const [selectedChoiceNo, setSelectedChoiceNo] = useState<number | null>(null);
+  const submitLockRef = useRef(false);
 
   // 문제가 바뀔 때마다 입력 상태 초기화
   useEffect(() => {
     console.log('[DEBUG] Question changed → resetting input state. New questionId:', question.questionId, 'type:', question.questionType);
     setSelectedChoiceNo(null);
     setAnswerText('');
+    submitLockRef.current = false;
   }, [question.questionId, question.questionType]);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    if (!isSubmitting && !isInteractionLocked) {
+      submitLockRef.current = false;
+    }
+  }, [isSubmitting, isInteractionLocked]);
+
+  const isChoiceQuestion = question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'OX';
+  const isSubjectiveQuestion = question.questionType === 'SHORT_ANSWER' || question.questionType === 'ESSAY';
+
+  const handleSubmit = useCallback(() => {
+    if (isSubmitting || isInteractionLocked || submitLockRef.current) {
+      return;
+    }
+
     const payload: CSAttemptAnswerRequest = {
       questionId: question.questionId,
     };
 
-    if (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'OX') {
+    if (isChoiceQuestion) {
       if (selectedChoiceNo === null) {
         console.log('[DEBUG] Validation failed: no choice selected');
         toast.error('선택지를 선택해주세요.');
@@ -52,15 +73,49 @@ export default function CSQuestionPresenter({ question, onSubmit, isSubmitting }
       payload.answerText = normalized;
     }
 
+    submitLockRef.current = true;
     console.log('[DEBUG] Submitting payload:', JSON.stringify(payload));
     onSubmit(payload);
-  };
+  }, [
+    answerText,
+    isChoiceQuestion,
+    isSubmitting,
+    isInteractionLocked,
+    onSubmit,
+    question.questionId,
+    selectedChoiceNo,
+  ]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (isSubmitting || isInteractionLocked) return;
+
+      if (isChoiceQuestion) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        handleSubmit();
+        return;
+      }
+
+      if (isSubjectiveQuestion && event.key === 'Enter') {
+        const target = event.target as HTMLElement | null;
+        if (!target || target.tagName !== 'TEXTAREA') return;
+        event.preventDefault();
+        handleSubmit();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSubmit, isChoiceQuestion, isInteractionLocked, isSubjectiveQuestion, isSubmitting]);
 
   const typeLabel = QUESTION_TYPE_LABEL[question.questionType] || question.questionType;
-  const isChoiceQuestion = question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'OX';
   const hasTextAnswer = answerText.trim().length > 0;
   const isAnswerReady = isChoiceQuestion ? selectedChoiceNo !== null : hasTextAnswer;
-  const isSubmitDisabled = isSubmitting || !isAnswerReady;
+  const isSubmitDisabled = isSubmitting || isInteractionLocked || !isAnswerReady;
 
   return (
     <Card className="w-full max-w-2xl mx-auto p-6 md:p-8 flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
