@@ -47,6 +47,7 @@ function WorkbooksContent() {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
 
   const handleCreateClick = () => {
+    setSelectedId(null); // 문제집 상세 패널 닫기
     setModalMode('create');
     setModalOpen(true);
   };
