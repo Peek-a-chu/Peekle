@@ -7,6 +7,8 @@ import com.peekle.domain.cs.dto.response.CsAttemptProgressResponse;
 import com.peekle.domain.cs.dto.response.CsAttemptStartResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionChoiceResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionPayloadResponse;
+import com.peekle.domain.cs.dto.response.CsTrackSkipResponse;
+import com.peekle.domain.cs.entity.CsDomainTrack;
 import com.peekle.domain.cs.entity.CsPastExamBestScore;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
@@ -19,6 +21,7 @@ import com.peekle.domain.cs.enums.CsAttemptPhase;
 import com.peekle.domain.cs.enums.CsQuestionGradingMode;
 import com.peekle.domain.cs.enums.CsQuestionType;
 import com.peekle.domain.cs.enums.CsTrackLearningMode;
+import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
@@ -26,6 +29,7 @@ import com.peekle.domain.cs.repository.CsPastExamBestScoreRepository;
 import com.peekle.domain.cs.repository.CsStageAttemptLogRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
+import com.peekle.domain.cs.repository.CsUserProfileRepository;
 import com.peekle.domain.cs.repository.CsWrongProblemRepository;
 import com.peekle.domain.cs.service.store.CsAttemptSession;
 import com.peekle.domain.cs.service.store.CsAttemptStore;
@@ -48,6 +52,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -67,15 +72,20 @@ public class CsAttemptService {
     private static final Pattern ITEM_COUNT_PATTERN = Pattern.compile("\"itemCount\"\\s*:\\s*(\\d+)");
 
     private static final String LOCK_REASON_PREVIOUS_STAGE = "이전 스테이지를 먼저 완료해야 합니다.";
-    private static final String LOCK_REASON_NOT_CURRENT_TRACK = "현재 학습 중인 트랙만 입장할 수 있습니다.";
+    private static final String LOCK_REASON_FUTURE_TRACK = "해당 트랙은 아직 해금되지 않았습니다.";
+    private static final String LOCK_REASON_SKIP_ONLY_CURRICULUM = "현재 진행 중인 커리큘럼 트랙만 스킵할 수 있습니다.";
+
+    private static final short FIRST_STAGE_NO = 1;
 
     private final CsStageRepository csStageRepository;
+    private final CsDomainTrackRepository csDomainTrackRepository;
     private final CsQuestionRepository csQuestionRepository;
     private final CsQuestionChoiceRepository csQuestionChoiceRepository;
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
     private final CsPastExamBestScoreRepository csPastExamBestScoreRepository;
     private final CsStageAttemptLogRepository csStageAttemptLogRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
+    private final CsUserProfileRepository csUserProfileRepository;
     private final CsWrongProblemRepository csWrongProblemRepository;
     private final CsAttemptStore csAttemptStore;
     private final UserRepository userRepository;
@@ -210,11 +220,12 @@ public class CsAttemptService {
         persistStageAttemptLog(user, stage, correctCount, totalQuestionCount);
         updatePastExamBestScoreIfNeeded(user, stage, correctRate);
 
-        Long nextStageId = resolveNextStageId(stage);
-        boolean isTrackCompleted = nextStageId == null;
+        NextStageProgress nextStage = resolveNextStageProgress(stage);
+        Long nextStageId = nextStage == null ? null : nextStage.stageId();
+        boolean isTrackCompleted = nextStage == null;
 
         if (stage.getTrack().getLearningMode() == CsTrackLearningMode.CURRICULUM) {
-            updateDomainProgressIfNeeded(userId, stage, nextStageId);
+            updateDomainProgressIfNeeded(userId, stage, nextStage);
         }
         StreakResult streak = applyStreak(user);
         if (earnedScore > 0) {
@@ -236,6 +247,47 @@ public class CsAttemptService {
                 earnedScore,
                 totalScore,
                 nextStageId);
+    }
+
+    @Transactional
+    public CsTrackSkipResponse skipCurrentTrack(Long userId) {
+        getUser(userId);
+
+        CsUserDomainProgress progress = resolveCurrentDomainProgress(userId);
+        CsDomainTrack currentTrack = csDomainTrackRepository
+                .findByDomain_IdAndTrackNo(progress.getDomain().getId(), progress.getCurrentTrackNo())
+                .orElseThrow(() -> new BusinessException(ErrorCode.CS_TRACK_NOT_FOUND));
+
+        if (currentTrack.getLearningMode() != CsTrackLearningMode.CURRICULUM) {
+            throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_SKIP_ONLY_CURRICULUM);
+        }
+
+        short lastStageNo = csStageRepository.findTopByTrack_IdOrderByStageNoDesc(currentTrack.getId())
+                .map(CsStage::getStageNo)
+                .orElse(progress.getCurrentStageNo());
+
+        clearTrackAttemptSessions(userId, currentTrack.getId());
+
+        NextStageProgress nextStage = resolveNextTrackFirstStage(currentTrack);
+        if (nextStage != null) {
+            progress.advanceTo(nextStage.trackNo(), nextStage.stageNo());
+            return new CsTrackSkipResponse(
+                    (int) currentTrack.getTrackNo(),
+                    (int) nextStage.trackNo(),
+                    (int) nextStage.stageNo(),
+                    nextStage.stageId(),
+                    false);
+        }
+
+        short completionCursor = (short) (lastStageNo + 1);
+        progress.advanceTo(currentTrack.getTrackNo(), completionCursor);
+
+        return new CsTrackSkipResponse(
+                (int) currentTrack.getTrackNo(),
+                null,
+                null,
+                null,
+                true);
     }
 
     private void persistStageAttemptLog(User user, CsStage stage, int correctCount, int totalQuestionCount) {
@@ -477,13 +529,74 @@ public class CsAttemptService {
         }
     }
 
-    private Long resolveNextStageId(CsStage stage) {
-        return csStageRepository.findByTrack_IdAndStageNo(stage.getTrack().getId(), (short) (stage.getStageNo() + 1))
-                .map(CsStage::getId)
-                .orElse(null);
+    private NextStageProgress resolveNextStageProgress(CsStage stage) {
+        Optional<CsStage> nextStageInTrack = csStageRepository.findByTrack_IdAndStageNo(
+                stage.getTrack().getId(),
+                (short) (stage.getStageNo() + 1));
+        if (nextStageInTrack.isPresent()) {
+            CsStage next = nextStageInTrack.get();
+            return new NextStageProgress(next.getId(), stage.getTrack().getTrackNo(), next.getStageNo());
+        }
+
+        if (stage.getTrack().getLearningMode() != CsTrackLearningMode.CURRICULUM) {
+            return null;
+        }
+
+        return resolveNextTrackFirstStage(stage.getTrack());
     }
 
-    private void updateDomainProgressIfNeeded(Long userId, CsStage stage, Long nextStageId) {
+    private NextStageProgress resolveNextTrackFirstStage(CsDomainTrack currentTrack) {
+        Integer domainId = currentTrack.getDomain().getId();
+        short currentTrackNo = currentTrack.getTrackNo();
+
+        List<CsDomainTrack> tracks = csDomainTrackRepository.findByDomain_IdOrderByTrackNoAsc(domainId);
+        for (CsDomainTrack track : tracks) {
+            if (track.getLearningMode() != CsTrackLearningMode.CURRICULUM) {
+                continue;
+            }
+            if (track.getTrackNo() <= currentTrackNo) {
+                continue;
+            }
+
+            Optional<CsStage> firstStage = csStageRepository.findByTrack_IdAndStageNo(track.getId(), FIRST_STAGE_NO);
+            if (firstStage.isPresent()) {
+                CsStage next = firstStage.get();
+                return new NextStageProgress(next.getId(), track.getTrackNo(), next.getStageNo());
+            }
+        }
+
+        return null;
+    }
+
+    private CsUserDomainProgress resolveCurrentDomainProgress(Long userId) {
+        List<CsUserDomainProgress> progresses = csUserDomainProgressRepository.findByUser_IdOrderByUpdatedAtDesc(userId);
+        if (progresses.isEmpty()) {
+            throw new BusinessException(ErrorCode.CS_DOMAIN_NOT_STUDYING);
+        }
+
+        Integer currentDomainId = csUserProfileRepository.findByUserIdWithCurrentDomain(userId)
+                .map(profile -> profile.getCurrentDomain())
+                .map(domain -> domain.getId())
+                .orElse(null);
+
+        if (currentDomainId == null) {
+            return progresses.get(0);
+        }
+
+        return progresses.stream()
+                .filter(progress -> progress.getDomain().getId().equals(currentDomainId))
+                .findFirst()
+                .orElse(progresses.get(0));
+    }
+
+    private void clearTrackAttemptSessions(Long userId, Long trackId) {
+        List<CsStage> trackStages = csStageRepository.findByTrack_IdOrderByStageNoAsc(trackId);
+        for (CsStage trackStage : trackStages) {
+            csAttemptStore.delete(userId, trackStage.getId());
+        }
+    }
+
+    private void updateDomainProgressIfNeeded(Long userId, CsStage stage, NextStageProgress nextStage) {
         Integer domainId = stage.getTrack().getDomain().getId();
         CsUserDomainProgress progress = csUserDomainProgressRepository.findByUser_IdAndDomain_Id(userId, domainId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_PROGRESS_NOT_FOUND));
@@ -494,11 +607,11 @@ public class CsAttemptService {
         if (!progress.getCurrentStageNo().equals(stage.getStageNo())) {
             return;
         }
-        if (nextStageId == null) {
+        if (nextStage == null) {
             return;
         }
 
-        progress.advanceTo(progress.getCurrentTrackNo(), (short) (stage.getStageNo() + 1));
+        progress.advanceTo(nextStage.trackNo(), nextStage.stageNo());
     }
 
     private StreakResult applyStreak(User user) {
@@ -558,11 +671,11 @@ public class CsAttemptService {
         short targetTrackNo = stage.getTrack().getTrackNo();
         short targetStageNo = stage.getStageNo();
 
-        if (targetTrackNo != currentTrackNo) {
-            throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_NOT_CURRENT_TRACK);
+        if (targetTrackNo > currentTrackNo) {
+            throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_FUTURE_TRACK);
         }
 
-        if (targetStageNo > currentStageNo) {
+        if (targetTrackNo == currentTrackNo && targetStageNo > currentStageNo) {
             throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_PREVIOUS_STAGE);
         }
     }
@@ -936,5 +1049,8 @@ public class CsAttemptService {
             Integer correctChoiceNo,
             String correctAnswer,
             String explanation) {
+    }
+
+    private record NextStageProgress(Long stageId, Short trackNo, Short stageNo) {
     }
 }

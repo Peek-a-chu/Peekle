@@ -13,6 +13,7 @@ import com.peekle.domain.cs.dto.response.CsDomainResponse;
 import com.peekle.domain.cs.dto.response.CsDomainSubmitResponse;
 import com.peekle.domain.cs.dto.response.CsMyDomainItemResponse;
 import com.peekle.domain.cs.dto.response.CsPastExamCatalogResponse;
+import com.peekle.domain.cs.dto.response.CsTrackSkipResponse;
 import com.peekle.domain.cs.dto.response.CsWrongProblemPageResponse;
 import com.peekle.domain.cs.dto.response.CsWrongReviewAnswerResponse;
 import com.peekle.domain.cs.dto.response.CsWrongReviewCompleteResponse;
@@ -110,6 +111,12 @@ public class CsController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long stageId) {
         return ApiResponse.success(csAttemptService.completeAttempt(userId, stageId));
+    }
+
+    @PostMapping("/tracks/current/skip")
+    public ApiResponse<CsTrackSkipResponse> skipCurrentTrack(
+            @AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(csAttemptService.skipCurrentTrack(userId));
     }
 
     @GetMapping("/wrong-problems")

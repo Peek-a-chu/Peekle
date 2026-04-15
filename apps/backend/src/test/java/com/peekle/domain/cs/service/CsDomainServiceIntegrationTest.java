@@ -3,12 +3,18 @@ package com.peekle.domain.cs.service;
 import com.peekle.domain.cs.dto.response.CsBootstrapResponse;
 import com.peekle.domain.cs.dto.response.CsCurrentDomainChangeResponse;
 import com.peekle.domain.cs.dto.response.CsDomainSubmitResponse;
+import com.peekle.domain.cs.dto.response.CsStageStatusResponse;
 import com.peekle.domain.cs.entity.CsDomain;
 import com.peekle.domain.cs.entity.CsDomainTrack;
+import com.peekle.domain.cs.entity.CsStage;
+import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsUserProfile;
 import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
+import com.peekle.domain.cs.repository.CsStageRepository;
+import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsUserProfileRepository;
+import com.peekle.domain.cs.enums.CsStageStatus;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,6 +44,12 @@ class CsDomainServiceIntegrationTest {
 
     @Autowired
     private CsDomainTrackRepository csDomainTrackRepository;
+
+    @Autowired
+    private CsStageRepository csStageRepository;
+
+    @Autowired
+    private CsUserDomainProgressRepository csUserDomainProgressRepository;
 
     @Autowired
     private CsUserProfileRepository csUserProfileRepository;
@@ -90,6 +104,62 @@ class CsDomainServiceIntegrationTest {
         assertThat(response.progress()).isNull();
     }
 
+    @Test
+    @DisplayName("현재 트랙 학습 중이면 다음 트랙 1번 스테이지가 미리 노출된다")
+    void bootstrap_showsPreviewOfNextTrackFirstStage() {
+        User user = createUser("preview-next-track");
+        CsDomain domain = createDomain(101, "트랙 프리뷰 도메인");
+        CsDomainTrack track1 = createTrack(domain, 1, "1트랙");
+        CsDomainTrack track2 = createTrack(domain, 2, "2트랙");
+        createStages(track1, 5);
+        List<CsStage> track2Stages = createStages(track2, 5);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+
+        CsBootstrapResponse response = csDomainService.getBootstrap(user.getId());
+        assertThat(response.stages()).hasSize(6);
+
+        CsStageStatusResponse preview = response.stages().get(5);
+        assertThat(preview.trackNo()).isEqualTo(2);
+        assertThat(preview.stageNo()).isEqualTo(1);
+        assertThat(preview.stageId()).isEqualTo(track2Stages.get(0).getId());
+        assertThat(preview.status()).isEqualTo(CsStageStatus.LOCKED);
+    }
+
+    @Test
+    @DisplayName("2번 트랙 학습 중이어도 1번 트랙 스테이지가 상단에 유지된다")
+    void bootstrap_whenStudyingTrack2_keepsTrack1StagesVisible() {
+        User user = createUser("track2-with-track1-visible");
+        CsDomain domain = createDomain(102, "트랙 가시성 도메인");
+        CsDomainTrack track1 = createTrack(domain, 1, "1트랙");
+        CsDomainTrack track2 = createTrack(domain, 2, "2트랙");
+        CsDomainTrack track3 = createTrack(domain, 3, "3트랙");
+        createStages(track1, 5);
+        createStages(track2, 5);
+        createStages(track3, 5);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        CsUserDomainProgress progress = csUserDomainProgressRepository
+                .findByUser_IdAndDomain_Id(user.getId(), domain.getId())
+                .orElseThrow();
+        progress.advanceTo((short) 2, (short) 1);
+
+        CsBootstrapResponse response = csDomainService.getBootstrap(user.getId());
+        assertThat(response.progress()).isNotNull();
+        assertThat(response.progress().currentTrackNo()).isEqualTo(2);
+        assertThat(response.stages()).isNotEmpty();
+
+        List<CsStageStatusResponse> track1Stages = response.stages().stream()
+                .filter(stage -> stage.trackNo() == 1)
+                .toList();
+        assertThat(track1Stages).hasSize(5);
+        assertThat(track1Stages).allSatisfy(stage -> assertThat(stage.status()).isEqualTo(CsStageStatus.COMPLETED));
+
+        assertThat(response.stages().stream()
+                .anyMatch(stage -> stage.trackNo() == 3 && stage.stageNo() == 1))
+                .isTrue();
+    }
+
     private User createUser(String suffix) {
         return userRepository.save(User.builder()
                 .socialId("social-" + suffix)
@@ -102,16 +172,34 @@ class CsDomainServiceIntegrationTest {
     }
 
     private CsDomain createDomainWithTrack(int domainId, String domainName, String trackName) {
-        CsDomain domain = csDomainRepository.save(CsDomain.builder()
+        CsDomain domain = createDomain(domainId, domainName);
+        createTrack(domain, 1, trackName);
+        return domain;
+    }
+
+    private CsDomain createDomain(int domainId, String domainName) {
+        return csDomainRepository.save(CsDomain.builder()
                 .id(domainId)
                 .name(domainName)
                 .build());
+    }
 
-        csDomainTrackRepository.save(CsDomainTrack.builder()
+    private CsDomainTrack createTrack(CsDomain domain, int trackNo, String trackName) {
+        return csDomainTrackRepository.save(CsDomainTrack.builder()
                 .domain(domain)
-                .trackNo((short) 1)
+                .trackNo((short) trackNo)
                 .name(trackName)
                 .build());
-        return domain;
+    }
+
+    private List<CsStage> createStages(CsDomainTrack track, int stageCount) {
+        java.util.ArrayList<CsStage> stages = new java.util.ArrayList<>();
+        for (int stageNo = 1; stageNo <= stageCount; stageNo++) {
+            stages.add(csStageRepository.save(CsStage.builder()
+                    .track(track)
+                    .stageNo((short) stageNo)
+                    .build()));
+        }
+        return stages;
     }
 }

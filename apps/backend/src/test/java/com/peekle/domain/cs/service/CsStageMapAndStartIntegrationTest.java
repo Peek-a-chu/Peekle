@@ -14,6 +14,7 @@ import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
+import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
@@ -53,6 +54,9 @@ class CsStageMapAndStartIntegrationTest {
 
     @Autowired
     private CsQuestionChoiceRepository csQuestionChoiceRepository;
+
+    @Autowired
+    private CsUserDomainProgressRepository csUserDomainProgressRepository;
 
     @Test
     @DisplayName("bootstrap 응답에 완료/진행/잠금 스테이지 상태가 포함된다")
@@ -116,6 +120,33 @@ class CsStageMapAndStartIntegrationTest {
         assertThat(response.firstQuestion().questionId()).isEqualTo(question.getId());
         assertThat(response.firstQuestion().questionType()).isEqualTo(CsQuestionType.MULTIPLE_CHOICE);
         assertThat(response.firstQuestion().choices()).hasSize(4);
+    }
+
+    @Test
+    @DisplayName("현재 2트랙 학습 중이어도 과거 1트랙 스테이지는 다시 진입할 수 있다")
+    void startAttempt_pastTrackStage_isAllowed() {
+        User user = createUser("past-track-access");
+        CsDomain domain = createDomain(304, "과거 트랙 재진입 도메인");
+        CsDomainTrack track1 = createTrack(domain, 1, "1트랙");
+        CsDomainTrack track2 = createTrack(domain, 2, "2트랙");
+
+        CsStage track1Stage1 = createStage(track1, 1);
+        createMultipleChoiceQuestion(track1Stage1);
+        CsStage track1Stage2 = createStage(track1, 2);
+        CsQuestion question = createMultipleChoiceQuestion(track1Stage2);
+
+        CsStage track2Stage1 = createStage(track2, 1);
+        createMultipleChoiceQuestion(track2Stage1);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csUserDomainProgressRepository.findByUser_IdAndDomain_Id(user.getId(), domain.getId())
+                .orElseThrow()
+                .advanceTo((short) 2, (short) 1);
+
+        CsAttemptStartResponse response = csDomainService.startStageAttempt(user.getId(), track1Stage2.getId());
+
+        assertThat(response.stageId()).isEqualTo(track1Stage2.getId());
+        assertThat(response.firstQuestion().questionId()).isEqualTo(question.getId());
     }
 
     private User createUser(String suffix) {

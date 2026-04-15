@@ -46,7 +46,7 @@ public class CsDomainService {
     private static final short INITIAL_TRACK_NO = 1;
     private static final short INITIAL_STAGE_NO = 1;
     private static final String LOCK_REASON_PREVIOUS_STAGE = "이전 스테이지를 먼저 완료해야 합니다.";
-    private static final String LOCK_REASON_NOT_CURRENT_TRACK = "현재 학습 중인 트랙만 입장할 수 있습니다.";
+    private static final String LOCK_REASON_FUTURE_TRACK = "해당 트랙은 아직 해금되지 않았습니다.";
 
     private final CsDomainRepository csDomainRepository;
     private final CsDomainTrackRepository csDomainTrackRepository;
@@ -238,34 +238,76 @@ public class CsDomainService {
     }
 
     private List<CsStageStatusResponse> toStageStatusResponses(CsUserDomainProgress progress) {
-        CsDomainTrack track = csDomainTrackRepository
-                .findByDomain_IdAndTrackNo(progress.getDomain().getId(), progress.getCurrentTrackNo())
-                .orElseThrow(() -> new BusinessException(ErrorCode.CS_TRACK_NOT_FOUND));
-
-        List<CsStage> stages = csStageRepository.findByTrack_IdOrderByStageNoAsc(track.getId());
-        List<CsStageStatusResponse> responses = new ArrayList<>(stages.size());
+        Integer domainId = progress.getDomain().getId();
+        short currentTrackNo = progress.getCurrentTrackNo();
         short currentStageNo = progress.getCurrentStageNo();
 
-        for (CsStage stage : stages) {
-            short stageNo = stage.getStageNo();
-            if (stageNo < currentStageNo) {
+        List<CsDomainTrack> tracks = csDomainTrackRepository
+                .findByDomain_IdOrderByTrackNoAsc(domainId)
+                .stream()
+                .filter(t -> t.getTrackNo() <= currentTrackNo + 1)
+                .toList();
+
+        List<CsStageStatusResponse> responses = new ArrayList<>();
+
+        for (CsDomainTrack track : tracks) {
+            List<CsStage> stages = csStageRepository.findByTrack_IdOrderByStageNoAsc(track.getId());
+            if (stages.isEmpty()) continue;
+
+            short trackNo = track.getTrackNo();
+            String trackName = track.getName();
+
+            if (trackNo == currentTrackNo + 1) {
+                // Next track: just show the first stage as locked
+                CsStage firstStage = stages.get(0);
                 responses.add(new CsStageStatusResponse(
-                        stage.getId(),
-                        (int) stageNo,
-                        CsStageStatus.COMPLETED,
-                        null));
-            } else if (stageNo == currentStageNo) {
-                responses.add(new CsStageStatusResponse(
-                        stage.getId(),
-                        (int) stageNo,
-                        CsStageStatus.IN_PROGRESS,
-                        null));
-            } else {
-                responses.add(new CsStageStatusResponse(
-                        stage.getId(),
-                        (int) stageNo,
+                        firstStage.getId(),
+                        (int) firstStage.getStageNo(),
+                        (int) trackNo,
+                        trackName,
                         CsStageStatus.LOCKED,
-                        LOCK_REASON_PREVIOUS_STAGE));
+                        "이전 트랙을 먼저 완료해야 합니다."));
+                continue;
+            }
+
+            for (CsStage stage : stages) {
+                short stageNo = stage.getStageNo();
+
+                if (trackNo < currentTrackNo) {
+                    responses.add(new CsStageStatusResponse(
+                            stage.getId(),
+                            (int) stageNo,
+                            (int) trackNo,
+                            trackName,
+                            CsStageStatus.COMPLETED,
+                            null));
+                } else {
+                    if (stageNo < currentStageNo) {
+                        responses.add(new CsStageStatusResponse(
+                                stage.getId(),
+                                (int) stageNo,
+                                (int) trackNo,
+                                trackName,
+                                CsStageStatus.COMPLETED,
+                                null));
+                    } else if (stageNo == currentStageNo) {
+                        responses.add(new CsStageStatusResponse(
+                                stage.getId(),
+                                (int) stageNo,
+                                (int) trackNo,
+                                trackName,
+                                CsStageStatus.IN_PROGRESS,
+                                null));
+                    } else {
+                        responses.add(new CsStageStatusResponse(
+                                stage.getId(),
+                                (int) stageNo,
+                                (int) trackNo,
+                                trackName,
+                                CsStageStatus.LOCKED,
+                                LOCK_REASON_PREVIOUS_STAGE));
+                    }
+                }
             }
         }
         return responses;
@@ -277,11 +319,11 @@ public class CsDomainService {
         short targetTrackNo = stage.getTrack().getTrackNo();
         short targetStageNo = stage.getStageNo();
 
-        if (targetTrackNo != currentTrackNo) {
-            throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_NOT_CURRENT_TRACK);
+        if (targetTrackNo > currentTrackNo) {
+            throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_FUTURE_TRACK);
         }
 
-        if (targetStageNo > currentStageNo) {
+        if (targetTrackNo == currentTrackNo && targetStageNo > currentStageNo) {
             throw new BusinessException(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS, LOCK_REASON_PREVIOUS_STAGE);
         }
     }

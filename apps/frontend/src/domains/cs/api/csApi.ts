@@ -28,6 +28,8 @@ export type CSStageStatus = 'COMPLETED' | 'IN_PROGRESS' | 'LOCKED';
 export interface CSStageStatusItem {
   stageId: number;
   stageNo: number;
+  trackNo?: number;
+  trackName?: string;
   status: CSStageStatus;
   lockReason: string | null;
 }
@@ -116,6 +118,14 @@ export interface CSAttemptCompleteResponse {
   earnedScore: number;
   totalScore: number;
   nextStageId: number | null;
+}
+
+export interface CSTrackSkipResponse {
+  skippedTrackNo: number;
+  nextTrackNo: number | null;
+  nextStageNo: number | null;
+  nextStageId: number | null;
+  isCurriculumCompleted: boolean;
 }
 
 export type CSWrongProblemStatus = 'ACTIVE' | 'CLEARED';
@@ -295,6 +305,19 @@ export const completeCSStageAttempt = async (
     },
   );
   return assertApiData(response, '스테이지 결과 조회에 실패했습니다.');
+};
+
+/**
+ * 현재 트랙 스킵
+ */
+export const skipCurrentCSTrack = async (): Promise<CSTrackSkipResponse> => {
+  const response = await apiFetch<CSTrackSkipResponse>(
+    '/api/cs/tracks/current/skip',
+    {
+      method: 'POST',
+    },
+  );
+  return assertApiData(response, '현재 트랙 스킵에 실패했습니다.');
 };
 
 /**
