@@ -1,5 +1,7 @@
 package com.peekle.domain.cs.dto.request;
 
+import com.peekle.domain.cs.enums.CsQuestionContentMode;
+import com.peekle.domain.cs.enums.CsQuestionGradingMode;
 import com.peekle.domain.cs.enums.CsQuestionType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -18,6 +20,14 @@ public record CsAdminQuestionDraft(
 
         @NotBlank(message = "explanation은 필수입니다.")
         String explanation,
+
+        CsQuestionContentMode contentMode,
+
+        String contentBlocks,
+
+        CsQuestionGradingMode gradingMode,
+
+        String metadata,
 
         List<@Valid CsAdminQuestionChoiceDraft> choices,
 

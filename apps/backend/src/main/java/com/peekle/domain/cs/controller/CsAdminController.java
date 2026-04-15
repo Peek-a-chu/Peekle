@@ -1,6 +1,7 @@
 package com.peekle.domain.cs.controller;
 
 import com.peekle.domain.cs.dto.request.CsAdminDomainNameRequest;
+import com.peekle.domain.cs.dto.request.CsAdminImagePresignRequest;
 import com.peekle.domain.cs.dto.request.CsAdminQuestionShortAnswersUpdateRequest;
 import com.peekle.domain.cs.dto.request.CsAdminQuestionUpdateRequest;
 import com.peekle.domain.cs.dto.request.CsAdminStageQuestionImportRequest;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -137,5 +139,15 @@ public class CsAdminController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long stageId) {
         return ApiResponse.success(csAdminContentService.getStageClaims(userId, stageId));
+    }
+
+    @PostMapping("/images/presigned-url")
+    public ApiResponse<Map<String, String>> getQuestionImagePresignedUrl(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody CsAdminImagePresignRequest request) {
+        return ApiResponse.success(csAdminContentService.getQuestionImagePresignedUrl(
+                userId,
+                request.fileName(),
+                request.contentType()));
     }
 }

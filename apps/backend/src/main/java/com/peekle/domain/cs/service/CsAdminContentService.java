@@ -24,7 +24,10 @@ import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
+import com.peekle.domain.cs.enums.CsQuestionContentMode;
+import com.peekle.domain.cs.enums.CsQuestionGradingMode;
 import com.peekle.domain.cs.enums.CsQuestionType;
+import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
@@ -35,6 +38,7 @@ import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.enums.UserRole;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.global.storage.R2StorageService;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +53,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -57,7 +62,16 @@ public class CsAdminContentService {
 
     private static final int DEFAULT_STAGE_COUNT_PER_TRACK = 5;
     private static final int MAX_STAGE_COUNT_PER_TRACK = 20;
-    private static final int REQUIRED_STAGE_QUESTION_COUNT = 10;
+    private static final int CURRICULUM_REQUIRED_STAGE_QUESTION_COUNT = 10;
+    private static final int PAST_EXAM_MAX_STAGE_QUESTION_COUNT = 20;
+    private static final int PAST_EXAM_MIN_YEAR = 2020;
+    private static final int PAST_EXAM_MAX_YEAR = 2025;
+    private static final Set<String> ALLOWED_IMAGE_CONTENT_TYPES = Set.of(
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+            "image/gif");
 
     private final CsDomainRepository csDomainRepository;
     private final CsDomainTrackRepository csDomainTrackRepository;
@@ -67,6 +81,7 @@ public class CsAdminContentService {
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final UserRepository userRepository;
+    private final R2StorageService r2StorageService;
 
     public List<CsDomainResponse> getDomains(Long userId) {
         assertAdmin(userId);
@@ -120,7 +135,10 @@ public class CsAdminContentService {
     public CsAdminTrackResponse createTrack(Long userId, Integer domainId, CsAdminTrackCreateRequest request) {
         assertAdmin(userId);
         CsDomain domain = getDomain(domainId);
-        int stageCount = resolveRequestedStageCount(request.stageCount());
+        CsTrackLearningMode learningMode = resolveLearningMode(request.learningMode());
+        Short examYear = resolveExamYear(learningMode, request.examYear());
+        validatePastExamTrackUniqueness(domainId, learningMode, examYear, null);
+        int stageCount = resolveRequestedStageCount(learningMode, examYear, request.stageCount());
 
         short nextTrackNo = (short) (csDomainTrackRepository.findTopByDomain_IdOrderByTrackNoDesc(domainId)
                 .map(track -> (int) track.getTrackNo())
@@ -130,6 +148,8 @@ public class CsAdminContentService {
                 .domain(domain)
                 .trackNo(nextTrackNo)
                 .name(request.name().trim())
+                .learningMode(learningMode)
+                .examYear(examYear)
                 .build());
 
         List<CsAdminStageSummaryResponse> stages = new ArrayList<>(stageCount);
@@ -147,6 +167,8 @@ public class CsAdminContentService {
                 domain.getName(),
                 (int) track.getTrackNo(),
                 track.getName(),
+                track.getLearningMode(),
+                track.getExamYear() == null ? null : (int) track.getExamYear(),
                 stages);
     }
 
@@ -154,7 +176,16 @@ public class CsAdminContentService {
     public CsAdminTrackResponse renameTrack(Long userId, Long trackId, CsAdminTrackCreateRequest request) {
         assertAdmin(userId);
         CsDomainTrack track = getTrack(trackId);
+        CsTrackLearningMode learningMode = request.learningMode() == null
+                ? track.getLearningMode()
+                : resolveLearningMode(request.learningMode());
+        Integer requestedExamYear = request.learningMode() == null
+                ? (track.getExamYear() == null ? null : (int) track.getExamYear())
+                : request.examYear();
+        Short examYear = resolveExamYear(learningMode, requestedExamYear);
+        validatePastExamTrackUniqueness(track.getDomain().getId(), learningMode, examYear, track.getId());
         track.rename(request.name().trim());
+        track.updateLearningMode(learningMode, examYear);
         return toTrackResponse(track);
     }
 
@@ -236,13 +267,13 @@ public class CsAdminContentService {
         assertAdmin(userId);
         CsStage stage = getStage(stageId);
         ImportMode mode = ImportMode.from(request.mode());
-        validateImportRequest(mode, request.questions());
+        List<CsQuestion> activeQuestions = csQuestionRepository.findByStage_IdAndIsActiveTrueOrderByIdAsc(stageId);
+        validateImportRequest(stage, mode, request.questions(), activeQuestions);
 
         int createdCount = 0;
         int updatedCount = 0;
         int deactivatedCount = 0;
 
-        List<CsQuestion> activeQuestions = csQuestionRepository.findByStage_IdAndIsActiveTrueOrderByIdAsc(stageId);
         if (mode == ImportMode.REPLACE) {
             for (CsQuestion question : activeQuestions) {
                 question.deactivate();
@@ -292,6 +323,10 @@ public class CsAdminContentService {
                 request.questionType(),
                 request.prompt(),
                 request.explanation(),
+                request.contentMode(),
+                request.contentBlocks(),
+                request.gradingMode(),
+                request.metadata(),
                 request.choices(),
                 request.shortAnswers());
 
@@ -329,13 +364,57 @@ public class CsAdminContentService {
                 List.<CsAdminClaimItemResponse>of());
     }
 
+    public Map<String, String> getQuestionImagePresignedUrl(Long userId, String fileName, String contentType) {
+        assertAdmin(userId);
+
+        String normalizedContentType = normalizeOptionalText(contentType);
+        if (normalizedContentType == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "contentType은 필수입니다.");
+        }
+        normalizedContentType = normalizedContentType.toLowerCase(Locale.ROOT);
+        if (!ALLOWED_IMAGE_CONTENT_TYPES.contains(normalizedContentType)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 이미지 형식입니다.");
+        }
+
+        String sanitizedFileName = sanitizeFileName(fileName);
+        if (sanitizedFileName.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "fileName은 필수입니다.");
+        }
+
+        String objectKey = "cs/questions/"
+                + userId
+                + "/"
+                + System.currentTimeMillis()
+                + "_"
+                + UUID.randomUUID()
+                + "_"
+                + sanitizedFileName;
+
+        String presignedUrl = r2StorageService.generatePresignedUrl(objectKey, normalizedContentType);
+        String publicUrl = r2StorageService.getPublicUrl(objectKey);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("presignedUrl", presignedUrl);
+        response.put("publicUrl", publicUrl);
+        return response;
+    }
+
     private CsQuestion createQuestion(CsStage stage, CsAdminQuestionDraft draft) {
         validateDraftByType(draft);
+        CsQuestionContentMode contentMode = resolveContentMode(draft);
+        CsQuestionGradingMode gradingMode = resolveGradingMode(draft);
+        String contentBlocks = normalizeContentBlocks(contentMode, draft.contentBlocks());
+        String metadata = normalizeOptionalText(draft.metadata());
+
         CsQuestion question = csQuestionRepository.save(CsQuestion.builder()
                 .stage(stage)
                 .questionType(draft.questionType())
                 .prompt(draft.prompt().trim())
                 .explanation(draft.explanation().trim())
+                .contentMode(contentMode)
+                .contentBlocks(contentBlocks)
+                .gradingMode(gradingMode)
+                .metadata(metadata)
                 .isActive(true)
                 .build());
 
@@ -346,10 +425,19 @@ public class CsAdminContentService {
     private void updateQuestion(CsQuestion question, CsAdminQuestionDraft draft) {
         validateDraftByType(draft);
         CsQuestionType previousType = question.getQuestionType();
+        CsQuestionContentMode contentMode = resolveContentMode(draft);
+        CsQuestionGradingMode gradingMode = resolveGradingMode(draft);
+        String contentBlocks = normalizeContentBlocks(contentMode, draft.contentBlocks());
+        String metadata = normalizeOptionalText(draft.metadata());
+
         question.updateContent(
                 draft.questionType(),
                 draft.prompt().trim(),
-                draft.explanation().trim());
+                draft.explanation().trim(),
+                contentMode,
+                contentBlocks,
+                gradingMode,
+                metadata);
 
         if (previousType != draft.questionType()) {
             csQuestionChoiceRepository.deleteByQuestionId(question.getId());
@@ -480,6 +568,10 @@ public class CsAdminContentService {
         if (explanation.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "explanation은 필수입니다.");
         }
+        if (resolveContentMode(draft) == CsQuestionContentMode.BLOCKS
+                && normalizeOptionalText(draft.contentBlocks()) == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "BLOCKS 모드에서는 contentBlocks가 필요합니다.");
+        }
 
         if (draft.questionType() == CsQuestionType.MULTIPLE_CHOICE) {
             validateChoices(draft.choices(), false);
@@ -554,15 +646,48 @@ public class CsAdminContentService {
         return normalized;
     }
 
-    private void validateImportRequest(ImportMode mode, List<CsAdminQuestionDraft> questions) {
+    private void validateImportRequest(
+            CsStage stage,
+            ImportMode mode,
+            List<CsAdminQuestionDraft> questions,
+            List<CsQuestion> activeQuestions) {
         if (questions == null || questions.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "questions는 최소 1개 이상 필요합니다.");
         }
 
-        if (mode == ImportMode.REPLACE && questions.size() != REQUIRED_STAGE_QUESTION_COUNT) {
-            throw new BusinessException(
-                    ErrorCode.INVALID_INPUT_VALUE,
-                    "전체 교체(REPLACE)는 문제가 정확히 " + REQUIRED_STAGE_QUESTION_COUNT + "개여야 합니다.");
+        boolean isPastExamStage = stage.getTrack().getLearningMode() == CsTrackLearningMode.PAST_EXAM;
+
+        if (mode == ImportMode.REPLACE) {
+            if (isPastExamStage) {
+                if (questions.size() > PAST_EXAM_MAX_STAGE_QUESTION_COUNT) {
+                    throw new BusinessException(
+                            ErrorCode.INVALID_INPUT_VALUE,
+                            "기출 회차 문제는 최대 " + PAST_EXAM_MAX_STAGE_QUESTION_COUNT + "개까지 등록할 수 있습니다.");
+                }
+            } else if (questions.size() != CURRICULUM_REQUIRED_STAGE_QUESTION_COUNT) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "전체 교체(REPLACE)는 문제가 정확히 "
+                                + CURRICULUM_REQUIRED_STAGE_QUESTION_COUNT
+                                + "개여야 합니다.");
+            }
+        }
+
+        if (isPastExamStage && mode == ImportMode.UPSERT) {
+            Set<Long> activeQuestionIds = activeQuestions.stream()
+                    .map(CsQuestion::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            long newQuestionCount = questions.stream()
+                    .filter(draft -> draft.questionId() == null || !activeQuestionIds.contains(draft.questionId()))
+                    .count();
+
+            long projectedTotal = activeQuestionIds.size() + newQuestionCount;
+            if (projectedTotal > PAST_EXAM_MAX_STAGE_QUESTION_COUNT) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "기출 회차 문제는 최대 " + PAST_EXAM_MAX_STAGE_QUESTION_COUNT + "개까지 등록할 수 있습니다.");
+            }
         }
 
         Set<Long> upsertQuestionIds = new HashSet<>();
@@ -628,9 +753,47 @@ public class CsAdminContentService {
                 question.getQuestionType(),
                 question.getPrompt(),
                 question.getExplanation(),
+                question.getContentMode(),
+                question.getContentBlocks(),
+                question.getGradingMode(),
+                question.getMetadata(),
                 question.getIsActive(),
                 choices,
                 shortAnswers);
+    }
+
+    private CsQuestionContentMode resolveContentMode(CsAdminQuestionDraft draft) {
+        if (draft.contentMode() != null) {
+            return draft.contentMode();
+        }
+        return CsQuestionContentMode.LEGACY_TEXT;
+    }
+
+    private CsQuestionGradingMode resolveGradingMode(CsAdminQuestionDraft draft) {
+        if (draft.gradingMode() != null) {
+            return draft.gradingMode();
+        }
+
+        return switch (draft.questionType()) {
+            case MULTIPLE_CHOICE, OX -> CsQuestionGradingMode.SINGLE_CHOICE;
+            case SHORT_ANSWER -> CsQuestionGradingMode.SHORT_TEXT_EXACT;
+        };
+    }
+
+    private String normalizeContentBlocks(CsQuestionContentMode contentMode, String contentBlocks) {
+        String normalized = normalizeOptionalText(contentBlocks);
+        if (contentMode == CsQuestionContentMode.LEGACY_TEXT) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalText(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private CsDomain getDomain(Integer domainId) {
@@ -660,10 +823,18 @@ public class CsAdminContentService {
                 track.getDomain().getName(),
                 (int) track.getTrackNo(),
                 track.getName(),
+                track.getLearningMode(),
+                track.getExamYear() == null ? null : (int) track.getExamYear(),
                 stages);
     }
 
-    private int resolveRequestedStageCount(Integer requestedStageCount) {
+    private int resolveRequestedStageCount(
+            CsTrackLearningMode learningMode,
+            Short examYear,
+            Integer requestedStageCount) {
+        if (learningMode == CsTrackLearningMode.PAST_EXAM && requestedStageCount == null) {
+            return expectedPastExamRoundCount(examYear);
+        }
         if (requestedStageCount == null) {
             return DEFAULT_STAGE_COUNT_PER_TRACK;
         }
@@ -672,7 +843,68 @@ public class CsAdminContentService {
                     ErrorCode.INVALID_INPUT_VALUE,
                     "stageCount는 1 이상 " + MAX_STAGE_COUNT_PER_TRACK + " 이하여야 합니다.");
         }
+        if (learningMode == CsTrackLearningMode.PAST_EXAM && examYear != null) {
+            int expected = expectedPastExamRoundCount(examYear);
+            if (requestedStageCount != expected) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "기출 트랙의 stageCount는 " + examYear + "년 기준 " + expected + "회차여야 합니다.");
+            }
+        }
         return requestedStageCount;
+    }
+
+    private CsTrackLearningMode resolveLearningMode(CsTrackLearningMode learningMode) {
+        if (learningMode == null) {
+            return CsTrackLearningMode.CURRICULUM;
+        }
+        return learningMode;
+    }
+
+    private Short resolveExamYear(CsTrackLearningMode learningMode, Integer examYear) {
+        if (learningMode == CsTrackLearningMode.CURRICULUM) {
+            return null;
+        }
+        if (examYear == null) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "기출 트랙은 examYear가 필요합니다.");
+        }
+        if (examYear < PAST_EXAM_MIN_YEAR || examYear > PAST_EXAM_MAX_YEAR) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "examYear는 " + PAST_EXAM_MIN_YEAR + "년부터 " + PAST_EXAM_MAX_YEAR + "년까지 가능합니다.");
+        }
+        return examYear.shortValue();
+    }
+
+    private int expectedPastExamRoundCount(Short examYear) {
+        if (examYear == null) {
+            return 3;
+        }
+        return examYear == 2020 ? 4 : 3;
+    }
+
+    private void validatePastExamTrackUniqueness(
+            Integer domainId,
+            CsTrackLearningMode learningMode,
+            Short examYear,
+            Long selfTrackId) {
+        if (learningMode != CsTrackLearningMode.PAST_EXAM || examYear == null) {
+            return;
+        }
+
+        List<CsDomainTrack> tracks = csDomainTrackRepository.findByDomain_IdOrderByTrackNoAsc(domainId);
+        boolean duplicated = tracks.stream()
+                .filter(track -> selfTrackId == null || !track.getId().equals(selfTrackId))
+                .anyMatch(track -> track.getLearningMode() == CsTrackLearningMode.PAST_EXAM
+                        && examYear.equals(track.getExamYear()));
+
+        if (duplicated) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    domainId + "번 도메인에 " + examYear + "년 기출 트랙이 이미 존재합니다.");
+        }
     }
 
     private void resequenceTracks(List<CsDomainTrack> tracks) {
@@ -765,6 +997,18 @@ public class CsAdminContentService {
         return input.strip()
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", "");
+    }
+
+    private String sanitizeFileName(String fileName) {
+        if (fileName == null) {
+            return "";
+        }
+        String normalized = fileName.trim().replace("\\", "/");
+        int slashIndex = normalized.lastIndexOf('/');
+        if (slashIndex >= 0 && slashIndex < normalized.length() - 1) {
+            normalized = normalized.substring(slashIndex + 1);
+        }
+        return normalized.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private enum ImportMode {

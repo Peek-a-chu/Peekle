@@ -6,16 +6,20 @@ import com.peekle.domain.cs.dto.response.CsAttemptCompleteResponse;
 import com.peekle.domain.cs.dto.response.CsAttemptStartResponse;
 import com.peekle.domain.cs.entity.CsDomain;
 import com.peekle.domain.cs.entity.CsDomainTrack;
+import com.peekle.domain.cs.entity.CsPastExamBestScore;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsWrongProblem;
 import com.peekle.domain.cs.enums.CsAttemptPhase;
+import com.peekle.domain.cs.enums.CsQuestionGradingMode;
 import com.peekle.domain.cs.enums.CsQuestionType;
+import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.enums.CsWrongProblemStatus;
 import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
+import com.peekle.domain.cs.repository.CsPastExamBestScoreRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
@@ -73,6 +77,9 @@ class CsAttemptFlowIntegrationTest {
 
     @Autowired
     private CsUserDomainProgressRepository csUserDomainProgressRepository;
+
+    @Autowired
+    private CsPastExamBestScoreRepository csPastExamBestScoreRepository;
 
     @Test
     @DisplayName("오답이 남아있으면 재풀이 라운드를 반복하고 완료 시 오답노트에 누적 저장한다")
@@ -364,6 +371,97 @@ class CsAttemptFlowIntegrationTest {
         assertThat(wrongProblem.getStatus()).isEqualTo(CsWrongProblemStatus.ACTIVE);
     }
 
+    @Test
+    @DisplayName("멀티 빈칸 채점은 순서대로 각 답안을 검증한다")
+    void shortAnswer_multiBlankOrdered_gradesByOrderedParts() {
+        User user = createUser("short-multi-blank");
+        CsDomain domain = createDomain(409, "멀티 빈칸 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "멀티 빈칸 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion question = csQuestionRepository.save(CsQuestion.builder()
+                .stage(stage)
+                .questionType(CsQuestionType.SHORT_ANSWER)
+                .prompt("애플리케이션 성능 지표 3가지를 순서대로 쓰시오.")
+                .explanation("처리량, 응답 시간, 경과 시간 순서입니다.")
+                .gradingMode(CsQuestionGradingMode.MULTI_BLANK_ORDERED)
+                .metadata("{\"blankCount\":3}")
+                .isActive(true)
+                .build());
+
+        addShortAnswer(question, "처리량", "처리량", true);
+        addShortAnswer(question, "응답시간", "응답시간", false);
+        addShortAnswer(question, "경과시간", "경과시간", false);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        CsAttemptAnswerResponse wrongOrderAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "응답시간|||처리량|||경과시간"));
+        assertThat(wrongOrderAnswer.isCorrect()).isFalse();
+        assertThat(wrongOrderAnswer.correctAnswer()).isEqualTo("(1) 처리량, (2) 응답시간, (3) 경과시간");
+
+        CsAttemptAnswerResponse correctOrderAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "처리량|||응답 시간|||경과 시간"));
+        assertThat(correctOrderAnswer.isCorrect()).isTrue();
+        assertThat(correctOrderAnswer.phase()).isEqualTo(CsAttemptPhase.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("기출 회차 완료 시 최고 점수가 저장되고 더 높은 점수로 갱신된다")
+    void pastExamBestScore_isSavedAndUpdated() {
+        User user = createUser("past-best-score");
+        CsDomain domain = createDomain(408, "기출 최고점 도메인");
+        CsDomainTrack track = createPastExamTrack(domain, 1, "2024 기출", 2024);
+        CsStage stage = createStage(track, 1);
+        CsQuestion q1 = createMultipleChoiceQuestion(stage, "기출 문제 1");
+        createMultipleChoiceQuestion(stage, "기출 문제 2");
+
+        // 1차 시도: 50점(1/2)
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+        CsAttemptAnswerResponse firstAttemptQ1 = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(q1.getId(), 1, null));
+        Long q2IdFirstAttempt = firstAttemptQ1.nextQuestion().questionId();
+
+        CsAttemptAnswerResponse firstAttemptQ2Wrong = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(q2IdFirstAttempt, 2, null));
+        assertThat(firstAttemptQ2Wrong.isCorrect()).isFalse();
+
+        csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(q2IdFirstAttempt, 1, null));
+        csAttemptService.completeAttempt(user.getId(), stage.getId());
+
+        CsPastExamBestScore firstBest = csPastExamBestScoreRepository
+                .findByUser_IdAndExamYearAndExamRound(user.getId(), (short) 2024, (short) 1)
+                .orElseThrow();
+        assertThat(firstBest.getBestScore()).isEqualTo(50);
+
+        // 2차 시도: 100점(2/2) -> 최고점 갱신
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+        CsAttemptAnswerResponse firstResponse = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(q1.getId(), 1, null));
+        Long q2IdSecondAttempt = firstResponse.nextQuestion().questionId();
+        csAttemptService.submitAnswer(user.getId(), stage.getId(), new CsAttemptAnswerRequest(q2IdSecondAttempt, 1, null));
+        csAttemptService.completeAttempt(user.getId(), stage.getId());
+
+        CsPastExamBestScore updatedBest = csPastExamBestScoreRepository
+                .findByUser_IdAndExamYearAndExamRound(user.getId(), (short) 2024, (short) 1)
+                .orElseThrow();
+        assertThat(updatedBest.getBestScore()).isEqualTo(100);
+    }
+
     private User createUser(String suffix) {
         return userRepository.save(User.builder()
                 .socialId("social-" + suffix)
@@ -387,6 +485,16 @@ class CsAttemptFlowIntegrationTest {
                 .domain(domain)
                 .trackNo((short) trackNo)
                 .name(name)
+                .build());
+    }
+
+    private CsDomainTrack createPastExamTrack(CsDomain domain, int trackNo, String name, int examYear) {
+        return csDomainTrackRepository.save(CsDomainTrack.builder()
+                .domain(domain)
+                .trackNo((short) trackNo)
+                .name(name)
+                .learningMode(CsTrackLearningMode.PAST_EXAM)
+                .examYear((short) examYear)
                 .build());
     }
 
