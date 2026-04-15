@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface CsQuestionShortAnswerRepository extends JpaRepository<CsQuestionShortAnswer, Long> {
-    List<CsQuestionShortAnswer> findByQuestion_IdOrderByIsPrimaryDescIdAsc(Long questionId);
+    List<CsQuestionShortAnswer> findByQuestion_IdOrderByBlankIndexAscIsPrimaryDescIdAsc(Long questionId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from CsQuestionShortAnswer s where s.question.id = :questionId")

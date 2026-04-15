@@ -13,6 +13,7 @@ export type CSQuestionGradingMode =
   | 'SINGLE_CHOICE'
   | 'SHORT_TEXT_EXACT'
   | 'MULTI_BLANK_ORDERED'
+  | 'MULTI_BLANK_UNORDERED'
   | 'ORDERING';
 export type CSAttemptPhase = 'FIRST_PASS' | 'RETRY_WRONG' | 'COMPLETED';
 

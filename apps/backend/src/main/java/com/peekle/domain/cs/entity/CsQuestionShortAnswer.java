@@ -24,8 +24,8 @@ import lombok.NoArgsConstructor;
         name = "cs_question_short_answers",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_cs_question_short_answers_question_normalized",
-                        columnNames = { "question_id", "normalized_answer" })
+                        name = "uk_cs_question_short_answers_question_blank_normalized",
+                        columnNames = { "question_id", "blank_index", "normalized_answer" })
         })
 public class CsQuestionShortAnswer {
 
@@ -44,12 +44,17 @@ public class CsQuestionShortAnswer {
     private String normalizedAnswer;
 
     @Builder.Default
+    @Column(name = "blank_index", nullable = false)
+    private Short blankIndex = 1;
+
+    @Builder.Default
     @Column(name = "is_primary", nullable = false)
     private Boolean isPrimary = false;
 
-    public void update(String answerText, String normalizedAnswer, Boolean isPrimary) {
+    public void update(String answerText, String normalizedAnswer, Short blankIndex, Boolean isPrimary) {
         this.answerText = answerText;
         this.normalizedAnswer = normalizedAnswer;
+        this.blankIndex = blankIndex;
         this.isPrimary = isPrimary;
     }
 }

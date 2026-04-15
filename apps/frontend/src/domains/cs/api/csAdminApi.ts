@@ -33,6 +33,7 @@ export interface CSAdminQuestionChoice {
 
 export interface CSAdminQuestionShortAnswer {
   answerText: string;
+  blankIndex?: number;
   isPrimary: boolean;
 }
 

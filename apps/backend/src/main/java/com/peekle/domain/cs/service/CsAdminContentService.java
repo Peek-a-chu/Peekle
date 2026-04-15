@@ -66,6 +66,7 @@ public class CsAdminContentService {
     private static final int PAST_EXAM_MAX_STAGE_QUESTION_COUNT = 20;
     private static final int PAST_EXAM_MIN_YEAR = 2020;
     private static final int PAST_EXAM_MAX_YEAR = 2025;
+    private static final short DEFAULT_SHORT_ANSWER_BLANK_INDEX = 1;
     private static final Set<String> ALLOWED_IMAGE_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/jpg",
@@ -347,7 +348,9 @@ public class CsAdminContentService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "단답형 문제만 정답을 수정할 수 있습니다.");
         }
 
-        List<CsAdminQuestionShortAnswerDraft> normalized = validateShortAnswers(request.shortAnswers());
+        List<CsAdminQuestionShortAnswerDraft> normalized = validateShortAnswers(
+                request.shortAnswers(),
+                resolveEffectiveGradingMode(question));
         syncShortAnswers(question, normalized);
 
         return toAdminQuestionResponse(question);
@@ -447,7 +450,7 @@ public class CsAdminContentService {
         }
 
         if (draft.questionType() == CsQuestionType.SHORT_ANSWER) {
-            syncShortAnswers(question, validateShortAnswers(draft.shortAnswers()));
+            syncShortAnswers(question, validateShortAnswers(draft.shortAnswers(), gradingMode));
             return;
         }
 
@@ -459,7 +462,7 @@ public class CsAdminContentService {
             saveChoices(question, draft.choices());
             return;
         }
-        saveShortAnswers(question, validateShortAnswers(draft.shortAnswers()));
+        saveShortAnswers(question, validateShortAnswers(draft.shortAnswers(), resolveGradingMode(draft)));
     }
 
     private void saveChoices(CsQuestion question, List<CsAdminQuestionChoiceDraft> choices) {
@@ -510,10 +513,12 @@ public class CsAdminContentService {
     private void saveShortAnswers(CsQuestion question, List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
         List<CsAdminQuestionShortAnswerDraft> normalizedDrafts = normalizePrimaryShortAnswers(shortAnswers);
         for (CsAdminQuestionShortAnswerDraft answer : normalizedDrafts) {
+            short blankIndex = normalizeBlankIndex(answer.blankIndex());
             csQuestionShortAnswerRepository.save(CsQuestionShortAnswer.builder()
                     .question(question)
                     .answerText(answer.answerText().trim())
                     .normalizedAnswer(normalizeStrict(answer.answerText()))
+                    .blankIndex(blankIndex)
                     .isPrimary(Boolean.TRUE.equals(answer.isPrimary()))
                     .build());
         }
@@ -522,21 +527,26 @@ public class CsAdminContentService {
     private void syncShortAnswers(CsQuestion question, List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
         List<CsAdminQuestionShortAnswerDraft> normalizedDrafts = normalizePrimaryShortAnswers(shortAnswers);
         List<CsQuestionShortAnswer> existingAnswers = csQuestionShortAnswerRepository
-                .findByQuestion_IdOrderByIsPrimaryDescIdAsc(question.getId());
+                .findByQuestion_IdOrderByBlankIndexAscIsPrimaryDescIdAsc(question.getId());
 
-        Map<String, CsQuestionShortAnswer> existingByNormalized = new HashMap<>();
+        Map<String, CsQuestionShortAnswer> existingByBlankAndNormalized = new HashMap<>();
         for (CsQuestionShortAnswer existingAnswer : existingAnswers) {
-            existingByNormalized.put(existingAnswer.getNormalizedAnswer(), existingAnswer);
+            existingByBlankAndNormalized.put(
+                    toShortAnswerKey(existingAnswer.getBlankIndex(), existingAnswer.getNormalizedAnswer()),
+                    existingAnswer);
         }
 
         for (CsAdminQuestionShortAnswerDraft answer : normalizedDrafts) {
             String normalized = normalizeStrict(answer.answerText());
-            CsQuestionShortAnswer existing = existingByNormalized.remove(normalized);
+            short blankIndex = normalizeBlankIndex(answer.blankIndex());
+            String key = toShortAnswerKey(blankIndex, normalized);
+            CsQuestionShortAnswer existing = existingByBlankAndNormalized.remove(key);
             if (existing == null) {
                 csQuestionShortAnswerRepository.save(CsQuestionShortAnswer.builder()
                         .question(question)
                         .answerText(answer.answerText().trim())
                         .normalizedAnswer(normalized)
+                        .blankIndex(blankIndex)
                         .isPrimary(Boolean.TRUE.equals(answer.isPrimary()))
                         .build());
                 continue;
@@ -545,11 +555,12 @@ public class CsAdminContentService {
             existing.update(
                     answer.answerText().trim(),
                     normalized,
+                    blankIndex,
                     Boolean.TRUE.equals(answer.isPrimary()));
         }
 
-        if (!existingByNormalized.isEmpty()) {
-            csQuestionShortAnswerRepository.deleteAllInBatch(existingByNormalized.values());
+        if (!existingByBlankAndNormalized.isEmpty()) {
+            csQuestionShortAnswerRepository.deleteAllInBatch(existingByBlankAndNormalized.values());
         }
     }
 
@@ -581,7 +592,7 @@ public class CsAdminContentService {
             validateChoices(draft.choices(), true);
             return;
         }
-        validateShortAnswers(draft.shortAnswers());
+        validateShortAnswers(draft.shortAnswers(), resolveGradingMode(draft));
     }
 
     private void validateChoices(List<CsAdminQuestionChoiceDraft> choices, boolean ox) {
@@ -623,12 +634,16 @@ public class CsAdminContentService {
         }
     }
 
-    private List<CsAdminQuestionShortAnswerDraft> validateShortAnswers(List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
+    private List<CsAdminQuestionShortAnswerDraft> validateShortAnswers(
+            List<CsAdminQuestionShortAnswerDraft> shortAnswers,
+            CsQuestionGradingMode gradingMode) {
         if (shortAnswers == null || shortAnswers.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "단답형 문제는 shortAnswers가 1개 이상 필요합니다.");
         }
 
         Set<String> normalizedSet = new HashSet<>();
+        Map<Short, Integer> answerCountByBlank = new HashMap<>();
+        Map<Short, Integer> primaryCountByBlank = new HashMap<>();
         List<CsAdminQuestionShortAnswerDraft> normalized = new ArrayList<>(shortAnswers.size());
         for (CsAdminQuestionShortAnswerDraft answer : shortAnswers) {
             String trimmed = answer.answerText() == null ? "" : answer.answerText().trim();
@@ -636,13 +651,46 @@ public class CsAdminContentService {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "shortAnswers.answerText는 비어 있을 수 없습니다.");
             }
 
+            short blankIndex = normalizeBlankIndex(answer.blankIndex());
             String normalizedAnswer = normalizeStrict(trimmed);
-            if (!normalizedSet.add(normalizedAnswer)) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "단답형 정답은 중복될 수 없습니다.");
+            if (!normalizedSet.add(toShortAnswerKey(blankIndex, normalizedAnswer))) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "같은 빈칸의 단답형 정답은 중복될 수 없습니다.");
             }
 
-            normalized.add(new CsAdminQuestionShortAnswerDraft(trimmed, answer.isPrimary()));
+            answerCountByBlank.merge(blankIndex, 1, Integer::sum);
+            if (Boolean.TRUE.equals(answer.isPrimary())) {
+                primaryCountByBlank.merge(blankIndex, 1, Integer::sum);
+            }
+
+            normalized.add(new CsAdminQuestionShortAnswerDraft(trimmed, (int) blankIndex, answer.isPrimary()));
         }
+
+        for (Map.Entry<Short, Integer> primaryEntry : primaryCountByBlank.entrySet()) {
+            if (primaryEntry.getValue() != null && primaryEntry.getValue() > 1) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        primaryEntry.getKey() + "번 빈칸에는 대표 정답을 1개만 설정할 수 있습니다.");
+            }
+        }
+
+        if (isMultiBlankGradingMode(gradingMode)) {
+            if (answerCountByBlank.size() < 2) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "멀티 빈칸 문제는 빈칸별 정답이 최소 2개 이상 필요합니다.");
+            }
+            short maxBlankIndex = answerCountByBlank.keySet().stream()
+                    .max(Short::compareTo)
+                    .orElse(DEFAULT_SHORT_ANSWER_BLANK_INDEX);
+            for (short i = 1; i <= maxBlankIndex; i++) {
+                if (!answerCountByBlank.containsKey(i)) {
+                    throw new BusinessException(
+                            ErrorCode.INVALID_INPUT_VALUE,
+                            "빈칸 번호는 1부터 순서대로 입력해야 합니다. 누락된 번호: " + i);
+                }
+            }
+        } else if (answerCountByBlank.keySet().stream().anyMatch(index -> index != DEFAULT_SHORT_ANSWER_BLANK_INDEX)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "단일 단답 모드에서는 blankIndex를 1로만 설정할 수 있습니다.");
+        }
+
         return normalized;
     }
 
@@ -712,18 +760,34 @@ public class CsAdminContentService {
     private List<CsAdminQuestionShortAnswerDraft> normalizePrimaryShortAnswers(
             List<CsAdminQuestionShortAnswerDraft> shortAnswers) {
         List<CsAdminQuestionShortAnswerDraft> normalizedDrafts = new ArrayList<>(shortAnswers.size());
-        boolean hasPrimary = shortAnswers.stream()
-                .anyMatch(answer -> Boolean.TRUE.equals(answer.isPrimary()));
+        Map<Short, Integer> firstIndexByBlank = new HashMap<>();
+        Set<Short> hasPrimaryByBlank = new HashSet<>();
 
         for (int i = 0; i < shortAnswers.size(); i++) {
             CsAdminQuestionShortAnswerDraft answer = shortAnswers.get(i);
-            boolean isPrimary = hasPrimary
-                    ? Boolean.TRUE.equals(answer.isPrimary())
-                    : i == 0;
+            short blankIndex = normalizeBlankIndex(answer.blankIndex());
+            boolean isPrimary = Boolean.TRUE.equals(answer.isPrimary());
+            if (isPrimary) {
+                hasPrimaryByBlank.add(blankIndex);
+            }
+            firstIndexByBlank.putIfAbsent(blankIndex, i);
 
             normalizedDrafts.add(new CsAdminQuestionShortAnswerDraft(
                     answer.answerText().trim(),
+                    (int) blankIndex,
                     isPrimary));
+        }
+
+        for (Map.Entry<Short, Integer> entry : firstIndexByBlank.entrySet()) {
+            if (hasPrimaryByBlank.contains(entry.getKey())) {
+                continue;
+            }
+            int index = entry.getValue();
+            CsAdminQuestionShortAnswerDraft answer = normalizedDrafts.get(index);
+            normalizedDrafts.set(index, new CsAdminQuestionShortAnswerDraft(
+                    answer.answerText(),
+                    answer.blankIndex(),
+                    true));
         }
         return normalizedDrafts;
     }
@@ -739,12 +803,13 @@ public class CsAdminContentService {
                 .toList();
 
         List<CsAdminQuestionShortAnswerResponse> shortAnswers = csQuestionShortAnswerRepository
-                .findByQuestion_IdOrderByIsPrimaryDescIdAsc(question.getId())
+                .findByQuestion_IdOrderByBlankIndexAscIsPrimaryDescIdAsc(question.getId())
                 .stream()
                 .map(answer -> new CsAdminQuestionShortAnswerResponse(
                         answer.getId(),
                         answer.getAnswerText(),
                         answer.getNormalizedAnswer(),
+                        answer.getBlankIndex() == null ? (int) DEFAULT_SHORT_ANSWER_BLANK_INDEX : (int) answer.getBlankIndex(),
                         answer.getIsPrimary()))
                 .toList();
 
@@ -778,6 +843,37 @@ public class CsAdminContentService {
             case MULTIPLE_CHOICE, OX -> CsQuestionGradingMode.SINGLE_CHOICE;
             case SHORT_ANSWER -> CsQuestionGradingMode.SHORT_TEXT_EXACT;
         };
+    }
+
+    private CsQuestionGradingMode resolveEffectiveGradingMode(CsQuestion question) {
+        CsQuestionGradingMode gradingMode = question.getGradingMode();
+        if (gradingMode == null || gradingMode == CsQuestionGradingMode.DEFAULT_BY_TYPE) {
+            return question.getQuestionType() == CsQuestionType.SHORT_ANSWER
+                    ? CsQuestionGradingMode.SHORT_TEXT_EXACT
+                    : CsQuestionGradingMode.SINGLE_CHOICE;
+        }
+        return gradingMode;
+    }
+
+    private boolean isMultiBlankGradingMode(CsQuestionGradingMode gradingMode) {
+        return gradingMode == CsQuestionGradingMode.MULTI_BLANK_ORDERED
+                || gradingMode == CsQuestionGradingMode.MULTI_BLANK_UNORDERED
+                || gradingMode == CsQuestionGradingMode.ORDERING;
+    }
+
+    private short normalizeBlankIndex(Integer blankIndex) {
+        if (blankIndex == null || blankIndex < 1) {
+            return DEFAULT_SHORT_ANSWER_BLANK_INDEX;
+        }
+        if (blankIndex > Short.MAX_VALUE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "blankIndex 값이 너무 큽니다.");
+        }
+        return blankIndex.shortValue();
+    }
+
+    private String toShortAnswerKey(Short blankIndex, String normalizedAnswer) {
+        short safeBlankIndex = blankIndex == null ? DEFAULT_SHORT_ANSWER_BLANK_INDEX : blankIndex;
+        return safeBlankIndex + ":" + normalizedAnswer;
     }
 
     private String normalizeContentBlocks(CsQuestionContentMode contentMode, String contentBlocks) {

@@ -387,7 +387,7 @@ public class CsAttemptService {
                 }
 
                 List<CsQuestionShortAnswer> acceptableAnswers = csQuestionShortAnswerRepository
-                        .findByQuestion_IdOrderByIsPrimaryDescIdAsc(question.getId());
+                        .findByQuestion_IdOrderByBlankIndexAscIsPrimaryDescIdAsc(question.getId());
                 if (acceptableAnswers.isEmpty()) {
                     throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "단답형 정답 구성이 올바르지 않습니다.");
                 }
@@ -395,8 +395,7 @@ public class CsAttemptService {
                 String submitted = answerText.strip();
                 CsQuestionGradingMode gradingMode = resolveEffectiveGradingMode(question);
 
-                if (gradingMode == CsQuestionGradingMode.MULTI_BLANK_ORDERED
-                        || gradingMode == CsQuestionGradingMode.ORDERING) {
+                if (isOrderedMultiBlankMode(gradingMode)) {
                     List<String> submittedParts = parseOrderedSubmittedAnswers(submitted);
                     List<String> expectedParts = resolveOrderedExpectedAnswers(question, acceptableAnswers);
                     boolean isCorrect = isOrderedAnswerCorrect(submittedParts, expectedParts);
@@ -405,6 +404,18 @@ public class CsAttemptService {
                             isCorrect,
                             null,
                             isCorrect ? null : formatOrderedAnswerForFeedback(expectedParts),
+                            question.getExplanation());
+                }
+
+                if (gradingMode == CsQuestionGradingMode.MULTI_BLANK_UNORDERED) {
+                    List<String> submittedParts = parseOrderedSubmittedAnswers(submitted);
+                    List<String> expectedParts = resolveOrderedExpectedAnswers(question, acceptableAnswers);
+                    boolean isCorrect = isUnorderedAnswerCorrect(submittedParts, expectedParts);
+
+                    yield new GradingResult(
+                            isCorrect,
+                            null,
+                            isCorrect ? null : formatUnorderedAnswerForFeedback(expectedParts),
                             question.getExplanation());
                 }
 
@@ -664,10 +675,23 @@ public class CsAttemptService {
     }
 
     private List<String> resolveOrderedExpectedAnswers(CsQuestion question, List<CsQuestionShortAnswer> acceptableAnswers) {
-        List<String> answerTexts = acceptableAnswers.stream()
+        List<CsQuestionShortAnswer> sortedAnswers = acceptableAnswers.stream()
                 .sorted(Comparator
-                        .comparing((CsQuestionShortAnswer answer) -> !Boolean.TRUE.equals(answer.getIsPrimary()))
+                        .comparing((CsQuestionShortAnswer answer) -> answer.getBlankIndex() == null
+                                ? (short) 1
+                                : answer.getBlankIndex())
+                        .thenComparing((CsQuestionShortAnswer answer) -> !Boolean.TRUE.equals(answer.getIsPrimary()))
                         .thenComparing(CsQuestionShortAnswer::getId))
+                .toList();
+
+        List<String> groupedByBlank = resolveExpectedAnswersByBlankGroup(sortedAnswers);
+        int expectedCount = extractExpectedBlankCount(question.getMetadata());
+        if (groupedByBlank.size() > 1
+                && (expectedCount <= 1 || groupedByBlank.size() == expectedCount)) {
+            return groupedByBlank;
+        }
+
+        List<String> answerTexts = sortedAnswers.stream()
                 .map(this::resolveDisplayAnswerText)
                 .filter(text -> text != null && !text.isBlank())
                 .map(String::trim)
@@ -677,7 +701,6 @@ public class CsAttemptService {
             return List.of();
         }
 
-        int expectedCount = extractExpectedBlankCount(question.getMetadata());
         if (expectedCount > 1) {
             if (answerTexts.size() >= expectedCount) {
                 return new ArrayList<>(answerTexts.subList(0, expectedCount));
@@ -695,6 +718,36 @@ public class CsAttemptService {
 
         List<String> splitSingle = splitOrderedTokens(answerTexts.get(0));
         return splitSingle.isEmpty() ? answerTexts : splitSingle;
+    }
+
+    private List<String> resolveExpectedAnswersByBlankGroup(List<CsQuestionShortAnswer> sortedAnswers) {
+        Map<Short, List<String>> answersByBlank = new java.util.LinkedHashMap<>();
+        for (CsQuestionShortAnswer answer : sortedAnswers) {
+            String displayText = resolveDisplayAnswerText(answer);
+            if (displayText == null || displayText.isBlank()) {
+                continue;
+            }
+            short blankIndex = answer.getBlankIndex() == null ? 1 : answer.getBlankIndex();
+            answersByBlank.computeIfAbsent(blankIndex, key -> new ArrayList<>())
+                    .add(displayText.trim());
+        }
+
+        List<String> grouped = new ArrayList<>();
+        for (List<String> candidates : answersByBlank.values()) {
+            Set<String> seen = new HashSet<>();
+            List<String> deduplicated = new ArrayList<>();
+            for (String candidate : candidates) {
+                String normalized = normalizeStrict(candidate);
+                if (normalized.isBlank() || !seen.add(normalized)) {
+                    continue;
+                }
+                deduplicated.add(candidate);
+            }
+            if (!deduplicated.isEmpty()) {
+                grouped.add(String.join(" / ", deduplicated));
+            }
+        }
+        return grouped;
     }
 
     private List<String> splitOrderedTokens(String text) {
@@ -728,19 +781,77 @@ public class CsAttemptService {
         return true;
     }
 
+    private boolean isUnorderedAnswerCorrect(List<String> submittedParts, List<String> expectedParts) {
+        if (submittedParts.isEmpty() || expectedParts.isEmpty()) {
+            return false;
+        }
+        if (submittedParts.size() != expectedParts.size()) {
+            return false;
+        }
+
+        boolean[] used = new boolean[submittedParts.size()];
+        return matchExpectedPart(expectedParts, submittedParts, used, 0);
+    }
+
+    private boolean matchExpectedPart(
+            List<String> expectedParts,
+            List<String> submittedParts,
+            boolean[] used,
+            int expectedIndex) {
+        if (expectedIndex >= expectedParts.size()) {
+            return true;
+        }
+
+        String expectedPart = expectedParts.get(expectedIndex);
+        for (int submittedIndex = 0; submittedIndex < submittedParts.size(); submittedIndex++) {
+            if (used[submittedIndex]) {
+                continue;
+            }
+            if (!isOrderedPartCorrect(submittedParts.get(submittedIndex), expectedPart)) {
+                continue;
+            }
+
+            used[submittedIndex] = true;
+            if (matchExpectedPart(expectedParts, submittedParts, used, expectedIndex + 1)) {
+                return true;
+            }
+            used[submittedIndex] = false;
+        }
+        return false;
+    }
+
+    private boolean isOrderedMultiBlankMode(CsQuestionGradingMode gradingMode) {
+        return gradingMode == CsQuestionGradingMode.MULTI_BLANK_ORDERED
+                || gradingMode == CsQuestionGradingMode.ORDERING;
+    }
+
     private boolean isOrderedPartCorrect(String submittedPart, String expectedPart) {
         String strictSubmitted = normalizeStrict(submittedPart);
         String relaxedSubmitted = normalizeRelaxed(strictSubmitted);
 
-        String[] expectedOptions = expectedPart.split("[|/]+");
         Set<String> strictCandidates = new HashSet<>();
         Set<String> relaxedCandidates = new HashSet<>();
-        for (String option : expectedOptions) {
+        for (String option : parseExpectedPartOptions(expectedPart)) {
             addCandidateNormalization(strictCandidates, relaxedCandidates, option);
         }
 
         return strictCandidates.contains(strictSubmitted)
                 || (!relaxedSubmitted.isBlank() && relaxedCandidates.contains(relaxedSubmitted));
+    }
+
+    private List<String> parseExpectedPartOptions(String expectedPart) {
+        if (expectedPart == null || expectedPart.isBlank()) {
+            return List.of();
+        }
+        String[] rawTokens = expectedPart.split("[|/]+");
+        List<String> tokens = new ArrayList<>();
+        for (String rawToken : rawTokens) {
+            String normalized = rawToken == null ? "" : rawToken.trim();
+            if (!normalized.isBlank()) {
+                tokens.add(normalized);
+            }
+        }
+        return tokens;
     }
 
     private int extractExpectedBlankCount(String metadata) {
@@ -782,6 +893,13 @@ public class CsAttemptService {
             builder.append("(").append(i + 1).append(") ").append(expectedParts.get(i));
         }
         return builder.toString();
+    }
+
+    private String formatUnorderedAnswerForFeedback(List<String> expectedParts) {
+        if (expectedParts == null || expectedParts.isEmpty()) {
+            return null;
+        }
+        return String.join(", ", expectedParts);
     }
 
     private String resolveDisplayAnswerText(CsQuestionShortAnswer answer) {
