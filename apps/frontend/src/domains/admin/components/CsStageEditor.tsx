@@ -21,7 +21,7 @@ import {
   CSQuestionGradingMode,
   CSQuestionType,
 } from '@/domains/cs/api/csApi';
-import { RefreshCw, Upload, Edit, Save, Plus, X } from 'lucide-react';
+import { RefreshCw, Upload, Edit, Save, Plus, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface CsStageEditorProps {
@@ -31,6 +31,11 @@ interface CsStageEditorProps {
 }
 
 type ShortAnswerMode = 'SINGLE' | 'MULTI_BLANK_ORDERED';
+type GuiQuestionTemplateId =
+  | 'MULTI_BLANK_TABLE'
+  | 'MULTI_BOX_ORDER'
+  | 'JAVA_CODE_OUTPUT'
+  | 'DOUBLE_TABLE_SQL';
 
 export default function CsStageEditor({
   stageId,
@@ -40,6 +45,7 @@ export default function CsStageEditor({
   const { toast } = useToast();
   const [questions, setQuestions] = useState<CSAdminQuestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reordering, setReordering] = useState(false);
   
   const [isJsonMode, setIsJsonMode] = useState(false);
   const [jsonText, setJsonText] = useState('');
@@ -105,7 +111,37 @@ export default function CsStageEditor({
 
   const handleLoadNewTypeExample = () => {
     setJsonText(JSON.stringify(buildNewTypeExampleDraft(), null, 2));
-    toast({ title: '예시 JSON 반영', description: '멀티박스/테이블/코드블럭 예시를 불러왔습니다.' });
+    toast({ title: '예시 JSON 반영', description: '신규 유형 4종 예시를 불러왔습니다.' });
+  };
+
+  const handleMoveQuestion = async (index: number, direction: -1 | 1) => {
+    if (reordering) return;
+    const target = index + direction;
+    if (target < 0 || target >= questions.length) return;
+
+    const reordered = [...questions];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(target, 0, moved);
+    setQuestions(reordered);
+
+    try {
+      setReordering(true);
+      await importAdminStageQuestions(stageId, {
+        mode: 'REPLACE',
+        questions: toJsonDraft(reordered),
+      });
+      toast({ title: '문제 순서 변경 완료' });
+      await loadQuestions();
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: '문제 순서 변경 실패',
+        description: err?.message ?? '문제 순서 저장에 실패했습니다.',
+      });
+      await loadQuestions();
+    } finally {
+      setReordering(false);
+    }
   };
 
   const questionCountHint = exactQuestionCount === null
@@ -119,6 +155,7 @@ export default function CsStageEditor({
           총 {questions.length}개 문제
           {` · ${questionCountHint}`}
           {isJsonMode ? ' · JSON 수정 모드' : ' · GUI 편집 모드'}
+          {reordering ? ' · 순서 저장 중...' : ''}
         </p>
         <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" onClick={handleToggleJsonMode}>
@@ -138,22 +175,7 @@ export default function CsStageEditor({
           <CardContent className="flex flex-col gap-3">
             <Textarea
               className="font-mono text-xs min-h-[260px]"
-              placeholder={`[
-  {
-    "questionType": "SHORT_ANSWER",
-    "prompt": "애플리케이션 성능 지표 3가지를 순서대로 작성하시오.",
-    "explanation": "정답 순서: 처리량, 응답시간, 경과시간",
-    "contentMode": "BLOCKS",
-    "contentBlocks": "[{\\"type\\":\\"TEXT\\",\\"text\\":\\"표를 보고 (a),(b),(c)에 들어갈 용어를 순서대로 입력하세요.\\"},{\\"type\\":\\"TABLE\\",\\"headers\\":[\\"지표\\",\\"설명\\"],\\"rows\\":[[\\"(a)\\",\\"주어진 시간에 처리 가능한 트랜잭션 수\\"],[\\"(b)\\",\\"사용자 입력 후 응답 시작까지 걸린 시간\\"],[\\"(c)\\",\\"입력 시점부터 결과 출력 완료까지 걸린 시간\\"]]}, {\\"type\\":\\"MULTI_BOX\\",\\"boxes\\":[{\\"key\\":\\"a\\",\\"label\\":\\"(a)\\"},{\\"key\\":\\"b\\",\\"label\\":\\"(b)\\"},{\\"key\\":\\"c\\",\\"label\\":\\"(c)\\"}]}, {\\"type\\":\\"CODE\\",\\"language\\":\\"sql\\",\\"code\\":\\"SELECT * FROM performance_metrics;\\"}]",
-    "gradingMode": "MULTI_BLANK_ORDERED",
-    "metadata": "{\\"blankCount\\":3}",
-    "shortAnswers": [
-      { "answerText": "처리량", "isPrimary": true },
-      { "answerText": "응답시간", "isPrimary": false },
-      { "answerText": "경과시간", "isPrimary": false }
-    ]
-  }
-]`}
+              placeholder={JSON.stringify(buildNewTypeExampleDraft(), null, 2)}
               value={jsonText}
               onChange={(e) => setJsonText(e.target.value)}
             />
@@ -187,6 +209,11 @@ export default function CsStageEditor({
                 question={q}
                 index={index}
                 onUpdate={loadQuestions}
+                canMoveUp={index > 0}
+                canMoveDown={index < questions.length - 1}
+                onMoveUp={() => handleMoveQuestion(index, -1)}
+                onMoveDown={() => handleMoveQuestion(index, 1)}
+                reordering={reordering}
               />
             ))
           )}
@@ -212,6 +239,7 @@ function QuestionCreateCard({
   const [shortAnswerMode, setShortAnswerMode] = useState<ShortAnswerMode>('SINGLE');
   const [promptText, setPromptText] = useState('');
   const [explanationText, setExplanationText] = useState('');
+  const [contentBlocks, setContentBlocks] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [choices, setChoices] = useState<CSAdminQuestionChoice[]>([
     { choiceNo: 1, content: '', isAnswer: true },
@@ -249,6 +277,53 @@ function QuestionCreateCard({
             { choiceNo: 1, content: '', isAnswer: true },
             { choiceNo: 2, content: '', isAnswer: false },
           ],
+    );
+  };
+
+  const handleApplyTemplate = (templateId: GuiQuestionTemplateId) => {
+    const template = getGuiQuestionTemplates().find((item) => item.id === templateId);
+    if (!template) return;
+    const draft = template.draft;
+
+    setQuestionType(draft.questionType);
+    setPromptText(draft.prompt);
+    setExplanationText(draft.explanation);
+    setContentBlocks(draft.contentBlocks ?? null);
+    setImageUrl(extractImageUrlFromContentBlocks(draft.contentBlocks ?? null));
+
+    if (draft.questionType === 'SHORT_ANSWER') {
+      setShortAnswerMode(inferShortAnswerModeFromQuestion({
+        gradingMode: draft.gradingMode ?? undefined,
+        metadata: draft.metadata ?? null,
+      }));
+      setShortAnswers(
+        (draft.shortAnswers ?? []).length > 0
+          ? (draft.shortAnswers ?? []).map((answer) => ({
+              answerText: answer.answerText,
+              isPrimary: answer.isPrimary,
+            }))
+          : [{ answerText: '', isPrimary: true }],
+      );
+      return;
+    }
+
+    setChoices(
+      (draft.choices ?? []).length > 0
+        ? (draft.choices ?? []).map((choice, index) => ({
+            choiceNo: index + 1,
+            content: choice.content,
+            isAnswer: choice.isAnswer,
+          }))
+        : toEditableChoices({
+            questionId: 0,
+            questionType: draft.questionType,
+            prompt: '',
+            explanation: null,
+            choices: [],
+            shortAnswers: [],
+            createdAt: '',
+            updatedAt: '',
+          }),
     );
   };
 
@@ -344,6 +419,12 @@ function QuestionCreateCard({
     if (!explanationText.trim()) {
       throw new Error('해설은 비어 있을 수 없습니다.');
     }
+    if (contentBlocks?.trim()) {
+      const parsedBlocks = parseContentBlocks(contentBlocks);
+      if (parsedBlocks === null) {
+        throw new Error('콘텐츠 블록 JSON 형식이 올바르지 않습니다.');
+      }
+    }
 
     if (questionType === 'SHORT_ANSWER') {
       const texts = shortAnswers.map((answer) => answer.answerText.trim());
@@ -379,6 +460,7 @@ function QuestionCreateCard({
     setShortAnswerMode('SINGLE');
     setPromptText('');
     setExplanationText('');
+    setContentBlocks(null);
     setImageUrl('');
     setChoices([
       { choiceNo: 1, content: '', isAnswer: true },
@@ -391,7 +473,7 @@ function QuestionCreateCard({
   };
 
   const buildCreatePayload = (): CSAdminQuestionDraft => {
-    const resolvedImage = applyImageBlockToContentBlocks(null, imageUrl);
+    const resolvedImage = applyImageBlockToContentBlocks(contentBlocks, imageUrl);
     const resolvedShortAnswerMode = resolveShortAnswerModeBySelection(shortAnswerMode);
     const base: CSAdminQuestionDraft = {
       questionType,
@@ -468,6 +550,24 @@ function QuestionCreateCard({
         </div>
 
         <div className="grid grid-cols-1 gap-1.5">
+          <label className="text-xs text-muted-foreground">신규 유형 템플릿</label>
+          <div className="flex flex-wrap gap-2">
+            {getGuiQuestionTemplates().map((template) => (
+              <Button
+                key={template.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleApplyTemplate(template.id)}
+                disabled={submitting || !canCreate || uploadingImage}
+              >
+                {template.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-1.5">
           <label className="text-xs text-muted-foreground">문제 본문</label>
           <Textarea
             value={promptText}
@@ -484,6 +584,17 @@ function QuestionCreateCard({
             onChange={(e) => setExplanationText(e.target.value)}
             className="min-h-[56px]"
             disabled={submitting || !canCreate}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-1.5">
+          <label className="text-xs text-muted-foreground">콘텐츠 블록 JSON (선택)</label>
+          <Textarea
+            value={contentBlocks ?? ''}
+            onChange={(e) => setContentBlocks(e.target.value || null)}
+            className="min-h-[96px] font-mono text-xs"
+            placeholder='[{"type":"TEXT","text":"추가 안내"},{"type":"TABLE","headers":["컬럼1"],"rows":[["값"]]}]'
+            disabled={submitting || !canCreate || uploadingImage}
           />
         </div>
 
@@ -634,11 +745,21 @@ function QuestionFormItem({
   question,
   index,
   onUpdate,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  reordering,
 }: {
   stageId: number;
   question: CSAdminQuestion;
   index: number;
   onUpdate: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  reordering: boolean;
 }) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -699,6 +820,57 @@ function QuestionFormItem({
             { choiceNo: 1, content: '', isAnswer: true },
             { choiceNo: 2, content: '', isAnswer: false },
           ],
+    );
+  };
+
+  const handleApplyTemplate = (templateId: GuiQuestionTemplateId) => {
+    const template = getGuiQuestionTemplates().find((item) => item.id === templateId);
+    if (!template) return;
+    const draft = template.draft;
+
+    setQuestionType(draft.questionType);
+    setPromptText(draft.prompt);
+    setExplanationText(draft.explanation);
+    setContentBlocks(draft.contentBlocks ?? null);
+    setImageUrl(extractImageUrlFromContentBlocks(draft.contentBlocks ?? null));
+
+    if (draft.questionType === 'SHORT_ANSWER') {
+      setShortAnswerMode(inferShortAnswerModeFromQuestion({
+        gradingMode: draft.gradingMode ?? undefined,
+        metadata: draft.metadata ?? null,
+      }));
+      setGradingMode(draft.gradingMode ?? 'SHORT_TEXT_EXACT');
+      setMetadataText(draft.metadata ?? null);
+      setShortAnswers(
+        (draft.shortAnswers ?? []).length > 0
+          ? (draft.shortAnswers ?? []).map((answer) => ({
+              answerText: answer.answerText,
+              isPrimary: answer.isPrimary,
+            }))
+          : [{ answerText: '', isPrimary: true }],
+      );
+      return;
+    }
+
+    setGradingMode(draft.gradingMode ?? 'SINGLE_CHOICE');
+    setMetadataText(draft.metadata ?? null);
+    setChoices(
+      (draft.choices ?? []).length > 0
+        ? (draft.choices ?? []).map((choice, index) => ({
+            choiceNo: index + 1,
+            content: choice.content,
+            isAnswer: choice.isAnswer,
+          }))
+        : toEditableChoices({
+            questionId: 0,
+            questionType: draft.questionType,
+            prompt: '',
+            explanation: null,
+            choices: [],
+            shortAnswers: [],
+            createdAt: '',
+            updatedAt: '',
+          }),
     );
   };
 
@@ -792,6 +964,12 @@ function QuestionFormItem({
     }
     if (!explanationText.trim()) {
       throw new Error('해설은 비어 있을 수 없습니다.');
+    }
+    if (contentBlocks?.trim()) {
+      const parsedBlocks = parseContentBlocks(contentBlocks);
+      if (parsedBlocks === null) {
+        throw new Error('콘텐츠 블록 JSON 형식이 올바르지 않습니다.');
+      }
     }
 
     if (questionType === 'SHORT_ANSWER') {
@@ -890,9 +1068,33 @@ function QuestionFormItem({
             <span className="text-sm font-medium border px-1 rounded bg-secondary/50 mr-2">{question.questionType}</span>
             <span className="text-sm">{question.prompt}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => isEditing ? setIsEditing(false) : setIsEditing(true)}>
-            {isEditing ? '취소' : <Edit className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onMoveUp}
+              disabled={!canMoveUp || reordering || isEditing}
+              title="위로 이동"
+              className="h-8 w-8"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onMoveDown}
+              disabled={!canMoveDown || reordering || isEditing}
+              title="아래로 이동"
+              className="h-8 w-8"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => isEditing ? setIsEditing(false) : setIsEditing(true)} disabled={reordering}>
+              {isEditing ? '취소' : <Edit className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         {isEditing ? (
@@ -911,6 +1113,24 @@ function QuestionFormItem({
             </div>
 
             <div className="grid grid-cols-1 gap-1.5">
+              <label className="text-xs text-muted-foreground">신규 유형 템플릿</label>
+              <div className="flex flex-wrap gap-2">
+                {getGuiQuestionTemplates().map((template) => (
+                  <Button
+                    key={template.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleApplyTemplate(template.id)}
+                    disabled={saving || uploadingImage}
+                  >
+                    {template.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-1.5">
               <label className="text-xs text-muted-foreground">문제 본문</label>
               <Textarea
                 value={promptText}
@@ -925,6 +1145,17 @@ function QuestionFormItem({
                 value={explanationText}
                 onChange={(e) => setExplanationText(e.target.value)}
                 className="min-h-[56px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-1.5">
+              <label className="text-xs text-muted-foreground">콘텐츠 블록 JSON (선택)</label>
+              <Textarea
+                value={contentBlocks ?? ''}
+                onChange={(e) => setContentBlocks(e.target.value || null)}
+                className="min-h-[96px] font-mono text-xs"
+                placeholder='[{"type":"TEXT","text":"추가 안내"},{"type":"TABLE","headers":["컬럼1"],"rows":[["값"]]}]'
+                disabled={saving || uploadingImage}
               />
             </div>
 
@@ -1260,51 +1491,90 @@ function buildEmptyStageExampleDraft(): CSAdminQuestionDraft[] {
   ];
 }
 
-function buildNewTypeExampleDraft(): CSAdminQuestionDraft[] {
+function getGuiQuestionTemplates(): Array<{
+  id: GuiQuestionTemplateId;
+  label: string;
+  draft: CSAdminQuestionDraft;
+}> {
   return [
     {
-      questionType: 'SHORT_ANSWER',
-      prompt: '애플리케이션 성능 지표 3가지를 순서대로 작성하시오.',
-      explanation: '정답 순서: 처리량, 응답시간, 경과시간',
-      contentMode: 'BLOCKS',
-      contentBlocks:
-        '[{"type":"TEXT","text":"아래 표를 읽고 (a),(b),(c)의 용어를 순서대로 작성하세요."},{"type":"IMAGE","url":"https://example.com/sample.png","alt":"문제 이미지 예시"},{"type":"TABLE","headers":["지표","설명"],"rows":[["(a)","주어진 시간에 처리 가능한 트랜잭션 수"],["(b)","사용자 입력 후 응답 시작까지 걸린 시간"],["(c)","입력 시점부터 결과 출력 완료까지 걸린 시간"]]},{"type":"MULTI_BOX","boxes":[{"key":"a","label":"(a)"},{"key":"b","label":"(b)"},{"key":"c","label":"(c)"}]}]',
-      gradingMode: 'MULTI_BLANK_ORDERED',
-      metadata: '{"blankCount":3}',
-      shortAnswers: [
-        { answerText: '처리량', isPrimary: true },
-        { answerText: '응답시간', isPrimary: false },
-        { answerText: '경과시간', isPrimary: false },
-      ],
+      id: 'MULTI_BLANK_TABLE',
+      label: '멀티빈칸+표',
+      draft: {
+        questionType: 'SHORT_ANSWER',
+        prompt: '애플리케이션 성능 지표 3가지를 순서대로 작성하시오.',
+        explanation: '정답 순서: 처리량, 응답시간, 경과시간',
+        contentMode: 'BLOCKS',
+        contentBlocks:
+          '[{"type":"TEXT","text":"아래 표를 읽고 (a),(b),(c)의 용어를 순서대로 작성하세요."},{"type":"IMAGE","url":"https://example.com/sample.png","alt":"문제 이미지 예시"},{"type":"TABLE","headers":["지표","설명"],"rows":[["(a)","주어진 시간에 처리 가능한 트랜잭션 수"],["(b)","사용자 입력 후 응답 시작까지 걸린 시간"],["(c)","입력 시점부터 결과 출력 완료까지 걸린 시간"]]},{"type":"MULTI_BOX","boxes":[{"key":"a","label":"(a)"},{"key":"b","label":"(b)"},{"key":"c","label":"(c)"}]}]',
+        gradingMode: 'MULTI_BLANK_ORDERED',
+        metadata: '{"blankCount":3}',
+        shortAnswers: [
+          { answerText: '처리량', isPrimary: true },
+          { answerText: '응답시간', isPrimary: false },
+          { answerText: '경과시간', isPrimary: false },
+        ],
+      },
     },
     {
-      questionType: 'SHORT_ANSWER',
-      prompt: '프로세스 상태 전이를 순서대로 작성하시오.',
-      explanation: '준비-실행-대기-준비의 순환 흐름을 이해했는지 확인하는 문제입니다.',
-      contentMode: 'BLOCKS',
-      contentBlocks:
-        '[{"type":"TEXT","text":"각 박스에 올바른 상태명을 입력하세요."},{"type":"MULTI_BOX","boxes":[{"key":"state1","label":"박스1"},{"key":"state2","label":"박스2"},{"key":"state3","label":"박스3"}]}]',
-      gradingMode: 'ORDERING',
-      metadata: '{"itemCount":3}',
-      shortAnswers: [
-        { answerText: '준비,실행,대기', isPrimary: true },
-        { answerText: 'READY,RUNNING,WAITING', isPrimary: false },
-      ],
+      id: 'MULTI_BOX_ORDER',
+      label: '멀티박스 순서',
+      draft: {
+        questionType: 'SHORT_ANSWER',
+        prompt: '프로세스 상태 전이를 순서대로 작성하시오.',
+        explanation: '준비-실행-대기-준비의 순환 흐름을 이해했는지 확인하는 문제입니다.',
+        contentMode: 'BLOCKS',
+        contentBlocks:
+          '[{"type":"TEXT","text":"각 박스에 올바른 상태명을 입력하세요."},{"type":"MULTI_BOX","boxes":[{"key":"state1","label":"박스1"},{"key":"state2","label":"박스2"},{"key":"state3","label":"박스3"}]}]',
+        gradingMode: 'ORDERING',
+        metadata: '{"itemCount":3}',
+        shortAnswers: [
+          { answerText: '준비,실행,대기', isPrimary: true },
+          { answerText: 'READY,RUNNING,WAITING', isPrimary: false },
+        ],
+      },
     },
     {
-      questionType: 'SHORT_ANSWER',
-      prompt: '다음 Java 코드의 출력 결과를 작성하시오.',
-      explanation: '상위 타입 참조로 호출되는 메서드 오버라이딩/오버로딩 동작을 구분하는 문제입니다.',
-      contentMode: 'BLOCKS',
-      contentBlocks:
-        '[{"type":"TEXT","text":"코드를 읽고 콘솔 출력값을 정확히 작성하세요."},{"type":"CODE","language":"java","code":"abstract class Vehicle {\\n  private String name;\\n  abstract public String getName(String val);\\n  public String getName() {\\n    return \\"vehicle name:\\" + name;\\n  }\\n  public void setName(String val) {\\n    name = val;\\n  }\\n}\\n\\nclass Car extends Vehicle {\\n  public Car(String val) {\\n    setName(val);\\n  }\\n  public String getName(String val) {\\n    return \\"Car name : \\" + val;\\n  }\\n}\\n\\npublic class Good {\\n  public static void main(String[] args) {\\n    Vehicle obj = new Car(\\"Spark\\");\\n    System.out.print(obj.getName());\\n  }\\n}"}]',
-      gradingMode: 'SHORT_TEXT_EXACT',
-      metadata: null,
-      shortAnswers: [
-        { answerText: 'vehicle name:Spark', isPrimary: true },
-      ],
+      id: 'JAVA_CODE_OUTPUT',
+      label: '코드블럭(자바)',
+      draft: {
+        questionType: 'SHORT_ANSWER',
+        prompt: '다음 Java 코드의 출력 결과를 작성하시오.',
+        explanation: '상위 타입 참조로 호출되는 메서드 오버라이딩/오버로딩 동작을 구분하는 문제입니다.',
+        contentMode: 'BLOCKS',
+        contentBlocks:
+          '[{"type":"TEXT","text":"코드를 읽고 콘솔 출력값을 정확히 작성하세요."},{"type":"CODE","language":"java","code":"abstract class Vehicle {\\n  private String name;\\n  abstract public String getName(String val);\\n  public String getName() {\\n    return \\"vehicle name:\\" + name;\\n  }\\n  public void setName(String val) {\\n    name = val;\\n  }\\n}\\n\\nclass Car extends Vehicle {\\n  public Car(String val) {\\n    setName(val);\\n  }\\n  public String getName(String val) {\\n    return \\"Car name : \\" + val;\\n  }\\n}\\n\\npublic class Good {\\n  public static void main(String[] args) {\\n    Vehicle obj = new Car(\\"Spark\\");\\n    System.out.print(obj.getName());\\n  }\\n}"}]',
+        gradingMode: 'SHORT_TEXT_EXACT',
+        metadata: null,
+        shortAnswers: [{ answerText: 'vehicle name:Spark', isPrimary: true }],
+      },
+    },
+    {
+      id: 'DOUBLE_TABLE_SQL',
+      label: '2중 테이블(SQL)',
+      draft: {
+        questionType: 'SHORT_ANSWER',
+        prompt: '다음 조건을 만족하면서 과목별 평균이 90 이상인 과목이름, 최소점수, 최대점수를 구하는 SQL문을 작성하시오.',
+        explanation: 'WHERE 없이 GROUP BY + HAVING을 사용하고 별칭(AS)을 적용해야 합니다.',
+        contentMode: 'BLOCKS',
+        contentBlocks:
+          '[{"type":"TEXT","text":"- 대소문자를 구분하지 않는다.\\n- WHERE 구분을 사용하지 않는다.\\n- GROUP BY, HAVING 구문을 반드시 사용한다.\\n- 세미콜론(;)은 생략 가능하다.\\n- 별칭(AS)을 사용해야 한다."},{"type":"TEXT","text":"[성적]"},{"type":"TABLE","headers":["과목코드","과목이름","학점","점수"],"rows":[["1000","컴퓨터과학","A+","95"],["2000","운영체제","B+","85"],["1000","컴퓨터과학","B+","85"],["2000","운영체제","B","80"]]},{"type":"TEXT","text":"[결과]"},{"type":"TABLE","headers":["과목이름","최소점수","최대점수"],"rows":[["컴퓨터과학","85","95"]]}]',
+        gradingMode: 'SHORT_TEXT_EXACT',
+        metadata: null,
+        shortAnswers: [
+          {
+            answerText:
+              'SELECT 과목이름 AS 과목이름, MIN(점수) AS 최소점수, MAX(점수) AS 최대점수 FROM 성적 GROUP BY 과목이름 HAVING AVG(점수) >= 90',
+            isPrimary: true,
+          },
+        ],
+      },
     },
   ];
+}
+
+function buildNewTypeExampleDraft(): CSAdminQuestionDraft[] {
+  return getGuiQuestionTemplates().map((template) => template.draft);
 }
 
 function validateJsonDraft(
