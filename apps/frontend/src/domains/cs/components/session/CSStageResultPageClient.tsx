@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { CSAttemptCompleteResponse } from '@/domains/cs/api/csApi';
@@ -14,6 +14,9 @@ interface CSStageResultPageClientProps {
 
 export default function CSStageResultPageClient({ stageId }: CSStageResultPageClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isPastExam = searchParams.get('source') === 'past-exam';
+  const returnPath = isPastExam ? '/cs/past-exams' : '/cs';
   const [result, setResult] = useState<CSAttemptCompleteResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -22,7 +25,7 @@ export default function CSStageResultPageClient({ stageId }: CSStageResultPageCl
     const raw = sessionStorage.getItem(key);
 
     if (!raw) {
-      router.replace('/cs');
+      router.replace(returnPath);
       return;
     }
 
@@ -34,9 +37,9 @@ export default function CSStageResultPageClient({ stageId }: CSStageResultPageCl
       setIsLoading(false);
     } catch (error) {
       console.error('Failed to parse CS stage result:', error);
-      router.replace('/cs');
+      router.replace(returnPath);
     }
-  }, [router, stageId]);
+  }, [returnPath, router, stageId]);
 
   if (isLoading || !result) {
     return (
@@ -47,5 +50,5 @@ export default function CSStageResultPageClient({ stageId }: CSStageResultPageCl
     );
   }
 
-  return <CSResultScreen result={result} />;
+  return <CSResultScreen result={result} isPastExam={isPastExam} returnPath={returnPath} />;
 }

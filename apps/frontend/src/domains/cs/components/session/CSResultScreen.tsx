@@ -4,18 +4,20 @@ import React from 'react';
 import { CSAttemptCompleteResponse } from '@/domains/cs/api/csApi';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Trophy, Flame, CheckCircle, ArrowRight, RotateCcw, Coins } from 'lucide-react';
+import { Trophy, Flame, CheckCircle, RotateCcw, Coins } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface CSResultScreenProps {
   result: CSAttemptCompleteResponse;
+  isPastExam: boolean;
+  returnPath: string;
 }
 
-export default function CSResultScreen({ result }: CSResultScreenProps) {
+export default function CSResultScreen({ result, isPastExam, returnPath }: CSResultScreenProps) {
   const router = useRouter();
 
   const handleReturnToCS = () => {
-    router.replace('/cs');
+    router.replace(returnPath);
   };
 
   const handleNextStage = () => {
@@ -63,7 +65,16 @@ export default function CSResultScreen({ result }: CSResultScreenProps) {
           </div>
 
           <div className="flex flex-col w-full gap-3">
-            {result.isTrackCompleted ? (
+            {isPastExam ? (
+              <Button
+                variant="outline"
+                className="w-full h-14 text-lg font-bold rounded-2xl"
+                onClick={handleReturnToCS}
+              >
+                <RotateCcw className="w-5 h-5 mr-2" />
+                기출 목록으로 돌아가기
+              </Button>
+            ) : result.isTrackCompleted ? (
               <Button
                 className="w-full h-14 text-lg font-bold rounded-2xl"
                 onClick={handleReturnToCS}
@@ -79,7 +90,6 @@ export default function CSResultScreen({ result }: CSResultScreenProps) {
                     onClick={handleNextStage}
                   >
                     다음 스테이지 풀기
-                    <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 )}
                 <Button
