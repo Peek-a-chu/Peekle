@@ -64,4 +64,8 @@ public class CsQuestionClaim extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private CsQuestionClaimStatus status = CsQuestionClaimStatus.RECEIVED;
+
+    public void updateStatus(CsQuestionClaimStatus status) {
+        this.status = status;
+    }
 }

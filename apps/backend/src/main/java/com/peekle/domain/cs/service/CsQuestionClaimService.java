@@ -24,7 +24,7 @@ import java.time.ZonedDateTime;
 @Transactional(readOnly = true)
 public class CsQuestionClaimService {
 
-    private static final int DAILY_CLAIM_LIMIT = 5;
+    private static final int DAILY_CLAIM_LIMIT = 20;
     private static final int SAME_QUESTION_COOLDOWN_HOURS = 24;
     private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -75,7 +75,7 @@ public class CsQuestionClaimService {
         LocalDateTime startOfDay = LocalDate.now(KST_ZONE).atStartOfDay();
         long todayCount = csQuestionClaimRepository.countByUser_IdAndCreatedAtGreaterThanEqual(userId, startOfDay);
         if (todayCount >= DAILY_CLAIM_LIMIT) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "하루 신고 가능 횟수(5회)를 초과했습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "하루 신고 가능 횟수(20회)를 초과했습니다.");
         }
     }
 

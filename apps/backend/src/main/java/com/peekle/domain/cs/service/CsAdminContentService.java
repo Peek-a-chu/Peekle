@@ -8,6 +8,8 @@ import com.peekle.domain.cs.dto.request.CsAdminQuestionShortAnswersUpdateRequest
 import com.peekle.domain.cs.dto.request.CsAdminQuestionUpdateRequest;
 import com.peekle.domain.cs.dto.request.CsAdminStageQuestionImportRequest;
 import com.peekle.domain.cs.dto.request.CsAdminTrackCreateRequest;
+import com.peekle.domain.cs.dto.response.CsAdminClaimOverviewItemResponse;
+import com.peekle.domain.cs.dto.response.CsAdminClaimOverviewPageResponse;
 import com.peekle.domain.cs.dto.response.CsAdminClaimItemResponse;
 import com.peekle.domain.cs.dto.response.CsAdminClaimsPlaceholderResponse;
 import com.peekle.domain.cs.dto.response.CsAdminQuestionChoiceResponse;
@@ -26,6 +28,8 @@ import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.enums.CsQuestionContentMode;
+import com.peekle.domain.cs.enums.CsQuestionClaimStatus;
+import com.peekle.domain.cs.enums.CsQuestionClaimType;
 import com.peekle.domain.cs.enums.CsQuestionGradingMode;
 import com.peekle.domain.cs.enums.CsQuestionType;
 import com.peekle.domain.cs.enums.CsTrackLearningMode;
@@ -46,6 +50,8 @@ import com.peekle.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -373,6 +379,75 @@ public class CsAdminContentService {
                 items.size(),
                 items.isEmpty() ? "등록된 신고 내역이 없습니다." : "최신 신고 내역입니다.",
                 items);
+    }
+
+    public CsAdminClaimOverviewPageResponse getClaims(
+            Long userId,
+            CsQuestionClaimStatus status,
+            CsQuestionClaimType claimType,
+            Integer domainId,
+            Long trackId,
+            Long stageId,
+            Long questionId,
+            Integer page,
+            Integer size) {
+        assertAdmin(userId);
+
+        int normalizedPage = page == null ? 0 : Math.max(page, 0);
+        int normalizedSize = size == null ? 20 : Math.max(1, Math.min(size, 100));
+
+        Page<CsQuestionClaim> resultPage = csQuestionClaimRepository.findPagedByFilters(
+                status,
+                claimType,
+                domainId,
+                trackId,
+                stageId,
+                questionId,
+                PageRequest.of(normalizedPage, normalizedSize));
+
+        List<CsAdminClaimOverviewItemResponse> content = resultPage.getContent()
+                .stream()
+                .map(this::toClaimOverviewItemResponse)
+                .toList();
+
+        return new CsAdminClaimOverviewPageResponse(
+                content,
+                normalizedPage,
+                normalizedSize,
+                resultPage.getTotalElements());
+    }
+
+    @Transactional
+    public void updateClaimStatus(Long userId, Long claimId, CsQuestionClaimStatus status) {
+        assertAdmin(userId);
+        if (status == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "상태 값은 필수입니다.");
+        }
+
+        CsQuestionClaim claim = csQuestionClaimRepository.findById(claimId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "신고 내역을 찾을 수 없습니다."));
+        claim.updateStatus(status);
+    }
+
+    private CsAdminClaimOverviewItemResponse toClaimOverviewItemResponse(CsQuestionClaim claim) {
+        CsStage stage = claim.getStage();
+        CsDomainTrack track = stage.getTrack();
+        CsDomain domain = track.getDomain();
+
+        return new CsAdminClaimOverviewItemResponse(
+                claim.getId(),
+                claim.getQuestion().getId(),
+                domain.getId(),
+                domain.getName(),
+                track.getId(),
+                (int) track.getTrackNo(),
+                track.getName(),
+                stage.getId(),
+                (int) stage.getStageNo(),
+                claim.getClaimType(),
+                claim.getStatus(),
+                claim.getDescription(),
+                claim.getCreatedAt() == null ? "" : claim.getCreatedAt().toString());
     }
 
     private CsAdminClaimItemResponse toClaimItemResponse(CsQuestionClaim claim) {

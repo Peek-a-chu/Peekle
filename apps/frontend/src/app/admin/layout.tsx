@@ -18,6 +18,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 CS 콘텐츠
               </Link>
+              <Link
+                href="/admin/cs-claims"
+                className="flex items-center text-sm font-medium text-muted-foreground"
+              >
+                신고 관리
+              </Link>
             </nav>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-4">
