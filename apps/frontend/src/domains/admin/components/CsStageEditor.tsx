@@ -30,7 +30,7 @@ interface CsStageEditorProps {
   exactQuestionCount?: number | null;
 }
 
-type ShortAnswerMode = 'SINGLE' | 'MULTI_BLANK_ORDERED';
+type ShortAnswerMode = 'SINGLE' | 'MULTI_BLANK_ORDERED' | 'MULTI_BLANK_UNORDERED';
 type GuiQuestionTemplateId =
   | 'MULTI_BLANK_TABLE'
   | 'MULTI_BOX_ORDER'
@@ -246,7 +246,7 @@ function QuestionCreateCard({
     { choiceNo: 2, content: '', isAnswer: false },
   ]);
   const [shortAnswers, setShortAnswers] = useState<CSAdminQuestionShortAnswer[]>([
-    { answerText: '', isPrimary: true },
+    { answerText: '', blankIndex: 1, isPrimary: true },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -258,7 +258,7 @@ function QuestionCreateCard({
       setShortAnswerMode('SINGLE');
     }
     if (nextType === 'SHORT_ANSWER') {
-      setShortAnswers((prev) => (prev.length > 0 ? prev : [{ answerText: '', isPrimary: true }]));
+      setShortAnswers((prev) => (prev.length > 0 ? prev : [{ answerText: '', blankIndex: 1, isPrimary: true }]));
       return;
     }
 
@@ -300,9 +300,10 @@ function QuestionCreateCard({
         (draft.shortAnswers ?? []).length > 0
           ? (draft.shortAnswers ?? []).map((answer) => ({
               answerText: answer.answerText,
+              blankIndex: normalizeShortAnswerBlankIndex(answer.blankIndex),
               isPrimary: answer.isPrimary,
             }))
-          : [{ answerText: '', isPrimary: true }],
+          : [{ answerText: '', blankIndex: 1, isPrimary: true }],
       );
       return;
     }
@@ -361,7 +362,14 @@ function QuestionCreateCard({
   };
 
   const handleAddShortAnswer = () => {
-    setShortAnswers([...shortAnswers, { answerText: '', isPrimary: false }]);
+    setShortAnswers([
+      ...shortAnswers,
+      {
+        answerText: '',
+        blankIndex: resolveNewBlankIndex(shortAnswerMode, shortAnswers),
+        isPrimary: false,
+      },
+    ]);
   };
 
   const handleUpdateShortAnswerText = (i: number, val: string) => {
@@ -370,11 +378,32 @@ function QuestionCreateCard({
     setShortAnswers(updated);
   };
 
+  const handleUpdateShortAnswerBlankIndex = (i: number, blankIndex: number) => {
+    const normalizedBlankIndex = Math.max(1, blankIndex || 1);
+    const updated = [...shortAnswers];
+    const target = updated[i];
+    if (!target) return;
+
+    const hadPrimary = Boolean(target.isPrimary);
+    target.blankIndex = normalizedBlankIndex;
+    if (hadPrimary) {
+      updated.forEach((answer, idx) => {
+        if (idx !== i && normalizeShortAnswerBlankIndex(answer.blankIndex) === normalizedBlankIndex) {
+          answer.isPrimary = false;
+        }
+      });
+    }
+    setShortAnswers(updated);
+  };
+
   const handleSetPrimaryShortAnswer = (i: number) => {
+    const target = shortAnswers[i];
+    if (!target) return;
+    const targetBlankIndex = normalizeShortAnswerBlankIndex(target.blankIndex);
     setShortAnswers(
       shortAnswers.map((answer, idx) => ({
         ...answer,
-        isPrimary: idx === i,
+        isPrimary: normalizeShortAnswerBlankIndex(answer.blankIndex) === targetBlankIndex && idx === i,
       })),
     );
   };
@@ -427,16 +456,30 @@ function QuestionCreateCard({
     }
 
     if (questionType === 'SHORT_ANSWER') {
-      const texts = shortAnswers.map((answer) => answer.answerText.trim());
+      const normalizedShortAnswers = normalizeShortAnswersForSubmission(shortAnswers, shortAnswerMode);
+      const texts = normalizedShortAnswers.map((answer) => answer.answerText.trim());
       if (texts.length === 0 || texts.some((text) => !text)) {
         throw new Error('단답형 정답은 최소 1개 이상이며 비어 있을 수 없습니다.');
       }
-      if (shortAnswerMode === 'MULTI_BLANK_ORDERED' && texts.length < 2) {
-        throw new Error('멀티 빈칸 문제는 정답 칸이 최소 2개 이상 필요합니다.');
+      if (isMultiBlankSelectionMode(shortAnswerMode)) {
+        const blankIndexes = new Set(normalizedShortAnswers.map((answer) => answer.blankIndex ?? 1));
+        if (blankIndexes.size < 2) {
+          throw new Error('멀티 빈칸 문제는 서로 다른 빈칸 번호가 최소 2개 이상 필요합니다.');
+        }
+        const maxBlankIndex = Math.max(...Array.from(blankIndexes));
+        for (let blankIndex = 1; blankIndex <= maxBlankIndex; blankIndex += 1) {
+          if (!blankIndexes.has(blankIndex)) {
+            throw new Error(`빈칸 번호는 1부터 순서대로 입력해야 합니다. 누락된 번호: ${blankIndex}`);
+          }
+        }
       }
-      const unique = new Set(texts.map((text) => text.toLowerCase().replace(/\s+/g, '')));
-      if (unique.size !== texts.length) {
-        throw new Error('중복된 단답형 정답이 있습니다.');
+      const unique = new Set(
+        normalizedShortAnswers.map(
+          (answer) => `${answer.blankIndex ?? 1}:${answer.answerText.toLowerCase().replace(/\s+/g, '')}`,
+        ),
+      );
+      if (unique.size !== normalizedShortAnswers.length) {
+        throw new Error('같은 빈칸에 중복된 단답형 정답이 있습니다.');
       }
       return;
     }
@@ -466,7 +509,7 @@ function QuestionCreateCard({
       { choiceNo: 1, content: '', isAnswer: true },
       { choiceNo: 2, content: '', isAnswer: false },
     ]);
-    setShortAnswers([{ answerText: '', isPrimary: true }]);
+    setShortAnswers([{ answerText: '', blankIndex: 1, isPrimary: true }]);
     if (createImageFileRef.current) {
       createImageFileRef.current.value = '';
     }
@@ -482,17 +525,13 @@ function QuestionCreateCard({
       contentMode: resolvedImage.contentMode,
       contentBlocks: resolvedImage.contentBlocks,
       gradingMode: questionType === 'SHORT_ANSWER' ? resolvedShortAnswerMode.gradingMode : inferDefaultGradingMode(questionType),
-      metadata: questionType === 'SHORT_ANSWER' ? resolvedShortAnswerMode.buildMetadata(shortAnswers.length) : null,
+      metadata: questionType === 'SHORT_ANSWER'
+        ? resolvedShortAnswerMode.buildMetadata(resolveBlankCountForMode(shortAnswerMode, shortAnswers))
+        : null,
     };
 
     if (questionType === 'SHORT_ANSWER') {
-      const normalized = shortAnswers.map((answer) => ({
-        answerText: answer.answerText.trim(),
-        isPrimary: Boolean(answer.isPrimary),
-      }));
-      if (!normalized.some((answer) => answer.isPrimary) && normalized.length > 0) {
-        normalized[0].isPrimary = true;
-      }
+      const normalized = normalizeShortAnswersForSubmission(shortAnswers, shortAnswerMode);
       return { ...base, shortAnswers: normalized };
     }
 
@@ -639,16 +678,35 @@ function QuestionCreateCard({
               >
                 <option value="SINGLE">단일 단답 (동의어 허용)</option>
                 <option value="MULTI_BLANK_ORDERED">멀티 빈칸 (순서형)</option>
+                <option value="MULTI_BLANK_UNORDERED">멀티 빈칸 (순서 무관형)</option>
               </select>
             </div>
 
             <div className="font-semibold text-sm">
               {shortAnswerMode === 'MULTI_BLANK_ORDERED'
                 ? '빈칸 정답 목록 (순서대로)'
+                : shortAnswerMode === 'MULTI_BLANK_UNORDERED'
+                  ? '빈칸 정답 목록 (순서 무관)'
                 : '단답형 정답 (다중 허용)'}
             </div>
+            {isMultiBlankSelectionMode(shortAnswerMode) && (
+              <div className="text-[11px] text-muted-foreground">
+                같은 빈칸 번호로 여러 줄을 넣으면 해당 빈칸의 추가 정답(동의어)로 처리됩니다.
+              </div>
+            )}
             {shortAnswers.map((ans, i) => (
               <div key={i} className="flex items-center gap-2">
+                {isMultiBlankSelectionMode(shortAnswerMode) && (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={normalizeShortAnswerBlankIndex(ans.blankIndex)}
+                    onChange={(e) => handleUpdateShortAnswerBlankIndex(i, Number.parseInt(e.target.value, 10) || 1)}
+                    placeholder="빈칸"
+                    className="h-8 w-20 text-sm"
+                    disabled={submitting || !canCreate}
+                  />
+                )}
                 <input
                   type="radio"
                   checked={Boolean(ans.isPrimary)}
@@ -801,7 +859,7 @@ function QuestionFormItem({
       setShortAnswerMode('SINGLE');
     }
     if (nextType === 'SHORT_ANSWER') {
-      setShortAnswers((prev) => (prev.length > 0 ? prev : [{ answerText: '', isPrimary: true }]));
+      setShortAnswers((prev) => (prev.length > 0 ? prev : [{ answerText: '', blankIndex: 1, isPrimary: true }]));
       return;
     }
 
@@ -845,9 +903,10 @@ function QuestionFormItem({
         (draft.shortAnswers ?? []).length > 0
           ? (draft.shortAnswers ?? []).map((answer) => ({
               answerText: answer.answerText,
+              blankIndex: normalizeShortAnswerBlankIndex(answer.blankIndex),
               isPrimary: answer.isPrimary,
             }))
-          : [{ answerText: '', isPrimary: true }],
+          : [{ answerText: '', blankIndex: 1, isPrimary: true }],
       );
       return;
     }
@@ -910,7 +969,14 @@ function QuestionFormItem({
   };
 
   const handleAddShortAnswer = () => {
-    setShortAnswers([...shortAnswers, { answerText: '', isPrimary: false }]);
+    setShortAnswers([
+      ...shortAnswers,
+      {
+        answerText: '',
+        blankIndex: resolveNewBlankIndex(shortAnswerMode, shortAnswers),
+        isPrimary: false,
+      },
+    ]);
   };
 
   const handleUpdateShortAnswerText = (i: number, val: string) => {
@@ -919,11 +985,32 @@ function QuestionFormItem({
     setShortAnswers(updated);
   };
 
+  const handleUpdateShortAnswerBlankIndex = (i: number, blankIndex: number) => {
+    const normalizedBlankIndex = Math.max(1, blankIndex || 1);
+    const updated = [...shortAnswers];
+    const target = updated[i];
+    if (!target) return;
+
+    const hadPrimary = Boolean(target.isPrimary);
+    target.blankIndex = normalizedBlankIndex;
+    if (hadPrimary) {
+      updated.forEach((answer, idx) => {
+        if (idx !== i && normalizeShortAnswerBlankIndex(answer.blankIndex) === normalizedBlankIndex) {
+          answer.isPrimary = false;
+        }
+      });
+    }
+    setShortAnswers(updated);
+  };
+
   const handleSetPrimaryShortAnswer = (i: number) => {
+    const target = shortAnswers[i];
+    if (!target) return;
+    const targetBlankIndex = normalizeShortAnswerBlankIndex(target.blankIndex);
     setShortAnswers(
       shortAnswers.map((answer, idx) => ({
         ...answer,
-        isPrimary: idx === i,
+        isPrimary: normalizeShortAnswerBlankIndex(answer.blankIndex) === targetBlankIndex && idx === i,
       })),
     );
   };
@@ -973,19 +1060,33 @@ function QuestionFormItem({
     }
 
     if (questionType === 'SHORT_ANSWER') {
-      const texts = shortAnswers.map((answer) => answer.answerText.trim());
+      const normalizedShortAnswers = normalizeShortAnswersForSubmission(shortAnswers, shortAnswerMode);
+      const texts = normalizedShortAnswers.map((answer) => answer.answerText.trim());
       if (texts.length === 0) {
         throw new Error('단답형 정답은 최소 1개 이상이어야 합니다.');
       }
       if (texts.some((text) => !text)) {
         throw new Error('비어있는 정답 칸이 있습니다.');
       }
-      if (shortAnswerMode === 'MULTI_BLANK_ORDERED' && texts.length < 2) {
-        throw new Error('멀티 빈칸 문제는 정답 칸이 최소 2개 이상 필요합니다.');
+      if (isMultiBlankSelectionMode(shortAnswerMode)) {
+        const blankIndexes = new Set(normalizedShortAnswers.map((answer) => answer.blankIndex ?? 1));
+        if (blankIndexes.size < 2) {
+          throw new Error('멀티 빈칸 문제는 서로 다른 빈칸 번호가 최소 2개 이상 필요합니다.');
+        }
+        const maxBlankIndex = Math.max(...Array.from(blankIndexes));
+        for (let blankIndex = 1; blankIndex <= maxBlankIndex; blankIndex += 1) {
+          if (!blankIndexes.has(blankIndex)) {
+            throw new Error(`빈칸 번호는 1부터 순서대로 입력해야 합니다. 누락된 번호: ${blankIndex}`);
+          }
+        }
       }
-      const unique = new Set(texts.map((text) => text.toLowerCase().replace(/\s+/g, '')));
-      if (unique.size !== texts.length) {
-        throw new Error('중복된 정답이 존재합니다.');
+      const unique = new Set(
+        normalizedShortAnswers.map(
+          (answer) => `${answer.blankIndex ?? 1}:${answer.answerText.toLowerCase().replace(/\s+/g, '')}`,
+        ),
+      );
+      if (unique.size !== normalizedShortAnswers.length) {
+        throw new Error('같은 빈칸에 중복된 정답이 존재합니다.');
       }
       return;
     }
@@ -1015,18 +1116,12 @@ function QuestionFormItem({
       contentBlocks: resolvedImage.contentBlocks,
       gradingMode: questionType === 'SHORT_ANSWER' ? resolvedShortAnswerMode.gradingMode : gradingMode,
       metadata: questionType === 'SHORT_ANSWER'
-        ? resolvedShortAnswerMode.buildMetadata(shortAnswers.length)
+        ? resolvedShortAnswerMode.buildMetadata(resolveBlankCountForMode(shortAnswerMode, shortAnswers))
         : metadataText,
     };
 
     if (questionType === 'SHORT_ANSWER') {
-      const normalized = shortAnswers.map((answer, i) => ({
-        answerText: answer.answerText.trim(),
-        isPrimary: Boolean(answer.isPrimary),
-      }));
-      if (!normalized.some((answer) => answer.isPrimary) && normalized.length > 0) {
-        normalized[0].isPrimary = true;
-      }
+      const normalized = normalizeShortAnswersForSubmission(shortAnswers, shortAnswerMode);
       return {
         ...base,
         shortAnswers: normalized,
@@ -1198,16 +1293,34 @@ function QuestionFormItem({
                   >
                     <option value="SINGLE">단일 단답 (동의어 허용)</option>
                     <option value="MULTI_BLANK_ORDERED">멀티 빈칸 (순서형)</option>
+                    <option value="MULTI_BLANK_UNORDERED">멀티 빈칸 (순서 무관형)</option>
                   </select>
                 </div>
 
                 <div className="font-semibold text-sm">
                   {shortAnswerMode === 'MULTI_BLANK_ORDERED'
                     ? '빈칸 정답 목록 (순서대로)'
+                    : shortAnswerMode === 'MULTI_BLANK_UNORDERED'
+                      ? '빈칸 정답 목록 (순서 무관)'
                     : '단답형 정답 (다중 허용)'}
                 </div>
+                {isMultiBlankSelectionMode(shortAnswerMode) && (
+                  <div className="text-[11px] text-muted-foreground">
+                    같은 빈칸 번호로 여러 줄을 넣으면 해당 빈칸의 추가 정답(동의어)로 처리됩니다.
+                  </div>
+                )}
                 {shortAnswers.map((ans, i) => (
                   <div key={i} className="flex items-center gap-2">
+                    {isMultiBlankSelectionMode(shortAnswerMode) && (
+                      <Input
+                        type="number"
+                        min={1}
+                        value={normalizeShortAnswerBlankIndex(ans.blankIndex)}
+                        onChange={(e) => handleUpdateShortAnswerBlankIndex(i, Number.parseInt(e.target.value, 10) || 1)}
+                        placeholder="빈칸"
+                        className="h-8 w-20 text-sm"
+                      />
+                    )}
                     <input
                       type="radio"
                       checked={Boolean(ans.isPrimary)}
@@ -1286,6 +1399,11 @@ function QuestionFormItem({
                 <ul className="list-disc list-inside">
                   {question.shortAnswers?.map((ans, i) => (
                     <li key={i}>
+                      {inferShortAnswerModeFromQuestion(question) !== 'SINGLE' && (
+                        <span className="text-xs text-muted-foreground mr-1">
+                          [빈칸 {normalizeShortAnswerBlankIndex(ans.blankIndex)}]
+                        </span>
+                      )}
                       {ans.answerText}{' '}
                       {ans.isPrimary && <span className="text-xs text-primary">(대표 정답)</span>}
                     </li>
@@ -1329,6 +1447,7 @@ function toJsonDraft(questions: CSAdminQuestion[]): CSAdminQuestionDraft[] {
         ...base,
         shortAnswers: question.shortAnswers?.map((answer) => ({
           answerText: answer.answerText,
+          blankIndex: normalizeShortAnswerBlankIndex(answer.blankIndex),
           isPrimary: answer.isPrimary,
         })) ?? [],
       };
@@ -1385,9 +1504,9 @@ function buildEmptyStageExampleDraft(): CSAdminQuestionDraft[] {
       gradingMode: 'MULTI_BLANK_ORDERED',
       metadata: '{"blankCount":3}',
       shortAnswers: [
-        { answerText: '처리량', isPrimary: true },
-        { answerText: '응답시간', isPrimary: false },
-        { answerText: '경과시간', isPrimary: false },
+        { answerText: '처리량', blankIndex: 1, isPrimary: true },
+        { answerText: '응답시간', blankIndex: 2, isPrimary: true },
+        { answerText: '경과시간', blankIndex: 3, isPrimary: true },
       ],
     },
     {
@@ -1456,8 +1575,8 @@ function buildEmptyStageExampleDraft(): CSAdminQuestionDraft[] {
       gradingMode: 'ORDERING',
       metadata: '{"itemCount":4}',
       shortAnswers: [
-        { answerText: '정답8', isPrimary: true },
-        { answerText: '정답8_보조', isPrimary: false },
+        { answerText: '정답8', blankIndex: 1, isPrimary: true },
+        { answerText: '정답8_보조', blankIndex: 1, isPrimary: false },
       ],
     },
     {
@@ -1510,9 +1629,9 @@ function getGuiQuestionTemplates(): Array<{
         gradingMode: 'MULTI_BLANK_ORDERED',
         metadata: '{"blankCount":3}',
         shortAnswers: [
-          { answerText: '처리량', isPrimary: true },
-          { answerText: '응답시간', isPrimary: false },
-          { answerText: '경과시간', isPrimary: false },
+          { answerText: '처리량', blankIndex: 1, isPrimary: true },
+          { answerText: '응답시간', blankIndex: 2, isPrimary: true },
+          { answerText: '경과시간', blankIndex: 3, isPrimary: true },
         ],
       },
     },
@@ -1529,8 +1648,12 @@ function getGuiQuestionTemplates(): Array<{
         gradingMode: 'ORDERING',
         metadata: '{"itemCount":3}',
         shortAnswers: [
-          { answerText: '준비,실행,대기', isPrimary: true },
-          { answerText: 'READY,RUNNING,WAITING', isPrimary: false },
+          { answerText: '준비', blankIndex: 1, isPrimary: true },
+          { answerText: 'READY', blankIndex: 1, isPrimary: false },
+          { answerText: '실행', blankIndex: 2, isPrimary: true },
+          { answerText: 'RUNNING', blankIndex: 2, isPrimary: false },
+          { answerText: '대기', blankIndex: 3, isPrimary: true },
+          { answerText: 'WAITING', blankIndex: 3, isPrimary: false },
         ],
       },
     },
@@ -1565,6 +1688,7 @@ function getGuiQuestionTemplates(): Array<{
           {
             answerText:
               'SELECT 과목이름 AS 과목이름, MIN(점수) AS 최소점수, MAX(점수) AS 최대점수 FROM 성적 GROUP BY 과목이름 HAVING AVG(점수) >= 90',
+            blankIndex: 1,
             isPrimary: true,
           },
         ],
@@ -1615,7 +1739,11 @@ function validateJsonDraft(
     }
 
     if (question.questionType === 'SHORT_ANSWER') {
-      validateShortAnswers(question.shortAnswers, position);
+      validateShortAnswers(
+        question.shortAnswers,
+        position,
+        question.gradingMode ?? inferDefaultGradingMode(question.questionType),
+      );
       return;
     }
 
@@ -1644,6 +1772,7 @@ function validateQuestionModeFields(question: CSAdminQuestionDraft, position: nu
       'SINGLE_CHOICE',
       'SHORT_TEXT_EXACT',
       'MULTI_BLANK_ORDERED',
+      'MULTI_BLANK_UNORDERED',
       'ORDERING',
     ].includes(question.gradingMode)
   ) {
@@ -1696,24 +1825,136 @@ function validateChoices(
   }
 }
 
-function validateShortAnswers(shortAnswers: CSAdminQuestionDraft['shortAnswers'], position: number) {
+function validateShortAnswers(
+  shortAnswers: CSAdminQuestionDraft['shortAnswers'],
+  position: number,
+  gradingMode: CSQuestionGradingMode,
+) {
   if (!shortAnswers || shortAnswers.length === 0) {
     throw new Error(`${position}번 단답형 문제는 shortAnswers가 1개 이상 필요합니다.`);
   }
 
   const normalizedSet = new Set<string>();
+  const blankIndexSet = new Set<number>();
   shortAnswers.forEach((answer) => {
     const text = answer.answerText?.trim();
     if (!text) {
       throw new Error(`${position}번 단답형 문제의 answerText가 비어 있습니다.`);
     }
 
+    const blankIndex = normalizeShortAnswerBlankIndex(answer.blankIndex);
+    blankIndexSet.add(blankIndex);
     const normalized = text.toLowerCase().replace(/\s+/g, '');
-    if (normalizedSet.has(normalized)) {
-      throw new Error(`${position}번 단답형 문제의 정답이 중복되었습니다.`);
+    const dedupeKey = `${blankIndex}:${normalized}`;
+    if (normalizedSet.has(dedupeKey)) {
+      throw new Error(`${position}번 단답형 문제의 같은 빈칸 정답이 중복되었습니다.`);
     }
-    normalizedSet.add(normalized);
+    normalizedSet.add(dedupeKey);
   });
+
+  if (isMultiBlankGradingMode(gradingMode)) {
+    if (blankIndexSet.size < 2) {
+      throw new Error(`${position}번 멀티 빈칸 문제는 서로 다른 빈칸 번호가 최소 2개 이상 필요합니다.`);
+    }
+    const maxBlankIndex = Math.max(...Array.from(blankIndexSet));
+    for (let blankIndex = 1; blankIndex <= maxBlankIndex; blankIndex += 1) {
+      if (!blankIndexSet.has(blankIndex)) {
+        throw new Error(`${position}번 멀티 빈칸 문제의 빈칸 번호가 비연속입니다. 누락: ${blankIndex}`);
+      }
+    }
+    return;
+  }
+
+  if (blankIndexSet.size > 1 || (blankIndexSet.size === 1 && !blankIndexSet.has(1))) {
+    throw new Error(`${position}번 단일 단답 문제는 blankIndex를 1로만 설정할 수 있습니다.`);
+  }
+}
+
+function isMultiBlankGradingMode(gradingMode: CSQuestionGradingMode | undefined): boolean {
+  return gradingMode === 'MULTI_BLANK_ORDERED'
+    || gradingMode === 'MULTI_BLANK_UNORDERED'
+    || gradingMode === 'ORDERING';
+}
+
+function isMultiBlankSelectionMode(mode: ShortAnswerMode): boolean {
+  return mode === 'MULTI_BLANK_ORDERED' || mode === 'MULTI_BLANK_UNORDERED';
+}
+
+function normalizeShortAnswerBlankIndex(blankIndex: number | undefined): number {
+  if (!Number.isFinite(blankIndex) || !blankIndex || blankIndex < 1) {
+    return 1;
+  }
+  return Math.floor(blankIndex);
+}
+
+function resolveNewBlankIndex(
+  mode: ShortAnswerMode,
+  shortAnswers: CSAdminQuestionShortAnswer[],
+): number {
+  if (!isMultiBlankSelectionMode(mode)) {
+    return 1;
+  }
+  const usedIndexes = shortAnswers.map((answer) => normalizeShortAnswerBlankIndex(answer.blankIndex));
+  if (usedIndexes.length === 0) {
+    return 1;
+  }
+  return Math.max(...usedIndexes) + 1;
+}
+
+function resolveBlankCountForMode(
+  mode: ShortAnswerMode,
+  shortAnswers: CSAdminQuestionShortAnswer[],
+): number {
+  if (!isMultiBlankSelectionMode(mode)) {
+    return 1;
+  }
+  const indexes = shortAnswers.map((answer) => normalizeShortAnswerBlankIndex(answer.blankIndex));
+  if (indexes.length === 0) {
+    return 2;
+  }
+  return Math.max(...indexes);
+}
+
+function normalizeShortAnswersForSubmission(
+  shortAnswers: CSAdminQuestionShortAnswer[],
+  mode: ShortAnswerMode,
+): CSAdminQuestionShortAnswer[] {
+  const primaryAssignedByBlank = new Set<number>();
+  const normalized = shortAnswers.map((answer) => {
+    const blankIndex = isMultiBlankSelectionMode(mode)
+      ? normalizeShortAnswerBlankIndex(answer.blankIndex)
+      : 1;
+    const requestedPrimary = Boolean(answer.isPrimary);
+    const isPrimary = requestedPrimary && !primaryAssignedByBlank.has(blankIndex);
+    if (isPrimary) {
+      primaryAssignedByBlank.add(blankIndex);
+    }
+    return {
+      answerText: answer.answerText.trim(),
+      blankIndex,
+      isPrimary,
+    };
+  });
+
+  const firstIndexByBlank = new Map<number, number>();
+  const hasPrimaryByBlank = new Set<number>();
+  normalized.forEach((answer, index) => {
+    const blankIndex = normalizeShortAnswerBlankIndex(answer.blankIndex);
+    if (!firstIndexByBlank.has(blankIndex)) {
+      firstIndexByBlank.set(blankIndex, index);
+    }
+    if (answer.isPrimary) {
+      hasPrimaryByBlank.add(blankIndex);
+    }
+  });
+
+  firstIndexByBlank.forEach((firstIndex, blankIndex) => {
+    if (!hasPrimaryByBlank.has(blankIndex)) {
+      normalized[firstIndex].isPrimary = true;
+    }
+  });
+
+  return normalized;
 }
 
 function toEditableChoices(question: CSAdminQuestion): CSAdminQuestionChoice[] {
@@ -1741,11 +1982,19 @@ function toEditableChoices(question: CSAdminQuestion): CSAdminQuestionChoice[] {
 }
 
 function toEditableShortAnswers(question: CSAdminQuestion): CSAdminQuestionShortAnswer[] {
-  const mapped = (question.shortAnswers ?? []).map((answer) => ({
-    answerText: answer.answerText,
-    isPrimary: answer.isPrimary,
-  }));
-  return mapped.length > 0 ? mapped : [{ answerText: '', isPrimary: true }];
+  const mapped = (question.shortAnswers ?? [])
+    .map((answer) => ({
+      answerText: answer.answerText,
+      blankIndex: normalizeShortAnswerBlankIndex(answer.blankIndex),
+      isPrimary: answer.isPrimary,
+    }))
+    .sort((a, b) => {
+      const blankOrder = normalizeShortAnswerBlankIndex(a.blankIndex) - normalizeShortAnswerBlankIndex(b.blankIndex);
+      if (blankOrder !== 0) return blankOrder;
+      if (a.isPrimary === b.isPrimary) return 0;
+      return a.isPrimary ? -1 : 1;
+    });
+  return mapped.length > 0 ? mapped : [{ answerText: '', blankIndex: 1, isPrimary: true }];
 }
 
 function validateImageFile(file: File) {
@@ -1838,6 +2087,9 @@ function applyImageBlockToContentBlocks(
 
 function inferShortAnswerModeFromQuestion(question: Pick<CSAdminQuestion, 'gradingMode' | 'metadata'>): ShortAnswerMode {
   const gradingMode = question.gradingMode;
+  if (gradingMode === 'MULTI_BLANK_UNORDERED') {
+    return 'MULTI_BLANK_UNORDERED';
+  }
   if (gradingMode === 'MULTI_BLANK_ORDERED' || gradingMode === 'ORDERING') {
     return 'MULTI_BLANK_ORDERED';
   }
@@ -1871,6 +2123,12 @@ function resolveShortAnswerModeBySelection(mode: ShortAnswerMode): {
   if (mode === 'MULTI_BLANK_ORDERED') {
     return {
       gradingMode: 'MULTI_BLANK_ORDERED',
+      buildMetadata: (answerCount: number) => JSON.stringify({ blankCount: Math.max(answerCount, 1) }),
+    };
+  }
+  if (mode === 'MULTI_BLANK_UNORDERED') {
+    return {
+      gradingMode: 'MULTI_BLANK_UNORDERED',
       buildMetadata: (answerCount: number) => JSON.stringify({ blankCount: Math.max(answerCount, 1) }),
     };
   }
