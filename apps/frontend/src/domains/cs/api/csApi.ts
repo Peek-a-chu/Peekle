@@ -106,6 +106,29 @@ export interface CSAttemptAnswerResponse {
   nextQuestion?: CSQuestionPayload;
 }
 
+export type CSQuestionClaimType =
+  | 'INCORRECT_ANSWER'
+  | 'INCORRECT_EXPLANATION'
+  | 'QUESTION_TEXT_ERROR'
+  | 'OTHER';
+
+export interface CSQuestionClaimRequest {
+  questionId: number;
+  claimType: CSQuestionClaimType;
+  description: string;
+  isCorrect: boolean;
+  selectedChoiceNo?: number;
+  submittedAnswer?: string;
+}
+
+export interface CSQuestionClaimResponse {
+  claimId: number;
+  questionId: number;
+  claimType: CSQuestionClaimType;
+  status: 'RECEIVED' | 'REVIEWED' | 'RESOLVED';
+  createdAt: string;
+}
+
 export interface CSAttemptCompleteResponse {
   stageId: number;
   isTrackCompleted: boolean;
@@ -305,6 +328,20 @@ export const completeCSStageAttempt = async (
     },
   );
   return assertApiData(response, '스테이지 결과 조회에 실패했습니다.');
+};
+
+/**
+ * 문제/정답/해설 신고
+ */
+export const submitCSQuestionClaim = async (
+  stageId: number,
+  payload: CSQuestionClaimRequest,
+): Promise<CSQuestionClaimResponse> => {
+  const response = await apiFetch<CSQuestionClaimResponse>(`/api/cs/stages/${stageId}/claims`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return assertApiData(response, '문제 신고 접수에 실패했습니다.');
 };
 
 /**

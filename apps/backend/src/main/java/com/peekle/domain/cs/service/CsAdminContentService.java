@@ -20,6 +20,7 @@ import com.peekle.domain.cs.dto.response.CsDomainResponse;
 import com.peekle.domain.cs.entity.CsDomain;
 import com.peekle.domain.cs.entity.CsDomainTrack;
 import com.peekle.domain.cs.entity.CsQuestion;
+import com.peekle.domain.cs.entity.CsQuestionClaim;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
@@ -31,6 +32,7 @@ import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
+import com.peekle.domain.cs.repository.CsQuestionClaimRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
@@ -79,6 +81,7 @@ public class CsAdminContentService {
     private final CsStageRepository csStageRepository;
     private final CsQuestionRepository csQuestionRepository;
     private final CsQuestionChoiceRepository csQuestionChoiceRepository;
+    private final CsQuestionClaimRepository csQuestionClaimRepository;
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final UserRepository userRepository;
@@ -360,11 +363,34 @@ public class CsAdminContentService {
         assertAdmin(userId);
         getStage(stageId);
 
+        List<CsAdminClaimItemResponse> items = csQuestionClaimRepository.findByStage_IdOrderByCreatedAtDesc(stageId)
+                .stream()
+                .map(this::toClaimItemResponse)
+                .toList();
+
         return new CsAdminClaimsPlaceholderResponse(
                 stageId,
-                0,
-                "문제 신고 내역 기능은 후속 이슈에서 제공됩니다.",
-                List.<CsAdminClaimItemResponse>of());
+                items.size(),
+                items.isEmpty() ? "등록된 신고 내역이 없습니다." : "최신 신고 내역입니다.",
+                items);
+    }
+
+    private CsAdminClaimItemResponse toClaimItemResponse(CsQuestionClaim claim) {
+        return new CsAdminClaimItemResponse(
+                String.valueOf(claim.getId()),
+                claim.getQuestion().getId(),
+                "[" + toClaimTypeLabel(claim) + "] " + claim.getDescription(),
+                claim.getStatus().name(),
+                claim.getCreatedAt() == null ? "" : claim.getCreatedAt().toString());
+    }
+
+    private String toClaimTypeLabel(CsQuestionClaim claim) {
+        return switch (claim.getClaimType()) {
+            case INCORRECT_ANSWER -> "정답 오류";
+            case INCORRECT_EXPLANATION -> "해설 오류";
+            case QUESTION_TEXT_ERROR -> "문항 오류/모호함";
+            case OTHER -> "기타";
+        };
     }
 
     public Map<String, String> getQuestionImagePresignedUrl(Long userId, String fileName, String contentType) {
