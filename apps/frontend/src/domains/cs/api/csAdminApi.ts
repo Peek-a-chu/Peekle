@@ -94,6 +94,43 @@ export interface CSAdminStageClaimsResponse {
   items: CSAdminClaimItem[];
 }
 
+export type CSAdminClaimStatus = 'RECEIVED' | 'REVIEWED' | 'RESOLVED';
+export type CSAdminClaimType = 'INCORRECT_ANSWER' | 'INCORRECT_EXPLANATION' | 'QUESTION_TEXT_ERROR' | 'OTHER';
+
+export interface CSAdminClaimOverviewItem {
+  claimId: number;
+  questionId: number;
+  domainId: number;
+  domainName: string;
+  trackId: number;
+  trackNo: number;
+  trackName: string;
+  stageId: number;
+  stageNo: number;
+  claimType: CSAdminClaimType;
+  status: CSAdminClaimStatus;
+  description: string;
+  createdAt: string;
+}
+
+export interface CSAdminClaimOverviewPageResponse {
+  content: CSAdminClaimOverviewItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+}
+
+export interface CSAdminClaimOverviewQuery {
+  status?: CSAdminClaimStatus;
+  claimType?: CSAdminClaimType;
+  domainId?: number;
+  trackId?: number;
+  stageId?: number;
+  questionId?: number;
+  page?: number;
+  size?: number;
+}
+
 function assertApiData<T>(response: ApiResponse<T>, defaultMessage: string): T {
   if (!response.success || response.data === null || response.data === undefined) {
     throw new Error(response.error?.message || defaultMessage);
@@ -216,6 +253,39 @@ export const updateAdminQuestionShortAnswers = async (questionId: number, payloa
 export const fetchAdminStageClaims = async (stageId: number): Promise<CSAdminStageClaimsResponse> => {
   const response = await apiFetch<CSAdminStageClaimsResponse>(`/api/cs/admin/stages/${stageId}/claims`);
   return assertApiData(response, '클레임 목록을 불러오지 못했습니다.');
+};
+
+export const fetchAdminClaimsOverview = async (
+  query: CSAdminClaimOverviewQuery = {},
+): Promise<CSAdminClaimOverviewPageResponse> => {
+  const params = new URLSearchParams();
+  if (query.status) params.set('status', query.status);
+  if (query.claimType) params.set('claimType', query.claimType);
+  if (typeof query.domainId === 'number') params.set('domainId', String(query.domainId));
+  if (typeof query.trackId === 'number') params.set('trackId', String(query.trackId));
+  if (typeof query.stageId === 'number') params.set('stageId', String(query.stageId));
+  if (typeof query.questionId === 'number') params.set('questionId', String(query.questionId));
+  if (typeof query.page === 'number') params.set('page', String(query.page));
+  if (typeof query.size === 'number') params.set('size', String(query.size));
+
+  const queryString = params.toString();
+  const response = await apiFetch<CSAdminClaimOverviewPageResponse>(
+    `/api/cs/admin/claims${queryString ? `?${queryString}` : ''}`,
+  );
+  return assertApiData(response, '통합 신고 목록을 불러오지 못했습니다.');
+};
+
+export const updateAdminClaimStatus = async (
+  claimId: number,
+  status: CSAdminClaimStatus,
+): Promise<void> => {
+  const response = await apiFetch<void>(`/api/cs/admin/claims/${claimId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+  if (!response.success) {
+    throw new Error(response.error?.message || '신고 상태 변경에 실패했습니다.');
+  }
 };
 
 export const getAdminQuestionImagePresignedUrl = async (

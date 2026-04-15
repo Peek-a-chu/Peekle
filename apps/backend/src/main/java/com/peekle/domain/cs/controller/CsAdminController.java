@@ -2,15 +2,19 @@ package com.peekle.domain.cs.controller;
 
 import com.peekle.domain.cs.dto.request.CsAdminDomainNameRequest;
 import com.peekle.domain.cs.dto.request.CsAdminImagePresignRequest;
+import com.peekle.domain.cs.dto.request.CsAdminClaimStatusUpdateRequest;
 import com.peekle.domain.cs.dto.request.CsAdminQuestionShortAnswersUpdateRequest;
 import com.peekle.domain.cs.dto.request.CsAdminQuestionUpdateRequest;
 import com.peekle.domain.cs.dto.request.CsAdminStageQuestionImportRequest;
 import com.peekle.domain.cs.dto.request.CsAdminTrackCreateRequest;
+import com.peekle.domain.cs.dto.response.CsAdminClaimOverviewPageResponse;
 import com.peekle.domain.cs.dto.response.CsAdminClaimsPlaceholderResponse;
 import com.peekle.domain.cs.dto.response.CsAdminQuestionImportResponse;
 import com.peekle.domain.cs.dto.response.CsAdminQuestionResponse;
 import com.peekle.domain.cs.dto.response.CsAdminTrackResponse;
 import com.peekle.domain.cs.dto.response.CsDomainResponse;
+import com.peekle.domain.cs.enums.CsQuestionClaimStatus;
+import com.peekle.domain.cs.enums.CsQuestionClaimType;
 import com.peekle.domain.cs.service.CsAdminContentService;
 import com.peekle.global.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -23,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -139,6 +144,38 @@ public class CsAdminController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long stageId) {
         return ApiResponse.success(csAdminContentService.getStageClaims(userId, stageId));
+    }
+
+    @GetMapping("/claims")
+    public ApiResponse<CsAdminClaimOverviewPageResponse> getClaims(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) CsQuestionClaimStatus status,
+            @RequestParam(required = false) CsQuestionClaimType claimType,
+            @RequestParam(required = false) Integer domainId,
+            @RequestParam(required = false) Long trackId,
+            @RequestParam(required = false) Long stageId,
+            @RequestParam(required = false) Long questionId,
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size) {
+        return ApiResponse.success(csAdminContentService.getClaims(
+                userId,
+                status,
+                claimType,
+                domainId,
+                trackId,
+                stageId,
+                questionId,
+                page,
+                size));
+    }
+
+    @PutMapping("/claims/{claimId}/status")
+    public ApiResponse<Void> updateClaimStatus(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long claimId,
+            @Valid @RequestBody CsAdminClaimStatusUpdateRequest request) {
+        csAdminContentService.updateClaimStatus(userId, claimId, request.status());
+        return ApiResponse.success();
     }
 
     @PostMapping("/images/presigned-url")
