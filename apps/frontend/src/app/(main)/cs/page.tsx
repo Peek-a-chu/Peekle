@@ -3,18 +3,30 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { fetchCSBootstrap, CSBootstrapResponse } from '@/domains/cs/api/csApi';
+import { fetchCSBootstrap, skipCurrentCSTrack, CSBootstrapResponse } from '@/domains/cs/api/csApi';
 import DomainSelection from '@/domains/cs/components/DomainSelection';
 import LearningMap from '@/domains/cs/components/LearningMap';
 import CSTopBar from '@/domains/cs/components/CSTopBar';
 import CSModeSwitch from '@/domains/cs/components/CSModeSwitch';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function CSPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bootstrapData, setBootstrapData] = useState<CSBootstrapResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [skipDialogOpen, setSkipDialogOpen] = useState(false);
+  const [skipTargetTrack, setSkipTargetTrack] = useState<{ trackNo: number; trackName?: string } | null>(null);
   const forceSelection = searchParams.get('mode') === 'add';
 
   const setAddMode = (isAddMode: boolean) => {
@@ -42,6 +54,28 @@ export default function CSPage() {
   useEffect(() => {
     loadBootstrap();
   }, []);
+
+  const handleSkipTrack = async () => {
+    try {
+      setSkipDialogOpen(false);
+      setLoading(true);
+      const skipResult = await skipCurrentCSTrack();
+      if (skipResult.isCurriculumCompleted) {
+        toast.success('마지막 트랙을 스킵해 커리큘럼을 완료했습니다.');
+      } else {
+        toast.success(`트랙을 스킵했습니다. (${skipResult.nextTrackNo}-${skipResult.nextStageNo}로 이동)`);
+      }
+      await loadBootstrap();
+    } catch (error) {
+      toast.error('트랙 스킵에 실패했습니다.');
+      setLoading(false);
+    }
+  };
+
+  const handleRequestSkipTrack = (targetTrackNo: number, targetTrackName?: string) => {
+    setSkipTargetTrack({ trackNo: targetTrackNo, trackName: targetTrackName });
+    setSkipDialogOpen(true);
+  };
 
   if (loading) {
     return (
@@ -105,7 +139,11 @@ export default function CSPage() {
       <div className="bg-card rounded-2xl p-8 shadow-sm">
         {bootstrapData?.progress ? (
           <div className="w-full flex flex-col items-center">
-            <LearningMap progress={bootstrapData.progress} stages={bootstrapData.stages ?? []} />
+            <LearningMap
+              progress={bootstrapData.progress}
+              stages={bootstrapData.stages ?? []}
+              onRequestSkipTrack={handleRequestSkipTrack}
+            />
           </div>
         ) : (
           <div className="p-8 border border-dashed border-primary/30 rounded-xl bg-primary/5 text-center">
@@ -113,6 +151,25 @@ export default function CSPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={skipDialogOpen} onOpenChange={setSkipDialogOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>트랙 스킵</AlertDialogTitle>
+            <AlertDialogDescription>
+              {skipTargetTrack
+                ? `현재 트랙의 남은 단계를 모두 건너뛰고 ${skipTargetTrack.trackNo}트랙의 첫 번째 단계${skipTargetTrack.trackName ? `(${skipTargetTrack.trackName})` : ''}로 이동하시겠습니까?`
+                : '현재 트랙의 남은 단계를 모두 건너뛰고 다음 트랙의 첫 번째 단계로 이동하시겠습니까?'}
+              <br /><br />
+              <span className="text-destructive font-medium">※ 스킵한 단계는 완료로 간주되지 않으며 점수가 부여되지 않습니다. 잠금/미래 스테이지의 개별 스킵은 불가합니다.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0 mt-2">
+            <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSkipTrack} className="rounded-xl bg-primary">스킵하기</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

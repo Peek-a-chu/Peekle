@@ -4,6 +4,7 @@ import com.peekle.domain.cs.dto.request.CsAttemptAnswerRequest;
 import com.peekle.domain.cs.dto.response.CsAttemptAnswerResponse;
 import com.peekle.domain.cs.dto.response.CsAttemptCompleteResponse;
 import com.peekle.domain.cs.dto.response.CsAttemptStartResponse;
+import com.peekle.domain.cs.dto.response.CsTrackSkipResponse;
 import com.peekle.domain.cs.entity.CsDomain;
 import com.peekle.domain.cs.entity.CsDomainTrack;
 import com.peekle.domain.cs.entity.CsPastExamBestScore;
@@ -172,6 +173,129 @@ class CsAttemptFlowIntegrationTest {
         assertThat(csUserDomainProgressRepository.findByUser_IdAndDomain_Id(user.getId(), domain.getId()))
                 .get()
                 .satisfies(progress -> assertThat(progress.getCurrentStageNo()).isEqualTo((short) 2));
+    }
+
+    @Test
+    @DisplayName("커리큘럼 트랙 마지막 스테이지 완료 시 다음 트랙 1번 스테이지를 해금한다")
+    void completeAttempt_unlocksFirstStageOfNextTrack() {
+        User user = createUser("attempt-next-track");
+        CsDomain domain = createDomain(412, "트랙 경계 도메인");
+        CsDomainTrack track1 = createTrack(domain, 1, "1트랙");
+        CsDomainTrack track2 = createTrack(domain, 2, "2트랙");
+        CsStage stage1 = createStage(track1, 1);
+        CsStage stage2First = createStage(track2, 1);
+        CsQuestion question = createMultipleChoiceQuestion(stage1, "트랙 경계 문제");
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+
+        csAttemptService.startStageAttempt(user.getId(), stage1.getId());
+        CsAttemptAnswerResponse answer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage1.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 1, null));
+        assertThat(answer.isLast()).isTrue();
+        assertThat(answer.phase()).isEqualTo(CsAttemptPhase.COMPLETED);
+
+        CsAttemptCompleteResponse completeResponse = csAttemptService.completeAttempt(user.getId(), stage1.getId());
+        assertThat(completeResponse.isTrackCompleted()).isFalse();
+        assertThat(completeResponse.nextStageId()).isEqualTo(stage2First.getId());
+
+        assertThat(csUserDomainProgressRepository.findByUser_IdAndDomain_Id(user.getId(), domain.getId()))
+                .get()
+                .satisfies(progress -> {
+                    assertThat(progress.getCurrentTrackNo()).isEqualTo((short) 2);
+                    assertThat(progress.getCurrentStageNo()).isEqualTo((short) 1);
+                });
+    }
+
+    @Test
+    @DisplayName("현재 트랙 스킵 시 다음 트랙 1번 스테이지로 이동하고 점수/스트릭은 변하지 않는다")
+    void skipCurrentTrack_movesToNextTrackWithoutScoreOrStreak() {
+        User user = createUser("skip-next-track");
+        CsDomain domain = createDomain(413, "스킵 도메인");
+        CsDomainTrack track1 = createTrack(domain, 1, "1트랙");
+        CsDomainTrack track2 = createTrack(domain, 2, "2트랙");
+        CsStage stage1 = createStage(track1, 1);
+        CsStage stage2First = createStage(track2, 1);
+        CsQuestion question = createMultipleChoiceQuestion(stage1, "스킵 테스트 문제");
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage1.getId());
+
+        CsTrackSkipResponse skipResponse = csAttemptService.skipCurrentTrack(user.getId());
+        assertThat(skipResponse.skippedTrackNo()).isEqualTo(1);
+        assertThat(skipResponse.nextTrackNo()).isEqualTo(2);
+        assertThat(skipResponse.nextStageNo()).isEqualTo(1);
+        assertThat(skipResponse.nextStageId()).isEqualTo(stage2First.getId());
+        assertThat(skipResponse.isCurriculumCompleted()).isFalse();
+
+        assertThat(csUserDomainProgressRepository.findByUser_IdAndDomain_Id(user.getId(), domain.getId()))
+                .get()
+                .satisfies(progress -> {
+                    assertThat(progress.getCurrentTrackNo()).isEqualTo((short) 2);
+                    assertThat(progress.getCurrentStageNo()).isEqualTo((short) 1);
+                });
+
+        assertThat(userRepository.findById(user.getId()))
+                .get()
+                .satisfies(savedUser -> {
+                    assertThat(savedUser.getLeaguePoint()).isEqualTo(0);
+                    assertThat(savedUser.getLastSolvedDate()).isNull();
+                });
+
+        assertThatThrownBy(() -> csAttemptService.submitAnswer(
+                user.getId(),
+                stage1.getId(),
+                new CsAttemptAnswerRequest(question.getId(), 1, null)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> {
+                    BusinessException businessException = (BusinessException) exception;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.CS_ATTEMPT_NOT_FOUND);
+                });
+    }
+
+    @Test
+    @DisplayName("마지막 커리큘럼 트랙을 스킵하면 최종 완료 상태를 반환한다")
+    void skipCurrentTrack_onLastTrack_returnsCurriculumCompleted() {
+        User user = createUser("skip-last-track");
+        CsDomain domain = createDomain(414, "마지막 트랙 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "유일 트랙");
+        createStage(track, 1);
+        createStage(track, 2);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+
+        CsTrackSkipResponse skipResponse = csAttemptService.skipCurrentTrack(user.getId());
+        assertThat(skipResponse.skippedTrackNo()).isEqualTo(1);
+        assertThat(skipResponse.nextTrackNo()).isNull();
+        assertThat(skipResponse.nextStageNo()).isNull();
+        assertThat(skipResponse.nextStageId()).isNull();
+        assertThat(skipResponse.isCurriculumCompleted()).isTrue();
+
+        assertThat(csUserDomainProgressRepository.findByUser_IdAndDomain_Id(user.getId(), domain.getId()))
+                .get()
+                .satisfies(progress -> {
+                    assertThat(progress.getCurrentTrackNo()).isEqualTo((short) 1);
+                    assertThat(progress.getCurrentStageNo()).isEqualTo((short) 3);
+                });
+    }
+
+    @Test
+    @DisplayName("현재 트랙이 커리큘럼이 아니면 트랙 스킵을 허용하지 않는다")
+    void skipCurrentTrack_forPastExamTrack_throwsForbidden() {
+        User user = createUser("skip-past-exam");
+        CsDomain domain = createDomain(415, "기출 스킵 제한 도메인");
+        CsDomainTrack pastExamTrack = createPastExamTrack(domain, 1, "2024 기출", 2024);
+        createStage(pastExamTrack, 1);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+
+        assertThatThrownBy(() -> csAttemptService.skipCurrentTrack(user.getId()))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> {
+                    BusinessException businessException = (BusinessException) exception;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.CS_FORBIDDEN_STAGE_ACCESS);
+                });
     }
 
     @Test
