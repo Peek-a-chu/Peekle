@@ -101,6 +101,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const initSession = useCallback(async () => {
     try {
       setPhase('loading');
+      let hasTrackInfoFromBootstrap = false;
 
       try {
         const bootstrap = await fetchCSBootstrap();
@@ -112,7 +113,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
               trackNo: bootstrap.progress.currentTrackNo,
               stageNo: matchedStage.stageNo
             });
-            return;
+            hasTrackInfoFromBootstrap = true;
           }
         }
       } catch (err) {
@@ -120,7 +121,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       }
 
       const source = searchParams.get('source');
-      if (source === 'past-exam') {
+      if (!hasTrackInfoFromBootstrap && source === 'past-exam') {
         const year = searchParams.get('year');
         const round = searchParams.get('round');
         if (year && round) {
