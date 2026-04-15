@@ -79,6 +79,21 @@ export interface CSAdminImagePresignedUrlResponse {
   publicUrl: string;
 }
 
+export interface CSAdminClaimItem {
+  claimId: string;
+  questionId: number;
+  reason: string;
+  status: 'RECEIVED' | 'REVIEWED' | 'RESOLVED';
+  createdAt: string;
+}
+
+export interface CSAdminStageClaimsResponse {
+  stageId: number;
+  totalClaims: number;
+  message: string;
+  items: CSAdminClaimItem[];
+}
+
 function assertApiData<T>(response: ApiResponse<T>, defaultMessage: string): T {
   if (!response.success || response.data === null || response.data === undefined) {
     throw new Error(response.error?.message || defaultMessage);
@@ -198,8 +213,8 @@ export const updateAdminQuestionShortAnswers = async (questionId: number, payloa
   return assertApiData(response, '단답형 정답 수정에 실패했습니다.');
 };
 
-export const fetchAdminStageClaims = async (stageId: number): Promise<any> => {
-  const response = await apiFetch<any>(`/api/cs/admin/stages/${stageId}/claims`);
+export const fetchAdminStageClaims = async (stageId: number): Promise<CSAdminStageClaimsResponse> => {
+  const response = await apiFetch<CSAdminStageClaimsResponse>(`/api/cs/admin/stages/${stageId}/claims`);
   return assertApiData(response, '클레임 목록을 불러오지 못했습니다.');
 };
 

@@ -2,6 +2,7 @@ package com.peekle.domain.cs.controller;
 
 import com.peekle.domain.cs.dto.request.CsAttemptAnswerRequest;
 import com.peekle.domain.cs.dto.request.CsDomainIdRequest;
+import com.peekle.domain.cs.dto.request.CsQuestionClaimCreateRequest;
 import com.peekle.domain.cs.dto.request.CsWrongReviewAnswerRequest;
 import com.peekle.domain.cs.dto.request.CsWrongReviewStartRequest;
 import com.peekle.domain.cs.dto.response.CsAttemptAnswerResponse;
@@ -13,6 +14,7 @@ import com.peekle.domain.cs.dto.response.CsDomainResponse;
 import com.peekle.domain.cs.dto.response.CsDomainSubmitResponse;
 import com.peekle.domain.cs.dto.response.CsMyDomainItemResponse;
 import com.peekle.domain.cs.dto.response.CsPastExamCatalogResponse;
+import com.peekle.domain.cs.dto.response.CsQuestionClaimSubmitResponse;
 import com.peekle.domain.cs.dto.response.CsTrackSkipResponse;
 import com.peekle.domain.cs.dto.response.CsWrongProblemPageResponse;
 import com.peekle.domain.cs.dto.response.CsWrongReviewAnswerResponse;
@@ -22,6 +24,7 @@ import com.peekle.domain.cs.enums.CsWrongProblemStatus;
 import com.peekle.domain.cs.service.CsAttemptService;
 import com.peekle.domain.cs.service.CsDomainService;
 import com.peekle.domain.cs.service.CsPastExamService;
+import com.peekle.domain.cs.service.CsQuestionClaimService;
 import com.peekle.domain.cs.service.CsWrongProblemService;
 import com.peekle.global.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -47,6 +50,7 @@ public class CsController {
     private final CsAttemptService csAttemptService;
     private final CsWrongProblemService csWrongProblemService;
     private final CsPastExamService csPastExamService;
+    private final CsQuestionClaimService csQuestionClaimService;
 
     @GetMapping("/bootstrap")
     public ApiResponse<CsBootstrapResponse> getBootstrap(@AuthenticationPrincipal Long userId) {
@@ -111,6 +115,14 @@ public class CsController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long stageId) {
         return ApiResponse.success(csAttemptService.completeAttempt(userId, stageId));
+    }
+
+    @PostMapping("/stages/{stageId}/claims")
+    public ApiResponse<CsQuestionClaimSubmitResponse> submitQuestionClaim(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long stageId,
+            @Valid @RequestBody CsQuestionClaimCreateRequest request) {
+        return ApiResponse.success(csQuestionClaimService.submitClaim(userId, stageId, request));
     }
 
     @PostMapping("/tracks/current/skip")

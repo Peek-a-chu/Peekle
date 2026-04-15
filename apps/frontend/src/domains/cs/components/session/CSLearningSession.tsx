@@ -9,10 +9,12 @@ import {
   startCSStageAttempt,
   answerCSStageQuestion,
   completeCSStageAttempt,
+  submitCSQuestionClaim,
   fetchCSBootstrap,
   CSQuestionPayload,
   CSAttemptAnswerRequest,
   CSAttemptAnswerResponse,
+  CSQuestionClaimType,
 } from '@/domains/cs/api/csApi';
 
 import CSQuestionPresenter from './CSQuestionPresenter';
@@ -28,6 +30,17 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CSLearningSessionProps {
   stageId: number;
@@ -97,6 +110,11 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const [showExitAlert, setShowExitAlert] = useState(false);
   const [answerResult, setAnswerResult] = useState<CSAttemptAnswerResponse | null>(null);
   const [trackInfo, setTrackInfo] = useState<{ name: string; trackNo: number; stageNo: number } | null>(null);
+  const [lastSubmittedAnswer, setLastSubmittedAnswer] = useState<CSAttemptAnswerRequest | null>(null);
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [claimType, setClaimType] = useState<CSQuestionClaimType>('INCORRECT_ANSWER');
+  const [claimDescription, setClaimDescription] = useState('');
+  const [isClaimSubmitting, setIsClaimSubmitting] = useState(false);
 
   const initSession = useCallback(async () => {
     try {
@@ -137,6 +155,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       setCurrentQuestion(res.firstQuestion);
       setTotalQuestionCount(res.totalQuestionCount);
       setSolvedQuestionIds([]);
+      setLastSubmittedAnswer(null);
       setPhase('playing');
     } catch (err) {
       console.error('Failed to start session:', err);
@@ -175,6 +194,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     if (!currentQuestion) return;
 
     setIsSubmitting(true);
+    setLastSubmittedAnswer(payload);
     try {
       console.log(`[DEBUG] Submitting answer for question ${currentQuestion.questionId}...`);
       const res = await answerCSStageQuestion(stageId, payload);
@@ -186,6 +206,40 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       toast.error('답안 제출에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const resetClaimForm = () => {
+    setClaimType('INCORRECT_ANSWER');
+    setClaimDescription('');
+  };
+
+  const handleSubmitClaim = async () => {
+    if (!answerResult) return;
+    const normalizedDescription = claimDescription.trim();
+    if (normalizedDescription.length < 10) {
+      toast.error('신고 내용은 최소 10자 이상 입력해주세요.');
+      return;
+    }
+
+    try {
+      setIsClaimSubmitting(true);
+      await submitCSQuestionClaim(stageId, {
+        questionId: answerResult.questionId,
+        claimType,
+        description: normalizedDescription,
+        isCorrect: answerResult.isCorrect,
+        selectedChoiceNo: lastSubmittedAnswer?.selectedChoiceNo,
+        submittedAnswer: lastSubmittedAnswer?.answerText,
+      });
+      toast.success('문제 신고가 접수되었습니다.');
+      setClaimDialogOpen(false);
+      resetClaimForm();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : '문제 신고 접수에 실패했습니다.');
+    } finally {
+      setIsClaimSubmitting(false);
     }
   };
 
@@ -202,6 +256,9 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     }
     
     setAnswerResult(null);
+    setClaimDialogOpen(false);
+    resetClaimForm();
+    setLastSubmittedAnswer(null);
 
     if (isLast) {
       await handleCompleteSession();
@@ -217,6 +274,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     }
 
     const handleFeedbackAdvanceKeyDown = (event: KeyboardEvent) => {
+      if (claimDialogOpen) return;
       if (event.isComposing || event.keyCode === 229) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
 
@@ -228,7 +286,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     return () => {
       window.removeEventListener('keydown', handleFeedbackAdvanceKeyDown);
     };
-  }, [answerResult, handleNextAfterFeedback]);
+  }, [answerResult, claimDialogOpen, handleNextAfterFeedback]);
 
   const handleExitConfirm = () => {
     router.replace('/cs');
@@ -411,11 +469,78 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
             >
               계속하기
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12 font-semibold rounded-xl"
+              onClick={() => setClaimDialogOpen(true)}
+            >
+              문제 신고
+            </Button>
           </div>
             );
           })()}
         </div>
       )}
+
+      <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>문제 신고</DialogTitle>
+            <DialogDescription>
+              정답/해설/문항 오류를 알려주시면 검토 후 반영하겠습니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="claim-type">신고 유형</Label>
+              <Select value={claimType} onValueChange={(value) => setClaimType(value as CSQuestionClaimType)}>
+                <SelectTrigger id="claim-type">
+                  <SelectValue placeholder="신고 유형을 선택해주세요." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INCORRECT_ANSWER">정답이 잘못됨</SelectItem>
+                  <SelectItem value="INCORRECT_EXPLANATION">해설이 잘못됨</SelectItem>
+                  <SelectItem value="QUESTION_TEXT_ERROR">문제 문구가 모호/오류</SelectItem>
+                  <SelectItem value="OTHER">기타</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="claim-description">상세 내용</Label>
+              <Textarea
+                id="claim-description"
+                value={claimDescription}
+                onChange={(event) => setClaimDescription(event.target.value)}
+                placeholder="어떤 부분이 문제인지 구체적으로 적어주세요. (최소 10자)"
+                minLength={10}
+                maxLength={2000}
+              />
+              <p className="text-xs text-muted-foreground">{claimDescription.trim().length}/2000</p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setClaimDialogOpen(false)}
+              disabled={isClaimSubmitting}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmitClaim}
+              disabled={isClaimSubmitting || claimDescription.trim().length < 10}
+            >
+              {isClaimSubmitting ? '제출 중...' : '신고 제출'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
