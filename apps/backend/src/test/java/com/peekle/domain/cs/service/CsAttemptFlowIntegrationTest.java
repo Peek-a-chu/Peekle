@@ -412,6 +412,76 @@ class CsAttemptFlowIntegrationTest {
     }
 
     @Test
+    @DisplayName("멀티 빈칸 순서형은 빈칸별 추가 정답(동의어)을 허용한다")
+    void shortAnswer_multiBlankOrdered_acceptsAliasesPerBlank() {
+        User user = createUser("short-multi-blank-ordered-alias");
+        CsDomain domain = createDomain(410, "멀티 빈칸 순서형 별칭 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "멀티 빈칸 순서형 별칭 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion question = csQuestionRepository.save(CsQuestion.builder()
+                .stage(stage)
+                .questionType(CsQuestionType.SHORT_ANSWER)
+                .prompt("ACID 속성 중 원자성과 격리성을 순서대로 쓰시오.")
+                .explanation("원자성, 격리성 순서입니다.")
+                .gradingMode(CsQuestionGradingMode.MULTI_BLANK_ORDERED)
+                .metadata("{\"blankCount\":2}")
+                .isActive(true)
+                .build());
+
+        addShortAnswer(question, "원자성", "원자성", 1, true);
+        addShortAnswer(question, "atomic", "atomic", 1, false);
+        addShortAnswer(question, "격리성", "격리성", 2, true);
+        addShortAnswer(question, "isolation", "isolation", 2, false);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        CsAttemptAnswerResponse answer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "atomic|||isolation"));
+
+        assertThat(answer.isCorrect()).isTrue();
+        assertThat(answer.phase()).isEqualTo(CsAttemptPhase.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("멀티 빈칸 순서 무관형은 순서가 달라도 각 빈칸 정답이 있으면 정답 처리한다")
+    void shortAnswer_multiBlankUnordered_acceptsSwappedOrder() {
+        User user = createUser("short-multi-blank-unordered");
+        CsDomain domain = createDomain(411, "멀티 빈칸 순서 무관 도메인");
+        CsDomainTrack track = createTrack(domain, 1, "멀티 빈칸 순서 무관 트랙");
+        CsStage stage = createStage(track, 1);
+
+        CsQuestion question = csQuestionRepository.save(CsQuestion.builder()
+                .stage(stage)
+                .questionType(CsQuestionType.SHORT_ANSWER)
+                .prompt("ACID 속성 중 원자성과 격리성을 쓰시오.")
+                .explanation("원자성, 격리성입니다.")
+                .gradingMode(CsQuestionGradingMode.MULTI_BLANK_UNORDERED)
+                .metadata("{\"blankCount\":2}")
+                .isActive(true)
+                .build());
+
+        addShortAnswer(question, "원자성", "원자성", 1, true);
+        addShortAnswer(question, "atomic", "atomic", 1, false);
+        addShortAnswer(question, "격리성", "격리성", 2, true);
+        addShortAnswer(question, "isolation", "isolation", 2, false);
+
+        csDomainService.addMyDomain(user.getId(), domain.getId());
+        csAttemptService.startStageAttempt(user.getId(), stage.getId());
+
+        CsAttemptAnswerResponse swappedAnswer = csAttemptService.submitAnswer(
+                user.getId(),
+                stage.getId(),
+                new CsAttemptAnswerRequest(question.getId(), null, "isolation|||atomic"));
+
+        assertThat(swappedAnswer.isCorrect()).isTrue();
+        assertThat(swappedAnswer.phase()).isEqualTo(CsAttemptPhase.COMPLETED);
+    }
+
+    @Test
     @DisplayName("기출 회차 완료 시 최고 점수가 저장되고 더 높은 점수로 갱신된다")
     void pastExamBestScore_isSavedAndUpdated() {
         User user = createUser("past-best-score");
@@ -541,10 +611,20 @@ class CsAttemptFlowIntegrationTest {
     }
 
     private void addShortAnswer(CsQuestion question, String answerText, String normalizedAnswer, boolean isPrimary) {
+        addShortAnswer(question, answerText, normalizedAnswer, 1, isPrimary);
+    }
+
+    private void addShortAnswer(
+            CsQuestion question,
+            String answerText,
+            String normalizedAnswer,
+            int blankIndex,
+            boolean isPrimary) {
         csQuestionShortAnswerRepository.save(CsQuestionShortAnswer.builder()
                 .question(question)
                 .answerText(answerText)
                 .normalizedAnswer(normalizedAnswer)
+                .blankIndex((short) blankIndex)
                 .isPrimary(isPrimary)
                 .build());
     }

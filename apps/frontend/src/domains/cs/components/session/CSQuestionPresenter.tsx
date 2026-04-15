@@ -47,8 +47,14 @@ export default function CSQuestionPresenter({
   );
   const isMultiBlankQuestion =
     question.questionType === 'SHORT_ANSWER' &&
-    (question.gradingMode === 'MULTI_BLANK_ORDERED' || question.gradingMode === 'ORDERING') &&
+    (
+      question.gradingMode === 'MULTI_BLANK_ORDERED'
+      || question.gradingMode === 'MULTI_BLANK_UNORDERED'
+      || question.gradingMode === 'ORDERING'
+    ) &&
     multiBlankCount > 1;
+  const isOrderSensitiveMultiBlank =
+    question.gradingMode === 'MULTI_BLANK_ORDERED' || question.gradingMode === 'ORDERING';
   const displayedContentBlocks = useMemo(
     () =>
       parsedContentBlocks.filter((block) => {
@@ -224,7 +230,11 @@ export default function CSQuestionPresenter({
 
       {isMultiBlankQuestion && (
         <div className="mt-4 flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">각 빈칸의 답을 순서대로 입력해주세요.</p>
+          <p className="text-sm text-muted-foreground">
+            {isOrderSensitiveMultiBlank
+              ? '각 빈칸의 답을 순서대로 입력해주세요.'
+              : '각 빈칸의 답을 입력해주세요. 순서는 상관없습니다.'}
+          </p>
           {Array.from({ length: multiBlankCount }, (_, index) => (
             <div key={`blank-${index}`} className="flex items-center gap-2">
               <span className="w-14 text-sm font-semibold text-muted-foreground">
