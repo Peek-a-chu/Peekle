@@ -1,6 +1,13 @@
 import { apiFetch } from '@/lib/api';
 import { ApiResponse } from '@/types/apiUtils';
-import { CSDomain, CSQuestionType } from './csApi';
+import {
+  CSDomain,
+  CSQuestionType,
+  CSQuestionContentMode,
+  CSQuestionGradingMode,
+} from './csApi';
+
+export type CSTrackLearningMode = 'CURRICULUM' | 'PAST_EXAM';
 
 export interface CSAdminTrack {
   trackId: number;
@@ -8,6 +15,8 @@ export interface CSAdminTrack {
   domainName: string;
   trackNo: number;
   name: string;
+  learningMode: CSTrackLearningMode;
+  examYear: number | null;
   stages: CSAdminStageSummary[];
 }
 
@@ -32,6 +41,10 @@ export interface CSAdminQuestion {
   questionType: CSQuestionType;
   prompt: string;
   explanation: string | null;
+  contentMode?: CSQuestionContentMode;
+  contentBlocks?: string | null;
+  gradingMode?: CSQuestionGradingMode;
+  metadata?: string | null;
   choices: CSAdminQuestionChoice[];
   shortAnswers: CSAdminQuestionShortAnswer[];
   createdAt: string;
@@ -43,6 +56,10 @@ export interface CSAdminQuestionDraft {
   questionType: CSQuestionType;
   prompt: string;
   explanation: string;
+  contentMode?: CSQuestionContentMode;
+  contentBlocks?: string | null;
+  gradingMode?: CSQuestionGradingMode;
+  metadata?: string | null;
   choices?: CSAdminQuestionChoice[];
   shortAnswers?: CSAdminQuestionShortAnswer[];
 }
@@ -54,6 +71,11 @@ export interface CSAdminStageQuestionImportRequest {
 
 export interface CSAdminQuestionShortAnswersUpdateRequest {
   shortAnswers: CSAdminQuestionShortAnswer[];
+}
+
+export interface CSAdminImagePresignedUrlResponse {
+  presignedUrl: string;
+  publicUrl: string;
 }
 
 function assertApiData<T>(response: ApiResponse<T>, defaultMessage: string): T {
@@ -103,19 +125,26 @@ export const fetchAdminTracks = async (domainId: number): Promise<CSAdminTrack[]
 export const createAdminTrack = async (
   domainId: number,
   name: string,
-  stageCount?: number
+  stageCount?: number,
+  learningMode?: CSTrackLearningMode,
+  examYear?: number | null
 ): Promise<CSAdminTrack> => {
   const response = await apiFetch<CSAdminTrack>(`/api/cs/admin/domains/${domainId}/tracks`, {
     method: 'POST',
-    body: JSON.stringify({ name, stageCount }),
+    body: JSON.stringify({ name, stageCount, learningMode, examYear }),
   });
   return assertApiData(response, '트랙 생성에 실패했습니다.');
 };
 
-export const renameAdminTrack = async (trackId: number, name: string): Promise<CSAdminTrack> => {
+export const renameAdminTrack = async (
+  trackId: number,
+  name: string,
+  learningMode?: CSTrackLearningMode,
+  examYear?: number | null,
+): Promise<CSAdminTrack> => {
   const response = await apiFetch<CSAdminTrack>(`/api/cs/admin/tracks/${trackId}`, {
     method: 'PUT',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, learningMode, examYear }),
   });
   return assertApiData(response, '트랙 이름 변경에 실패했습니다.');
 };
@@ -171,4 +200,33 @@ export const updateAdminQuestionShortAnswers = async (questionId: number, payloa
 export const fetchAdminStageClaims = async (stageId: number): Promise<any> => {
   const response = await apiFetch<any>(`/api/cs/admin/stages/${stageId}/claims`);
   return assertApiData(response, '클레임 목록을 불러오지 못했습니다.');
+};
+
+export const getAdminQuestionImagePresignedUrl = async (
+  fileName: string,
+  contentType: string,
+): Promise<CSAdminImagePresignedUrlResponse> => {
+  const response = await apiFetch<CSAdminImagePresignedUrlResponse>('/api/cs/admin/images/presigned-url', {
+    method: 'POST',
+    body: JSON.stringify({ fileName, contentType }),
+  });
+  return assertApiData(response, '이미지 업로드 URL 발급에 실패했습니다.');
+};
+
+export const uploadAdminQuestionImage = async (file: File): Promise<string> => {
+  const { presignedUrl, publicUrl } = await getAdminQuestionImagePresignedUrl(file.name, file.type);
+
+  const uploadResponse = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type,
+    },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error('R2 이미지 업로드에 실패했습니다.');
+  }
+
+  return publicUrl;
 };

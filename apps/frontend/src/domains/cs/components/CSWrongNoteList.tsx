@@ -23,6 +23,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+interface CSWrongNoteListProps {
+  initialDomainId?: number | null;
+  initialStageId?: number | null;
+  initialYear?: number | null;
+  initialRound?: number | null;
+}
+
 function formatRelativeDate(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -97,11 +104,17 @@ function WrongProblemCard({ item }: { item: CSWrongProblemItem }) {
   );
 }
 
-export default function CSWrongNoteList() {
+export default function CSWrongNoteList({
+  initialDomainId = null,
+  initialStageId = null,
+  initialYear = null,
+  initialRound = null,
+}: CSWrongNoteListProps) {
   const router = useRouter();
+  const isStageScoped = initialStageId !== null;
 
   const [myDomains, setMyDomains] = useState<CSMyDomainItem[]>([]);
-  const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
+  const [selectedDomainId, setSelectedDomainId] = useState<number | null>(initialDomainId);
   const [activeTab, setActiveTab] = useState<CSWrongProblemStatus>('ACTIVE');
   const [items, setItems] = useState<CSWrongProblemItem[]>([]);
   const [totalElements, setTotalElements] = useState(0);
@@ -111,12 +124,21 @@ export default function CSWrongNoteList() {
 
   useEffect(() => {
     const loadDomains = async () => {
+      if (isStageScoped) {
+        setIsLoadingDomains(false);
+        return;
+      }
+
       setIsLoadingDomains(true);
       try {
         const domains = await fetchMyCSDomains();
         setMyDomains(domains);
 
-        const currentDomain = domains.find((domain) => domain.isCurrent) ?? domains[0];
+        const currentDomain =
+          domains.find((domain) => domain.domain.id === initialDomainId)
+          ?? domains.find((domain) => domain.isCurrent)
+          ?? domains[0];
+
         if (currentDomain) {
           setSelectedDomainId(currentDomain.domain.id);
         }
@@ -129,14 +151,20 @@ export default function CSWrongNoteList() {
     };
 
     loadDomains();
-  }, []);
+  }, [initialDomainId, isStageScoped]);
 
   const loadWrongProblems = useCallback(async () => {
-    if (selectedDomainId === null) return;
+    if (!isStageScoped && selectedDomainId === null) return;
 
     setIsLoadingItems(true);
     try {
-      const response = await fetchCSWrongProblems(selectedDomainId, activeTab, 0, 20);
+      const response = await fetchCSWrongProblems(
+        isStageScoped ? null : selectedDomainId,
+        activeTab,
+        initialStageId,
+        0,
+        20,
+      );
       setItems(response.content);
       setTotalElements(response.totalElements);
     } catch (error) {
@@ -145,7 +173,7 @@ export default function CSWrongNoteList() {
     } finally {
       setIsLoadingItems(false);
     }
-  }, [selectedDomainId, activeTab]);
+  }, [activeTab, initialStageId, isStageScoped, selectedDomainId]);
 
   useEffect(() => {
     loadWrongProblems();
@@ -155,14 +183,24 @@ export default function CSWrongNoteList() {
     myDomains.find((domain) => domain.domain.id === selectedDomainId)?.domain.name ?? '도메인 선택';
 
   const handleStartReview = () => {
-    if (!selectedDomainId) {
+    if (!isStageScoped && !selectedDomainId) {
       toast.error('먼저 도메인을 선택해주세요.');
       return;
     }
-    router.push(`/cs/wrong-problems/review?domainId=${selectedDomainId}`);
+
+    const query = new URLSearchParams();
+    if (isStageScoped && initialStageId) {
+      query.set('stageId', String(initialStageId));
+      query.set('scope', 'past-exam');
+      if (initialYear) query.set('year', String(initialYear));
+      if (initialRound) query.set('round', String(initialRound));
+    } else if (selectedDomainId) {
+      query.set('domainId', String(selectedDomainId));
+    }
+    router.push(`/cs/wrong-problems/review?${query.toString()}`);
   };
 
-  if (!isLoadingDomains && myDomains.length === 0) {
+  if (!isStageScoped && !isLoadingDomains && myDomains.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
         <BookX className="h-14 w-14 text-muted-foreground/40" />
@@ -177,57 +215,65 @@ export default function CSWrongNoteList() {
 
   return (
     <div className="flex flex-col gap-5 animate-in fade-in duration-300">
-      <div className="relative">
-        <button
-          id="wrong-note-domain-filter"
-          onClick={() => setDomainDropdownOpen((prev) => !prev)}
-          disabled={isLoadingDomains}
-          className={cn(
-            'w-full rounded-2xl border border-border/60 bg-card px-4 py-3 text-left text-sm font-semibold shadow-sm transition-all duration-200',
-            'hover:border-primary/50 hover:shadow-md',
-            domainDropdownOpen && 'border-primary/60 ring-2 ring-primary/20',
-          )}
-        >
-          <span className="flex items-center justify-between gap-2">
-            <span className="truncate text-foreground">
-              {isLoadingDomains ? '도메인 로딩 중...' : selectedDomainName}
-            </span>
-            <ChevronDown
-              className={cn(
-                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
-                domainDropdownOpen && 'rotate-180',
-              )}
-            />
-          </span>
-        </button>
-
-        {domainDropdownOpen && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-xl">
-            {myDomains.map((domainItem) => (
-              <button
-                key={domainItem.domain.id}
-                onClick={() => {
-                  setSelectedDomainId(domainItem.domain.id);
-                  setDomainDropdownOpen(false);
-                }}
+      {isStageScoped ? (
+        <div className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary">
+          {initialYear && initialRound
+            ? `${initialYear}년 ${initialRound}회차 기출 오답노트`
+            : '기출 회차 오답노트'}
+        </div>
+      ) : (
+        <div className="relative">
+          <button
+            id="wrong-note-domain-filter"
+            onClick={() => setDomainDropdownOpen((prev) => !prev)}
+            disabled={isLoadingDomains}
+            className={cn(
+              'w-full rounded-2xl border border-border/60 bg-card px-4 py-3 text-left text-sm font-semibold shadow-sm transition-all duration-200',
+              'hover:border-primary/50 hover:shadow-md',
+              domainDropdownOpen && 'border-primary/60 ring-2 ring-primary/20',
+            )}
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="truncate text-foreground">
+                {isLoadingDomains ? '도메인 로딩 중...' : selectedDomainName}
+              </span>
+              <ChevronDown
                 className={cn(
-                  'w-full px-4 py-3 text-left text-sm transition-colors hover:bg-muted',
-                  selectedDomainId === domainItem.domain.id && 'bg-primary/5 font-bold text-primary',
+                  'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                  domainDropdownOpen && 'rotate-180',
                 )}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="truncate">{domainItem.domain.name}</span>
-                  {domainItem.isCurrent && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                      학습 중
-                    </span>
+              />
+            </span>
+          </button>
+
+          {domainDropdownOpen && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-xl">
+              {myDomains.map((domainItem) => (
+                <button
+                  key={domainItem.domain.id}
+                  onClick={() => {
+                    setSelectedDomainId(domainItem.domain.id);
+                    setDomainDropdownOpen(false);
+                  }}
+                  className={cn(
+                    'w-full px-4 py-3 text-left text-sm transition-colors hover:bg-muted',
+                    selectedDomainId === domainItem.domain.id && 'bg-primary/5 font-bold text-primary',
                   )}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="truncate">{domainItem.domain.name}</span>
+                    {domainItem.isCurrent && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                        학습 중
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-2">

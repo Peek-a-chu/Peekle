@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, X, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -86,6 +86,7 @@ function splitAnswerText(answer: string): AnswerDisplay {
 
 export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const feedbackAdvanceLockRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -111,10 +112,24 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
               trackNo: bootstrap.progress.currentTrackNo,
               stageNo: matchedStage.stageNo
             });
+            return;
           }
         }
       } catch (err) {
         console.error('Failed to fetch track info:', err);
+      }
+
+      const source = searchParams.get('source');
+      if (source === 'past-exam') {
+        const year = searchParams.get('year');
+        const round = searchParams.get('round');
+        if (year && round) {
+          setTrackInfo({
+            name: `${year}년 정보처리기사 기출`,
+            trackNo: Number(year),
+            stageNo: Number(round),
+          });
+        }
       }
 
       const res = await startCSStageAttempt(stageId);
@@ -127,7 +142,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       toast.error('스테이지 세션을 시작하지 못했습니다.');
       setPhase('error');
     }
-  }, [stageId]);
+  }, [searchParams, stageId]);
 
   useEffect(() => {
     initSession();

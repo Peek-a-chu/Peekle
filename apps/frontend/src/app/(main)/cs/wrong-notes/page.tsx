@@ -8,7 +8,27 @@ export const metadata: Metadata = {
   description: '틀린 CS 문제를 모아 복습하고 약점을 보완하세요.',
 };
 
-export default function CSWrongNotesPage() {
+interface CSWrongNotesPageProps {
+  searchParams: Promise<{
+    domainId?: string;
+    stageId?: string;
+    year?: string;
+    round?: string;
+  }>;
+}
+
+export default async function CSWrongNotesPage({ searchParams }: CSWrongNotesPageProps) {
+  const params = await searchParams;
+  const parsedDomainId = params.domainId ? Number(params.domainId) : NaN;
+  const parsedStageId = params.stageId ? Number(params.stageId) : NaN;
+  const parsedYear = params.year ? Number(params.year) : NaN;
+  const parsedRound = params.round ? Number(params.round) : NaN;
+
+  const domainId = Number.isFinite(parsedDomainId) ? parsedDomainId : null;
+  const stageId = Number.isFinite(parsedStageId) ? parsedStageId : null;
+  const year = Number.isFinite(parsedYear) ? parsedYear : null;
+  const round = Number.isFinite(parsedRound) ? parsedRound : null;
+
   return (
     <div className="flex flex-col min-h-[80vh] animate-in fade-in duration-300">
       {/* ── 헤더 ──────────────────────────────────────────────────────────── */}
@@ -28,7 +48,12 @@ export default function CSWrongNotesPage() {
       </header>
 
       {/* ── 목록 컴포넌트 ────────────────────────────────────────────────── */}
-      <CSWrongNoteList />
+      <CSWrongNoteList
+        initialDomainId={domainId}
+        initialStageId={stageId}
+        initialYear={year}
+        initialRound={round}
+      />
     </div>
   );
 }
