@@ -93,6 +93,8 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const feedbackAdvanceLockRef = useRef(false);
+  const isPastExamSource = searchParams.get('source') === 'past-exam';
+  const exitPath = isPastExamSource ? '/cs/past-exams' : '/cs';
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [currentQuestion, setCurrentQuestion] = useState<CSQuestionPayload | null>(null);
@@ -174,7 +176,23 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       if (typeof window !== 'undefined') {
         sessionStorage.setItem(getCSStageResultStorageKey(stageId), JSON.stringify(res));
       }
-      router.replace(`/cs/stage/${stageId}/result`);
+      const resultQuery = new URLSearchParams();
+      const source = searchParams.get('source');
+      const year = searchParams.get('year');
+      const round = searchParams.get('round');
+
+      if (source) {
+        resultQuery.set('source', source);
+      }
+      if (year) {
+        resultQuery.set('year', year);
+      }
+      if (round) {
+        resultQuery.set('round', round);
+      }
+
+      const queryString = resultQuery.toString();
+      router.replace(`/cs/stage/${stageId}/result${queryString ? `?${queryString}` : ''}`);
     } catch (err) {
       console.error(err);
       toast.error('스테이지 결과를 불러오는 데 실패했습니다.');
@@ -281,7 +299,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
   }, [answerResult, claimDialogOpen, handleNextAfterFeedback]);
 
   const handleExitConfirm = () => {
-    router.replace('/cs');
+    router.replace(exitPath);
   };
 
   if (phase === 'error') {
@@ -289,7 +307,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="w-12 h-12 text-destructive" />
         <h2 className="text-xl font-bold">오류가 발생했습니다</h2>
-        <Button onClick={() => router.replace('/cs')} variant="outline">
+        <Button onClick={() => router.replace(exitPath)} variant="outline">
           돌아가기
         </Button>
       </div>
