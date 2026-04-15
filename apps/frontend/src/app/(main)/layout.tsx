@@ -14,7 +14,7 @@ export default async function MainLayout({
   const user = await getMyProfile();
 
   return (
-    <div className="flex h-[100dvh] min-h-screen overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible">
+    <div className="flex h-screen supports-[height:100dvh]:h-[100dvh] overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible">
       <Sidebar user={user} />
       <MainContentWrapper>
         <main className="flex-1 min-h-0 w-full max-w-7xl mx-auto overflow-y-auto px-4 py-0 lg:px-8 lg:overflow-visible">

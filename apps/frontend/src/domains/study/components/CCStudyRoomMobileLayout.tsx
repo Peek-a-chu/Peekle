@@ -29,7 +29,7 @@ export function CCStudyRoomMobileLayout({
   }, [viewMode, setMobileTab]);
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background text-foreground overflow-hidden w-full">
+    <div className="flex h-screen supports-[height:100dvh]:h-[100dvh] flex-col bg-background text-foreground overflow-hidden w-full">
       {header && <header className="shrink-0 border-b border-border">{header}</header>}
 
       <main className="relative flex flex-col flex-1 min-h-0 overflow-hidden w-full">
@@ -53,50 +53,52 @@ export function CCStudyRoomMobileLayout({
       </main>
 
       {/* Bottom Navigation Bar */}
-      <nav className="shrink-0 flex items-center justify-around border-t border-border bg-card h-[64px] pb-safe z-50 w-full shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
-        <button
-          onClick={() => setMobileTab('video')}
-          className={cn(
-            'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
-            mobileTab === 'video' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
-          )}
-        >
-          <Video className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">화상</span>
-        </button>
-        
-        <button
-          onClick={() => setMobileTab('code')}
-          className={cn(
-            'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
-            mobileTab === 'code' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
-          )}
-        >
-          <Code2 className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">코드</span>
-        </button>
-        
-        <button
-          onClick={() => setMobileTab('problems')}
-          className={cn(
-            'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
-            mobileTab === 'problems' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
-          )}
-        >
-          <ListTodo className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">문제</span>
-        </button>
-        
-        <button
-          onClick={() => setMobileTab('chat')}
-          className={cn(
-            'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
-            mobileTab === 'chat' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
-          )}
-        >
-          <MessageSquare className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">소통</span>
-        </button>
+      <nav className="shrink-0 border-t border-border bg-card z-50 w-full shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+        <div className="flex h-[64px] items-center justify-around">
+          <button
+            onClick={() => setMobileTab('video')}
+            className={cn(
+              'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
+              mobileTab === 'video' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
+            )}
+          >
+            <Video className="w-5 h-5" />
+            <span className="text-[10px] font-medium mt-0.5">화상</span>
+          </button>
+
+          <button
+            onClick={() => setMobileTab('code')}
+            className={cn(
+              'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
+              mobileTab === 'code' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
+            )}
+          >
+            <Code2 className="w-5 h-5" />
+            <span className="text-[10px] font-medium mt-0.5">코드</span>
+          </button>
+
+          <button
+            onClick={() => setMobileTab('problems')}
+            className={cn(
+              'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
+              mobileTab === 'problems' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
+            )}
+          >
+            <ListTodo className="w-5 h-5" />
+            <span className="text-[10px] font-medium mt-0.5">문제</span>
+          </button>
+
+          <button
+            onClick={() => setMobileTab('chat')}
+            className={cn(
+              'flex flex-col items-center justify-center w-full h-full gap-1 transition-colors',
+              mobileTab === 'chat' ? 'text-primary' : 'text-muted-foreground hover:text-foreground/80'
+            )}
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-[10px] font-medium mt-0.5">소통</span>
+          </button>
+        </div>
       </nav>
     </div>
   );
