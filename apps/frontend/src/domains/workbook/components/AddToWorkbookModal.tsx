@@ -147,7 +147,7 @@ export function AddToWorkbookModal({
                 className={cn(
                     'bg-card border-border shadow-2xl flex flex-col gap-0',
                     isMobile
-                        ? 'w-[calc(100vw-1rem)] max-w-none h-[calc(100vh-1.5rem)] max-h-[calc(100vh-1.5rem)] rounded-2xl top-3 translate-y-0 p-4 overflow-hidden'
+                        ? 'w-[calc(100vw-1rem)] max-w-none h-[calc(100vh-1.5rem)] max-h-[calc(100vh-1.5rem)] supports-[height:100dvh]:h-[calc(100dvh-1.5rem)] supports-[height:100dvh]:max-h-[calc(100dvh-1.5rem)] rounded-2xl top-3 translate-y-0 p-4 overflow-hidden'
                         : 'sm:max-w-[420px] rounded-3xl p-6 max-h-[85vh]'
                 )}
             >

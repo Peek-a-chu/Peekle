@@ -166,7 +166,7 @@ export function CCHistoryList({ initialHistory }: Props) {
       {/* relative for calendar popover context if needed, though usually popover is near trigger */}
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-200">
         <div
-          className={`h-[calc(100vh-120px)] flex flex-col transition-all duration-300 ease-in-out ${selectedSubmission ? 'pr-[480px]' : ''}`}
+          className={`h-[calc(100vh-120px)] supports-[height:100dvh]:h-[calc(100dvh-120px)] flex flex-col transition-all duration-300 ease-in-out ${selectedSubmission ? 'pr-[480px]' : ''}`}
         >
           {/* 1. Header & Filters */}
           <div className="flex-none mb-6 space-y-4">

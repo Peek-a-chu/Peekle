@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-4">
+    <div className="flex h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] flex-col items-center justify-center gap-4">
       <h2 className="text-2xl font-bold">404 - 페이지를 찾을 수 없습니다</h2>
       <p className="text-muted-foreground">요청하신 리소스가 존재하지 않거나 삭제되었습니다.</p>
       <Link
