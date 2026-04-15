@@ -30,14 +30,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -407,13 +399,22 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
             } animate-in slide-in-from-bottom sm:slide-in-from-bottom-8 duration-300 pointer-events-auto`}
           >
             <div className="flex flex-col gap-2">
-              <h2
-                className={`text-2xl font-black tracking-tight ${
-                  answerResult.isCorrect ? 'text-emerald-600' : 'text-red-500'
-                }`}
-              >
-                {answerResult.isCorrect ? '정답입니다!' : '틀렸습니다.'}
-              </h2>
+              <div className="flex items-start justify-between gap-3">
+                <h2
+                  className={`text-2xl font-black tracking-tight ${
+                    answerResult.isCorrect ? 'text-emerald-600' : 'text-red-500'
+                  }`}
+                >
+                  {answerResult.isCorrect ? '정답입니다!' : '틀렸습니다.'}
+                </h2>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md border border-slate-300 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-white"
+                  onClick={() => setClaimDialogOpen((prev) => !prev)}
+                >
+                  문제 신고
+                </button>
+              </div>
               {!answerResult.isCorrect && (
                 <div className="mt-2 flex flex-col gap-3">
                   {wrongFeedback?.answer && (
@@ -459,6 +460,64 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
                 </div>
               )}
             </div>
+            {claimDialogOpen && (
+              <div className="mt-1 rounded-xl border border-slate-300/80 bg-white/95 p-4 shadow-sm">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-slate-800">문제 신고</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    정답/해설/문항 오류를 알려주시면 검토 후 반영하겠습니다.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="claim-type">신고 유형</Label>
+                    <Select
+                      value={claimType}
+                      onValueChange={(value) => setClaimType(value as CSQuestionClaimType)}
+                    >
+                      <SelectTrigger id="claim-type">
+                        <SelectValue placeholder="신고 유형을 선택해주세요." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INCORRECT_ANSWER">정답이 잘못됨</SelectItem>
+                        <SelectItem value="INCORRECT_EXPLANATION">해설이 잘못됨</SelectItem>
+                        <SelectItem value="QUESTION_TEXT_ERROR">문제 문구가 모호/오류</SelectItem>
+                        <SelectItem value="OTHER">기타</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="claim-description">상세 내용</Label>
+                    <Textarea
+                      id="claim-description"
+                      value={claimDescription}
+                      onChange={(event) => setClaimDescription(event.target.value)}
+                      placeholder="어떤 부분이 문제인지 구체적으로 적어주세요. (최소 10자)"
+                      minLength={10}
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-slate-500">{claimDescription.trim().length}/2000</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setClaimDialogOpen(false)}
+                    disabled={isClaimSubmitting}
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSubmitClaim}
+                    disabled={isClaimSubmitting || claimDescription.trim().length < 10}
+                  >
+                    {isClaimSubmitting ? '제출 중...' : '신고 제출'}
+                  </Button>
+                </div>
+              </div>
+            )}
             <Button
               onClick={handleNextAfterFeedback}
               className={`w-full h-14 mt-4 font-bold text-lg rounded-xl shadow-sm hover:shadow-md transition-all ${
@@ -469,78 +528,11 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
             >
               계속하기
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 font-semibold rounded-xl"
-              onClick={() => setClaimDialogOpen(true)}
-            >
-              문제 신고
-            </Button>
           </div>
             );
           })()}
         </div>
       )}
-
-      <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
-        <DialogContent className="rounded-2xl sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>문제 신고</DialogTitle>
-            <DialogDescription>
-              정답/해설/문항 오류를 알려주시면 검토 후 반영하겠습니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="claim-type">신고 유형</Label>
-              <Select value={claimType} onValueChange={(value) => setClaimType(value as CSQuestionClaimType)}>
-                <SelectTrigger id="claim-type">
-                  <SelectValue placeholder="신고 유형을 선택해주세요." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="INCORRECT_ANSWER">정답이 잘못됨</SelectItem>
-                  <SelectItem value="INCORRECT_EXPLANATION">해설이 잘못됨</SelectItem>
-                  <SelectItem value="QUESTION_TEXT_ERROR">문제 문구가 모호/오류</SelectItem>
-                  <SelectItem value="OTHER">기타</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="claim-description">상세 내용</Label>
-              <Textarea
-                id="claim-description"
-                value={claimDescription}
-                onChange={(event) => setClaimDescription(event.target.value)}
-                placeholder="어떤 부분이 문제인지 구체적으로 적어주세요. (최소 10자)"
-                minLength={10}
-                maxLength={2000}
-              />
-              <p className="text-xs text-muted-foreground">{claimDescription.trim().length}/2000</p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setClaimDialogOpen(false)}
-              disabled={isClaimSubmitting}
-            >
-              취소
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSubmitClaim}
-              disabled={isClaimSubmitting || claimDescription.trim().length < 10}
-            >
-              {isClaimSubmitting ? '제출 중...' : '신고 제출'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
