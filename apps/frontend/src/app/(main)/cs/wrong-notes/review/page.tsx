@@ -7,13 +7,19 @@ export const metadata: Metadata = {
 };
 
 interface CSWrongReviewPageProps {
-  searchParams: Promise<{ domainId?: string }>;
+  searchParams: Promise<{ domainId?: string; stageId?: string; year?: string; round?: string }>;
 }
 
 export default async function CSWrongReviewPage({ searchParams }: CSWrongReviewPageProps) {
-  const { domainId: rawDomainId } = await searchParams;
+  const { domainId: rawDomainId, stageId: rawStageId, year: rawYear, round: rawRound } = await searchParams;
   const parsedDomainId = rawDomainId ? Number(rawDomainId) : NaN;
+  const parsedStageId = rawStageId ? Number(rawStageId) : NaN;
+  const parsedYear = rawYear ? Number(rawYear) : NaN;
+  const parsedRound = rawRound ? Number(rawRound) : NaN;
   const domainId = Number.isFinite(parsedDomainId) ? parsedDomainId : null;
+  const stageId = Number.isFinite(parsedStageId) ? parsedStageId : null;
+  const year = Number.isFinite(parsedYear) ? parsedYear : null;
+  const round = Number.isFinite(parsedRound) ? parsedRound : null;
 
-  return <CSWrongReviewSession domainId={domainId} />;
+  return <CSWrongReviewSession domainId={domainId} stageId={stageId} year={year} round={round} />;
 }

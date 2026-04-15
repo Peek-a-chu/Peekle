@@ -7,6 +7,7 @@ import com.peekle.domain.cs.dto.response.CsAttemptProgressResponse;
 import com.peekle.domain.cs.dto.response.CsAttemptStartResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionChoiceResponse;
 import com.peekle.domain.cs.dto.response.CsQuestionPayloadResponse;
+import com.peekle.domain.cs.entity.CsPastExamBestScore;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
@@ -15,10 +16,13 @@ import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsWrongProblem;
 import com.peekle.domain.cs.enums.CsAttemptPhase;
+import com.peekle.domain.cs.enums.CsQuestionGradingMode;
 import com.peekle.domain.cs.enums.CsQuestionType;
+import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
+import com.peekle.domain.cs.repository.CsPastExamBestScoreRepository;
 import com.peekle.domain.cs.repository.CsStageAttemptLogRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
@@ -45,16 +49,22 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CsAttemptService {
 
-    private static final int ATTEMPT_QUESTION_COUNT = 10;
+    private static final int CURRICULUM_ATTEMPT_QUESTION_COUNT = 10;
+    private static final int PAST_EXAM_ATTEMPT_QUESTION_MAX_COUNT = 20;
     private static final int MESSAGE_SCORE_EXCELLENT = 90;
     private static final int MESSAGE_SCORE_GOOD = 70;
     private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
+    private static final String MULTI_BLANK_DELIMITER = "|||";
+    private static final Pattern BLANK_COUNT_PATTERN = Pattern.compile("\"blankCount\"\\s*:\\s*(\\d+)");
+    private static final Pattern ITEM_COUNT_PATTERN = Pattern.compile("\"itemCount\"\\s*:\\s*(\\d+)");
 
     private static final String LOCK_REASON_PREVIOUS_STAGE = "이전 스테이지를 먼저 완료해야 합니다.";
     private static final String LOCK_REASON_NOT_CURRENT_TRACK = "현재 학습 중인 트랙만 입장할 수 있습니다.";
@@ -63,6 +73,7 @@ public class CsAttemptService {
     private final CsQuestionRepository csQuestionRepository;
     private final CsQuestionChoiceRepository csQuestionChoiceRepository;
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
+    private final CsPastExamBestScoreRepository csPastExamBestScoreRepository;
     private final CsStageAttemptLogRepository csStageAttemptLogRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final CsWrongProblemRepository csWrongProblemRepository;
@@ -75,18 +86,21 @@ public class CsAttemptService {
         CsStage stage = getStage(stageId);
 
         Integer domainId = stage.getTrack().getDomain().getId();
-        CsUserDomainProgress progress = csUserDomainProgressRepository
-                .findByUser_IdAndDomain_Id(user.getId(), domainId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_NOT_STUDYING));
+        if (stage.getTrack().getLearningMode() == CsTrackLearningMode.CURRICULUM) {
+            CsUserDomainProgress progress = csUserDomainProgressRepository
+                    .findByUser_IdAndDomain_Id(user.getId(), domainId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_NOT_STUDYING));
 
-        validateStageAccess(progress, stage);
+            validateStageAccess(progress, stage);
+        }
 
         List<CsQuestion> loadedQuestions = csQuestionRepository.findByStage_IdAndIsActiveTrueOrderByIdAsc(stageId);
         if (loadedQuestions.isEmpty()) {
             throw new BusinessException(ErrorCode.CS_QUESTION_NOT_FOUND, "스테이지에 등록된 문제가 없습니다.");
         }
 
-        List<CsQuestion> questionSet = selectQuestionSet(loadedQuestions);
+        int targetQuestionCount = resolveAttemptQuestionCount(stage, loadedQuestions.size());
+        List<CsQuestion> questionSet = selectQuestionSet(loadedQuestions, targetQuestionCount);
         List<Long> questionIds = questionSet.stream()
                 .map(CsQuestion::getId)
                 .toList();
@@ -112,7 +126,7 @@ public class CsAttemptService {
         csAttemptStore.delete(userId, stageId);
         csAttemptStore.save(session);
 
-        return new CsAttemptStartResponse(stageId, ATTEMPT_QUESTION_COUNT, toQuestionPayload(questionSet.get(0)));
+        return new CsAttemptStartResponse(stageId, questionSet.size(), toQuestionPayload(questionSet.get(0)));
     }
 
     @Transactional
@@ -140,7 +154,7 @@ public class CsAttemptService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_QUESTION_NOT_FOUND));
 
         int currentQuestionNo = currentRoundIndex + 1;
-        int totalQuestionCount = ATTEMPT_QUESTION_COUNT;
+        int totalQuestionCount = session.getQuestionOrder().size();
 
         GradingResult gradingResult = gradeAnswer(question, request);
         boolean isCorrect = gradingResult.isCorrect();
@@ -194,11 +208,14 @@ public class CsAttemptService {
 
         persistWrongProblems(user, session);
         persistStageAttemptLog(user, stage, correctCount, totalQuestionCount);
+        updatePastExamBestScoreIfNeeded(user, stage, correctRate);
 
         Long nextStageId = resolveNextStageId(stage);
         boolean isTrackCompleted = nextStageId == null;
 
-        updateDomainProgressIfNeeded(userId, stage, nextStageId);
+        if (stage.getTrack().getLearningMode() == CsTrackLearningMode.CURRICULUM) {
+            updateDomainProgressIfNeeded(userId, stage, nextStageId);
+        }
         StreakResult streak = applyStreak(user);
         if (earnedScore > 0) {
             user.addLeaguePoint(earnedScore);
@@ -234,6 +251,40 @@ public class CsAttemptService {
                 .build();
 
         csStageAttemptLogRepository.save(attemptLog);
+    }
+
+    private void updatePastExamBestScoreIfNeeded(User user, CsStage stage, int correctRate) {
+        if (stage.getTrack().getLearningMode() != CsTrackLearningMode.PAST_EXAM) {
+            return;
+        }
+        if (stage.getTrack().getExamYear() == null) {
+            return;
+        }
+
+        Short examYear = stage.getTrack().getExamYear();
+        Short examRound = stage.getStageNo();
+        LocalDateTime now = LocalDateTime.now();
+
+        CsPastExamBestScore bestScore = csPastExamBestScoreRepository
+                .findByUser_IdAndExamYearAndExamRound(user.getId(), examYear, examRound)
+                .orElseGet(() -> CsPastExamBestScore.builder()
+                        .user(user)
+                        .examYear(examYear)
+                        .examRound(examRound)
+                        .bestScore(correctRate)
+                        .achievedAt(now)
+                        .build());
+
+        if (bestScore.getBestScore() == null || correctRate > bestScore.getBestScore()) {
+            bestScore.updateBestScore(correctRate, now);
+            csPastExamBestScoreRepository.save(bestScore);
+            return;
+        }
+
+        if (correctRate == bestScore.getBestScore()) {
+            bestScore.updateBestScore(correctRate, now);
+            csPastExamBestScoreRepository.save(bestScore);
+        }
     }
 
     private CsAttemptSession getAttemptSession(Long userId, Long stageId) {
@@ -342,6 +393,21 @@ public class CsAttemptService {
                 }
 
                 String submitted = answerText.strip();
+                CsQuestionGradingMode gradingMode = resolveEffectiveGradingMode(question);
+
+                if (gradingMode == CsQuestionGradingMode.MULTI_BLANK_ORDERED
+                        || gradingMode == CsQuestionGradingMode.ORDERING) {
+                    List<String> submittedParts = parseOrderedSubmittedAnswers(submitted);
+                    List<String> expectedParts = resolveOrderedExpectedAnswers(question, acceptableAnswers);
+                    boolean isCorrect = isOrderedAnswerCorrect(submittedParts, expectedParts);
+
+                    yield new GradingResult(
+                            isCorrect,
+                            null,
+                            isCorrect ? null : formatOrderedAnswerForFeedback(expectedParts),
+                            question.getExplanation());
+                }
+
                 String strictSubmitted = normalizeStrict(submitted);
                 String relaxedSubmitted = normalizeRelaxed(strictSubmitted);
 
@@ -461,11 +527,18 @@ public class CsAttemptService {
         return "CS_RESULT_KEEP_GOING";
     }
 
-    private List<CsQuestion> selectQuestionSet(List<CsQuestion> loadedQuestions) {
-        if (loadedQuestions.size() <= ATTEMPT_QUESTION_COUNT) {
+    private List<CsQuestion> selectQuestionSet(List<CsQuestion> loadedQuestions, int attemptQuestionCount) {
+        if (loadedQuestions.size() <= attemptQuestionCount) {
             return loadedQuestions;
         }
-        return new ArrayList<>(loadedQuestions.subList(0, ATTEMPT_QUESTION_COUNT));
+        return new ArrayList<>(loadedQuestions.subList(0, attemptQuestionCount));
+    }
+
+    private int resolveAttemptQuestionCount(CsStage stage, int loadedQuestionCount) {
+        if (stage.getTrack().getLearningMode() == CsTrackLearningMode.PAST_EXAM) {
+            return Math.min(loadedQuestionCount, PAST_EXAM_ATTEMPT_QUESTION_MAX_COUNT);
+        }
+        return Math.min(loadedQuestionCount, CURRICULUM_ATTEMPT_QUESTION_COUNT);
     }
 
     private void validateStageAccess(CsUserDomainProgress progress, CsStage stage) {
@@ -512,6 +585,10 @@ public class CsAttemptService {
                 question.getId(),
                 question.getQuestionType(),
                 question.getPrompt(),
+                question.getContentMode(),
+                question.getContentBlocks(),
+                question.getGradingMode(),
+                question.getMetadata(),
                 choices.isEmpty() ? null : choices);
     }
 
@@ -556,6 +633,155 @@ public class CsAttemptService {
                 .map(this::resolveDisplayAnswerText)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private CsQuestionGradingMode resolveEffectiveGradingMode(CsQuestion question) {
+        CsQuestionGradingMode gradingMode = question.getGradingMode();
+        if (gradingMode == null || gradingMode == CsQuestionGradingMode.DEFAULT_BY_TYPE) {
+            return question.getQuestionType() == CsQuestionType.SHORT_ANSWER
+                    ? CsQuestionGradingMode.SHORT_TEXT_EXACT
+                    : CsQuestionGradingMode.SINGLE_CHOICE;
+        }
+        return gradingMode;
+    }
+
+    private List<String> parseOrderedSubmittedAnswers(String submitted) {
+        if (submitted == null || submitted.isBlank()) {
+            return List.of();
+        }
+        if (submitted.contains(MULTI_BLANK_DELIMITER)) {
+            String[] rawParts = submitted.split(Pattern.quote(MULTI_BLANK_DELIMITER));
+            List<String> parts = new ArrayList<>();
+            for (String rawPart : rawParts) {
+                String normalized = rawPart == null ? "" : rawPart.trim();
+                if (!normalized.isBlank()) {
+                    parts.add(normalized);
+                }
+            }
+            return parts;
+        }
+        return splitOrderedTokens(submitted);
+    }
+
+    private List<String> resolveOrderedExpectedAnswers(CsQuestion question, List<CsQuestionShortAnswer> acceptableAnswers) {
+        List<String> answerTexts = acceptableAnswers.stream()
+                .sorted(Comparator
+                        .comparing((CsQuestionShortAnswer answer) -> !Boolean.TRUE.equals(answer.getIsPrimary()))
+                        .thenComparing(CsQuestionShortAnswer::getId))
+                .map(this::resolveDisplayAnswerText)
+                .filter(text -> text != null && !text.isBlank())
+                .map(String::trim)
+                .toList();
+
+        if (answerTexts.isEmpty()) {
+            return List.of();
+        }
+
+        int expectedCount = extractExpectedBlankCount(question.getMetadata());
+        if (expectedCount > 1) {
+            if (answerTexts.size() >= expectedCount) {
+                return new ArrayList<>(answerTexts.subList(0, expectedCount));
+            }
+
+            List<String> splitPrimary = splitOrderedTokens(answerTexts.get(0));
+            if (splitPrimary.size() >= expectedCount) {
+                return new ArrayList<>(splitPrimary.subList(0, expectedCount));
+            }
+        }
+
+        if (answerTexts.size() > 1) {
+            return answerTexts;
+        }
+
+        List<String> splitSingle = splitOrderedTokens(answerTexts.get(0));
+        return splitSingle.isEmpty() ? answerTexts : splitSingle;
+    }
+
+    private List<String> splitOrderedTokens(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        String[] rawTokens = text.split("[,\\n;/]+");
+        List<String> tokens = new ArrayList<>();
+        for (String rawToken : rawTokens) {
+            String normalized = rawToken == null ? "" : rawToken.trim();
+            if (!normalized.isBlank()) {
+                tokens.add(normalized);
+            }
+        }
+        return tokens;
+    }
+
+    private boolean isOrderedAnswerCorrect(List<String> submittedParts, List<String> expectedParts) {
+        if (submittedParts.isEmpty() || expectedParts.isEmpty()) {
+            return false;
+        }
+        if (submittedParts.size() != expectedParts.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < expectedParts.size(); i++) {
+            if (!isOrderedPartCorrect(submittedParts.get(i), expectedParts.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isOrderedPartCorrect(String submittedPart, String expectedPart) {
+        String strictSubmitted = normalizeStrict(submittedPart);
+        String relaxedSubmitted = normalizeRelaxed(strictSubmitted);
+
+        String[] expectedOptions = expectedPart.split("[|/]+");
+        Set<String> strictCandidates = new HashSet<>();
+        Set<String> relaxedCandidates = new HashSet<>();
+        for (String option : expectedOptions) {
+            addCandidateNormalization(strictCandidates, relaxedCandidates, option);
+        }
+
+        return strictCandidates.contains(strictSubmitted)
+                || (!relaxedSubmitted.isBlank() && relaxedCandidates.contains(relaxedSubmitted));
+    }
+
+    private int extractExpectedBlankCount(String metadata) {
+        int blankCount = extractCount(metadata, BLANK_COUNT_PATTERN);
+        if (blankCount > 0) {
+            return blankCount;
+        }
+        return extractCount(metadata, ITEM_COUNT_PATTERN);
+    }
+
+    private int extractCount(String source, Pattern pattern) {
+        if (source == null || source.isBlank()) {
+            return 0;
+        }
+        Matcher matcher = pattern.matcher(source);
+        if (!matcher.find()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private String formatOrderedAnswerForFeedback(List<String> expectedParts) {
+        if (expectedParts == null || expectedParts.isEmpty()) {
+            return null;
+        }
+        if (expectedParts.size() == 1) {
+            return expectedParts.get(0);
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < expectedParts.size(); i++) {
+            if (i > 0) {
+                builder.append(", ");
+            }
+            builder.append("(").append(i + 1).append(") ").append(expectedParts.get(i));
+        }
+        return builder.toString();
     }
 
     private String resolveDisplayAnswerText(CsQuestionShortAnswer answer) {

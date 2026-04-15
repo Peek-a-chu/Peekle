@@ -7,6 +7,7 @@ import { fetchCSBootstrap, CSBootstrapResponse } from '@/domains/cs/api/csApi';
 import DomainSelection from '@/domains/cs/components/DomainSelection';
 import LearningMap from '@/domains/cs/components/LearningMap';
 import CSTopBar from '@/domains/cs/components/CSTopBar';
+import CSModeSwitch from '@/domains/cs/components/CSModeSwitch';
 import { toast } from 'sonner';
 
 export default function CSPage() {
@@ -73,6 +74,9 @@ export default function CSPage() {
 
   return (
     <div className="flex flex-col animate-in fade-in duration-500">
+      <div className="pt-2">
+        <CSModeSwitch />
+      </div>
       {bootstrapData?.currentDomain && (
         <CSTopBar
           currentDomain={bootstrapData.currentDomain}

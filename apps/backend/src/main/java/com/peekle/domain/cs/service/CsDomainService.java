@@ -17,6 +17,7 @@ import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsUserProfile;
 import com.peekle.domain.cs.enums.CsStageStatus;
+import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.repository.CsDomainRepository;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
@@ -184,11 +185,13 @@ public class CsDomainService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_STAGE_NOT_FOUND));
 
         Integer domainId = stage.getTrack().getDomain().getId();
-        CsUserDomainProgress progress = csUserDomainProgressRepository
-                .findByUser_IdAndDomain_Id(user.getId(), domainId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_NOT_STUDYING));
+        if (stage.getTrack().getLearningMode() == CsTrackLearningMode.CURRICULUM) {
+            CsUserDomainProgress progress = csUserDomainProgressRepository
+                    .findByUser_IdAndDomain_Id(user.getId(), domainId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_NOT_STUDYING));
 
-        validateStageAccess(progress, stage);
+            validateStageAccess(progress, stage);
+        }
 
         List<CsQuestion> questions = csQuestionRepository.findByStage_IdAndIsActiveTrueOrderByIdAsc(stageId);
         if (questions.isEmpty()) {
@@ -299,6 +302,10 @@ public class CsDomainService {
                 question.getId(),
                 question.getQuestionType(),
                 question.getPrompt(),
+                question.getContentMode(),
+                question.getContentBlocks(),
+                question.getGradingMode(),
+                question.getMetadata(),
                 choices.isEmpty() ? null : choices);
     }
 }

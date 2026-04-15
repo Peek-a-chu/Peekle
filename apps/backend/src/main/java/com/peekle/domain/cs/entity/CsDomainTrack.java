@@ -1,7 +1,10 @@
 package com.peekle.domain.cs.entity;
 
+import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -43,11 +46,24 @@ public class CsDomainTrack {
     @Column(nullable = false, length = 150)
     private String name;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "learning_mode", nullable = false, length = 20)
+    private CsTrackLearningMode learningMode = CsTrackLearningMode.CURRICULUM;
+
+    @Column(name = "exam_year")
+    private Short examYear;
+
     public void rename(String name) {
         this.name = name;
     }
 
     public void updateTrackNo(short trackNo) {
         this.trackNo = trackNo;
+    }
+
+    public void updateLearningMode(CsTrackLearningMode learningMode, Short examYear) {
+        this.learningMode = learningMode;
+        this.examYear = examYear;
     }
 }

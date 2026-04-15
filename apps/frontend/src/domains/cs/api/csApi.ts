@@ -7,6 +7,13 @@ export interface CSDomain {
 }
 
 export type CSQuestionType = 'MULTIPLE_CHOICE' | 'SHORT_ANSWER' | 'ESSAY' | 'OX';
+export type CSQuestionContentMode = 'LEGACY_TEXT' | 'BLOCKS';
+export type CSQuestionGradingMode =
+  | 'DEFAULT_BY_TYPE'
+  | 'SINGLE_CHOICE'
+  | 'SHORT_TEXT_EXACT'
+  | 'MULTI_BLANK_ORDERED'
+  | 'ORDERING';
 export type CSAttemptPhase = 'FIRST_PASS' | 'RETRY_WRONG' | 'COMPLETED';
 
 export interface CSProgress {
@@ -58,6 +65,10 @@ export interface CSQuestionPayload {
   questionId: number;
   questionType: CSQuestionType;
   prompt: string;
+  contentMode?: CSQuestionContentMode;
+  contentBlocks?: string | null;
+  gradingMode?: CSQuestionGradingMode;
+  metadata?: string | null;
   choices?: CSQuestionChoice[];
 }
 
@@ -128,6 +139,22 @@ export interface CSWrongProblemsResponse {
   page: number;
   size: number;
   totalElements: number;
+}
+
+export interface CSPastExamRound {
+  roundNo: number;
+  stageId: number | null;
+  questionCount: number;
+  isReady: boolean;
+}
+
+export interface CSPastExamYear {
+  year: number;
+  rounds: CSPastExamRound[];
+}
+
+export interface CSPastExamCatalogResponse {
+  years: CSPastExamYear[];
 }
 
 export interface CSWrongReviewStartRequest {
@@ -270,20 +297,29 @@ export const completeCSStageAttempt = async (
 };
 
 /**
+ * 정보처리기사 기출 카탈로그 조회
+ */
+export const fetchCSPastExamCatalog = async (): Promise<CSPastExamCatalogResponse> => {
+  const response = await apiFetch<CSPastExamCatalogResponse>('/api/cs/past-exams');
+  return assertApiData(response, '기출 카탈로그를 불러오지 못했습니다.');
+};
+
+/**
  * 오답노트 조회
  */
 export const fetchCSWrongProblems = async (
-  domainId: number,
+  domainId: number | null,
   status: CSWrongProblemStatus,
+  stageId: number | null = null,
   page = 0,
   size = 20,
 ): Promise<CSWrongProblemsResponse> => {
-  const query = new URLSearchParams({
-    domainId: String(domainId),
-    status,
-    page: String(page),
-    size: String(size),
-  });
+  const query = new URLSearchParams();
+  if (domainId !== null) query.set('domainId', String(domainId));
+  if (stageId !== null) query.set('stageId', String(stageId));
+  query.set('status', status);
+  query.set('page', String(page));
+  query.set('size', String(size));
 
   const response = await apiFetch<CSWrongProblemsResponse>(`/api/cs/wrong-problems?${query.toString()}`);
   return assertApiData(response, '오답노트를 불러오지 못했습니다.');

@@ -12,6 +12,7 @@ import com.peekle.domain.cs.dto.response.CsCurrentDomainChangeResponse;
 import com.peekle.domain.cs.dto.response.CsDomainResponse;
 import com.peekle.domain.cs.dto.response.CsDomainSubmitResponse;
 import com.peekle.domain.cs.dto.response.CsMyDomainItemResponse;
+import com.peekle.domain.cs.dto.response.CsPastExamCatalogResponse;
 import com.peekle.domain.cs.dto.response.CsWrongProblemPageResponse;
 import com.peekle.domain.cs.dto.response.CsWrongReviewAnswerResponse;
 import com.peekle.domain.cs.dto.response.CsWrongReviewCompleteResponse;
@@ -19,6 +20,7 @@ import com.peekle.domain.cs.dto.response.CsWrongReviewStartResponse;
 import com.peekle.domain.cs.enums.CsWrongProblemStatus;
 import com.peekle.domain.cs.service.CsAttemptService;
 import com.peekle.domain.cs.service.CsDomainService;
+import com.peekle.domain.cs.service.CsPastExamService;
 import com.peekle.domain.cs.service.CsWrongProblemService;
 import com.peekle.global.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -43,6 +45,7 @@ public class CsController {
     private final CsDomainService csDomainService;
     private final CsAttemptService csAttemptService;
     private final CsWrongProblemService csWrongProblemService;
+    private final CsPastExamService csPastExamService;
 
     @GetMapping("/bootstrap")
     public ApiResponse<CsBootstrapResponse> getBootstrap(@AuthenticationPrincipal Long userId) {
@@ -78,6 +81,20 @@ public class CsController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long stageId) {
         return ApiResponse.success(csAttemptService.startStageAttempt(userId, stageId));
+    }
+
+    @GetMapping("/past-exams")
+    public ApiResponse<CsPastExamCatalogResponse> getPastExamCatalog(
+            @AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(csPastExamService.getPastExamCatalog(userId));
+    }
+
+    @PostMapping("/past-exams/{year}/rounds/{roundNo}/attempt/start")
+    public ApiResponse<CsAttemptStartResponse> startPastExamAttempt(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Integer year,
+            @PathVariable Integer roundNo) {
+        return ApiResponse.success(csPastExamService.startPastExamAttemptByRound(userId, year, roundNo));
     }
 
     @PostMapping("/stages/{stageId}/attempt/answer")

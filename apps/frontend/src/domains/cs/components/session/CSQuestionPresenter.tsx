@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { CSQuestionPayload, CSAttemptAnswerRequest } from '@/domains/cs/api/csApi';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,6 +20,9 @@ interface CSQuestionPresenterProps {
   isInteractionLocked?: boolean;
 }
 
+type ParsedContentBlock = Record<string, unknown>;
+const MULTI_BLANK_DELIMITER = '|||';
+
 export default function CSQuestionPresenter({
   question,
   onSubmit,
@@ -27,16 +30,47 @@ export default function CSQuestionPresenter({
   isInteractionLocked = false,
 }: CSQuestionPresenterProps) {
   const [answerText, setAnswerText] = useState('');
+  const [blankAnswers, setBlankAnswers] = useState<string[]>([]);
   const [selectedChoiceNo, setSelectedChoiceNo] = useState<number | null>(null);
   const submitLockRef = useRef(false);
+  const parsedContentBlocks = useMemo(
+    () => parseQuestionContentBlocks(question.contentMode, question.contentBlocks),
+    [question.contentMode, question.contentBlocks],
+  );
+  const multiBlankCount = useMemo(
+    () => resolveMultiBlankCount(question.metadata, parsedContentBlocks),
+    [question.metadata, parsedContentBlocks],
+  );
+  const multiBlankLabels = useMemo(
+    () => resolveMultiBlankLabels(parsedContentBlocks, multiBlankCount),
+    [parsedContentBlocks, multiBlankCount],
+  );
+  const isMultiBlankQuestion =
+    question.questionType === 'SHORT_ANSWER' &&
+    (question.gradingMode === 'MULTI_BLANK_ORDERED' || question.gradingMode === 'ORDERING') &&
+    multiBlankCount > 1;
+  const displayedContentBlocks = useMemo(
+    () =>
+      parsedContentBlocks.filter((block) => {
+        if (!isMultiBlankQuestion) return true;
+        const type = String(block.type ?? '').toUpperCase();
+        return type !== 'MULTI_BOX';
+      }),
+    [isMultiBlankQuestion, parsedContentBlocks],
+  );
 
   // 문제가 바뀔 때마다 입력 상태 초기화
   useEffect(() => {
     console.log('[DEBUG] Question changed → resetting input state. New questionId:', question.questionId, 'type:', question.questionType);
     setSelectedChoiceNo(null);
     setAnswerText('');
+    setBlankAnswers(
+      isMultiBlankQuestion
+        ? Array.from({ length: multiBlankCount }, () => '')
+        : [],
+    );
     submitLockRef.current = false;
-  }, [question.questionId, question.questionType]);
+  }, [question.questionId, question.questionType, isMultiBlankQuestion, multiBlankCount]);
 
   useEffect(() => {
     if (!isSubmitting && !isInteractionLocked) {
@@ -64,13 +98,23 @@ export default function CSQuestionPresenter({
       }
       payload.selectedChoiceNo = selectedChoiceNo;
     } else {
-      const normalized = answerText.trim();
-      if (!normalized) {
-        console.log('[DEBUG] Validation failed: empty answer text');
-        toast.error('답안을 입력해주세요.');
-        return;
+      if (isMultiBlankQuestion) {
+        const normalizedParts = blankAnswers.map((answer) => answer.trim());
+        if (normalizedParts.length !== multiBlankCount || normalizedParts.some((part) => !part)) {
+          console.log('[DEBUG] Validation failed: empty multi-blank answer');
+          toast.error('모든 빈칸 답안을 입력해주세요.');
+          return;
+        }
+        payload.answerText = normalizedParts.join(MULTI_BLANK_DELIMITER);
+      } else {
+        const normalized = answerText.trim();
+        if (!normalized) {
+          console.log('[DEBUG] Validation failed: empty answer text');
+          toast.error('답안을 입력해주세요.');
+          return;
+        }
+        payload.answerText = normalized;
       }
-      payload.answerText = normalized;
     }
 
     submitLockRef.current = true;
@@ -78,9 +122,12 @@ export default function CSQuestionPresenter({
     onSubmit(payload);
   }, [
     answerText,
+    blankAnswers,
     isChoiceQuestion,
+    isMultiBlankQuestion,
     isSubmitting,
     isInteractionLocked,
+    multiBlankCount,
     onSubmit,
     question.questionId,
     selectedChoiceNo,
@@ -100,7 +147,9 @@ export default function CSQuestionPresenter({
 
       if (isSubjectiveQuestion && event.key === 'Enter') {
         const target = event.target as HTMLElement | null;
-        if (!target || target.tagName !== 'TEXTAREA') return;
+        if (!target) return;
+        const tagName = target.tagName;
+        if (tagName !== 'TEXTAREA' && !(isMultiBlankQuestion && tagName === 'INPUT')) return;
         event.preventDefault();
         handleSubmit();
       }
@@ -110,11 +159,15 @@ export default function CSQuestionPresenter({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleSubmit, isChoiceQuestion, isInteractionLocked, isSubjectiveQuestion, isSubmitting]);
+  }, [handleSubmit, isChoiceQuestion, isInteractionLocked, isMultiBlankQuestion, isSubjectiveQuestion, isSubmitting]);
 
   const typeLabel = QUESTION_TYPE_LABEL[question.questionType] || question.questionType;
   const hasTextAnswer = answerText.trim().length > 0;
-  const isAnswerReady = isChoiceQuestion ? selectedChoiceNo !== null : hasTextAnswer;
+  const isMultiBlankReady =
+    isMultiBlankQuestion &&
+    blankAnswers.length === multiBlankCount &&
+    blankAnswers.every((value) => value.trim().length > 0);
+  const isAnswerReady = isChoiceQuestion ? selectedChoiceNo !== null : isMultiBlankQuestion ? isMultiBlankReady : hasTextAnswer;
   const isSubmitDisabled = isSubmitting || isInteractionLocked || !isAnswerReady;
 
   return (
@@ -127,6 +180,14 @@ export default function CSQuestionPresenter({
           {question.prompt}
         </h2>
       </div>
+
+      {displayedContentBlocks.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/20 p-4">
+          {displayedContentBlocks.map((block, index) => (
+            <QuestionContentBlock key={`block-${index}`} block={block} />
+          ))}
+        </div>
+      )}
 
       {question.choices && question.choices.length > 0 && (
         <div className="flex flex-col gap-3 mt-4">
@@ -150,7 +211,7 @@ export default function CSQuestionPresenter({
         </div>
       )}
 
-      {(question.questionType === 'SHORT_ANSWER' || question.questionType === 'ESSAY') && (
+      {(question.questionType === 'SHORT_ANSWER' || question.questionType === 'ESSAY') && !isMultiBlankQuestion && (
         <div className="mt-4">
           <textarea
             className="w-full min-h-[120px] p-4 rounded-xl border-2 border-border focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20 resize-none transition-shadow bg-card"
@@ -158,6 +219,30 @@ export default function CSQuestionPresenter({
             value={answerText}
             onChange={(e) => setAnswerText(e.target.value)}
           />
+        </div>
+      )}
+
+      {isMultiBlankQuestion && (
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">각 빈칸의 답을 순서대로 입력해주세요.</p>
+          {Array.from({ length: multiBlankCount }, (_, index) => (
+            <div key={`blank-${index}`} className="flex items-center gap-2">
+              <span className="w-14 text-sm font-semibold text-muted-foreground">
+                {multiBlankLabels[index] ?? `(${toAlphabetLabel(index)})`}
+              </span>
+              <input
+                type="text"
+                className="w-full h-11 px-3 rounded-lg border-2 border-border focus:border-primary focus:outline-none bg-card"
+                value={blankAnswers[index] ?? ''}
+                onChange={(event) => {
+                  const next = [...blankAnswers];
+                  next[index] = event.target.value;
+                  setBlankAnswers(next);
+                }}
+                placeholder={`${index + 1}번 답`}
+              />
+            </div>
+          ))}
         </div>
       )}
 
@@ -176,5 +261,209 @@ export default function CSQuestionPresenter({
       </div>
     </Card>
   );
+}
+
+function resolveMultiBlankCount(
+  metadata: string | null | undefined,
+  parsedContentBlocks: ParsedContentBlock[],
+): number {
+  const metadataCount = extractCountFromMetadata(metadata, ['blankCount', 'itemCount']);
+  if (metadataCount > 1) {
+    return metadataCount;
+  }
+
+  for (const block of parsedContentBlocks) {
+    const type = String(block.type ?? '').toUpperCase();
+    if (type !== 'MULTI_BOX') continue;
+    const boxes = Array.isArray(block.boxes) ? block.boxes : [];
+    if (boxes.length > 1) {
+      return boxes.length;
+    }
+  }
+
+  return 0;
+}
+
+function extractCountFromMetadata(metadata: string | null | undefined, keys: string[]): number {
+  if (!metadata) return 0;
+  try {
+    const parsed = JSON.parse(metadata);
+    if (!parsed || typeof parsed !== 'object') {
+      return 0;
+    }
+    const safeParsed = parsed as Record<string, unknown>;
+    for (const key of keys) {
+      const value = safeParsed[key];
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        return Math.floor(value);
+      }
+      if (typeof value === 'string') {
+        const numericValue = Number.parseInt(value, 10);
+        if (!Number.isNaN(numericValue) && numericValue > 0) {
+          return numericValue;
+        }
+      }
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+function resolveMultiBlankLabels(parsedContentBlocks: ParsedContentBlock[], blankCount: number): string[] {
+  for (const block of parsedContentBlocks) {
+    const type = String(block.type ?? '').toUpperCase();
+    if (type !== 'MULTI_BOX') continue;
+
+    const boxes = Array.isArray(block.boxes) ? block.boxes : [];
+    if (boxes.length === 0) break;
+
+    const labels = boxes.slice(0, blankCount).map((box, index) => {
+      const safeBox = typeof box === 'object' && box !== null ? (box as Record<string, unknown>) : {};
+      const label = safeBox.label;
+      if (typeof label === 'string' && label.trim().length > 0) {
+        return label.trim();
+      }
+      return `(${toAlphabetLabel(index)})`;
+    });
+
+    return labels;
+  }
+
+  return Array.from({ length: blankCount }, (_, index) => `(${toAlphabetLabel(index)})`);
+}
+
+function toAlphabetLabel(index: number): string {
+  const normalized = Math.max(0, index);
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+  const base = alphabet[normalized % alphabet.length] ?? 'a';
+  return base;
+}
+
+function QuestionContentBlock({ block }: { block: ParsedContentBlock }) {
+  const type = String(block.type ?? '').toUpperCase();
+
+  if (type === 'TEXT') {
+    const text = typeof block.text === 'string' ? block.text : '';
+    return <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>;
+  }
+
+  if (type === 'IMAGE') {
+    const url = typeof block.url === 'string' ? block.url : typeof block.src === 'string' ? block.src : '';
+    const alt = typeof block.alt === 'string' ? block.alt : '문제 이미지';
+    if (!url) return null;
+    return (
+      <div className="overflow-hidden rounded-lg border bg-background">
+        <img src={url} alt={alt} className="w-full max-h-[420px] object-contain bg-black/5" loading="lazy" />
+      </div>
+    );
+  }
+
+  if (type === 'CODE') {
+    const language = typeof block.language === 'string' ? block.language.trim() : '';
+    const code =
+      typeof block.code === 'string'
+        ? block.code
+        : typeof block.text === 'string'
+          ? block.text
+          : '';
+    if (!code) return null;
+    return (
+      <div className="overflow-hidden rounded-lg border bg-slate-950 text-slate-100">
+        {language && (
+          <div className="border-b border-slate-800 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-300">
+            {language}
+          </div>
+        )}
+        <pre className="overflow-x-auto p-3 text-xs leading-relaxed">
+          <code>{code}</code>
+        </pre>
+      </div>
+    );
+  }
+
+  if (type === 'TABLE') {
+    const headers = Array.isArray(block.headers) ? block.headers : [];
+    const rows = Array.isArray(block.rows) ? block.rows : [];
+    return (
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="min-w-full text-sm">
+          <thead className="bg-muted/40">
+            <tr>
+              {headers.map((header, index) => (
+                <th key={`h-${index}`} className="px-3 py-2 text-left font-semibold border-b">
+                  {String(header)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={`r-${rowIndex}`} className="border-b last:border-b-0">
+                {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
+                  <td key={`c-${rowIndex}-${cellIndex}`} className="px-3 py-2 align-top">
+                    {String(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (type === 'MULTI_BOX') {
+    const boxes = Array.isArray(block.boxes) ? block.boxes : [];
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {boxes.map((box, index) => {
+          const safeBox = typeof box === 'object' && box !== null ? (box as Record<string, unknown>) : {};
+          const label = typeof safeBox.label === 'string' ? safeBox.label : `빈칸 ${index + 1}`;
+          return (
+            <div key={`b-${index}`} className="rounded-md border border-dashed px-3 py-2 bg-background">
+              <div className="text-xs text-muted-foreground mb-1">{label}</div>
+              <div className="h-7 rounded bg-muted/40" />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (type === 'DIAGRAM') {
+    const nodes = Array.isArray(block.nodes) ? block.nodes : [];
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {nodes.map((node, index) => (
+          <React.Fragment key={`n-${index}`}>
+            <span className="rounded-md border px-2 py-1 text-xs bg-background">{String(node)}</span>
+            {index < nodes.length - 1 && <span className="text-muted-foreground text-xs">→</span>}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function parseQuestionContentBlocks(
+  contentMode: CSQuestionPayload['contentMode'],
+  rawContentBlocks: string | null | undefined,
+): ParsedContentBlock[] {
+  if (contentMode !== 'BLOCKS' || !rawContentBlocks) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawContentBlocks);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((item) => item && typeof item === 'object') as ParsedContentBlock[];
+  } catch {
+    return [];
+  }
 }
 

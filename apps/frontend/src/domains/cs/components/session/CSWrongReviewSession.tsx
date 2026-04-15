@@ -29,6 +29,9 @@ import { Button } from '@/components/ui/button';
 
 interface CSWrongReviewSessionProps {
   domainId: number | null;
+  stageId: number | null;
+  year: number | null;
+  round: number | null;
 }
 
 type SessionPhase = 'loading' | 'playing' | 'submitting_complete' | 'empty' | 'error' | 'done';
@@ -82,8 +85,40 @@ function splitAnswerText(answer: string): AnswerDisplay {
   };
 }
 
-export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionProps) {
+export default function CSWrongReviewSession({
+  domainId,
+  stageId,
+  year,
+  round,
+}: CSWrongReviewSessionProps) {
   const router = useRouter();
+  const backToWrongNotesPath = (() => {
+    const query = new URLSearchParams();
+    if (stageId !== null) {
+      query.set('stageId', String(stageId));
+      query.set('scope', 'past-exam');
+      if (year !== null) query.set('year', String(year));
+      if (round !== null) query.set('round', String(round));
+    } else if (domainId !== null) {
+      query.set('domainId', String(domainId));
+    }
+    const queryString = query.toString();
+    return queryString ? `/cs/wrong-problems?${queryString}` : '/cs/wrong-problems';
+  })();
+
+  const restartReviewPath = (() => {
+    const query = new URLSearchParams();
+    if (stageId !== null) {
+      query.set('stageId', String(stageId));
+      query.set('scope', 'past-exam');
+      if (year !== null) query.set('year', String(year));
+      if (round !== null) query.set('round', String(round));
+    } else if (domainId !== null) {
+      query.set('domainId', String(domainId));
+    }
+    const queryString = query.toString();
+    return queryString ? `/cs/wrong-problems/review?${queryString}` : '/cs/wrong-problems/review';
+  })();
 
   const [phase, setPhase] = useState<SessionPhase>('loading');
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -100,6 +135,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
       setPhase('loading');
       const started = await startCSWrongReview({
         domainId: domainId ?? undefined,
+        stageId: stageId ?? undefined,
         questionCount: 10,
       });
 
@@ -118,7 +154,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
       toast.error('오답 복습 세션을 시작하지 못했습니다.');
       setPhase('error');
     }
-  }, [domainId]);
+  }, [domainId, stageId]);
 
   useEffect(() => {
     initSession();
@@ -175,7 +211,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
   };
 
   const handleExitConfirm = () => {
-    router.replace('/cs/wrong-problems');
+    router.replace(backToWrongNotesPath);
   };
 
   if (phase === 'error') {
@@ -183,7 +219,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="w-12 h-12 text-destructive" />
         <h2 className="text-xl font-bold">오류가 발생했습니다</h2>
-        <Button onClick={() => router.replace('/cs/wrong-problems')} variant="outline">
+        <Button onClick={() => router.replace(backToWrongNotesPath)} variant="outline">
           돌아가기
         </Button>
       </div>
@@ -204,7 +240,7 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="w-12 h-12 text-muted-foreground/50" />
         <h2 className="text-xl font-bold">복습할 오답이 없습니다</h2>
-        <Button onClick={() => router.replace('/cs/wrong-problems')} variant="outline">
+        <Button onClick={() => router.replace(backToWrongNotesPath)} variant="outline">
           오답노트로 이동
         </Button>
       </div>
@@ -242,13 +278,13 @@ export default function CSWrongReviewSession({ domainId }: CSWrongReviewSessionP
             </div>
 
             <div className="flex flex-col w-full gap-3">
-              <Button className="w-full h-14 text-lg font-bold rounded-2xl" onClick={() => router.replace('/cs/wrong-problems')}>
+              <Button className="w-full h-14 text-lg font-bold rounded-2xl" onClick={() => router.replace(backToWrongNotesPath)}>
                 오답노트로 돌아가기
               </Button>
               <Button
                 variant="outline"
                 className="w-full h-14 text-lg font-bold rounded-2xl"
-                onClick={() => router.replace(`/cs/wrong-problems/review?domainId=${domainId ?? ''}`)}
+                onClick={() => router.replace(restartReviewPath)}
               >
                 다시 복습하기
               </Button>
