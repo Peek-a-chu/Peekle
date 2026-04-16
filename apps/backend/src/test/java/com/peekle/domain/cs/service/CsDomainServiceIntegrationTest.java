@@ -17,6 +17,8 @@ import com.peekle.domain.cs.repository.CsUserProfileRepository;
 import com.peekle.domain.cs.enums.CsStageStatus;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.global.exception.BusinessException;
+import com.peekle.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -158,6 +161,32 @@ class CsDomainServiceIntegrationTest {
         assertThat(response.stages().stream()
                 .anyMatch(stage -> stage.trackNo() == 3 && stage.stageNo() == 1))
                 .isTrue();
+    }
+
+    @Test
+    @DisplayName("도메인 선택 목록에서 정보처리기사 기출(id=10)은 제외된다")
+    void getAvailableDomains_excludesPastExamDomain() {
+        User user = createUser("exclude-past-exam-domain");
+        createDomainWithTrack(10, "정보처리기사 기출", "2025 기출");
+        createDomainWithTrack(201, "일반 CS 도메인", "자료구조");
+
+        assertThat(csDomainService.getAvailableDomains(user.getId()))
+                .extracting(domain -> domain.id())
+                .doesNotContain(10);
+    }
+
+    @Test
+    @DisplayName("정보처리기사 기출(id=10)은 도메인으로 추가할 수 없다")
+    void addMyDomain_pastExamDomain_throwsInvalidInput() {
+        User user = createUser("add-past-exam-domain-denied");
+        createDomainWithTrack(10, "정보처리기사 기출", "2025 기출");
+
+        assertThatThrownBy(() -> csDomainService.addMyDomain(user.getId(), 10))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> {
+                    BusinessException businessException = (BusinessException) exception;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+                });
     }
 
     private User createUser(String suffix) {

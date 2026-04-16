@@ -93,6 +93,7 @@ export default function PastExamList() {
                       stageId={roundData.stageId}
                       questionCount={roundData.questionCount}
                       isReady={roundData.isReady}
+                      maxSolve={roundData.maxSolve}
                     />
                   ))}
                 </div>

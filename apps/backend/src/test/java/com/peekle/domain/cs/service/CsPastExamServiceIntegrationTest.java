@@ -9,6 +9,7 @@ import com.peekle.domain.cs.entity.CsDomainTrack;
 import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsStage;
+import com.peekle.domain.cs.entity.CsStageSolveRecord;
 import com.peekle.domain.cs.enums.CsQuestionType;
 import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.repository.CsDomainRepository;
@@ -16,6 +17,7 @@ import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
+import com.peekle.domain.cs.repository.CsStageSolveRecordRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +55,9 @@ class CsPastExamServiceIntegrationTest {
     @Autowired
     private CsQuestionChoiceRepository csQuestionChoiceRepository;
 
+    @Autowired
+    private CsStageSolveRecordRepository csStageSolveRecordRepository;
+
     @Test
     @DisplayName("기출 카탈로그는 2020~2025 연도와 회차 기본 구조를 반환한다")
     void catalog_returnsFixedYearsAndRounds() {
@@ -84,6 +89,7 @@ class CsPastExamServiceIntegrationTest {
         assertThat(round1.stageId()).isEqualTo(stage2020Round1.getId());
         assertThat(round1.questionCount()).isEqualTo(1);
         assertThat(round1.isReady()).isTrue();
+        assertThat(round1.maxSolve()).isNull();
 
         CsPastExamYearResponse year2025 = catalog.years().stream()
                 .filter(year -> year.year() == 2025)
@@ -92,6 +98,7 @@ class CsPastExamServiceIntegrationTest {
         assertThat(year2025.rounds()).hasSize(3);
         assertThat(year2025.rounds().get(0).stageId()).isNull();
         assertThat(year2025.rounds().get(0).isReady()).isFalse();
+        assertThat(year2025.rounds().get(0).maxSolve()).isNull();
     }
 
     @Test
@@ -108,6 +115,36 @@ class CsPastExamServiceIntegrationTest {
         assertThat(response.stageId()).isEqualTo(round1.getId());
         assertThat(response.totalQuestionCount()).isEqualTo(1);
         assertThat(response.firstQuestion()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("기출 카탈로그는 사용자별 stage 최고 정답 수(maxSolve)를 함께 반환한다")
+    void catalog_includesMaxSolveByStage() {
+        User user = createUser("past-max-solve");
+        CsDomain domain = createDomain(10, "기출 도메인-최고기록");
+        CsDomainTrack track2024 = createPastExamTrack(domain, 1, 2024, "2024 기출");
+        CsStage stage2024Round1 = createStage(track2024, 1);
+        createMultipleChoiceQuestion(stage2024Round1);
+
+        csStageSolveRecordRepository.save(CsStageSolveRecord.builder()
+                .user(user)
+                .stage(stage2024Round1)
+                .maxSolve(17)
+                .build());
+
+        CsPastExamCatalogResponse catalog = csPastExamService.getPastExamCatalog(user.getId());
+
+        CsPastExamYearResponse year2024 = catalog.years().stream()
+                .filter(year -> year.year() == 2024)
+                .findFirst()
+                .orElseThrow();
+        CsPastExamRoundResponse round1 = year2024.rounds().stream()
+                .filter(round -> round.roundNo() == 1)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(round1.stageId()).isEqualTo(stage2024Round1.getId());
+        assertThat(round1.maxSolve()).isEqualTo(17);
     }
 
     private User createUser(String suffix) {

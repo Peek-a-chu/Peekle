@@ -14,6 +14,7 @@ import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStageAttemptLog;
+import com.peekle.domain.cs.entity.CsStageSolveRecord;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.entity.CsUserDomainProgress;
 import com.peekle.domain.cs.entity.CsWrongProblem;
@@ -27,6 +28,7 @@ import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
 import com.peekle.domain.cs.repository.CsPastExamBestScoreRepository;
 import com.peekle.domain.cs.repository.CsStageAttemptLogRepository;
+import com.peekle.domain.cs.repository.CsStageSolveRecordRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsUserProfileRepository;
@@ -84,6 +86,7 @@ public class CsAttemptService {
     private final CsQuestionShortAnswerRepository csQuestionShortAnswerRepository;
     private final CsPastExamBestScoreRepository csPastExamBestScoreRepository;
     private final CsStageAttemptLogRepository csStageAttemptLogRepository;
+    private final CsStageSolveRecordRepository csStageSolveRecordRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final CsUserProfileRepository csUserProfileRepository;
     private final CsWrongProblemRepository csWrongProblemRepository;
@@ -218,6 +221,7 @@ public class CsAttemptService {
 
         persistWrongProblems(user, session);
         persistStageAttemptLog(user, stage, correctCount, totalQuestionCount);
+        Integer maxSolve = updatePastExamStageSolveRecordIfNeeded(user, stage, correctCount);
         updatePastExamBestScoreIfNeeded(user, stage, correctRate);
 
         NextStageProgress nextStage = resolveNextStageProgress(stage);
@@ -246,7 +250,8 @@ public class CsAttemptService {
                 streak.currentStreak(),
                 earnedScore,
                 totalScore,
-                nextStageId);
+                nextStageId,
+                maxSolve);
     }
 
     @Transactional
@@ -303,6 +308,31 @@ public class CsAttemptService {
                 .build();
 
         csStageAttemptLogRepository.save(attemptLog);
+    }
+
+    private Integer updatePastExamStageSolveRecordIfNeeded(User user, CsStage stage, int solvedCount) {
+        if (stage.getTrack().getLearningMode() != CsTrackLearningMode.PAST_EXAM) {
+            return null;
+        }
+
+        int safeSolvedCount = Math.max(solvedCount, 0);
+        CsStageSolveRecord solveRecord = csStageSolveRecordRepository
+                .findByUser_IdAndStage_Id(user.getId(), stage.getId())
+                .orElseGet(() -> CsStageSolveRecord.builder()
+                        .user(user)
+                        .stage(stage)
+                        .maxSolve(safeSolvedCount)
+                        .build());
+
+        Integer beforeMaxSolve = solveRecord.getMaxSolve();
+        solveRecord.updateMaxSolve(safeSolvedCount);
+        Integer afterMaxSolve = safeInt(solveRecord.getMaxSolve());
+
+        if (solveRecord.getId() == null || !afterMaxSolve.equals(beforeMaxSolve)) {
+            csStageSolveRecordRepository.save(solveRecord);
+        }
+
+        return afterMaxSolve;
     }
 
     private void updatePastExamBestScoreIfNeeded(User user, CsStage stage, int correctRate) {

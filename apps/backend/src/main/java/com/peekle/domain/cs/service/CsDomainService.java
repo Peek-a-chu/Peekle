@@ -43,10 +43,12 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class CsDomainService {
 
+    private static final int PAST_EXAM_DOMAIN_ID = 10;
     private static final short INITIAL_TRACK_NO = 1;
     private static final short INITIAL_STAGE_NO = 1;
     private static final String LOCK_REASON_PREVIOUS_STAGE = "이전 스테이지를 먼저 완료해야 합니다.";
     private static final String LOCK_REASON_FUTURE_TRACK = "해당 트랙은 아직 해금되지 않았습니다.";
+    private static final String DOMAIN_SELECTION_FORBIDDEN_REASON = "정보처리기사 기출 도메인은 도메인 선택에서 사용할 수 없습니다.";
 
     private final CsDomainRepository csDomainRepository;
     private final CsDomainTrackRepository csDomainTrackRepository;
@@ -103,6 +105,7 @@ public class CsDomainService {
 
         return csDomainRepository.findAllByOrderByIdAsc()
                 .stream()
+                .filter(domain -> !domain.getId().equals(PAST_EXAM_DOMAIN_ID))
                 .filter(domain -> !studyingDomainIds.contains(domain.getId()))
                 .map(this::toDomainResponse)
                 .toList();
@@ -128,6 +131,7 @@ public class CsDomainService {
     @Transactional
     public CsDomainSubmitResponse addMyDomain(Long userId, Integer domainId) {
         User user = getUser(userId);
+        validateSelectableDomain(domainId);
         CsDomain domain = getDomain(domainId);
 
         boolean added = false;
@@ -164,6 +168,7 @@ public class CsDomainService {
     @Transactional
     public CsCurrentDomainChangeResponse changeCurrentDomain(Long userId, Integer domainId) {
         User user = getUser(userId);
+        validateSelectableDomain(domainId);
         CsDomain domain = getDomain(domainId);
 
         CsUserDomainProgress progress = csUserDomainProgressRepository
@@ -219,6 +224,12 @@ public class CsDomainService {
     private CsDomain getDomain(Integer domainId) {
         return csDomainRepository.findById(domainId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_DOMAIN_NOT_FOUND));
+    }
+
+    private void validateSelectableDomain(Integer domainId) {
+        if (domainId != null && domainId.equals(PAST_EXAM_DOMAIN_ID)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, DOMAIN_SELECTION_FORBIDDEN_REASON);
+        }
     }
 
     private CsDomainResponse toDomainResponse(CsDomain domain) {
