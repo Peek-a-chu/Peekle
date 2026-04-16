@@ -4,5 +4,6 @@ public record CsPastExamRoundResponse(
         Integer roundNo,
         Long stageId,
         Integer questionCount,
-        Boolean isReady) {
+        Boolean isReady,
+        Integer maxSolve) {
 }

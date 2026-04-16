@@ -50,6 +50,20 @@ interface AnswerDisplay {
   text: string;
 }
 
+const CLAIM_TYPE_OPTIONS: Array<{ value: CSQuestionClaimType; label: string }> = [
+  { value: 'INCORRECT_ANSWER', label: '정답/채점이 잘못됨' },
+  { value: 'INCORRECT_EXPLANATION', label: '해설이 잘못됨' },
+  { value: 'QUESTION_TEXT_ERROR', label: '문항 문구/조건이 잘못됨' },
+  { value: 'OTHER', label: '기타' },
+];
+
+const DEFAULT_CLAIM_TYPE_WHEN_WRONG: CSQuestionClaimType = 'INCORRECT_ANSWER';
+const DEFAULT_CLAIM_TYPE_WHEN_CORRECT: CSQuestionClaimType = 'QUESTION_TEXT_ERROR';
+
+function isValidClaimType(value: string): value is CSQuestionClaimType {
+  return CLAIM_TYPE_OPTIONS.some((option) => option.value === value);
+}
+
 function parseWrongFeedback(answerResult: CSAttemptAnswerResponse): WrongFeedbackContent {
   const lines = (answerResult.feedback || '')
     .split('\n')
@@ -219,16 +233,20 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     }
   };
 
-  const resetClaimForm = () => {
-    setClaimType('INCORRECT_ANSWER');
+  const resolveDefaultClaimType = (isCorrect: boolean): CSQuestionClaimType => {
+    return isCorrect ? DEFAULT_CLAIM_TYPE_WHEN_CORRECT : DEFAULT_CLAIM_TYPE_WHEN_WRONG;
+  };
+
+  const resetClaimForm = (isCorrect = false) => {
+    setClaimType(resolveDefaultClaimType(isCorrect));
     setClaimDescription('');
   };
 
   const handleSubmitClaim = async () => {
     if (!answerResult) return;
     const normalizedDescription = claimDescription.trim();
-    if (normalizedDescription.length < 10) {
-      toast.error('신고 내용은 최소 10자 이상 입력해주세요.');
+    if (normalizedDescription.length < 5) {
+      toast.error('신고 내용은 최소 5자 이상 입력해주세요.');
       return;
     }
 
@@ -244,7 +262,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
       });
       toast.success('문제 신고가 접수되었습니다.');
       setClaimDialogOpen(false);
-      resetClaimForm();
+      resetClaimForm(answerResult.isCorrect);
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : '문제 신고 접수에 실패했습니다.');
@@ -267,7 +285,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
     
     setAnswerResult(null);
     setClaimDialogOpen(false);
-    resetClaimForm();
+    resetClaimForm(isCorrect);
     setLastSubmittedAnswer(null);
 
     if (isLast) {
@@ -428,7 +446,15 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
                 <button
                   type="button"
                   className="shrink-0 rounded-md border border-slate-300 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-white"
-                  onClick={() => setClaimDialogOpen((prev) => !prev)}
+                  onClick={() =>
+                    setClaimDialogOpen((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        resetClaimForm(answerResult.isCorrect);
+                      }
+                      return next;
+                    })
+                  }
                 >
                   문제 신고
                 </button>
@@ -491,16 +517,22 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
                     <Label htmlFor="claim-type">신고 유형</Label>
                     <Select
                       value={claimType}
-                      onValueChange={(value) => setClaimType(value as CSQuestionClaimType)}
+                      onValueChange={(value) => {
+                        if (!isValidClaimType(value)) {
+                          return;
+                        }
+                        setClaimType(value);
+                      }}
                     >
                       <SelectTrigger id="claim-type">
                         <SelectValue placeholder="신고 유형을 선택해주세요." />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="INCORRECT_ANSWER">정답이 잘못됨</SelectItem>
-                        <SelectItem value="INCORRECT_EXPLANATION">해설이 잘못됨</SelectItem>
-                        <SelectItem value="QUESTION_TEXT_ERROR">문제 문구가 모호/오류</SelectItem>
-                        <SelectItem value="OTHER">기타</SelectItem>
+                      <SelectContent className="z-[160]">
+                        {CLAIM_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -510,8 +542,8 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
                       id="claim-description"
                       value={claimDescription}
                       onChange={(event) => setClaimDescription(event.target.value)}
-                      placeholder="어떤 부분이 문제인지 구체적으로 적어주세요. (최소 10자)"
-                      minLength={10}
+                      placeholder="어떤 부분이 문제인지 구체적으로 적어주세요. (최소 5자)"
+                      minLength={5}
                       maxLength={2000}
                     />
                     <p className="text-xs text-slate-500">{claimDescription.trim().length}/2000</p>
@@ -529,7 +561,7 @@ export default function CSLearningSession({ stageId }: CSLearningSessionProps) {
                   <Button
                     type="button"
                     onClick={handleSubmitClaim}
-                    disabled={isClaimSubmitting || claimDescription.trim().length < 10}
+                    disabled={isClaimSubmitting || claimDescription.trim().length < 5}
                   >
                     {isClaimSubmitting ? '제출 중...' : '신고 제출'}
                   </Button>

@@ -42,8 +42,8 @@ public class CsQuestionClaimService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CS_QUESTION_NOT_FOUND));
 
         String normalizedDescription = request.description().trim();
-        if (normalizedDescription.length() < 10) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "신고 내용은 최소 10자 이상 입력해주세요.");
+        if (normalizedDescription.length() < 5) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "신고 내용은 최소 5자 이상 입력해주세요.");
         }
 
         validateDailyLimit(userId);

@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { CSDomain, fetchCSDomains, changeCSDomain, changeCurrentCSDomain } from '../api/csApi';
 import { Button } from '@/components/ui/button';
 
+const PAST_EXAM_DOMAIN_ID = 10;
+
 interface DomainSelectionProps {
   onSuccess: () => void;
   isAddMode?: boolean;
@@ -27,7 +29,10 @@ export default function DomainSelection({
       try {
         console.log('[DEBUG] Fetching CS Domains...');
         const data = await fetchCSDomains();
-        setDomains(Array.isArray(data) ? data : []);
+        const selectableDomains = (Array.isArray(data) ? data : []).filter(
+          (domain) => domain.id !== PAST_EXAM_DOMAIN_ID,
+        );
+        setDomains(selectableDomains);
       } catch (error) {
         toast.error('도메인 목록을 불러오지 못했습니다.');
         console.error(error);

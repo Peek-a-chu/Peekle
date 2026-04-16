@@ -141,6 +141,7 @@ export interface CSAttemptCompleteResponse {
   earnedScore: number;
   totalScore: number;
   nextStageId: number | null;
+  maxSolve?: number | null;
 }
 
 export interface CSTrackSkipResponse {
@@ -180,6 +181,7 @@ export interface CSPastExamRound {
   stageId: number | null;
   questionCount: number;
   isReady: boolean;
+  maxSolve?: number | null;
 }
 
 export interface CSPastExamYear {

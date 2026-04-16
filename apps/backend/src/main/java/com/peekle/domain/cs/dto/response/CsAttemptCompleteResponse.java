@@ -11,5 +11,6 @@ public record CsAttemptCompleteResponse(
         Integer currentStreak,
         Integer earnedScore,
         Integer totalScore,
-        Long nextStageId) {
+        Long nextStageId,
+        Integer maxSolve) {
 }

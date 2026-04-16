@@ -10,9 +10,17 @@ interface PastExamCardProps {
   stageId: number | null;
   questionCount: number;
   isReady: boolean;
+  maxSolve?: number | null;
 }
 
-export default function PastExamCard({ year, round, stageId, questionCount, isReady }: PastExamCardProps) {
+export default function PastExamCard({
+  year,
+  round,
+  stageId,
+  questionCount,
+  isReady,
+  maxSolve,
+}: PastExamCardProps) {
   const router = useRouter();
 
   const handleStart = () => {
@@ -42,6 +50,9 @@ export default function PastExamCard({ year, round, stageId, questionCount, isRe
                 <AlertCircle className="w-4 h-4" />
                 문제 미등록
               </span>
+            )}
+            {isReady && typeof maxSolve === 'number' && (
+              <span className="text-primary/80">최고 {maxSolve}문제 정답</span>
             )}
           </div>
         </div>

@@ -63,6 +63,11 @@ export default function CSResultScreen({ result, isPastExam, returnPath }: CSRes
               <div className="text-xs text-emerald-700/80">누적 {result.totalScore}점</div>
             </div>
           </div>
+          {isPastExam && typeof result.maxSolve === 'number' && (
+            <div className="w-full bg-primary/10 border border-primary/20 text-primary rounded-2xl p-3 mb-8">
+              최고 기록: {result.maxSolve}문제 정답
+            </div>
+          )}
 
           <div className="flex flex-col w-full gap-3">
             {isPastExam ? (

@@ -5,10 +5,12 @@ import com.peekle.domain.cs.dto.response.CsPastExamCatalogResponse;
 import com.peekle.domain.cs.dto.response.CsPastExamRoundResponse;
 import com.peekle.domain.cs.dto.response.CsPastExamYearResponse;
 import com.peekle.domain.cs.entity.CsDomainTrack;
+import com.peekle.domain.cs.entity.CsStageSolveRecord;
 import com.peekle.domain.cs.entity.CsStage;
 import com.peekle.domain.cs.enums.CsTrackLearningMode;
 import com.peekle.domain.cs.repository.CsDomainTrackRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
+import com.peekle.domain.cs.repository.CsStageSolveRecordRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
@@ -34,6 +36,7 @@ public class CsPastExamService {
     private final CsDomainTrackRepository csDomainTrackRepository;
     private final CsStageRepository csStageRepository;
     private final CsQuestionRepository csQuestionRepository;
+    private final CsStageSolveRecordRepository csStageSolveRecordRepository;
     private final CsAttemptService csAttemptService;
     private final UserRepository userRepository;
 
@@ -77,6 +80,16 @@ public class CsPastExamService {
                 questionCountByStageId.put(row.getStageId(), Math.toIntExact(row.getQuestionCount()));
             }
         }
+        Map<Long, Integer> maxSolveByStageId = new HashMap<>();
+        if (!allStageIds.isEmpty()) {
+            List<CsStageSolveRecord> rows = csStageSolveRecordRepository.findByUser_IdAndStage_IdIn(userId, allStageIds);
+            for (CsStageSolveRecord row : rows) {
+                if (row.getStage() == null || row.getStage().getId() == null) {
+                    continue;
+                }
+                maxSolveByStageId.put(row.getStage().getId(), row.getMaxSolve());
+            }
+        }
 
         List<CsPastExamYearResponse> years = new ArrayList<>();
         for (int year = MIN_EXAM_YEAR; year <= MAX_EXAM_YEAR; year++) {
@@ -89,7 +102,8 @@ public class CsPastExamService {
                 Long stageId = stage == null ? null : stage.getId();
                 int questionCount = stageId == null ? 0 : questionCountByStageId.getOrDefault(stageId, 0);
                 boolean isReady = stageId != null && questionCount > 0;
-                rounds.add(new CsPastExamRoundResponse(roundNo, stageId, questionCount, isReady));
+                Integer maxSolve = stageId == null ? null : maxSolveByStageId.get(stageId);
+                rounds.add(new CsPastExamRoundResponse(roundNo, stageId, questionCount, isReady, maxSolve));
             }
 
             years.add(new CsPastExamYearResponse(year, rounds));

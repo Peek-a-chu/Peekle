@@ -12,6 +12,7 @@ import com.peekle.domain.cs.entity.CsQuestion;
 import com.peekle.domain.cs.entity.CsQuestionChoice;
 import com.peekle.domain.cs.entity.CsQuestionShortAnswer;
 import com.peekle.domain.cs.entity.CsStage;
+import com.peekle.domain.cs.entity.CsStageSolveRecord;
 import com.peekle.domain.cs.entity.CsWrongProblem;
 import com.peekle.domain.cs.enums.CsAttemptPhase;
 import com.peekle.domain.cs.enums.CsQuestionGradingMode;
@@ -24,6 +25,7 @@ import com.peekle.domain.cs.repository.CsPastExamBestScoreRepository;
 import com.peekle.domain.cs.repository.CsQuestionChoiceRepository;
 import com.peekle.domain.cs.repository.CsQuestionRepository;
 import com.peekle.domain.cs.repository.CsQuestionShortAnswerRepository;
+import com.peekle.domain.cs.repository.CsStageSolveRecordRepository;
 import com.peekle.domain.cs.repository.CsStageRepository;
 import com.peekle.domain.cs.repository.CsUserDomainProgressRepository;
 import com.peekle.domain.cs.repository.CsWrongProblemRepository;
@@ -81,6 +83,9 @@ class CsAttemptFlowIntegrationTest {
 
     @Autowired
     private CsPastExamBestScoreRepository csPastExamBestScoreRepository;
+
+    @Autowired
+    private CsStageSolveRecordRepository csStageSolveRecordRepository;
 
     @Test
     @DisplayName("오답이 남아있으면 재풀이 라운드를 반복하고 완료 시 오답노트에 누적 저장한다")
@@ -633,12 +638,18 @@ class CsAttemptFlowIntegrationTest {
                 user.getId(),
                 stage.getId(),
                 new CsAttemptAnswerRequest(q2IdFirstAttempt, 1, null));
-        csAttemptService.completeAttempt(user.getId(), stage.getId());
+        CsAttemptCompleteResponse firstComplete = csAttemptService.completeAttempt(user.getId(), stage.getId());
 
         CsPastExamBestScore firstBest = csPastExamBestScoreRepository
                 .findByUser_IdAndExamYearAndExamRound(user.getId(), (short) 2024, (short) 1)
                 .orElseThrow();
         assertThat(firstBest.getBestScore()).isEqualTo(50);
+        assertThat(firstComplete.maxSolve()).isEqualTo(1);
+
+        CsStageSolveRecord firstSolveRecord = csStageSolveRecordRepository
+                .findByUser_IdAndStage_Id(user.getId(), stage.getId())
+                .orElseThrow();
+        assertThat(firstSolveRecord.getMaxSolve()).isEqualTo(1);
 
         // 2차 시도: 100점(2/2) -> 최고점 갱신
         csAttemptService.startStageAttempt(user.getId(), stage.getId());
@@ -648,12 +659,18 @@ class CsAttemptFlowIntegrationTest {
                 new CsAttemptAnswerRequest(q1.getId(), 1, null));
         Long q2IdSecondAttempt = firstResponse.nextQuestion().questionId();
         csAttemptService.submitAnswer(user.getId(), stage.getId(), new CsAttemptAnswerRequest(q2IdSecondAttempt, 1, null));
-        csAttemptService.completeAttempt(user.getId(), stage.getId());
+        CsAttemptCompleteResponse secondComplete = csAttemptService.completeAttempt(user.getId(), stage.getId());
 
         CsPastExamBestScore updatedBest = csPastExamBestScoreRepository
                 .findByUser_IdAndExamYearAndExamRound(user.getId(), (short) 2024, (short) 1)
                 .orElseThrow();
         assertThat(updatedBest.getBestScore()).isEqualTo(100);
+        assertThat(secondComplete.maxSolve()).isEqualTo(2);
+
+        CsStageSolveRecord updatedSolveRecord = csStageSolveRecordRepository
+                .findByUser_IdAndStage_Id(user.getId(), stage.getId())
+                .orElseThrow();
+        assertThat(updatedSolveRecord.getMaxSolve()).isEqualTo(2);
     }
 
     private User createUser(String suffix) {
