@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 public record CsQuestionClaimCreateRequest(
         @NotNull @Positive Long questionId,
         @NotNull CsQuestionClaimType claimType,
-        @NotBlank @Size(min = 10, max = 2000) String description,
+        @NotBlank @Size(min = 5, max = 2000) String description,
         @NotNull Boolean isCorrect,
         @Positive Integer selectedChoiceNo,
         @Size(max = 2000) String submittedAnswer) {
