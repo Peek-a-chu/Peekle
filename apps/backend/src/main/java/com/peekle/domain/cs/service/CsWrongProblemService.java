@@ -656,7 +656,7 @@ public class CsWrongProblemService {
         if (text == null || text.isBlank()) {
             return List.of();
         }
-        String[] rawTokens = text.split("[,\\n;/]+");
+        String[] rawTokens = text.split("[,\\n;]+");
         List<String> tokens = new ArrayList<>();
         for (String rawToken : rawTokens) {
             String normalized = rawToken == null ? "" : rawToken.trim();
@@ -745,7 +745,11 @@ public class CsWrongProblemService {
         if (expectedPart == null || expectedPart.isBlank()) {
             return List.of();
         }
-        String[] rawTokens = expectedPart.split("[|/]+");
+        String normalizedExpectedPart = expectedPart.trim();
+        if ("/".equals(normalizedExpectedPart)) {
+            return List.of("/");
+        }
+        String[] rawTokens = normalizedExpectedPart.split("\\s*\\|\\s*|\\s+/\\s+");
         List<String> tokens = new ArrayList<>();
         for (String rawToken : rawTokens) {
             String normalized = rawToken == null ? "" : rawToken.trim();
