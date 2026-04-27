@@ -39,6 +39,8 @@ test-ide
 
 test-results
 
+.agents
+
 # AI Server (Python)
 apps/ai-server/venv/
 apps/ai-server/__pycache__/
