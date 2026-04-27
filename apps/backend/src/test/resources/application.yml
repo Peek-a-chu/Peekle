@@ -22,7 +22,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:peekle-redis-password}
+      password: ${REDIS_PASSWORD:}
 
   # OAuth2 설정 (테스트용 더미 값)
   security:

@@ -17,7 +17,10 @@ services:
       BENCHMARK_GAME_FINISH_CLAIM_ENABLED: ${BENCHMARK_GAME_FINISH_CLAIM_ENABLED:-true}
       BENCHMARK_PROBLEMS_CSV_PATH: file:/app/data/problems.csv
       FRONTEND_URL: http://localhost:3000
-      JAVA_OPTS: -Xms1g -Xmx1g -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom
+      JAVA_OPTS: ${BENCHMARK_JAVA_OPTS:--Xms1g -Xmx1g -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom}
+    cpus: ${BENCHMARK_BACKEND_CPUS:-1.5}
+    mem_limit: ${BENCHMARK_BACKEND_MEM_LIMIT:-6g}
+    memswap_limit: ${BENCHMARK_BACKEND_MEM_LIMIT:-6g}
     ports:
       - "8082:8080"
     depends_on:
@@ -41,6 +44,9 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    cpus: ${BENCHMARK_MYSQL_CPUS:-0.35}
+    mem_limit: ${BENCHMARK_MYSQL_MEM_LIMIT:-1536m}
+    memswap_limit: ${BENCHMARK_MYSQL_MEM_LIMIT:-1536m}
     ports:
       - "3307:3306"
     healthcheck:
@@ -57,6 +63,9 @@ services:
     image: redis:7-alpine
     container_name: peekle-redis-benchmark
     command: redis-server --appendonly yes --requirepass peekle-redis-password
+    cpus: ${BENCHMARK_REDIS_CPUS:-0.15}
+    mem_limit: ${BENCHMARK_REDIS_MEM_LIMIT:-512m}
+    memswap_limit: ${BENCHMARK_REDIS_MEM_LIMIT:-512m}
     ports:
       - "6380:6379"
     healthcheck:
