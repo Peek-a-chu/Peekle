@@ -63,8 +63,8 @@ USER root
 EXPOSE 8080
 
 # JVM options for container environment
-# Enable ZGC (Generational ZGC) for low latency and high scalability
-# UseStringDeduplication to reduce memory usage
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseZGC -XX:+ZGenerational -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom"
+# Use tuned G1GC v26 for the 2vCPU/8GB production profile.
+# UseStringDeduplication reduces memory usage for repeated strings.
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:InitiatingHeapOccupancyPercent=40 -XX:G1ReservePercent=12 -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom"
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
