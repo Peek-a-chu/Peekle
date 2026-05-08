@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const LEETCODE_KOREAN_ENABLED_KEY = 'leetcodeKoreanEnabled';
+
     // [Check Env]
     let frontendBaseUrl = 'https://peekle.today'; // Default to prod
     let apiBaseUrl = 'https://peekle.today'; // Default to prod
@@ -25,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loggedOutBtns = document.getElementById('logged-out-btns');
     const nicknameEl = document.getElementById('nickname');
     const statusEl = document.getElementById('status');
+    const leetcodeKoreanToggle = document.getElementById('leetcode-korean-toggle');
 
     // 3. 버튼 이벤트 리스너
     document.getElementById('link-site-btn').onclick = () => {
@@ -36,6 +39,38 @@ document.addEventListener('DOMContentLoaded', () => {
         goSiteBtn.onclick = () => {
             chrome.tabs.create({ url: `${frontendBaseUrl}/home` });
         };
+    }
+
+    if (leetcodeKoreanToggle) {
+        chrome.storage.local.get([LEETCODE_KOREAN_ENABLED_KEY], (result) => {
+            leetcodeKoreanToggle.checked = result[LEETCODE_KOREAN_ENABLED_KEY] !== false;
+        });
+
+        leetcodeKoreanToggle.addEventListener('change', () => {
+            const enabled = leetcodeKoreanToggle.checked;
+
+            chrome.storage.local.set({
+                [LEETCODE_KOREAN_ENABLED_KEY]: enabled
+            }, () => {
+                chrome.tabs.query({
+                    url: [
+                        'https://leetcode.com/*',
+                        'https://www.leetcode.com/*'
+                    ]
+                }, (tabs) => {
+                    for (const tab of tabs) {
+                        if (!tab.id) continue;
+                        chrome.tabs.sendMessage(tab.id, {
+                            type: 'PEEKLE_LEETCODE_KOREAN_TOGGLE',
+                            enabled
+                        }, () => {
+                            // Content script may not be loaded in older tabs yet.
+                            chrome.runtime.lastError;
+                        });
+                    }
+                });
+            });
+        });
     }
 
     // 0. 테마 적용 (저장된 설정 확인)
