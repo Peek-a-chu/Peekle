@@ -9,6 +9,8 @@
     ],
     "host_permissions": [
         "https://www.acmicpc.net/*",
+        "https://leetcode.com/*",
+        "https://www.leetcode.com/*",
         "https://solved.ac/*",
         "http://localhost:8080/*",
         "http://localhost:3000/*",
@@ -40,6 +42,16 @@
             ],
             "js": [
                 "content.js"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://leetcode.com/*",
+                "https://www.leetcode.com/*"
+            ],
+            "js": [
+                "content/leetcode-localizer.js"
             ],
             "run_at": "document_idle"
         }
