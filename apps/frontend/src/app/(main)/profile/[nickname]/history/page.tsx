@@ -1,5 +1,9 @@
+import 'server-only';
+
 import { fetchUserHistory } from '@/domains/profile/actions/history';
 import { CCHistoryList } from '@/domains/profile/components/CCHistoryList';
+
+export const dynamic = 'force-dynamic';
 
 interface Props {
   params: Promise<{ nickname: string }>;

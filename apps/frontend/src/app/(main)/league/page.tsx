@@ -1,7 +1,11 @@
+import 'server-only';
+
 import { getLeagueStatusServer, getWeeklyPointSummaryServer } from '@/api/leagueServerApi';
 import CCLeagueMyStatus from '@/domains/league/components/CCLeagueMyStatus';
 import CCLeagueRankingList from '@/domains/league/components/CCLeagueRankingList';
 import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
+
+export const dynamic = 'force-dynamic';
 
 export default async function LeaguePage() {
   const [leagueStatus, weeklySummary] = await Promise.all([

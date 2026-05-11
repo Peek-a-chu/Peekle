@@ -1,6 +1,6 @@
 import Sidebar from '@/domains/lnb/components/Sidebar';
 import MobileBottomNav from '@/domains/lnb/components/MobileBottomNav';
-import LeagueResultModal from '@/domains/league/components/LeagueResultModal';
+import { LeagueResultModalHost } from '@/domains/league/components/LeagueResultModalHost';
 import { getMyProfile } from '@/domains/profile/actions/profile';
 import MainContentWrapper from './MainContentWrapper';
 
@@ -24,7 +24,7 @@ export default async function MainLayout({
           <MobileBottomNav />
         </div>
       </MainContentWrapper>
-      <LeagueResultModal />
+      <LeagueResultModalHost />
     </div>
   );
 }

@@ -1,28 +1,28 @@
+import 'server-only';
+
 import {
   getLeagueProgressServer,
   getWeeklyPointSummaryServer,
   getLeagueStatusServer,
 } from '@/api/leagueServerApi';
-import {
-  getActivityStreakServer,
-  getTimelineServer,
-} from '@/api/userServerApi';
+import { getActivityStreakServer, getTimelineServer } from '@/api/userServerApi';
 import HomeClient from './HomeClient';
 import { DEFAULT_LEAGUE_RANKING } from '@/domains/league/utils';
+
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const today = new Date();
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   // Parallel Data Fetching
-  const [leagueProgress, streak, timeline, weeklyScore, leagueRanking] =
-    await Promise.all([
-      getLeagueProgressServer(),
-      getActivityStreakServer(),
-      getTimelineServer(dateStr),
-      getWeeklyPointSummaryServer(dateStr),
-      getLeagueStatusServer(),
-    ]);
+  const [leagueProgress, streak, timeline, weeklyScore, leagueRanking] = await Promise.all([
+    getLeagueProgressServer(),
+    getActivityStreakServer(),
+    getTimelineServer(dateStr),
+    getWeeklyPointSummaryServer(dateStr),
+    getLeagueStatusServer(),
+  ]);
 
   return (
     <HomeClient
