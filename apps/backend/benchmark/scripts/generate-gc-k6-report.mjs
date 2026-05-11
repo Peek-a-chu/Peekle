@@ -4,6 +4,7 @@ import path from "node:path";
 const SCENARIO_ORDER = [
   "http-io",
   "http-cpu",
+  "ws-cpu",
   "http-ws-io",
   "http-ws-cpu",
 ];
@@ -20,6 +21,11 @@ const SCENARIO_META = {
     label: "HTTP CPU Bound",
     journey:
       "측정 직전에 preview cache를 eviction한 뒤, host가 `start-fallback` 경로로 게임 시작을 호출한다. preview rebuild와 metadata 로딩이 동반되는 allocation-heavy HTTP 경로를 본다.",
+  },
+  "ws-cpu": {
+    label: "WS Chat Only",
+    journey:
+      "동일한 benchmark fixture와 room 참가자들이 HTTP start 없이 `/pub/games/chat`으로 chat을 보내고 `/topic/games/{roomId}/chat/global`을 구독한다. HTTP start 경로와 분리된 WS fanout 자체의 RTT와 실패율을 본다.",
   },
   "http-ws-io": {
     label: "HTTP + WS I/O Bound",
@@ -77,7 +83,7 @@ function measurementValue(metric, statisticNames) {
 function summaryMetricValue(summary, metricName, fieldNames) {
   const metric = summary.metrics?.[metricName];
   if (!metric) {
-    return 0;
+    return Number.NaN;
   }
 
   for (const fieldName of fieldNames) {
@@ -94,7 +100,7 @@ function summaryMetricValue(summary, metricName, fieldNames) {
     }
   }
 
-  return 0;
+  return Number.NaN;
 }
 
 function computeCounterDelta(beforeMetric, afterMetric, statisticNames = ["COUNT", "TOTAL"]) {

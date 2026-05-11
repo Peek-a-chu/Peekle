@@ -20,6 +20,7 @@ HTTP_START_DELAY_MS="${HTTP_START_DELAY_MS:-750}"
 WS_CONNECT_TIMEOUT_MS="${WS_CONNECT_TIMEOUT_MS:-1200}"
 WS_CHAT_INTERVAL_MS="${WS_CHAT_INTERVAL_MS:-250}"
 WS_CHAT_START_DELAY_MS="${WS_CHAT_START_DELAY_MS:-200}"
+EVICT_START_SNAPSHOT="${EVICT_START_SNAPSHOT:-false}"
 BENCHMARK_STARTUP_STABILIZATION_SECONDS="${BENCHMARK_STARTUP_STABILIZATION_SECONDS:-5}"
 ENVIRONMENT_LABEL="${ENVIRONMENT_LABEL:-Spring Boot benchmark profile + MySQL 8 + Redis 7 (docker/docker-compose.benchmark.yml, total 2vCPU / 8GB)}"
 BENCHMARK_JVM_XMS="${BENCHMARK_JVM_XMS:-4g}"
@@ -154,6 +155,9 @@ scenario_script() {
       ;;
     http-ws-cpu)
       printf '%s\n' "${BACKEND_DIR}/benchmark/k6/gc-http-ws-cpu.js"
+      ;;
+    ws-cpu)
+      printf '%s\n' "${BACKEND_DIR}/benchmark/k6/gc-ws-cpu.js"
       ;;
     *)
       echo "Unsupported scenario: ${scenario}" >&2
@@ -293,6 +297,7 @@ run_cell() {
       -e WS_CONNECT_TIMEOUT_MS="${WS_CONNECT_TIMEOUT_MS}" \
       -e WS_CHAT_INTERVAL_MS="${WS_CHAT_INTERVAL_MS}" \
       -e WS_CHAT_START_DELAY_MS="${WS_CHAT_START_DELAY_MS}" \
+      -e EVICT_START_SNAPSHOT="${EVICT_START_SNAPSHOT}" \
       "$(scenario_script "${scenario}")"; then
     k6_status=0
   else
