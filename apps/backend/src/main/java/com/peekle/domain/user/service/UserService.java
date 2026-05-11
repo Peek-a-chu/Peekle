@@ -5,9 +5,12 @@ import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.dto.TimelineItemDto;
 import com.peekle.domain.user.dto.UserProfileResponse;
 import com.peekle.domain.user.entity.User;
+import com.peekle.domain.user.enums.UserRole;
 import com.peekle.domain.user.repository.UserRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +28,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +53,11 @@ public class UserService {
     private final CsUserProfileRepository csUserProfileRepository;
     private final CsUserDomainProgressRepository csUserDomainProgressRepository;
     private final CsStageAttemptLogRepository csStageAttemptLogRepository;
+    private final Cache<String, ExtensionTokenAuthentication> extensionTokenAuthenticationCache =
+            Caffeine.newBuilder()
+                    .maximumSize(50_000)
+                    .expireAfterWrite(Duration.ofMinutes(3))
+                    .build();
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Transactional
@@ -59,13 +68,20 @@ public class UserService {
         // Return existing token if already present (Single Token for Multiple Devices)
         // and NOT forcing regeneration
         if (!forceRegenerate && user.getExtensionToken() != null && !user.getExtensionToken().isEmpty()) {
+            extensionTokenAuthenticationCache.put(user.getExtensionToken(), ExtensionTokenAuthentication.from(user));
             return user.getExtensionToken();
+        }
+
+        String previousToken = user.getExtensionToken();
+        if (previousToken != null && !previousToken.isEmpty()) {
+            extensionTokenAuthenticationCache.invalidate(previousToken);
         }
 
         // Generate new UUID token
         String token = UUID.randomUUID().toString();
 
         user.updateExtensionToken(token);
+        extensionTokenAuthenticationCache.put(token, ExtensionTokenAuthentication.from(user));
 
         return token;
     }
@@ -155,6 +171,30 @@ public class UserService {
     public User getUserByExtensionToken(String token) {
         return userRepository.findByExtensionToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+    }
+
+    public ExtensionTokenAuthentication getExtensionTokenAuthentication(String token) {
+        return extensionTokenAuthenticationCache.get(token, this::loadExtensionTokenAuthentication);
+    }
+
+    public void primeExtensionTokenAuthentication(User user) {
+        if (user == null || user.getExtensionToken() == null || user.getExtensionToken().isEmpty()) {
+            return;
+        }
+        extensionTokenAuthenticationCache.put(user.getExtensionToken(), ExtensionTokenAuthentication.from(user));
+    }
+
+    private ExtensionTokenAuthentication loadExtensionTokenAuthentication(String token) {
+        User user = userRepository.findByExtensionToken(token)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+        return ExtensionTokenAuthentication.from(user);
+    }
+
+    public record ExtensionTokenAuthentication(Long userId, String roleName) {
+        private static ExtensionTokenAuthentication from(User user) {
+            UserRole role = user.getRole() == null ? UserRole.USER : user.getRole();
+            return new ExtensionTokenAuthentication(user.getId(), role.name());
+        }
     }
 
     public boolean existsByNickname(String nickname) {
