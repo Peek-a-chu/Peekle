@@ -7,14 +7,13 @@ import { cn } from '@/lib/utils';
 import { useSearchSuggestions } from './GlobalSearchBar/useSearchSuggestions';
 import { SearchDropdown } from './GlobalSearchBar/SearchDropdown';
 import type { SearchSuggestion } from './GlobalSearchBar/useSearchSuggestions';
+import { MIN_SEARCH_LENGTH } from '@/lib/search/searchConfig';
 
 interface GlobalSearchBarProps {
   className?: string;
   onSearch?: (query: string) => void;
   initialQuery?: string;
 }
-
-const MIN_SEARCH_LENGTH = 1;
 
 export function GlobalSearchBar({ className, onSearch, initialQuery = '' }: GlobalSearchBarProps) {
   const router = useRouter();

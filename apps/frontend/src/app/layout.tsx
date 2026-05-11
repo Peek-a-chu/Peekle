@@ -2,7 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { ThemeProvider } from '@/domains/settings/components/ThemeProvider';
-import SettingsModal from '@/domains/settings/components/SettingsModal';
+import { SettingsModalHost } from '@/domains/settings/components/SettingsModalHost';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import GoogleAnalyticsTracker from '@/components/common/GoogleAnalyticsTracker';
 import { ClientSessionManager } from '@/components/providers/ClientSessionManager';
@@ -107,7 +107,7 @@ export default function RootLayout({
             <ClientSessionManager />
             {children}
             <GoogleAnalyticsTracker />
-            <SettingsModal isGlobal={true} />
+            <SettingsModalHost isGlobal />
           </ThemeProvider>
           <ResponsiveToaster />
         </QueryProvider>

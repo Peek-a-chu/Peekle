@@ -4,7 +4,10 @@ import { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { CCIDEPanel, CCIDEPanelRef } from '@/domains/study/components/CCIDEPanel';
+import {
+  CCCollaborationIDEPanel,
+  type CCCollaborationIDEPanelRef,
+} from '@/domains/collaboration/components/CCCollaborationIDEPanel';
 import { GameVideoGrid } from '@/domains/game/components/game-video-grid';
 import { GameIDEToolbar } from '@/domains/game/components/game-ide-toolbar';
 import { GamePlayParticipant } from '@/domains/game/types/game-types';
@@ -41,7 +44,7 @@ export function GamePlayCenterPanel({
   const [isVideoGridFolded, setIsVideoGridFolded] = useState(false);
   const [theme, setTheme] = useState<'light' | 'vs-dark'>('light');
   const [fontSize, setFontSize] = useState<number>(14);
-  const idePanelRef = useRef<CCIDEPanelRef>(null);
+  const idePanelRef = useRef<CCCollaborationIDEPanelRef>(null);
 
   // Load font size from local storage on mount
   useState(() => {
@@ -118,10 +121,7 @@ export function GamePlayCenterPanel({
 
       {/* 화상 타일 (게임용) */}
       {!isVideoGridFolded && (
-        <GameVideoGrid
-          participants={participants}
-          currentUserId={currentUserId}
-        />
+        <GameVideoGrid participants={participants} currentUserId={currentUserId} />
       )}
 
       {/* IDE 영역 */}
@@ -147,7 +147,7 @@ export function GamePlayCenterPanel({
 
         {/* 에디터 */}
         <div className="flex-1 w-full" style={{ minHeight: '300px' }}>
-          <CCIDEPanel
+          <CCCollaborationIDEPanel
             key={`${selectedProblemUrl}-${language}`} // 문제 또는 언어가 바뀌면 IDE 리셋
             ref={idePanelRef}
             initialCode={code}

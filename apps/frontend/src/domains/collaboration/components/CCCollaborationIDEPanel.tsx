@@ -1,0 +1,702 @@
+'use client';
+
+import {
+  useState,
+  useRef,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+  type ReactNode,
+} from 'react';
+import Editor, { OnMount } from '@monaco-editor/react';
+import { toast } from 'sonner';
+
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
+
+// ----------------------------------------------------------------------
+// 타입 및 상수 정의
+// ----------------------------------------------------------------------
+
+type LanguageKey = 'python' | 'java' | 'cpp';
+
+const DEFAULT_CODE: Record<LanguageKey, string> = {
+  python: `import sys\n\n# 코드를 작성해주세요\nprint("Hello World!")`,
+  java: `import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println("Hello World!");\n    }\n}`,
+  cpp: `#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << "Hello World!" << endl;\n    return 0;\n}`,
+};
+
+const getSafeLanguageKey = (lang: string): LanguageKey => {
+  const normalized = lang.toLowerCase();
+  if (normalized.includes('java') && !normalized.includes('script')) return 'java';
+  if (normalized.includes('cpp') || normalized.includes('c++')) return 'cpp';
+  return 'python';
+};
+
+const getFileExtension = (lang: string) => {
+  const key = getSafeLanguageKey(lang);
+  switch (key) {
+    case 'cpp':
+      return 'cpp';
+    case 'java':
+      return 'java';
+    case 'python':
+    default:
+      return 'py';
+  }
+};
+
+const normalizeCode = (str: string) => str.replace(/\r\n/g, '\n').trim();
+
+export interface CollaborationIDEPanelActionContext {
+  code: string;
+  language: string;
+}
+
+export interface CollaborationIDEPanelToolbarControls {
+  language: string;
+  theme: 'light' | 'vs-dark';
+  onLanguageChange: (lang: string) => void;
+  onThemeToggle: () => void;
+  onCopy: () => void;
+  onRefChat: () => void;
+  onSubmit: () => void;
+}
+
+export interface CCCollaborationIDEPanelRef {
+  handleCopy: () => Promise<void>;
+  handleSubmit: () => void;
+  handleRefChat: () => void;
+  toggleTheme: () => void;
+  setLanguage: (lang: string) => void;
+  setValue: (code: string) => void; // Added for restoration
+  getValue: () => string; // To read current code actively
+}
+
+export interface CCCollaborationIDEPanelProps {
+  initialCode?: string;
+  readOnly?: boolean;
+  hideToolbar?: boolean;
+  language?: string;
+  theme?: 'light' | 'vs-dark';
+  fontSize?: number;
+  borderColorClass?: string;
+  onEditorMount?: (editor: Parameters<OnMount>[0]) => void;
+  onLanguageChange?: (lang: string, code?: string) => void;
+  onThemeChange?: (theme: 'light' | 'vs-dark') => void;
+  onFontSizeChange?: (size: number) => void;
+  onCodeChange?: (code: string, language?: string) => void; // Updated signature
+  onExecuteRequest?: () => void;
+  editorId?: string;
+  restoredCode?: string | null;
+  restoreVersion?: number;
+  sourceType?: 'STUDY' | 'GAME';
+  renderToolbar?: (controls: CollaborationIDEPanelToolbarControls) => ReactNode;
+  onSubmitRequest?: (context: CollaborationIDEPanelActionContext) => void;
+  onRefChatRequest?: (context: CollaborationIDEPanelActionContext) => void;
+}
+
+export const CCCollaborationIDEPanel = forwardRef<
+  CCCollaborationIDEPanelRef,
+  CCCollaborationIDEPanelProps
+>(
+  (
+    {
+      initialCode,
+      readOnly = false,
+      hideToolbar = false,
+      language: propLanguage,
+      theme: propTheme,
+      fontSize = 14,
+      borderColorClass,
+      onEditorMount,
+      onLanguageChange: propOnLanguageChange,
+      onThemeChange: propOnThemeChange,
+      onFontSizeChange: propOnFontSizeChange,
+      onCodeChange,
+      onExecuteRequest,
+      editorId = 'default',
+      restoredCode,
+      restoreVersion,
+      sourceType = 'STUDY',
+      renderToolbar,
+      onSubmitRequest,
+      onRefChatRequest,
+    },
+    ref,
+  ) => {
+    // ----------------------------------------------------------------------
+    // 상태 관리
+    // ----------------------------------------------------------------------
+    const [internalLanguage, setInternalLanguage] = useState<string>('python');
+    const [internalTheme, setInternalTheme] = useState<'light' | 'vs-dark'>('light');
+    const isMobile = useIsMobile(768);
+    const language = propLanguage || internalLanguage;
+    const theme = propTheme || internalTheme;
+
+    // 현재 화면에 보여지는 코드
+    const [code, setCode] = useState(initialCode ?? DEFAULT_CODE.python);
+
+    // [Realtime Fix] - 통합됨 (아래 useEffect에서 처리)
+    // 기존에 있던 readOnly 전용 이펙트는 아래의 일반 initialCode 이펙트와 중복되므로 제거하거나 병합합니다.
+    // useEffect(() => {
+    //   if (readOnly && initialCode !== undefined) {
+    //     setCode(initialCode);
+    //   }
+    // }, [initialCode, readOnly]);
+
+    // [Restoration Fix] 복구된 코드가 들어오면 에디터에 적용
+    // restoredCode === '' 은 해당 문제에 저장된 코드가 없음을 의미 -> 기본 코드로 초기화
+    // restoreVersion이 변경될 때마다 무조건 실행 (같은 코드여도 문제 전환 시 새로 적용)
+    const lastRestoreVersionRef = useRef<number | undefined>(undefined);
+    useEffect(() => {
+      if (restoredCode === null || restoredCode === undefined) return;
+      if (restoreVersion === lastRestoreVersionRef.current) return;
+
+      lastRestoreVersionRef.current = restoreVersion;
+
+      const newCode =
+        restoredCode === '' ? DEFAULT_CODE[getSafeLanguageKey(language)] : restoredCode;
+
+      setCode(newCode);
+      originCodeRef.current = newCode;
+      isDirtyRef.current = false;
+
+      // 모델 ID를 변경하여 에디터를 강제로 다시 마운트합니다.
+      // setValue만으로 해결되지 않는 렌더링 타이밍 이슈를 원천 차단합니다.
+      setModelId((prev) => prev + 1);
+    }, [restoredCode, restoreVersion, language]);
+
+    // 상위 컴포넌트(CCCenterPanel)에도 알림
+    const [modelId, setModelId] = useState(0);
+    const readOnlySnapshotKeyRef = useRef<string>('');
+
+    // 원본 코드 비교 및 변경 감지 Refs
+    const originCodeRef = useRef<string>(initialCode ?? DEFAULT_CODE.python);
+    const isDirtyRef = useRef(false);
+
+    // [핵심 해결책 1] 언어 변경 중임을 표시하는 플래그
+    // 이 플래그가 true일 때는 initialCode가 들어와도 무시합니다.
+    const isSwitchingLanguageRef = useRef(false);
+
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
+
+    const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+    const monacoRef = useRef<any>(null);
+    const editorDomCleanupRef = useRef<(() => void) | null>(null);
+    const readOnlyRef = useRef(readOnly);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Font size prop ref for event listeners
+    const fontSizeRef = useRef(fontSize);
+    useEffect(() => {
+      fontSizeRef.current = fontSize;
+    }, [fontSize]);
+
+    // ----------------------------------------------------------------------
+    // 초기화 및 Props 동기화 로직
+    // ----------------------------------------------------------------------
+
+    useEffect(() => {
+      // [핵심 해결책 1 적용]
+      // 언어 변경 중이거나, initialCode가 없는 경우 무시
+      if (isSwitchingLanguageRef.current) return;
+      if (readOnly) return;
+
+      if (initialCode !== undefined) {
+        setCode(initialCode);
+        originCodeRef.current = initialCode;
+        // 외부에서 새 코드가 들어오면 Dirty 상태 해제
+        isDirtyRef.current = false;
+
+        // 에디터가 이미 떠있다면 값 강제 업데이트
+        if (editorRef.current && editorRef.current.getValue() !== initialCode) {
+          editorRef.current.setValue(initialCode);
+        }
+      }
+    }, [initialCode, readOnly]);
+
+    useEffect(() => {
+      readOnlyRef.current = readOnly;
+    }, [readOnly]);
+
+    useEffect(() => {
+      if (!propLanguage) return;
+
+      if (readOnly) {
+        // Readonly state sync is handled by a dedicated snapshot effect below.
+        return;
+      }
+
+      const previousDefault = DEFAULT_CODE[getSafeLanguageKey(internalLanguage)];
+      const nextDefault = DEFAULT_CODE[getSafeLanguageKey(propLanguage)];
+
+      setCode((prev) => (prev === previousDefault ? nextDefault : prev));
+      setInternalLanguage(propLanguage);
+    }, [propLanguage, internalLanguage, readOnly]);
+
+    useEffect(() => {
+      if (!readOnly) return;
+
+      const incomingCode = initialCode ?? '';
+      const incomingLanguage = propLanguage ?? language;
+      const snapshotKey = `${incomingLanguage}::${incomingCode}`;
+
+      if (readOnlySnapshotKeyRef.current === snapshotKey) return;
+      readOnlySnapshotKeyRef.current = snapshotKey;
+
+      setInternalLanguage((current) => (current === incomingLanguage ? current : incomingLanguage));
+      setCode((current) => (current === incomingCode ? current : incomingCode));
+      originCodeRef.current = incomingCode;
+      isDirtyRef.current = false;
+
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      const model = editor?.getModel?.();
+
+      if (model && monaco?.editor?.setModelLanguage) {
+        const nextLanguage = getSafeLanguageKey(incomingLanguage);
+        const currentLanguage = model.getLanguageId?.();
+        if (currentLanguage !== nextLanguage) {
+          monaco.editor.setModelLanguage(model, nextLanguage);
+        }
+      }
+
+      if (editor && editor.getValue() !== incomingCode) {
+        editor.setValue(incomingCode);
+      }
+    }, [readOnly, initialCode, propLanguage, language]);
+
+    useEffect(() => {
+      return () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        if (editorDomCleanupRef.current) {
+          editorDomCleanupRef.current();
+          editorDomCleanupRef.current = null;
+        }
+        editorRef.current = null;
+        monacoRef.current = null;
+      };
+    }, []);
+
+    // ----------------------------------------------------------------------
+    // 언어 변경 로직
+    // ----------------------------------------------------------------------
+
+    const proceedLanguageChange = (newLang: string): void => {
+      // 1. 플래그 설정: "지금부터 언어 바꿀 거니까 외부 prop 간섭하지 마라"
+      isSwitchingLanguageRef.current = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+
+      const safeKey = getSafeLanguageKey(newLang);
+      const newCode = DEFAULT_CODE[safeKey];
+
+      setInternalLanguage(newLang);
+
+      // 2. State 업데이트: 새 언어의 스켈레톤 코드로 교체
+      setCode(newCode);
+
+      // Language switch sync is handled by a dedicated websocket event.
+      // Avoid sending a stale IDE/update packet during rapid language changes.
+
+      // 3. 원본 기준점 리셋
+      originCodeRef.current = newCode;
+      isDirtyRef.current = false;
+
+      // 4. 모델 ID 증가 -> Editor 컴포넌트 강제 재마운트 유도
+      setModelId((prev) => prev + 1);
+
+      if (propOnLanguageChange) {
+        propOnLanguageChange(newLang, newCode);
+      }
+
+      setIsConfirmModalOpen(false);
+      setPendingLanguage(null);
+
+      // 5. 안전장치: 잠시 후 플래그 해제 (React 렌더링 사이클 고려)
+      setTimeout(() => {
+        isSwitchingLanguageRef.current = false;
+      }, 500);
+    };
+
+    const handleLanguageChangeAttempt = (targetLang: string): void => {
+      if (readOnly) {
+        proceedLanguageChange(targetLang);
+        return;
+      }
+      if (targetLang === language) return;
+
+      // [Safe Guard] 현재 코드가 해당 언어의 기본 스켈레톤과 다르면 모달 띄움
+      // 복원(Restore)된 코드일 수도 있으므로, 단순 변경 여부(isDirty)가 아닌 내용 자체를 비교함
+      let isRiskOfDataLoss = false;
+
+      if (editorRef.current) {
+        const currentVal = normalizeCode(editorRef.current.getValue());
+
+        // 현재 언어 기준으로 스켈레톤 가져오기
+        const currentLangKey = getSafeLanguageKey(language);
+        const defaultVal = normalizeCode(DEFAULT_CODE[currentLangKey]);
+
+        if (currentVal !== defaultVal) {
+          isRiskOfDataLoss = true;
+        }
+      }
+
+      if (isRiskOfDataLoss) {
+        setPendingLanguage(targetLang);
+        setIsConfirmModalOpen(true);
+      } else {
+        proceedLanguageChange(targetLang);
+      }
+    };
+
+    const confirmLanguageChange = (): void => {
+      if (pendingLanguage) {
+        proceedLanguageChange(pendingLanguage);
+      }
+    };
+
+    // ----------------------------------------------------------------------
+    // 기타 핸들러
+    // ----------------------------------------------------------------------
+    const toggleTheme = (): void => {
+      const newTheme = theme === 'light' ? 'vs-dark' : 'light';
+      setInternalTheme(newTheme);
+      if (propOnThemeChange) propOnThemeChange(newTheme);
+    };
+
+    const handleCopy = async (): Promise<void> => {
+      if (editorRef.current) {
+        const value = editorRef.current.getValue();
+        try {
+          await navigator.clipboard.writeText(value);
+          toast.success('코드가 클립보드에 복사되었습니다.');
+        } catch {
+          toast.error('코드 복사에 실패했습니다.');
+        }
+      }
+    };
+
+    const handleRefChat = (): void => {
+      const currentCode = editorRef.current?.getValue() ?? code;
+      onRefChatRequest?.({ code: currentCode, language });
+    };
+
+    const handleSubmit = (): void => {
+      if (editorRef.current) {
+        const value = editorRef.current.getValue();
+        onSubmitRequest?.({ code: value, language });
+      }
+    };
+
+    // ----------------------------------------------------------------------
+    // Editor Mount
+    // ----------------------------------------------------------------------
+
+    const handleEditorDidMount: OnMount = (editor, monaco): void => {
+      editorRef.current = editor;
+      monacoRef.current = monaco;
+
+      // [Anti-Cheat] 게임 모드일 때 붙여넣기 금지 (Ctrl+V, Cmd+V)
+      if (sourceType === 'GAME') {
+        editor.onKeyDown((e) => {
+          const isPaste = (e.ctrlKey || e.metaKey) && e.keyCode === monaco.KeyCode.KeyV;
+
+          if (isPaste) {
+            e.preventDefault();
+            e.stopPropagation();
+            toast.error('게임 중에는 붙여넣기를 할 수 없습니다!', {
+              id: 'paste-blocked', // 중복 표시 방지
+            });
+          }
+        });
+      }
+
+      if (onEditorMount) onEditorMount(editor);
+
+      // Shift + Enter로 IntelliJ/Eclipse처럼 바로 아랫 줄에 빈 줄 삽입 후 이동
+      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+        editor.trigger('keyboard', 'editor.action.insertLineAfter', null);
+      });
+
+      // [핵심 해결책 2] 마운트 시점에 state에 있는 값을 강제로 주입
+      // 위에서 setCode로 업데이트된 상태가 여기(value prop)에 반영되겠지만,
+      // 확실한 동기화를 위해 한 번 더 설정합니다.
+      editor.setValue(code);
+
+      const container = editor.getContainerDomNode();
+      const isInteractiveOverlayTarget = (target: EventTarget | null): boolean => {
+        const element = target instanceof HTMLElement ? target : null;
+        if (!element) return false;
+        if (element.closest('.view-zones')) return true;
+        const tagName = element.tagName;
+        if (['TEXTAREA', 'INPUT', 'BUTTON', 'SELECT'].includes(tagName)) return true;
+        if (element.isContentEditable) return true;
+        return false;
+      };
+
+      const preventClipboard = (e: Event): void => {
+        if (isInteractiveOverlayTarget(e.target)) return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      // 폰트 크기 조절 이벤트 리스너 (Wheel + Ctrl)
+      const handleWheel = (e: WheelEvent) => {
+        if (isInteractiveOverlayTarget(e.target)) return;
+
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!propOnFontSizeChange) return;
+
+          const currentSize = fontSizeRef.current;
+          let newSize = currentSize;
+
+          if (e.deltaY < 0) {
+            newSize = Math.min(40, currentSize + 1); // Scroll Up -> Increase
+          } else {
+            newSize = Math.max(5, currentSize - 1); // Scroll Down -> Decrease
+          }
+
+          if (newSize !== currentSize) {
+            propOnFontSizeChange(newSize);
+          }
+        }
+      };
+
+      const handleKeyDown = (e: KeyboardEvent): void => {
+        if (isInteractiveOverlayTarget(e.target)) return;
+
+        // Code Execution Shortcut (Ctrl + Enter)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          onExecuteRequest?.();
+          return;
+        }
+
+        // Font Size Shorcuts (Ctrl + Up/Down)
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            if (propOnFontSizeChange) {
+              e.preventDefault();
+              e.stopPropagation();
+
+              const currentSize = fontSizeRef.current;
+              let newSize = currentSize;
+
+              if (e.key === 'ArrowUp') {
+                newSize = Math.min(40, currentSize + 1);
+              } else {
+                newSize = Math.max(5, currentSize - 1);
+              }
+
+              if (newSize !== currentSize) {
+                propOnFontSizeChange(newSize);
+              }
+              return;
+            }
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onExecuteRequest) onExecuteRequest();
+            return;
+          }
+        }
+
+        if (!readOnlyRef.current) return;
+        const allowedKeys = [
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'Home',
+          'End',
+          'PageUp',
+          'PageDown',
+          'Shift',
+          'Control',
+          'Alt',
+          'Meta',
+          'Escape',
+          'Tab',
+          'F1',
+          'F2',
+          'F3',
+          'F4',
+          'F5',
+          'F6',
+          'F7',
+          'F8',
+          'F9',
+          'F10',
+          'F11',
+          'F12',
+        ];
+        if (allowedKeys.includes(e.key)) return;
+        const isModifier = e.ctrlKey || e.metaKey || e.altKey;
+        if (isModifier && ['c', 'a'].includes(e.key.toLowerCase())) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        toast.warning('타인의 코드에 작성할 수 없습니다.', {
+          id: 'readonly-warning',
+          duration: 1000,
+        });
+      };
+
+      if (editorDomCleanupRef.current) {
+        editorDomCleanupRef.current();
+      }
+
+      container.addEventListener('copy', preventClipboard);
+      container.addEventListener('cut', preventClipboard);
+      container.addEventListener('paste', preventClipboard);
+      container.addEventListener('keydown', handleKeyDown as EventListener, true);
+      container.addEventListener('wheel', handleWheel as EventListener, {
+        capture: true,
+        passive: false,
+      });
+
+      editorDomCleanupRef.current = () => {
+        container.removeEventListener('copy', preventClipboard);
+        container.removeEventListener('cut', preventClipboard);
+        container.removeEventListener('paste', preventClipboard);
+        container.removeEventListener('keydown', handleKeyDown as EventListener, true);
+        container.removeEventListener('wheel', handleWheel as EventListener, true);
+      };
+    };
+
+    useImperativeHandle(ref, () => ({
+      handleCopy,
+      handleSubmit,
+      handleRefChat,
+      toggleTheme,
+      setLanguage: handleLanguageChangeAttempt,
+      setValue: (newCode: string) => {
+        setCode(newCode);
+        originCodeRef.current = newCode;
+        if (editorRef.current) {
+          editorRef.current.setValue(newCode);
+        }
+      },
+      getValue: () => {
+        if (editorRef.current) return editorRef.current.getValue();
+        return code;
+      },
+    }));
+
+    return (
+      <div
+        className={cn(
+          'flex h-full flex-col bg-background min-w-0 relative',
+          borderColorClass
+            ? `border-2 ${borderColorClass} rounded-lg`
+            : readOnly
+              ? 'border-2 border-yellow-400 rounded-lg'
+              : '',
+        )}
+      >
+        {!hideToolbar && !readOnly && (
+          <>
+            {renderToolbar?.({
+              language,
+              theme,
+              onLanguageChange: handleLanguageChangeAttempt,
+              onThemeToggle: toggleTheme,
+              onCopy: () => void handleCopy(),
+              onRefChat: handleRefChat,
+              onSubmit: () => void handleSubmit(),
+            })}
+          </>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <Editor
+            // [중요] 키 변경으로 컴포넌트 완전 재생성
+            key={`${language}-${modelId}`}
+            height="100%"
+            language={language}
+            theme={theme}
+            onMount={handleEditorDidMount}
+            // [중요] 경로 유니크화로 모델 캐싱 방지 + 에디터 구분
+            path={`${editorId}_file_${modelId}.${getFileExtension(language)}`}
+            // [중요] Controlled Component 방식 사용 (value에 전적으로 의존)
+            value={code}
+            onChange={(value, event) => {
+              if (!readOnly) {
+                const newVal = value || '';
+                setCode(newVal);
+                const isProgrammaticChange = Boolean(event?.isFlush);
+
+                if (onCodeChange && !isProgrammaticChange) {
+                  if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                  debounceTimerRef.current = setTimeout(() => {
+                    onCodeChange(newVal, language);
+                  }, 300);
+                }
+
+                const normalizedNew = normalizeCode(newVal);
+                const normalizedOrigin = normalizeCode(originCodeRef.current);
+                isDirtyRef.current = normalizedNew !== normalizedOrigin;
+              }
+            }}
+            options={{
+              readOnly: readOnly,
+              fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
+              fontSize: fontSize,
+              minimap: { enabled: false },
+              glyphMargin: !isMobile,
+              lineDecorationsWidth: isMobile ? 8 : 22,
+              lineNumbersMinChars: isMobile ? 3 : 5,
+              folding: !isMobile,
+              wordWrap: 'on',
+              automaticLayout: true,
+              scrollBeyondLastLine: false,
+            }}
+          />
+        </div>
+        {/* 확인 모달 */}
+        {isConfirmModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+            <div className="w-[350px] rounded-lg bg-background p-6 shadow-lg border">
+              <h3 className="text-lg font-semibold">언어 변경</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                기존 작성 내용이 사라집니다.
+                <br />
+                정말 변경하시겠습니까?
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={confirmLanguageChange}
+                  className="px-4 py-2 text-sm font-medium bg-red-500 text-white hover:bg-red-600 rounded-md"
+                >
+                  변경
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
+CCCollaborationIDEPanel.displayName = 'CCCollaborationIDEPanel';

@@ -26,7 +26,7 @@ import {
   useStudySocketActions,
   useStudySocketSubscription,
 } from '@/domains/study/hooks/useStudySocket';
-import SettingsModal from '@/domains/settings/components/SettingsModal';
+import { SettingsModalHost } from '@/domains/settings/components/SettingsModalHost';
 import { useSettingsStore } from '@/domains/settings/hooks/useSettingsStore';
 import { useLocalParticipant } from '@livekit/components-react';
 import { CCPreJoinModal } from '@/components/common/CCPreJoinModal';
@@ -73,9 +73,7 @@ function StudyRoomContent({
 }) {
   const router = useRouter();
   const isTouchMobile = useIsTouchMobile();
-  const initialLayoutModeRef = useRef<'mobile' | 'desktop'>(
-    isTouchMobile ? 'mobile' : 'desktop',
-  );
+  const initialLayoutModeRef = useRef<'mobile' | 'desktop'>(isTouchMobile ? 'mobile' : 'desktop');
   // Keep the initial layout mode stable to avoid unmounting the IDE tree
   // when viewport width changes (e.g. opening browser devtools).
   const isMobile = initialLayoutModeRef.current === 'mobile';
@@ -253,7 +251,8 @@ function StudyRoomContent({
   const aiRecommendationCleanedRef = useRef(false);
   const getAiActionKey = (action: 'add' | 'open') => {
     if (aiRecommendationRequestId) return `ai-rec:${action}:${aiRecommendationRequestId}`;
-    if (aiRecommendationExternalId) return `ai-rec:${action}:${studyId}:${aiRecommendationExternalId}`;
+    if (aiRecommendationExternalId)
+      return `ai-rec:${action}:${studyId}:${aiRecommendationExternalId}`;
     return null;
   };
   const markAiActionDone = (action: 'add' | 'open') => {
@@ -356,7 +355,7 @@ function StudyRoomContent({
         storeMuted: me.isMuted,
         realMuted: realIsMuted,
         storeVideo: me.isVideoOff,
-        realVideo: realIsVideoOff
+        realVideo: realIsVideoOff,
       });
       updateParticipant(currentUserId, { isMuted: realIsMuted, isVideoOff: realIsVideoOff });
       // Also notify server via socket
@@ -373,10 +372,13 @@ function StudyRoomContent({
   ]);
 
   // API Hooks
-  const { problems, isLoading: isProblemsLoading, addProblem, deleteProblem, refetch } = useProblems(
-    studyId,
-    format(selectedDate, 'yyyy-MM-dd'),
-  );
+  const {
+    problems,
+    isLoading: isProblemsLoading,
+    addProblem,
+    deleteProblem,
+    refetch,
+  } = useProblems(studyId, format(selectedDate, 'yyyy-MM-dd'));
   const { historyDates } = useProblemDates(studyId, selectedDate);
   const { submissions, loadSubmissions } = useSubmissions(studyId);
 
@@ -646,7 +648,11 @@ function StudyRoomContent({
         );
         const fallbackStudyProblemId = Number(response.data?.studyProblemId);
         const fallbackProblemDate = response.data?.problemDate;
-        if (!response.success || !Number.isFinite(fallbackStudyProblemId) || fallbackStudyProblemId <= 0) {
+        if (
+          !response.success ||
+          !Number.isFinite(fallbackStudyProblemId) ||
+          fallbackStudyProblemId <= 0
+        ) {
           return;
         }
 
@@ -664,13 +670,7 @@ function StudyRoomContent({
         // Ignore fallback fetch failures
       }
     })();
-  }, [
-    selectedStudyProblemId,
-    problems,
-    hintedStudyProblemId,
-    studyId,
-    handleSelectProblem,
-  ]);
+  }, [selectedStudyProblemId, problems, hintedStudyProblemId, studyId, handleSelectProblem]);
 
   useEffect(() => {
     aiRecommendationAddTriedRef.current = false;
@@ -717,16 +717,14 @@ function StudyRoomContent({
         setIsRightPanelFolded(true);
 
         const matchedExternalId = Number(
-          String((matchedProblem as any).externalId ?? (matchedProblem as any).problemId ?? '').replace(
-            /[^0-9]/g,
-            '',
-          ),
+          String(
+            (matchedProblem as any).externalId ?? (matchedProblem as any).problemId ?? '',
+          ).replace(/[^0-9]/g, ''),
         );
         const matchedStudyProblemId = Number(
-          String((matchedProblem as any).studyProblemId ?? (matchedProblem as any).id ?? '').replace(
-            /[^0-9]/g,
-            '',
-          ),
+          String(
+            (matchedProblem as any).studyProblemId ?? (matchedProblem as any).id ?? '',
+          ).replace(/[^0-9]/g, ''),
         );
         const numericStudyId = Number(String(studyId).replace(/[^0-9]/g, ''));
         const splitContext =
@@ -738,7 +736,10 @@ function StudyRoomContent({
                   Number.isFinite(matchedStudyProblemId) && matchedStudyProblemId > 0
                     ? matchedStudyProblemId
                     : undefined,
-                studyId: Number.isFinite(numericStudyId) && numericStudyId > 0 ? numericStudyId : undefined,
+                studyId:
+                  Number.isFinite(numericStudyId) && numericStudyId > 0
+                    ? numericStudyId
+                    : undefined,
               }
             : undefined;
 
@@ -804,7 +805,7 @@ function StudyRoomContent({
   ]);
   return (
     <>
-      <SettingsModal />
+      <SettingsModalHost />
       {isMobile ? (
         <CCStudyRoomMobileLayout
           header={

@@ -6,10 +6,10 @@ import { describe, it, expect } from 'vitest';
  */
 
 describe('SearchResultsPage - Page Structure', () => {
-  it('page component exists and is importable', async () => {
-    const module = await import('@/app/(main)/search/page');
-    expect(module.default).toBeDefined();
-    expect(typeof module.default).toBe('function');
+  it('client island component exists and is importable', async () => {
+    const searchPageModule = await import('@/app/(main)/search/CCSearchResultsPage');
+    expect(searchPageModule.CCSearchResultsPage).toBeDefined();
+    expect(typeof searchPageModule.CCSearchResultsPage).toBe('function');
   }, 20000);
 
   it('page file structure is valid', () => {

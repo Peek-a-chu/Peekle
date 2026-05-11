@@ -20,7 +20,7 @@ import {
   ChatMessage,
 } from '@/domains/game/types/game-types';
 import { CCGameResultModal } from '@/domains/game/components/game-result-modal/CCGameResultModal';
-import SettingsModal from '@/domains/settings/components/SettingsModal';
+import { SettingsModalHost } from '@/domains/settings/components/SettingsModalHost';
 
 // Constants for resizing
 const RIGHT_PANEL_MIN_WIDTH = 260;
@@ -88,8 +88,6 @@ export function GamePlayLayout({
     participants.forEach((p) => (newState[p.id] = true));
     setCamState((prev) => ({ ...prev, ...newState }));
   };
-
-
 
   const handleForfeitClick = () => {
     setIsForfeitModalOpen(true);
@@ -255,8 +253,8 @@ export function GamePlayLayout({
                   micState={micState}
                   camState={camState}
                   onMuteAll={handleMuteAll}
-                  onKick={() => { }}
-                  onDelegate={() => { }}
+                  onKick={() => {}}
+                  onDelegate={() => {}}
                   onlineUserIds={allOnlineUserIds}
                   teamType={gameState.teamType}
                 />
@@ -267,10 +265,9 @@ export function GamePlayLayout({
       </div>
 
       {/* 게임 결과 모달 */}
-      < CCGameResultModal
+      <CCGameResultModal
         isOpen={gameState.status === 'END'}
-        onClose={() => { }
-        }
+        onClose={() => {}}
         data={{
           participants: (gameState.result?.ranking || []).map((r, idx) => ({
             userId: r.userId,
@@ -284,21 +281,38 @@ export function GamePlayLayout({
             clearTime: (r as any).clearTime,
           })),
           personalStats: {
-            pointsGained: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.gainedExp || 0,
-            correctAnswers: gameState.result?.ranking?.find(r => r.userId === currentUserId)?.solvedCount || 0,
+            pointsGained:
+              (gameState.result?.ranking?.find((r) => r.userId === currentUserId) as any)
+                ?.gainedExp || 0,
+            correctAnswers:
+              gameState.result?.ranking?.find((r) => r.userId === currentUserId)?.solvedCount || 0,
             totalQuestions: gameState.problems.length,
-            accuracy: gameState.problems.length > 0
-              ? Math.round(((gameState.result?.ranking?.find(r => r.userId === currentUserId)?.solvedCount || 0) / gameState.problems.length) * 100)
-              : 0,
+            accuracy:
+              gameState.problems.length > 0
+                ? Math.round(
+                    ((gameState.result?.ranking?.find((r) => r.userId === currentUserId)
+                      ?.solvedCount || 0) /
+                      gameState.problems.length) *
+                      100,
+                  )
+                : 0,
           },
           leagueInfo: {
-            league: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.league || 'STONE',
-            currentExp: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.currentExp || 0,
-            gainedExp: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.gainedExp || 0,
+            league:
+              (gameState.result?.ranking?.find((r) => r.userId === currentUserId) as any)?.league ||
+              'STONE',
+            currentExp:
+              (gameState.result?.ranking?.find((r) => r.userId === currentUserId) as any)
+                ?.currentExp || 0,
+            gainedExp:
+              (gameState.result?.ranking?.find((r) => r.userId === currentUserId) as any)
+                ?.gainedExp || 0,
           },
           mode: gameState.mode,
           teamType: gameState.teamType,
-          playTime: (gameState.result?.ranking?.find(r => r.userId === currentUserId) as any)?.clearTime || 0,
+          playTime:
+            (gameState.result?.ranking?.find((r) => r.userId === currentUserId) as any)
+              ?.clearTime || 0,
         }}
       />
 
@@ -315,7 +329,7 @@ export function GamePlayLayout({
       />
 
       {/* 설정 모달 */}
-      <SettingsModal />
-    </div >
+      <SettingsModalHost />
+    </div>
   );
 }

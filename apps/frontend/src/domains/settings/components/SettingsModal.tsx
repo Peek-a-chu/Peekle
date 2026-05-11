@@ -1,13 +1,24 @@
 'use client';
 
 import { Palette, Monitor, X } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useSettingsStore, type SettingsTab } from '../hooks/useSettingsStore';
-import { Dialog, DialogContent, DialogOverlay, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogOverlay,
+  DialogTitle,
+  DialogClose,
+} from '@/components/ui/dialog';
 import ThemeSection from './ThemeSection';
-import DeviceSection from './DeviceSection';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+
+const DeviceSection = dynamic(() => import('./DeviceSection'), {
+  ssr: false,
+  loading: () => null,
+});
 
 interface SettingsModalProps {
   isGlobal?: boolean;
@@ -31,7 +42,6 @@ const SettingsModal = ({ isGlobal = false }: SettingsModalProps) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
       <DialogOverlay className="bg-black/60 backdrop-blur-[2px] z-[100]" />
       <DialogContent className="max-w-[840px] w-[92vw] max-h-[80vh] p-0 gap-0 overflow-hidden border border-border shadow-2xl z-[101] bg-card rounded-[20px] animate-in zoom-in-95 duration-200 flex flex-col">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 shrink-0 bg-card/50 backdrop-blur-sm z-10">
           <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-3">
@@ -42,7 +52,12 @@ const SettingsModal = ({ isGlobal = false }: SettingsModalProps) => {
           </DialogTitle>
 
           <DialogClose asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted" onClick={closeModal}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-muted"
+              onClick={closeModal}
+            >
               <X size={18} className="text-muted-foreground" />
             </Button>
           </DialogClose>
@@ -63,10 +78,14 @@ const SettingsModal = ({ isGlobal = false }: SettingsModalProps) => {
                     'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200',
                     isActive
                       ? 'bg-background text-foreground shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
                   )}
                 >
-                  <Icon size={16} strokeWidth={2.5} className={cn(isActive ? 'text-primary' : 'opacity-70')} />
+                  <Icon
+                    size={16}
+                    strokeWidth={2.5}
+                    className={cn(isActive ? 'text-primary' : 'opacity-70')}
+                  />
                   {tab.label}
                 </button>
               );
@@ -80,7 +99,6 @@ const SettingsModal = ({ isGlobal = false }: SettingsModalProps) => {
             {activeTab === 'theme' ? <ThemeSection /> : <DeviceSection isGlobal={isGlobal} />}
           </div>
         </main>
-
       </DialogContent>
     </Dialog>
   );

@@ -13,6 +13,8 @@ import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 import { getDeterministicUserColor, isBlankText } from '@/domains/study/utils/whiteboard';
 import type { Canvas as FabricCanvas } from 'fabric';
 
+type WhiteboardTool = 'select' | 'pen' | 'shape' | 'text' | 'eraser' | (string & {});
+
 export interface WhiteboardCanvasRef {
   add: (objData: any, senderId?: string) => void;
   modify: (objData: any) => void;
@@ -25,7 +27,7 @@ export interface WhiteboardCanvasRef {
 interface WhiteboardCanvasProps {
   width?: number;
   height?: number;
-  activeTool?: 'select' | 'pen' | 'shape' | 'text' | 'eraser' | string;
+  activeTool?: WhiteboardTool;
   currentUserId?: string | number;
   onObjectAdded?: (obj: any) => void;
   onObjectModified?: (obj: any) => void;
@@ -42,6 +44,8 @@ const resolveFabricModule = (module: typeof import('fabric')): typeof import('fa
   const compatModule = module as FabricModuleCompat;
   return compatModule.fabric ?? compatModule.default ?? module;
 };
+
+const WHITEBOARD_REMOTE_BATCH_MS = 16;
 
 declare global {
   interface Window {
@@ -69,6 +73,11 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
     const fabricRef = useRef<any>(null);
     const [isFabricLoaded, setIsFabricLoaded] = useState(false);
     const messageQueueRef = useRef<WhiteboardMessage[]>([]);
+    const pendingServerMessagesRef = useRef<WhiteboardMessage[]>([]);
+    const pendingServerFlushTimerRef = useRef<number | null>(null);
+    const isFlushingServerMessagesRef = useRef(false);
+    const objectIndexRef = useRef<Map<string, any>>(new Map());
+    const syncGenerationRef = useRef(0);
 
     // Map to track user colors for consistent coloring
     const userColorsRef = useRef<Map<string, string>>(new Map());
@@ -139,9 +148,76 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
       return obj.id;
     };
 
+    const registerObject = useCallback((obj: any) => {
+      if (obj?.id) {
+        objectIndexRef.current.set(String(obj.id), obj);
+      }
+    }, []);
+
+    const findObjectById = useCallback(
+      (canvas: any, objectId: string | undefined) => {
+        if (!objectId) return undefined;
+
+        const normalizedObjectId = String(objectId);
+        const cached = objectIndexRef.current.get(normalizedObjectId);
+        if (cached) {
+          if (cached.canvas === canvas || cached.group?.canvas === canvas) {
+            return cached;
+          }
+          objectIndexRef.current.delete(normalizedObjectId);
+        }
+
+        const found = canvas.getObjects().find((obj: any) => String(obj.id) === normalizedObjectId);
+        if (found) {
+          registerObject(found);
+        } else {
+          objectIndexRef.current.delete(normalizedObjectId);
+        }
+
+        return found;
+      },
+      [registerObject],
+    );
+
+    const removeObject = useCallback((canvas: any, obj: any) => {
+      const objectId = obj?.id ? String(obj.id) : null;
+      canvas.remove(obj);
+      if (objectId) {
+        objectIndexRef.current.delete(objectId);
+      }
+    }, []);
+
+    const enlivenObjects = useCallback(
+      (fabric: any, objectsData: any[], onObjects: (objects: any[]) => void) =>
+        new Promise<void>((resolve) => {
+          let settled = false;
+
+          const finish = (objects: any[]) => {
+            if (settled) return;
+            settled = true;
+            onObjects(objects);
+            resolve();
+          };
+
+          const enlivener = fabric.util.enlivenObjects(objectsData, finish);
+          if (enlivener && typeof enlivener.then === 'function') {
+            enlivener.then(finish).catch((error: unknown) => {
+              console.error('Failed to enliven whiteboard objects', error);
+              resolve();
+            });
+          }
+        }),
+      [],
+    );
+
     // 내부 액션 처리 함수 (재사용을 위해 분리)
     const handleAction = useCallback(
-      (action: string, objectId: string | undefined, data: any, senderId: string | undefined) => {
+      async (
+        action: string,
+        objectId: string | undefined,
+        data: any,
+        senderId: string | undefined,
+      ) => {
         if (!fabricCanvasRef.current || !fabricRef.current) return;
         const canvas = fabricCanvasRef.current;
         const fabric = fabricRef.current;
@@ -187,36 +263,35 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                   }
                   o.setCoords();
                   // 중복 추가 방지
-                  const exists = canvas.getObjects().find((existing: any) => existing.id === o.id);
+                  const exists = findObjectById(canvas, o.id);
                   if (!exists) {
                     canvas.add(o);
+                    registerObject(o);
                   }
                 });
-                canvas.renderAll();
+                canvas.requestRenderAll();
               };
 
               // Handle both Callback (v5) and Promise (v6)
-              const enlivener = fabric.util.enlivenObjects([objectData], addObjectsToCanvas);
-              if (enlivener && typeof enlivener.then === 'function') {
-                enlivener.then(addObjectsToCanvas);
-              }
+              await enlivenObjects(fabric, [objectData], addObjectsToCanvas);
             }
             break;
           case 'MODIFIED':
             if (objectId) {
-              const obj = canvas.getObjects().find((o: any) => o.id === objectId);
+              const obj = findObjectById(canvas, objectId);
               if (obj) {
                 obj.set(data);
                 obj.setCoords();
+                registerObject(obj);
                 canvas.requestRenderAll();
               }
             }
             break;
           case 'REMOVED':
             if (objectId) {
-              const obj = canvas.getObjects().find((o: any) => o.id === objectId);
+              const obj = findObjectById(canvas, objectId);
               if (obj) {
-                canvas.remove(obj);
+                removeObject(canvas, obj);
                 canvas.requestRenderAll();
               }
             }
@@ -228,24 +303,29 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
               .getObjects()
               .slice()
               .forEach((obj: any) => {
-                canvas.remove(obj);
+                removeObject(canvas, obj);
               });
+            objectIndexRef.current.clear();
             canvas.backgroundImage = null;
             canvas.overlayImage = null;
             canvas.setBackgroundColor('#ffffff', () => canvas.renderAll());
             break;
         }
       },
-      [currentUserId],
+      [currentUserId, enlivenObjects, findObjectById, registerObject, removeObject],
     );
 
     const processMessage = useCallback(
-      (message: WhiteboardMessage) => {
+      async (message: WhiteboardMessage) => {
         const { action, objectId, data, senderId } = message;
         if (action === 'SYNC') {
+          const syncGeneration = syncGenerationRef.current + 1;
+          syncGenerationRef.current = syncGeneration;
+
           // 초기 동기화: history 배열 처리
           if (data && Array.isArray(data.history)) {
-            handleAction('CLEAR', undefined, undefined, undefined);
+            await handleAction('CLEAR', undefined, undefined, undefined);
+            if (syncGeneration !== syncGenerationRef.current) return;
 
             const history = data.history as WhiteboardMessage[];
 
@@ -266,6 +346,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
               const addHistoryToCanvas = (objects: any[]) => {
                 const canvas = fabricCanvasRef.current;
+                if (syncGeneration !== syncGenerationRef.current) return;
                 if (!canvas) return;
 
                 objects.forEach((o, i) => {
@@ -305,42 +386,40 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
                   o.setCoords();
 
                   // [Fix] Prevent duplicates
-                  const exists = canvas.getObjects().find((existing: any) => existing.id === o.id);
+                  const exists = findObjectById(canvas, o.id);
                   if (!exists) {
                     canvas.add(o);
+                    registerObject(o);
                   }
                 });
 
-                // 2. 객체 추가 완료 후 나머지 이벤트(수정, 삭제 등) 처리
-                otherEvents.forEach((msg) => {
-                  handleAction(msg.action, msg.objectId, msg.data, msg.senderId?.toString());
-                });
                 canvas.requestRenderAll();
               };
 
               // Handle both Callback (v5) and Promise (v6)
-              const enlivener = fabricRef.current.util.enlivenObjects(
-                fabricDataList,
-                addHistoryToCanvas,
-              );
-              if (enlivener && typeof enlivener.then === 'function') {
-                enlivener.then(addHistoryToCanvas);
+              await enlivenObjects(fabricRef.current, fabricDataList, addHistoryToCanvas);
+              if (syncGeneration !== syncGenerationRef.current) return;
+
+              for (const msg of otherEvents) {
+                await handleAction(msg.action, msg.objectId, msg.data, msg.senderId?.toString());
               }
             } else {
               // 추가된 객체가 없으면 나머지 이벤트만 처리
-              otherEvents.forEach((msg) => {
-                handleAction(msg.action, msg.objectId, msg.data, msg.senderId?.toString());
-              });
+              for (const msg of otherEvents) {
+                await handleAction(msg.action, msg.objectId, msg.data, msg.senderId?.toString());
+              }
             }
           } else if (data && (Array.isArray(data) || Array.isArray(data.objects))) {
             // [New] Handle direct object list (Snapshot) for full sync
-            handleAction('CLEAR', undefined, undefined, undefined);
+            await handleAction('CLEAR', undefined, undefined, undefined);
+            if (syncGeneration !== syncGenerationRef.current) return;
             const rawObjects = Array.isArray(data) ? data : data.objects;
             const objectsData = JSON.parse(JSON.stringify(rawObjects));
 
             if (fabricRef.current && objectsData.length > 0) {
               const addObjectsToCanvas = (objects: any[]) => {
                 const canvas = fabricCanvasRef.current;
+                if (syncGeneration !== syncGenerationRef.current) return;
                 if (!canvas) return;
 
                 objects.forEach((o, i) => {
@@ -378,17 +457,12 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
                   o.setCoords();
                   canvas.add(o);
+                  registerObject(o);
                 });
                 canvas.requestRenderAll();
               };
 
-              const enlivener = fabricRef.current.util.enlivenObjects(
-                objectsData,
-                addObjectsToCanvas,
-              );
-              if (enlivener && typeof enlivener.then === 'function') {
-                enlivener.then(addObjectsToCanvas);
-              }
+              await enlivenObjects(fabricRef.current, objectsData, addObjectsToCanvas);
             }
           }
         } else {
@@ -401,10 +475,43 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           ) {
             return;
           }
-          handleAction(action, objectId, data, senderId?.toString());
+          await handleAction(action, objectId, data, senderId?.toString());
         }
       },
-      [handleAction, currentUserId],
+      [currentUserId, enlivenObjects, handleAction],
+    );
+
+    const flushPendingServerMessages = useCallback(async () => {
+      pendingServerFlushTimerRef.current = null;
+      if (isFlushingServerMessagesRef.current) return;
+
+      isFlushingServerMessagesRef.current = true;
+      try {
+        while (pendingServerMessagesRef.current.length > 0) {
+          const pendingMessages = pendingServerMessagesRef.current.splice(0);
+          for (const message of pendingMessages) {
+            await processMessage(message);
+          }
+        }
+      } finally {
+        isFlushingServerMessagesRef.current = false;
+      }
+    }, [processMessage]);
+
+    const enqueueServerMessage = useCallback(
+      (message: WhiteboardMessage) => {
+        pendingServerMessagesRef.current.push(message);
+
+        if (pendingServerFlushTimerRef.current || isFlushingServerMessagesRef.current) {
+          return;
+        }
+
+        pendingServerFlushTimerRef.current = window.setTimeout(
+          flushPendingServerMessages,
+          WHITEBOARD_REMOTE_BATCH_MS,
+        );
+      },
+      [flushPendingServerMessages],
     );
 
     useImperativeHandle(ref, () => ({
@@ -418,10 +525,22 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           messageQueueRef.current.push(message);
           return;
         }
-        processMessage(message);
+        enqueueServerMessage(message);
       },
       isReady: () => isFabricLoaded && !!fabricCanvasRef.current,
     }));
+
+    useEffect(() => {
+      return () => {
+        if (pendingServerFlushTimerRef.current) {
+          window.clearTimeout(pendingServerFlushTimerRef.current);
+          pendingServerFlushTimerRef.current = null;
+        }
+        pendingServerMessagesRef.current = [];
+        isFlushingServerMessagesRef.current = false;
+        objectIndexRef.current.clear();
+      };
+    }, []);
 
     useEffect(() => {
       if (!canvasEl.current) return;
@@ -476,12 +595,14 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           canvas.on('path:created', (e: any) => {
             if (e.path) {
               ensureId(e.path);
+              registerObject(e.path);
               onObjectAddedRef.current?.(e.path);
             }
           });
 
           canvas.on('object:modified', (e: any) => {
             if (e.target) {
+              registerObject(e.target);
               onObjectModifiedRef.current?.(e.target);
             }
           });
@@ -515,10 +636,10 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
     // Process queued messages when fabric is loaded
     useEffect(() => {
       if (isFabricLoaded && messageQueueRef.current.length > 0) {
-        messageQueueRef.current.forEach((msg) => processMessage(msg));
+        messageQueueRef.current.forEach((msg) => enqueueServerMessage(msg));
         messageQueueRef.current = [];
       }
-    }, [isFabricLoaded, processMessage]);
+    }, [isFabricLoaded, enqueueServerMessage]);
 
     // Updates when tool changes
     const mouseDownHandlerRef = useRef<((opt: any) => void) | null>(null);
@@ -573,7 +694,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
         handler = (opt) => {
           if (opt.target) {
             const targetId = opt.target.id;
-            canvas.remove(opt.target);
+            removeObject(canvas, opt.target);
             canvas.requestRenderAll();
             if (targetId) onObjectRemovedRef.current?.(targetId);
           }
@@ -596,6 +717,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           });
           rect.id = crypto.randomUUID();
           canvas.add(rect);
+          registerObject(rect);
           canvas.setActiveObject(rect);
           canvas.requestRenderAll();
           onObjectAddedRef.current?.(rect);
@@ -617,6 +739,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           });
           text.id = crypto.randomUUID();
           canvas.add(text);
+          registerObject(text);
           canvas.setActiveObject(text);
           text.enterEditing();
           canvas.requestRenderAll();
@@ -640,7 +763,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
           mouseDownHandlerRef.current = null;
         }
       };
-    }, [activeTool, isFabricLoaded, currentUserId]);
+    }, [activeTool, isFabricLoaded, currentUserId, registerObject, removeObject]);
 
     // Special listener for Text editing exit to trigger modification update
     useEffect(() => {
@@ -664,7 +787,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
 
           if (isBlankText(target.text)) {
             // User didn't enter anything -> remove locally and do not broadcast
-            canvas.remove(target);
+            removeObject(canvas, target);
             canvas.requestRenderAll();
             return;
           }
@@ -684,7 +807,7 @@ export const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvas
         canvas.off('text:editing:entered', enteredHandler);
         canvas.off('text:editing:exited', exitedHandler);
       };
-    }, [isFabricLoaded]);
+    }, [isFabricLoaded, removeObject]);
 
     return (
       <div className="relative border border-gray-200 shadow-sm">

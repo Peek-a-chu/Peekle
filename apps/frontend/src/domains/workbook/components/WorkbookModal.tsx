@@ -37,6 +37,8 @@ interface WorkbookModalProps {
   onSubmit: (data: { title: string; description: string; problems: WorkbookProblemItem[] }) => void;
 }
 
+const EMPTY_WORKBOOK_PROBLEMS: WorkbookProblem[] = [];
+
 interface SortableProblemItemProps {
   item: WorkbookProblemItem;
   index: number;
@@ -89,7 +91,7 @@ export function WorkbookModal({
   onOpenChange,
   mode,
   workbook,
-  problems = [],
+  problems = EMPTY_WORKBOOK_PROBLEMS,
   onSubmit,
 }: WorkbookModalProps) {
   const isMobile = useIsMobile();
@@ -227,7 +229,12 @@ export function WorkbookModal({
   };
 
   const searchSection = (
-    <div className={cn('overflow-visible min-w-0', isMobile ? 'px-4 py-3 border-b shrink-0' : 'p-5 flex-1')}>
+    <div
+      className={cn(
+        'overflow-visible min-w-0',
+        isMobile ? 'px-4 py-3 border-b shrink-0' : 'p-5 flex-1',
+      )}
+    >
       <label className="text-sm font-medium block mb-2">문제 검색</label>
       <div className="relative min-w-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -267,7 +274,9 @@ export function WorkbookModal({
                 <span>검색 중...</span>
               </div>
             ) : searchResults.length > 0 ? (
-              <div className={cn('py-1 overflow-y-auto', isMobile ? 'max-h-[180px]' : 'max-h-[240px]')}>
+              <div
+                className={cn('py-1 overflow-y-auto', isMobile ? 'max-h-[180px]' : 'max-h-[240px]')}
+              >
                 {searchResults.map((problem) => (
                   <button
                     key={problem.id}
@@ -275,9 +284,13 @@ export function WorkbookModal({
                     onClick={() => handleAddProblem(problem)}
                     className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm transition-colors min-w-0"
                   >
-                    <span className="font-medium text-primary w-12 shrink-0">{problem.externalId}</span>
+                    <span className="font-medium text-primary w-12 shrink-0">
+                      {problem.externalId}
+                    </span>
                     <span className="truncate flex-1 min-w-0">{problem.title}</span>
-                    <span className={cn('text-xs text-muted-foreground shrink-0', isMobile && 'hidden')}>
+                    <span
+                      className={cn('text-xs text-muted-foreground shrink-0', isMobile && 'hidden')}
+                    >
                       {problem.tier}
                     </span>
                   </button>
@@ -291,7 +304,9 @@ export function WorkbookModal({
           </div>
         )}
       </div>
-      {!isMobile && <p className="text-xs text-muted-foreground mt-2">클릭하면 우측 목록에 추가됩니다</p>}
+      {!isMobile && (
+        <p className="text-xs text-muted-foreground mt-2">클릭하면 우측 목록에 추가됩니다</p>
+      )}
     </div>
   );
 
@@ -317,8 +332,15 @@ export function WorkbookModal({
             </div>
           </div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={problemList.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={problemList.map((p) => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
               <div className="space-y-1.5">
                 {problemList.map((item, index) => (
                   <SortableProblemItem
