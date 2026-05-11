@@ -133,10 +133,6 @@ livekit:
   api-key: ${LIVEKIT_API_KEY:devkey}
   api-secret: ${LIVEKIT_API_SECRET:secret}
 
-gemini:
-  api-key: ${GEMINI_API_KEY:}
-  model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
-
 leetcode:
   translation:
     daily-limit: ${LEETCODE_TRANSLATION_DAILY_LIMIT:10}

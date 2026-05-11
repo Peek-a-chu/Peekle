@@ -80,6 +80,10 @@ class UserActivity(BaseModel):
     candidateProblems: Optional[List[CandidateProblem]] = []
 
 
+class LeetcodeTranslationRequest(BaseModel):
+    texts: Optional[List[str]] = []
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -331,6 +335,63 @@ def build_prompt(activity: UserActivity, candidates: List[dict], strong_tags: Li
   ]
 }}
 """
+
+
+def build_leetcode_translation_prompt(texts: List[str]) -> str:
+    input_json = json.dumps(texts, ensure_ascii=False)
+    return f"""
+You translate LeetCode problem statement or solution analysis fragments from English to Korean.
+Return only a valid JSON object in this exact shape: {{"translations":["..."]}}.
+
+Rules:
+- Keep the number and order of translations exactly the same as the input array.
+- Preserve placeholder markers exactly as-is, including §0§, §1§, §2§ and __peekle_0__ style markers.
+- Preserve programming identifiers, numbers, code values, booleans, and inline code meaning.
+- Do not translate labels named Input or Output if they appear.
+- Translate Explanation text naturally into Korean.
+- Do not add commentary, markdown, or extra keys.
+
+Input JSON array:
+{input_json}
+"""
+
+
+@app.post("/translate/leetcode")
+async def translate_leetcode(request: Request):
+    try:
+        try:
+            data = await request.json()
+            payload = LeetcodeTranslationRequest(**data)
+        except Exception:
+            payload = LeetcodeTranslationRequest()
+
+        texts = payload.texts or []
+        if not texts:
+            return {"translations": []}
+
+        if not os.getenv("GEMINI_API_KEY"):
+            raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured")
+
+        response = ai_client.chat.completions.create(
+            model=GEMINI_CHAT_MODEL,
+            messages=[{"role": "user", "content": build_leetcode_translation_prompt(texts)}],
+            temperature=0.1,
+        )
+
+        raw_content = (response.choices[0].message.content or "").strip()
+        parsed = extract_json_object(raw_content) or {}
+        translations = parsed.get("translations", []) if isinstance(parsed, dict) else []
+
+        if not isinstance(translations, list) or len(translations) != len(texts):
+            raise HTTPException(status_code=502, detail="Invalid translation response")
+
+        return {"translations": [str(item) for item in translations]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] LeetCode 번역 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/recommend/intelligent")
