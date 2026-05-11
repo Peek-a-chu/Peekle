@@ -1,8 +1,14 @@
 import { useInfiniteQuery, UseInfiniteQueryResult, InfiniteData } from '@tanstack/react-query';
 import { fetchSearchResults, SearchResponse, SearchCategory } from '@/api/searchApi';
+import {
+  MIN_SEARCH_LENGTH,
+  SEARCH_STALE_TIME_MS,
+  normalizeSearchKeyword,
+  normalizeSearchList,
+  searchQueryKeys,
+} from '@/lib/search/searchConfig';
 
-export const MIN_SEARCH_LENGTH = 1;
-const STALE_TIME_MS = 5 * 60 * 1000; // 5 minutes
+export { MIN_SEARCH_LENGTH };
 
 interface UseSearchParams {
   keyword: string;
@@ -23,24 +29,39 @@ export function useSearch({
   tags,
   enabled = true,
 }: UseSearchParams): UseSearchResult {
+  const normalizedKeyword = normalizeSearchKeyword(keyword);
+  const normalizedTiers = normalizeSearchList(tiers);
+  const normalizedTags = normalizeSearchList(tags);
+
   return useInfiniteQuery<SearchResponse, Error>({
-    queryKey: ['search', keyword, category, tiers, tags] as const,
-    queryFn: ({ pageParam = 0 }) =>
-      fetchSearchResults({
-        keyword,
-        category,
-        page: pageParam as number,
-        size,
-        tiers,
-        tags,
-      }),
+    queryKey: searchQueryKeys.results({
+      keyword: normalizedKeyword,
+      category,
+      size,
+      tiers: normalizedTiers,
+      tags: normalizedTags,
+    }),
+    queryFn: ({ pageParam = 0, signal }) =>
+      fetchSearchResults(
+        {
+          keyword: normalizedKeyword,
+          category,
+          page: pageParam as number,
+          size,
+          tiers: normalizedTiers,
+          tags: normalizedTags,
+        },
+        {
+          signal,
+        },
+      ),
     getNextPageParam: (lastPage) => {
       if (!lastPage?.pagination) return undefined;
       const { page, totalPages } = lastPage.pagination;
       return page < totalPages - 1 ? page + 1 : undefined;
     },
-    enabled: enabled && keyword.trim().length >= MIN_SEARCH_LENGTH,
-    staleTime: STALE_TIME_MS,
+    enabled: enabled && normalizedKeyword.length >= MIN_SEARCH_LENGTH,
+    staleTime: SEARCH_STALE_TIME_MS,
     initialPageParam: 0,
   });
 }
@@ -50,9 +71,10 @@ export function useSearch({
  * Useful for invalidation and prefetching
  */
 export const searchKeys = {
-  all: ['search'] as const,
-  lists: () => [...searchKeys.all, 'list'] as const,
-  list: (filters: { query: string; type?: string }) => [...searchKeys.lists(), filters] as const,
+  all: searchQueryKeys.all,
+  lists: () => [...searchQueryKeys.all, 'list'] as const,
+  list: (filters: { query: string; type?: string }) =>
+    [...searchKeys.lists(), { ...filters, query: normalizeSearchKeyword(filters.query) }] as const,
   details: () => [...searchKeys.all, 'detail'] as const,
   detail: (id: number) => [...searchKeys.details(), id] as const,
 };
