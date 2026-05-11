@@ -12,10 +12,16 @@ import { WhiteboardMessage } from '@/domains/study/types/whiteboard';
 import { Pencil, Square, Type, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSocketContext } from '@/domains/study/context/SocketContext';
+import { optimizeWhiteboardMessagePayload } from '@/domains/study/utils/whiteboardPathOptimization';
 
 interface WhiteboardPanelProps {
   className?: string;
 }
+
+type WhiteboardSerializableObject = {
+  id?: string;
+  toObject?: (properties?: string[]) => unknown;
+};
 
 export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   const { id: roomId } = useParams();
@@ -27,6 +33,8 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   const [activeTool, setActiveTool] = React.useState<'pen' | 'shape' | 'text' | 'eraser'>('pen');
   const canvasRef = useRef<WhiteboardCanvasRef>(null);
   const { connected } = useSocketContext();
+  const outboundMessageQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const isMountedRef = useRef(true);
 
   const handleMessage = useCallback((msg: WhiteboardMessage) => {
     console.log(`[WhiteboardOverlay] Received message:`, msg.action, msg.objectId || '');
@@ -43,6 +51,12 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
   );
 
   const hasJoinedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Reset join status when whiteboard is closed
   useEffect(() => {
@@ -67,6 +81,24 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
     console.log('[WhiteboardOverlay] Canvas ready');
   }, []);
 
+  const enqueueWhiteboardMessage = useCallback(
+    (messageFactory: () => WhiteboardMessage | Promise<WhiteboardMessage>) => {
+      outboundMessageQueueRef.current = outboundMessageQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const message = await optimizeWhiteboardMessagePayload(await messageFactory());
+            if (isMountedRef.current) {
+              sendMessage(message);
+            }
+          } catch (error) {
+            console.warn('[WhiteboardOverlay] Failed to send whiteboard message', error);
+          }
+        });
+    },
+    [sendMessage],
+  );
+
   // [Fix] Request initial state when connected and whiteboard is open
   useEffect(() => {
     if (isWhiteboardOverlayOpen && connected && !hasJoinedRef.current) {
@@ -76,29 +108,27 @@ export function WhiteboardPanel({ className }: WhiteboardPanelProps) {
     }
   }, [isWhiteboardOverlayOpen, connected, sendMessage]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleObjectAdded = useCallback(
-    (obj: any) => {
+    (obj: WhiteboardSerializableObject) => {
       const data = obj.toObject ? obj.toObject(['id']) : obj;
-      sendMessage({ action: 'ADDED', objectId: obj.id, data });
+      enqueueWhiteboardMessage(() => ({ action: 'ADDED', objectId: obj.id, data }));
     },
-    [sendMessage],
+    [enqueueWhiteboardMessage],
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleObjectModified = useCallback(
-    (obj: any) => {
+    (obj: WhiteboardSerializableObject) => {
       const data = obj.toObject ? obj.toObject(['id']) : obj;
-      sendMessage({ action: 'MODIFIED', objectId: obj.id, data });
+      enqueueWhiteboardMessage(() => ({ action: 'MODIFIED', objectId: obj.id, data }));
     },
-    [sendMessage],
+    [enqueueWhiteboardMessage],
   );
 
   const handleObjectRemoved = useCallback(
     (objectId: string) => {
-      sendMessage({ action: 'REMOVED', objectId });
+      enqueueWhiteboardMessage(() => ({ action: 'REMOVED', objectId }));
     },
-    [sendMessage],
+    [enqueueWhiteboardMessage],
   );
 
   if (!isWhiteboardOverlayOpen) {

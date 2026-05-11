@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import Editor from '@monaco-editor/react';
 import { SubmissionHistory } from '../types';
 import { X } from 'lucide-react';
 import { CCCalendarWidget, CCInlineCalendar } from '../../study/components/CCCalendarWidget';
-import { startOfToday, format, parse } from 'date-fns';
+import { startOfToday, format } from 'date-fns';
+import { CodeViewerSkeleton } from './CodeViewerSkeleton';
+import { useSubmissionCodeViewer } from '../hooks/useSubmissionCodeViewer';
+
+const CCSubmissionCodeViewer = dynamic(() => import('./CCSubmissionCodeViewer'), {
+  ssr: false,
+  loading: () => <CodeViewerSkeleton />,
+});
 
 interface Props {
   initialHistory: SubmissionHistory[];
@@ -18,7 +25,8 @@ export function CCHistoryList({ initialHistory }: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  const [selectedSubmission, setSelectedSubmission] = useState<SubmissionHistory | null>(null);
+  const { selectedSubmission, selectSubmission, closeSubmission } =
+    useSubmissionCodeViewer(initialHistory);
 
   // Initialize filter state from URL
   const [filterDate, setFilterDate] = useState(searchParams.get('date') || '');
@@ -45,7 +53,7 @@ export function CCHistoryList({ initialHistory }: Props) {
             return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
           }
           return new Date(); // fallback
-        } catch (e) {
+        } catch {
           return null;
         }
       })
@@ -62,26 +70,13 @@ export function CCHistoryList({ initialHistory }: Props) {
     }
   }, [filterDate]);
 
-  // Fixed width for the side panel matching Workbook page style approximately
-  const PANEL_WIDTH = 480;
-
   // URL query params 처리 (submissionId) 및 필터 상태 동기화
   useEffect(() => {
-    const submissionId = searchParams.get('submissionId');
-    if (submissionId) {
-      const target = initialHistory.find((h) => String(h.id) === submissionId);
-      if (target) {
-        setSelectedSubmission(target);
-      }
-    } else {
-      setSelectedSubmission(null);
-    }
-
     // Sync local state if URL changes externally (e.g. back button)
     setFilterDate(searchParams.get('date') || '');
     setFilterTier(searchParams.get('tier') || '전체');
     setFilterSource(searchParams.get('sourceType') || 'ALL');
-  }, [searchParams, initialHistory]);
+  }, [searchParams]);
 
   const updateFilters = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -135,21 +130,6 @@ export function CCHistoryList({ initialHistory }: Props) {
     // The previous code block used `searchParams.get('status')` directly.
     router.replace(pathname);
     setIsCalendarOpen(false);
-  };
-
-  const handleSelectSubmission = (item: SubmissionHistory) => {
-    setSelectedSubmission(item);
-    // URL 업데이트
-    const newUrl = new URL(window.location.href);
-    newUrl.searchParams.set('submissionId', String(item.id));
-    window.history.pushState({}, '', newUrl.toString());
-  };
-
-  const handleClosePanel = () => {
-    setSelectedSubmission(null);
-    const newUrl = new URL(window.location.href);
-    newUrl.searchParams.delete('submissionId');
-    window.history.pushState({}, '', newUrl.toString());
   };
 
   // Mock Filters
@@ -266,7 +246,8 @@ export function CCHistoryList({ initialHistory }: Props) {
             {initialHistory.map((item) => (
               <div
                 key={item.id}
-                onClick={() => handleSelectSubmission(item)}
+                data-testid={`history-submission-${item.id}`}
+                onClick={() => selectSubmission(item)}
                 className={`bg-card border rounded-xl p-4 flex items-center justify-between cursor-pointer transition-all hover:shadow-md hover:border-primary/50 group
                           ${selectedSubmission?.id === item.id ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border'}
                       `}
@@ -286,12 +267,13 @@ export function CCHistoryList({ initialHistory }: Props) {
                       </span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold text-white
-                                      ${item.tier.includes('Bronze')
-                            ? 'bg-amber-700'
-                            : item.tier.includes('Silver')
-                              ? 'bg-slate-400'
-                              : 'bg-yellow-500' // Gold etc
-                          }`}
+                                      ${
+                                        item.tier.includes('Bronze')
+                                          ? 'bg-amber-700'
+                                          : item.tier.includes('Silver')
+                                            ? 'bg-slate-400'
+                                            : 'bg-yellow-500' // Gold etc
+                                      }`}
                       >
                         {item.tier}
                       </span>
@@ -350,7 +332,7 @@ export function CCHistoryList({ initialHistory }: Props) {
                 </div>
               </div>
               <button
-                onClick={handleClosePanel}
+                onClick={closeSubmission}
                 className="p-1.5 hover:bg-muted rounded-md text-muted-foreground transition"
               >
                 <X className="w-5 h-5" />
@@ -358,31 +340,7 @@ export function CCHistoryList({ initialHistory }: Props) {
             </div>
 
             {/* Code Area */}
-            <div className="flex-1 overflow-hidden relative group bg-[#1e1e1e]">
-              <Editor
-                height="100%"
-                language={selectedSubmission.language.toLowerCase()}
-                theme="vs-dark"
-                value={selectedSubmission.code || '// 코드를 불러올 수 없습니다.'}
-                options={{
-                  readOnly: true,
-                  fontFamily: "'D2Coding', 'Fira Code', Consolas, monospace",
-                  fontSize: 14,
-                  minimap: { enabled: false },
-                  wordWrap: 'on',
-                  automaticLayout: true,
-                  padding: { top: 16 },
-                }}
-              />
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => navigator.clipboard.writeText(selectedSubmission.code || '')}
-                  className="px-3 py-1.5 bg-zinc-800 text-zinc-300 text-xs rounded border border-zinc-700 hover:bg-zinc-700 shadow-sm"
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
+            <CCSubmissionCodeViewer submission={selectedSubmission} />
 
             {/* Footer */}
             <div className="p-4 border-t border-border flex justify-end gap-2 bg-muted/10 shrink-0">

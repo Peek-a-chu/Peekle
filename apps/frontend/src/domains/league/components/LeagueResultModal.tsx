@@ -2,46 +2,55 @@
 
 import { useEffect, useState } from 'react';
 import {
-  getUnviewedLeagueHistory,
   markLeagueHistoryAsViewed,
   getLeagueHistoryRanking,
   LeagueHistoryResponse,
   BackendRankingMember,
 } from '@/api/leagueApi';
-import LeagueIcon, { LeagueType, LEAGUE_ORDER, LEAGUE_NAMES } from '@/components/LeagueIcon';
-import { motion, AnimatePresence } from 'framer-motion';
+import LeagueIcon, { LeagueType, LEAGUE_NAMES } from '@/components/LeagueIcon';
 import { UserIcon } from '@/components/UserIcon';
-import Image from 'next/image';
 
 type ModalStep = 'RANKING' | 'RESULT';
 
-export default function LeagueResultModal() {
-  const [history, setHistory] = useState<LeagueHistoryResponse | null>(null);
+interface LeagueResultModalProps {
+  initialHistory: LeagueHistoryResponse;
+  onDone: () => void;
+}
+
+export default function LeagueResultModal({ initialHistory, onDone }: LeagueResultModalProps) {
+  const [history, setHistory] = useState<LeagueHistoryResponse | null>(initialHistory);
   const [ranking, setRanking] = useState<BackendRankingMember[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [step, setStep] = useState<ModalStep>('RANKING');
   const [isLoadingRanking, setIsLoadingRanking] = useState(false);
 
   useEffect(() => {
-    async function checkHistory() {
-      try {
-        const data = await getUnviewedLeagueHistory();
-        if (data) {
-          setHistory(data);
-          setIsOpen(true);
+    let cancelled = false;
 
-          // Fetch ranking immediately if data exists
-          setIsLoadingRanking(true);
-          const rankList = await getLeagueHistoryRanking(data.id);
-          setRanking(rankList);
-          setIsLoadingRanking(false);
-        }
+    async function loadRanking() {
+      try {
+        setIsLoadingRanking(true);
+        const rankList = await getLeagueHistoryRanking(initialHistory.id);
+        if (cancelled) return;
+        setRanking(rankList);
+        setIsLoadingRanking(false);
       } catch (e) {
+        if (cancelled) return;
         console.error(e);
+        setIsLoadingRanking(false);
       }
     }
-    checkHistory();
-  }, []);
+
+    setHistory(initialHistory);
+    setRanking([]);
+    setIsOpen(true);
+    setStep('RANKING');
+    void loadRanking();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialHistory]);
 
   const handleContinue = async () => {
     if (step === 'RANKING') {
@@ -52,6 +61,7 @@ export default function LeagueResultModal() {
         setIsOpen(false);
         setHistory(null);
         setStep('RANKING'); // Reset for next time
+        onDone();
       }
     }
   };
