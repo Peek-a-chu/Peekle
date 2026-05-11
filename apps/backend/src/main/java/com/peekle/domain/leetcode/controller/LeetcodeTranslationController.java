@@ -2,8 +2,8 @@ package com.peekle.domain.leetcode.controller;
 
 import com.peekle.domain.leetcode.dto.request.LeetcodeTranslationRequest;
 import com.peekle.domain.leetcode.dto.response.LeetcodeTranslationResponse;
-import com.peekle.domain.leetcode.service.GeminiTranslationService;
 import com.peekle.domain.leetcode.service.LeetcodeTranslationQuotaService;
+import com.peekle.domain.leetcode.service.LeetcodeTranslationService;
 import com.peekle.global.dto.ApiResponse;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class LeetcodeTranslationController {
 
-    private final GeminiTranslationService geminiTranslationService;
+    private final LeetcodeTranslationService leetcodeTranslationService;
     private final LeetcodeTranslationQuotaService leetcodeTranslationQuotaService;
 
     @PostMapping("/translate")
@@ -35,8 +35,8 @@ public class LeetcodeTranslationController {
         }
 
         log.info("LeetCode 번역 요청 - userId: {}, count: {}", userId, request.texts().size());
-        geminiTranslationService.validateRequest(request.texts());
+        leetcodeTranslationService.validateRequest(request.texts());
         leetcodeTranslationQuotaService.consume(userId);
-        return ApiResponse.success(new LeetcodeTranslationResponse(geminiTranslationService.translate(request.texts())));
+        return ApiResponse.success(new LeetcodeTranslationResponse(leetcodeTranslationService.translate(request.texts())));
     }
 }
