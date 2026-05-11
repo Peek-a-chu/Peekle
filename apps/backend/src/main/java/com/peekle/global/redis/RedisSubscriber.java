@@ -31,7 +31,7 @@ public class RedisSubscriber implements MessageListener {
             String topic = new String(message.getChannel());
 
             messagingTemplate.convertAndSend("/" + topic, roomMessage);
-            log.info("Redis Sub >> Stomp Send: {} -> {}", topic, roomMessage);
+            log.debug("Redis subscribe dispatch: topic={}", topic);
 
         } catch (Exception e) {
             log.error("Redis Subscriber Error", e);
