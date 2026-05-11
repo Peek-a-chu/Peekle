@@ -57,12 +57,42 @@ export interface SearchParams {
   tags?: string[];
 }
 
+interface SearchApiUser {
+  userId: number;
+  nickname?: string;
+  handle?: string;
+  tier?: string;
+  profileImg?: string;
+  profileImage?: string;
+  league?: string;
+}
+
+interface SearchApiData {
+  problems?: Problem[];
+  workbooks?: Workbook[];
+  users?: SearchApiUser[];
+}
+
+interface SearchApiResponse {
+  category: SearchCategory;
+  counts: null;
+  data?: SearchApiData;
+  pagination: Pagination;
+}
+
+interface FetchSearchOptions {
+  signal?: AbortSignal;
+}
+
 /**
  * Fetch search results with pagination via Unified Search API
  * @param params - Search parameters
  * @returns Search results
  */
-export async function fetchSearchResults(params: SearchParams): Promise<SearchResponse> {
+export async function fetchSearchResults(
+  params: SearchParams,
+  options: FetchSearchOptions = {},
+): Promise<SearchResponse> {
   const { keyword, category = 'ALL', size = 20, page = 0, tiers, tags } = params;
 
   const urlParams = new URLSearchParams();
@@ -79,9 +109,10 @@ export async function fetchSearchResults(params: SearchParams): Promise<SearchRe
   }
 
   const queryString = urlParams.toString();
-  console.log('Fetching search results:', `/api/search?${queryString}`);
 
-  const res = await apiFetch<any>(`/api/search?${queryString}`);
+  const res = await apiFetch<SearchApiResponse>(`/api/search?${queryString}`, {
+    signal: options.signal,
+  });
 
   if (!res.success || !res.data) {
     console.error('Search API error:', res);
@@ -93,9 +124,9 @@ export async function fetchSearchResults(params: SearchParams): Promise<SearchRe
   const innerData = searchResult.data || {};
   const rawUsers = innerData.users || [];
 
-  const mappedUsers = rawUsers.map((user: any) => ({
+  const mappedUsers = rawUsers.map((user) => ({
     userId: user.userId,
-    handle: user.nickname || user.handle, // Map nickname to handle
+    handle: user.nickname || user.handle || '', // Map nickname to handle
     tier: user.tier || user.league || 'Unranked', // Fallback to league for color coding
     profileImg: user.profileImg || user.profileImage, // Map profileImg to profileImg
     league: user.league || user.tier || 'Unranked', // Use tier as league if league is missing
