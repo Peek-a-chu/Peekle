@@ -11,9 +11,12 @@ import com.peekle.domain.problem.repository.TagRepository;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.metrics.BenchmarkSqlStatisticsService;
+import com.peekle.global.metrics.BenchmarkStartGameStageMetricsService;
 import com.peekle.global.redis.RedisKeyConst;
 import com.peekle.global.redis.RedisPublisher;
 import com.peekle.global.socket.SocketResponse;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -22,11 +25,11 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -49,6 +52,15 @@ import com.peekle.global.util.SolvedAcLevelUtil;
 public class RedisGameService {
 
     private static final String METRIC_GAME_START_DURATION = "game.start.duration";
+    private static final String METRIC_GAME_START_TOTAL = "game.start.total.ms";
+    private static final String METRIC_GAME_START_LOCK_WAIT = "game.start.lock.wait.ms";
+    private static final String METRIC_GAME_START_LOCK_HOLD = "game.start.lock.hold.ms";
+    private static final String METRIC_GAME_START_READY_CHECK = "game.start.ready_check.ms";
+    private static final String METRIC_GAME_START_PROBLEM_SELECT = "game.start.problem_select.ms";
+    private static final String METRIC_GAME_START_REDIS_WRITE = "game.start.redis_write.ms";
+    private static final String METRIC_GAME_START_PUBLISH = "game.start.publish.ms";
+    private static final String METRIC_GAME_START_SCHEDULE_TIMEOUT = "game.start.schedule_timeout.ms";
+    private static final String METRIC_GAME_START_RESULT = "game.start.result";
     private static final String METRIC_GAME_CREATE_DURATION = "game.create.duration";
     private static final String METRIC_GAME_START_FAILURE = "game.start.failure";
     private static final String METRIC_GAME_START_SQL_COUNT = "game.start.sql_count";
@@ -61,6 +73,9 @@ public class RedisGameService {
     private static final String METRIC_GAME_FINISH_CLAIM_REJECTED = "game.finish.claim.rejected";
     private static final String RESULT_SUCCESS = "success";
     private static final String RESULT_FAILURE = "failure";
+    private static final String FAILURE_REASON_NONE = "none";
+    private static final String FAILURE_REASON_LOCK_BUSY = "lock_busy";
+    private static final String FAILURE_REASON_LOCK_INTERRUPTED = "lock_interrupted";
     private static final String FINISH_RESULT_PROCESSED = "processed";
     private static final String FINISH_RESULT_CLAIM_REJECTED = "claim_rejected";
     private static final String FINISH_RESULT_NOOP_NON_PLAYING = "noop_non_playing";
@@ -70,7 +85,6 @@ public class RedisGameService {
     private static final String FINISH_TRIGGER_TIMEOUT_ASYNC = "timeout_async";
     private static final String FINISH_TRIGGER_SOLVE = "solve";
     private static final String FINISH_TRIGGER_GRACE_TIMEOUT = "grace_timeout";
-    private static final long FINISH_CLAIM_TTL_SECONDS = 300L;
     private static final long FINISH_CLAIM_RESULT_NOOP_NON_PLAYING = 0L;
     private static final long FINISH_CLAIM_RESULT_GRANTED = 1L;
     private static final long FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING = 2L;
@@ -80,36 +94,6 @@ public class RedisGameService {
     private static final String CACHE_STATUS_MISS = "miss";
     private static final String CACHE_STATUS_DB = "db";
     private static final String CACHE_STATUS_NA = "na";
-    private static final DefaultRedisScript<Long> FINISH_CLAIM_ACQUIRE_SCRIPT = buildLongScript(
-            "local currentStatus = redis.call('GET', KEYS[1])\n"
-                    + "local hasClaim = redis.call('EXISTS', KEYS[2])\n"
-                    + "if currentStatus == ARGV[1] then\n"
-                    + "  if hasClaim == 1 then\n"
-                    + "    return -1\n"
-                    + "  end\n"
-                    + "  redis.call('SET', KEYS[2], ARGV[3], 'EX', " + FINISH_CLAIM_TTL_SECONDS + ")\n"
-                    + "  redis.call('SET', KEYS[1], ARGV[2])\n"
-                    + "  return 1\n"
-                    + "end\n"
-                    + "if currentStatus == ARGV[2] then\n"
-                    + "  if hasClaim == 1 then\n"
-                    + "    return -1\n"
-                    + "  end\n"
-                    + "  redis.call('SET', KEYS[2], ARGV[3], 'EX', " + FINISH_CLAIM_TTL_SECONDS + ")\n"
-                    + "  return 2\n"
-                    + "end\n"
-                    + "return 0\n");
-    private static final DefaultRedisScript<Long> FINISH_CLAIM_ROLLBACK_SCRIPT = buildLongScript(
-            "local currentClaim = redis.call('GET', KEYS[2])\n"
-                    + "if currentClaim ~= ARGV[1] then\n"
-                    + "  return 0\n"
-                    + "end\n"
-                    + "redis.call('DEL', KEYS[2])\n"
-                    + "if redis.call('GET', KEYS[1]) == ARGV[3] then\n"
-                    + "  redis.call('SET', KEYS[1], ARGV[2])\n"
-                    + "  return 1\n"
-                    + "end\n"
-                    + "return 2\n");
     private static final Map<String, String> DEFAULT_TEMPLATES = new HashMap<>();
 
     static {
@@ -118,13 +102,6 @@ public class RedisGameService {
                 "import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // 코드를 작성해주세요\n        System.out.println(\"Hello World!\");\n    }\n}");
         DEFAULT_TEMPLATES.put("cpp",
                 "#include <iostream>\n#include <vector>\n#include <algorithm>\n\nusing namespace std;\n\nint main() {\n    // 코드를 작성해주세요\n    cout << \"Hello World!\" << endl;\n    return 0;\n}");
-    }
-
-    private static DefaultRedisScript<Long> buildLongScript(String scriptText) {
-        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-        script.setScriptText(scriptText);
-        script.setResultType(Long.class);
-        return script;
     }
 
     private static final class FinishClaimState {
@@ -146,10 +123,72 @@ public class RedisGameService {
         }
     }
 
+    private record ChatSenderSnapshot(String nickname, String profileImg) {
+        private static ChatSenderSnapshot from(User user) {
+            return new ChatSenderSnapshot(user.getNickname(), user.getProfileImg());
+        }
+    }
+
+    private static final class StartGameTiming {
+        private final long totalStartedAtNanos = System.nanoTime();
+        private Long lockHoldStartedAtNanos;
+        private long lockWaitNanos;
+        private long lockHoldNanos;
+        private long readyCheckNanos;
+        private long problemSelectNanos;
+        private long redisWriteNanos;
+        private long publishNanos;
+        private long scheduleTimeoutNanos;
+
+        private long totalElapsedNanos() {
+            return elapsedSince(totalStartedAtNanos);
+        }
+
+        private void addLockWaitElapsedSince(long startedAtNanos) {
+            lockWaitNanos += elapsedSince(startedAtNanos);
+        }
+
+        private void startLockHold() {
+            lockHoldStartedAtNanos = System.nanoTime();
+        }
+
+        private void stopLockHold() {
+            if (lockHoldStartedAtNanos != null) {
+                lockHoldNanos += elapsedSince(lockHoldStartedAtNanos);
+                lockHoldStartedAtNanos = null;
+            }
+        }
+
+        private void addReadyCheckElapsedSince(long startedAtNanos) {
+            readyCheckNanos += elapsedSince(startedAtNanos);
+        }
+
+        private void addProblemSelectElapsedSince(long startedAtNanos) {
+            problemSelectNanos += elapsedSince(startedAtNanos);
+        }
+
+        private void addRedisWriteElapsedSince(long startedAtNanos) {
+            redisWriteNanos += elapsedSince(startedAtNanos);
+        }
+
+        private void addPublishElapsedSince(long startedAtNanos) {
+            publishNanos += elapsedSince(startedAtNanos);
+        }
+
+        private void addScheduleTimeoutElapsedSince(long startedAtNanos) {
+            scheduleTimeoutNanos += elapsedSince(startedAtNanos);
+        }
+
+        private static long elapsedSince(long startedAtNanos) {
+            return Math.max(System.nanoTime() - startedAtNanos, 0L);
+        }
+    }
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisPublisher redisPublisher;
     private final RedissonClient redissonClient;
     private final GameService gameService;
+    private final GameFinishClaimService gameFinishClaimService;
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
     private final WorkbookRepository workbookRepository;
@@ -159,9 +198,18 @@ public class RedisGameService {
     private final WorkbookPreviewCacheService workbookPreviewCacheService;
     private final MeterRegistry meterRegistry;
     private final Optional<BenchmarkSqlStatisticsService> benchmarkSqlStatisticsService;
+    private final Optional<BenchmarkStartGameStageMetricsService> benchmarkStartGameStageMetricsService;
+    private final Cache<Long, ChatSenderSnapshot> chatSenderCache =
+            Caffeine.newBuilder()
+                    .maximumSize(50_000)
+                    .expireAfterWrite(Duration.ofMinutes(10))
+                    .build();
 
     @Value("${benchmark.game-finish.claim-enabled:true}")
-    private boolean finishClaimEnabled;
+    private boolean finishClaimEnabled = true;
+
+    @Value("${game.chat.sender-cache.enabled:true}")
+    private boolean chatSenderCacheEnabled;
 
     /**
      * 게임 상태 변경 메서드
@@ -203,14 +251,45 @@ public class RedisGameService {
     }
 
     private void updateGameStatusInternal(Long roomId, GameStatus nextStatus) {
+        updateGameStatusInternal(roomId, nextStatus, null);
+    }
+
+    private void updateGameStatusInternal(Long roomId, GameStatus nextStatus, StartGameTiming startGameTiming) {
         String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
-        GameStatus currentStatus = getCurrentGameStatus(roomId);
+        long redisStageStartedAtNanos = System.nanoTime();
+        GameStatus currentStatus;
+        try {
+            currentStatus = getCurrentGameStatus(roomId);
+        } finally {
+            if (startGameTiming != null) {
+                startGameTiming.addRedisWriteElapsedSince(redisStageStartedAtNanos);
+            }
+        }
 
         validateStatusTransition(currentStatus, nextStatus);
 
-        redisTemplate.opsForValue().set(statusKey, nextStatus.name());
+        redisStageStartedAtNanos = System.nanoTime();
+        try {
+            redisTemplate.opsForValue().set(statusKey, nextStatus.name());
+        } finally {
+            if (startGameTiming != null) {
+                startGameTiming.addRedisWriteElapsedSince(redisStageStartedAtNanos);
+            }
+        }
         log.info("Game Room {} Status Changed: {} -> {}", roomId, currentStatus, nextStatus);
 
+        long publishStageStartedAtNanos = System.nanoTime();
+        try {
+            publishGameStatusChange(roomId, nextStatus);
+        } finally {
+            if (startGameTiming != null) {
+                startGameTiming.addPublishElapsedSince(publishStageStartedAtNanos);
+            }
+        }
+        log.info("📢 [Lobby] Game Room {} Status Updated to {} - Broadcasting to lobby", roomId, nextStatus);
+    }
+
+    private void publishGameStatusChange(Long roomId, GameStatus nextStatus) {
         String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("STATUS_CHANGE", nextStatus));
 
@@ -220,7 +299,6 @@ public class RedisGameService {
         redisPublisher.publish(
                 new ChannelTopic(RedisKeyConst.TOPIC_GAME_LOBBY),
                 SocketResponse.of("LOBBY_ROOM_UPDATED", lobbyUpdateData));
-        log.info("📢 [Lobby] Game Room {} Status Updated to {} - Broadcasting to lobby", roomId, nextStatus);
     }
 
     private GameStatus getCurrentGameStatus(Long roomId) {
@@ -417,79 +495,115 @@ public class RedisGameService {
     // 게임 시작
     public void startGame(Long roomId, Long userId) {
         Timer.Sample timerSample = Timer.start(meterRegistry);
+        StartGameTiming startGameTiming = new StartGameTiming();
         long sqlSnapshot = snapshotSqlCount();
         String problemSource = CACHE_STATUS_NA;
         String cacheStatus = CACHE_STATUS_NA;
+        String failureReason = FAILURE_REASON_NONE;
         boolean success = false;
+        boolean lockAcquired = false;
         RLock lock = getGameStatusLock(roomId);
 
         try {
-            if (!lock.tryLock(2, 10, TimeUnit.SECONDS)) {
+            long lockWaitStartedAtNanos = System.nanoTime();
+            boolean acquired;
+            try {
+                acquired = lock.tryLock(2, 10, TimeUnit.SECONDS);
+            } finally {
+                startGameTiming.addLockWaitElapsedSince(lockWaitStartedAtNanos);
+            }
+
+            if (!acquired) {
+                failureReason = FAILURE_REASON_LOCK_BUSY;
                 throw new IllegalStateException("현재 다른 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.");
             }
+            lockAcquired = true;
+            startGameTiming.startLockHold();
 
             String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
-            problemSource = String.valueOf(redisTemplate.opsForHash().get(infoKey, "problemSource"));
-            if ("null".equals(problemSource) || problemSource == null || problemSource.isBlank()) {
-                problemSource = "BOJ_RANDOM";
-            }
-
-            if (getCurrentGameStatus(roomId) != GameStatus.WAITING) {
-                throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
-            }
-
-            String hostIdStr = (String) redisTemplate.opsForHash().get(infoKey, "hostId");
-            if (hostIdStr == null || !hostIdStr.equals(String.valueOf(userId))) {
-                throw new IllegalStateException("방장만 게임을 시작할 수 있습니다.");
-            }
-
             String readyKey = String.format(RedisKeyConst.GAME_ROOM_READY_STATUS, roomId);
-            redisTemplate.opsForHash().put(readyKey, String.valueOf(userId), "true");
-
             String playersKey = String.format(RedisKeyConst.GAME_ROOM_PLAYERS, roomId);
-            Set<Object> players = redisTemplate.opsForSet().members(playersKey);
+            Set<Object> players;
+            List<Object> orderedPlayers;
+            String problemCountStr = null;
 
-            if (players != null) {
-                for (Object player : players) {
-                    String isReady = (String) redisTemplate.opsForHash().get(readyKey, player);
-                    if (!"true".equals(isReady)) {
-                        throw new IllegalStateException("모든 플레이어가 준비해야 시작할 수 있습니다.");
+            long readyCheckStartedAtNanos = System.nanoTime();
+            try {
+                List<Object> roomStartFields = redisTemplate.opsForHash().multiGet(
+                        infoKey,
+                        List.of("problemSource", "hostId", "teamType", "problemCount"));
+                problemSource = String.valueOf(getAt(roomStartFields, 0));
+                if ("null".equals(problemSource) || problemSource == null || problemSource.isBlank()) {
+                    problemSource = "BOJ_RANDOM";
+                }
+
+                GameStatus currentStatus = getCurrentGameStatus(roomId);
+                if (currentStatus != GameStatus.WAITING) {
+                    throw new BusinessException(ErrorCode.GAME_ALREADY_STARTED);
+                }
+                validateStatusTransition(currentStatus, GameStatus.PLAYING);
+
+                String hostIdStr = stringValue(getAt(roomStartFields, 1));
+                if (hostIdStr == null || !hostIdStr.equals(String.valueOf(userId))) {
+                    throw new IllegalStateException("방장만 게임을 시작할 수 있습니다.");
+                }
+                problemCountStr = stringValue(getAt(roomStartFields, 3));
+
+                redisTemplate.opsForHash().put(readyKey, String.valueOf(userId), "true");
+
+                players = redisTemplate.opsForSet().members(playersKey);
+                orderedPlayers = toOrderedRedisMembers(players);
+
+                if (!orderedPlayers.isEmpty()) {
+                    List<Object> readyStatuses = redisTemplate.opsForHash().multiGet(readyKey, orderedPlayers);
+                    for (Object isReady : readyStatuses) {
+                        String readyStatus = stringValue(isReady);
+                        if (!"true".equals(readyStatus)) {
+                            throw new IllegalStateException("모든 플레이어가 준비해야 시작할 수 있습니다.");
+                        }
                     }
                 }
+
+                String teamType = stringValue(getAt(roomStartFields, 2));
+                if ("TEAM".equals(teamType)) {
+                    String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
+                    Map<Object, Object> teams = redisTemplate.opsForHash().entries(teamsKey);
+
+                    long redCount = teams.values().stream().filter("RED"::equals).count();
+                    long blueCount = teams.values().stream().filter("BLUE"::equals).count();
+
+                    if (redCount != blueCount) {
+                        throw new IllegalStateException(
+                                "팀 인원이 같아야 시작할 수 있습니다. (RED: " + redCount + ", BLUE: " + blueCount + ")");
+                    }
+                    if (redCount == 0) {
+                        throw new IllegalStateException("각 팀에 최소 1명 이상이 필요합니다.");
+                    }
+                }
+            } finally {
+                startGameTiming.addReadyCheckElapsedSince(readyCheckStartedAtNanos);
             }
 
-            String teamType = (String) redisTemplate.opsForHash().get(infoKey, "teamType");
-            if ("TEAM".equals(teamType)) {
-                String teamsKey = String.format(RedisKeyConst.GAME_ROOM_TEAMS, roomId);
-                Map<Object, Object> teams = redisTemplate.opsForHash().entries(teamsKey);
-
-                long redCount = teams.values().stream().filter("RED"::equals).count();
-                long blueCount = teams.values().stream().filter("BLUE"::equals).count();
-
-                if (redCount != blueCount) {
-                    throw new IllegalStateException(
-                            "팀 인원이 같아야 시작할 수 있습니다. (RED: " + redCount + ", BLUE: " + blueCount + ")");
-                }
-                if (redCount == 0) {
-                    throw new IllegalStateException("각 팀에 최소 1명 이상이 필요합니다.");
-                }
-            }
-
-            int problemCount = parseIntSafe((String) redisTemplate.opsForHash().get(infoKey, "problemCount"));
             List<Problem> selectedProblems;
+            long problemSelectStartedAtNanos = System.nanoTime();
+            try {
+                int problemCount = parseIntSafe(problemCountStr);
 
-            if ("WORKBOOK".equals(problemSource)) {
-                cacheStatus = CACHE_STATUS_MISS;
-                WorkbookPreviewCacheService.WorkbookProblemSelection selection =
-                        workbookPreviewCacheService.selectProblemsForStart(roomId, problemCount);
-                selectedProblems = selection.problems();
-                cacheStatus = selection.cacheStatus();
-                log.info("📋 [Game Start] Selected {} workbook problems (cache status: {}) (Room {})",
-                        selectedProblems.size(), cacheStatus, roomId);
-            } else {
-                selectedProblems = selectProblems(roomId);
-                cacheStatus = CACHE_STATUS_DB;
-                log.info("📋 [Game Start] Selected {} problems from DB query (Room {})", selectedProblems.size(), roomId);
+                if ("WORKBOOK".equals(problemSource)) {
+                    cacheStatus = CACHE_STATUS_MISS;
+                    WorkbookPreviewCacheService.WorkbookProblemSelection selection =
+                            workbookPreviewCacheService.selectProblemsForStart(roomId, problemCount);
+                    selectedProblems = selection.problems();
+                    cacheStatus = selection.cacheStatus();
+                    log.info("📋 [Game Start] Selected {} workbook problems (cache status: {}) (Room {})",
+                            selectedProblems.size(), cacheStatus, roomId);
+                } else {
+                    selectedProblems = selectProblems(roomId);
+                    cacheStatus = CACHE_STATUS_DB;
+                    log.info("📋 [Game Start] Selected {} problems from DB query (Room {})", selectedProblems.size(), roomId);
+                }
+            } finally {
+                startGameTiming.addProblemSelectElapsedSince(problemSelectStartedAtNanos);
             }
 
             if (selectedProblems.isEmpty()) {
@@ -497,32 +611,30 @@ public class RedisGameService {
             }
 
             String problemsKey = String.format(RedisKeyConst.GAME_PROBLEMS, roomId);
-            redisTemplate.delete(problemsKey);
-            for (Problem p : selectedProblems) {
-                Map<String, String> pInfo = new HashMap<>();
-                pInfo.put("id", String.valueOf(p.getId()));
-                pInfo.put("externalId", p.getExternalId());
-                pInfo.put("title", p.getTitle());
-                pInfo.put("tier", p.getTier());
-                pInfo.put("url", p.getUrl());
-                redisTemplate.opsForList().rightPush(problemsKey, pInfo);
-            }
-            redisTemplate.expire(problemsKey, 6, TimeUnit.HOURS);
-
             String rankingKey = String.format(RedisKeyConst.GAME_RANKING, roomId);
-            if (players != null) {
-                for (Object player : players) {
+            String startTimeKey = String.format(RedisKeyConst.GAME_START_TIME, roomId);
+            List<Object> problemPayloads = selectedProblems.stream()
+                    .map(problem -> (Object) toProblemRedisPayload(problem))
+                    .toList();
+            long startTime = System.currentTimeMillis();
+            long redisWriteStartedAtNanos = System.nanoTime();
+            try {
+                redisTemplate.delete(problemsKey);
+                if (!problemPayloads.isEmpty()) {
+                    redisTemplate.opsForList().rightPushAll(problemsKey, problemPayloads.toArray());
+                }
+                redisTemplate.expire(problemsKey, 6, TimeUnit.HOURS);
+
+                for (Object player : orderedPlayers) {
                     redisTemplate.opsForZSet().add(rankingKey, player, 0);
                 }
+                redisTemplate.expire(rankingKey, 6, TimeUnit.HOURS);
+
+                updateGameStatusInternal(roomId, GameStatus.PLAYING, startGameTiming);
+                redisTemplate.opsForValue().set(startTimeKey, String.valueOf(startTime));
+            } finally {
+                startGameTiming.addRedisWriteElapsedSince(redisWriteStartedAtNanos);
             }
-            redisTemplate.expire(rankingKey, 6, TimeUnit.HOURS);
-
-            updateGameStatusInternal(roomId, GameStatus.PLAYING);
-
-            long startTime = System.currentTimeMillis();
-            redisTemplate.opsForValue().set(
-                    String.format(RedisKeyConst.GAME_START_TIME, roomId),
-                    String.valueOf(startTime));
 
             String topic = String.format(RedisKeyConst.TOPIC_GAME_ROOM, roomId);
             Map<String, Object> startData = new HashMap<>();
@@ -540,31 +652,87 @@ public class RedisGameService {
             startData.put("startTime", startTime);
             startData.put("serverTime", System.currentTimeMillis());
 
-            redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", startData));
-            scheduleGameTimeout(roomId);
+            long publishStartedAtNanos = System.nanoTime();
+            try {
+                redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("START", startData));
+            } finally {
+                startGameTiming.addPublishElapsedSince(publishStartedAtNanos);
+            }
+
+            long scheduleTimeoutStartedAtNanos = System.nanoTime();
+            try {
+                scheduleGameTimeout(roomId);
+            } finally {
+                startGameTiming.addScheduleTimeoutElapsedSince(scheduleTimeoutStartedAtNanos);
+            }
             success = true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            failureReason = FAILURE_REASON_LOCK_INTERRUPTED;
             meterRegistry.counter(METRIC_GAME_START_FAILURE,
                     "problem_source", normalizeProblemSource(problemSource),
                     "cache", normalizeCacheStatus(cacheStatus)).increment();
             throw new IllegalStateException("Lock interrupted", e);
         } catch (Exception e) {
+            if (FAILURE_REASON_NONE.equals(failureReason)) {
+                failureReason = classifyStartGameFailure(e);
+            }
             meterRegistry.counter(METRIC_GAME_START_FAILURE,
                     "problem_source", normalizeProblemSource(problemSource),
                     "cache", normalizeCacheStatus(cacheStatus)).increment();
             throw e;
         } finally {
+            if (lockAcquired) {
+                startGameTiming.stopLockHold();
+            }
             recordStartGameMetrics(
                     timerSample,
                     problemSource,
                     success ? RESULT_SUCCESS : RESULT_FAILURE,
                     cacheStatus,
                     sqlSnapshot);
+            recordStartGameStageMetrics(
+                    startGameTiming,
+                    problemSource,
+                    success ? RESULT_SUCCESS : RESULT_FAILURE,
+                    cacheStatus);
+            recordStartGameResult(
+                    problemSource,
+                    success ? RESULT_SUCCESS : RESULT_FAILURE,
+                    cacheStatus,
+                    success ? FAILURE_REASON_NONE : failureReason);
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
         }
+    }
+
+    private Object getAt(List<Object> values, int index) {
+        if (values == null || index < 0 || index >= values.size()) {
+            return null;
+        }
+        return values.get(index);
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private List<Object> toOrderedRedisMembers(Set<Object> members) {
+        if (members == null || members.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(members);
+    }
+
+    private Map<String, String> toProblemRedisPayload(Problem problem) {
+        Map<String, String> payload = new HashMap<>();
+        payload.put("id", String.valueOf(problem.getId()));
+        payload.put("externalId", problem.getExternalId());
+        payload.put("title", problem.getTitle());
+        payload.put("tier", problem.getTier());
+        payload.put("url", problem.getUrl());
+        return payload;
     }
 
     // 게임 타임아웃 스케줄링
@@ -572,7 +740,6 @@ public class RedisGameService {
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
         String timeLimitStr = (String) redisTemplate.opsForHash().get(infoKey, "timeLimit");
         long timeLimitSeconds = (timeLimitStr != null) ? Long.parseLong(timeLimitStr) : 40; // [TEST] Default 40s
-
         // [Safety Margin] 네트워크 지연 등을 고려해 3초 정도 여유를 두고 실행
         long delaySeconds = timeLimitSeconds + 5 + 3; // [TEST] No * 60 + 5s Buffer (Countdown) + 3s Margin
 
@@ -750,6 +917,76 @@ public class RedisGameService {
         recordSqlCount(METRIC_GAME_START_SQL_COUNT, problemSource, result, cacheStatus, sqlSnapshot);
     }
 
+    private void recordStartGameStageMetrics(
+            StartGameTiming timing,
+            String problemSource,
+            String result,
+            String cacheStatus) {
+        recordStartGameTimer(METRIC_GAME_START_TOTAL, timing.totalElapsedNanos(), problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_LOCK_WAIT, timing.lockWaitNanos, problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_LOCK_HOLD, timing.lockHoldNanos, problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_READY_CHECK, timing.readyCheckNanos, problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_PROBLEM_SELECT, timing.problemSelectNanos, problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_REDIS_WRITE, timing.redisWriteNanos, problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_PUBLISH, timing.publishNanos, problemSource, result, cacheStatus);
+        recordStartGameTimer(METRIC_GAME_START_SCHEDULE_TIMEOUT, timing.scheduleTimeoutNanos, problemSource, result, cacheStatus);
+    }
+
+    private void recordStartGameTimer(
+            String metricName,
+            long durationNanos,
+            String problemSource,
+            String result,
+            String cacheStatus) {
+        if (durationNanos <= 0) {
+            return;
+        }
+
+        Timer.builder(metricName)
+                .tag("problem_source", normalizeProblemSource(problemSource))
+                .tag("result", result)
+                .tag("cache", normalizeCacheStatus(cacheStatus))
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()
+                .register(meterRegistry)
+                .record(durationNanos, TimeUnit.NANOSECONDS);
+
+        benchmarkStartGameStageMetricsService.ifPresent(service -> service.record(
+                metricName,
+                durationNanos,
+                normalizeProblemSource(problemSource),
+                result,
+                normalizeCacheStatus(cacheStatus)));
+    }
+
+    private void recordStartGameResult(
+            String problemSource,
+            String result,
+            String cacheStatus,
+            String reason) {
+        meterRegistry.counter(METRIC_GAME_START_RESULT,
+                "problem_source", normalizeProblemSource(problemSource),
+                "result", result,
+                "cache", normalizeCacheStatus(cacheStatus),
+                "reason", normalizeStartFailureReason(reason))
+                .increment();
+    }
+
+    private String classifyStartGameFailure(Exception e) {
+        if (e instanceof BusinessException businessException) {
+            return businessException.getErrorCode().name().toLowerCase(Locale.ROOT);
+        }
+        String simpleName = e.getClass().getSimpleName();
+        if (simpleName == null || simpleName.isBlank()) {
+            return "unknown";
+        }
+        return simpleName.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeStartFailureReason(String reason) {
+        return reason == null || reason.isBlank() ? "unknown" : reason;
+    }
+
     private void recordFinishGameMetrics(
             Timer.Sample timerSample,
             String trigger,
@@ -812,25 +1049,36 @@ public class RedisGameService {
 
     private FinishClaimState tryAcquireFinishClaim(Long roomId, String trigger) {
         String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
-        String claimKey = String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId);
-        String claimToken = trigger + ":" + UUID.randomUUID();
+        String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
 
         if (!finishClaimEnabled) {
-            String currentStatus = (String) redisTemplate.opsForValue().get(statusKey);
             if (!GameStatus.PLAYING.name().equals(currentStatus)) {
                 return new FinishClaimState(FINISH_CLAIM_RESULT_NOOP_NON_PLAYING, null);
             }
             return new FinishClaimState(FINISH_CLAIM_RESULT_GRANTED, null);
         }
 
-        Long claimResult = redisTemplate.execute(
-                FINISH_CLAIM_ACQUIRE_SCRIPT,
-                List.of(statusKey, claimKey),
-                GameStatus.PLAYING.name(),
-                GameStatus.ENDING.name(),
-                claimToken);
-        long normalizedResult = claimResult != null ? claimResult : FINISH_CLAIM_RESULT_NOOP_NON_PLAYING;
-        return new FinishClaimState(normalizedResult, claimToken);
+        boolean recoveredFromStaleEnding = GameStatus.ENDING.name().equals(currentStatus);
+        if (!GameStatus.PLAYING.name().equals(currentStatus) && !recoveredFromStaleEnding) {
+            return new FinishClaimState(FINISH_CLAIM_RESULT_NOOP_NON_PLAYING, null);
+        }
+
+        GameFinishClaimService.FinishClaim claim = gameFinishClaimService.tryAcquire(roomId, trigger);
+        if (!claim.granted()) {
+            return new FinishClaimState(FINISH_CLAIM_RESULT_REJECTED, claim.claimToken());
+        }
+
+        try {
+            redisTemplate.opsForValue().set(statusKey, GameStatus.ENDING.name());
+        } catch (RuntimeException e) {
+            gameFinishClaimService.rollback(roomId, claim.claimToken());
+            throw e;
+        }
+
+        long resultCode = recoveredFromStaleEnding
+                ? FINISH_CLAIM_RESULT_GRANTED_FROM_STALE_ENDING
+                : FINISH_CLAIM_RESULT_GRANTED;
+        return new FinishClaimState(resultCode, claim.claimToken());
     }
 
     private void rollbackFinishClaim(Long roomId, FinishClaimState claimState) {
@@ -839,20 +1087,13 @@ public class RedisGameService {
         }
 
         String statusKey = String.format(RedisKeyConst.GAME_STATUS, roomId);
-        String claimKey = String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId);
-        Long rollbackResult = redisTemplate.execute(
-                FINISH_CLAIM_ROLLBACK_SCRIPT,
-                List.of(statusKey, claimKey),
-                claimState.claimToken,
-                GameStatus.PLAYING.name(),
-                GameStatus.ENDING.name());
-        long normalizedResult = rollbackResult != null ? rollbackResult : 0L;
-        if (normalizedResult == 1L) {
+        boolean rolledBack = gameFinishClaimService.rollback(roomId, claimState.claimToken);
+        if (rolledBack) {
+            Object currentStatus = redisTemplate.opsForValue().get(statusKey);
+            if (GameStatus.ENDING.name().equals(currentStatus)) {
+                redisTemplate.opsForValue().set(statusKey, GameStatus.PLAYING.name());
+            }
             log.warn("↩️ Rolled back finish claim for game {} after failure", roomId);
-            return;
-        }
-        if (normalizedResult == 2L) {
-            log.warn("🧹 Released finish claim for game {} after failure without reverting status", roomId);
         }
     }
 
@@ -869,20 +1110,26 @@ public class RedisGameService {
             topic = String.format(RedisKeyConst.TOPIC_GAME_CHAT_GLOBAL, request.getGameId());
         }
 
-        // [New] 보낸 사람 정보 조회
-        User sender = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+        ChatSenderSnapshot sender = chatSenderCacheEnabled
+                ? chatSenderCache.get(userId, this::loadChatSenderSnapshot)
+                : loadChatSenderSnapshot(userId);
 
         // 데이터 패킹
         Map<String, Object> chatData = new HashMap<>();
         chatData.put("senderId", userId);
-        chatData.put("senderNickname", sender.getNickname());
-        chatData.put("profileImg", sender.getProfileImg());
+        chatData.put("senderNickname", sender.nickname());
+        chatData.put("profileImg", sender.profileImg());
         chatData.put("message", request.getMessage());
         chatData.put("teamColor", request.getTeamColor());
         chatData.put("timestamp", System.currentTimeMillis());
 
         redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("CHAT", chatData));
+    }
+
+    private ChatSenderSnapshot loadChatSenderSnapshot(Long userId) {
+        User sender = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+        return ChatSenderSnapshot.from(sender);
     }
 
     // 코드 저장
@@ -1500,6 +1747,7 @@ public class RedisGameService {
         String normalizedTrigger = normalizeFinishTrigger(trigger);
         String result = FINISH_RESULT_FAILED;
         FinishClaimState claimState = null;
+        boolean finishClaimCompleted = false;
 
         try {
             claimState = tryAcquireFinishClaim(roomId, normalizedTrigger);
@@ -1568,12 +1816,11 @@ public class RedisGameService {
                 winner = String.valueOf(rankingSet.iterator().next().getValue());
             }
 
-            Map<Long, Integer> gainedPointsMap = new HashMap<>();
-            try {
-                gainedPointsMap = gameService.processGameResult(roomId, winner, teamType, normalizedTrigger);
-            } catch (Exception e) {
-                log.error("❌ Failed to process game result for Game ID: {}", roomId, e);
-            }
+            Map<Long, Integer> gainedPointsMap = gameService.processGameResult(
+                    roomId,
+                    winner,
+                    teamType,
+                    normalizedTrigger);
 
             if (rankingSet != null) {
                 for (ZSetOperations.TypedTuple<Object> entry : rankingSet) {
@@ -1638,6 +1885,10 @@ public class RedisGameService {
             endData.put("winner", winner);
             endData.put("teamType", teamType);
 
+            if (finishClaimEnabled && claimState.claimToken != null) {
+                gameFinishClaimService.markCompleted(roomId, claimState.claimToken);
+                finishClaimCompleted = true;
+            }
             updateGameStatusInternal(roomId, GameStatus.END);
             redisPublisher.publish(new ChannelTopic(topic), SocketResponse.of("GAME_END", endData));
             meterRegistry.counter(METRIC_GAME_FINISH_EVENT_PUBLISHED, "trigger", normalizedTrigger).increment();
@@ -1662,7 +1913,6 @@ public class RedisGameService {
             }
 
             redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_TIMER, roomId));
-            redisTemplate.delete(String.format(RedisKeyConst.GAME_FINISH_CLAIM, roomId));
 
             log.info("🗑️ Cleaning up all Redis data for finished game {}", roomId);
 
@@ -1693,7 +1943,9 @@ public class RedisGameService {
             log.info("✅ Game {} finished and cleaned up successfully. Winner: {}", roomId, winner);
             result = FINISH_RESULT_PROCESSED;
         } catch (Exception e) {
-            rollbackFinishClaim(roomId, claimState);
+            if (!finishClaimCompleted) {
+                rollbackFinishClaim(roomId, claimState);
+            }
             log.error("❌ Failed to finish game {} (trigger: {})", roomId, normalizedTrigger, e);
             throw e;
         } finally {
