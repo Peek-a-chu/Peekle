@@ -133,6 +133,18 @@ livekit:
   api-key: ${LIVEKIT_API_KEY:devkey}
   api-secret: ${LIVEKIT_API_SECRET:secret}
 
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
+
+leetcode:
+  translation:
+    daily-limit: ${LEETCODE_TRANSLATION_DAILY_LIMIT:10}
+    hourly-limit: ${LEETCODE_TRANSLATION_HOURLY_LIMIT:50}
+    max-batch-size: ${LEETCODE_TRANSLATION_MAX_BATCH_SIZE:20}
+    max-text-length: ${LEETCODE_TRANSLATION_MAX_TEXT_LENGTH:2000}
+    max-total-length: ${LEETCODE_TRANSLATION_MAX_TOTAL_LENGTH:12000}
+
 problem:
   sync:
     monthly:
