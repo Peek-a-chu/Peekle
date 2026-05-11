@@ -4,9 +4,38 @@
 
     const STORAGE_KEY = 'leetcodeKoreanEnabled';
     const STYLE_ID = 'peekle-leetcode-localizer-style';
+    const TRANSLATE_TOOLBAR_ID = 'peekle-problem-translation-toolbar';
+    const TRANSLATE_BUTTON_ID = 'peekle-problem-translate-button';
+    const TRANSLATION_STATUS_ID = 'peekle-problem-translation-status';
+    const ANALYSIS_TRANSLATE_TOOLBAR_ID = 'peekle-analysis-translation-toolbar';
+    const ANALYSIS_TRANSLATE_BUTTON_ID = 'peekle-analysis-translate-button';
+    const ANALYSIS_TRANSLATION_STATUS_ID = 'peekle-analysis-translation-status';
+    const DEFAULT_API_BASE_URL = 'https://peekle.today';
+    const PEEKLE_TOKEN_KEY = 'peekle_token';
+    const TRANSLATION_CACHE_KEY = 'peekle_leetcode_translation_cache_v1';
+    const TRANSLATION_BATCH_SIZE = 20;
+    const MAX_TRANSLATION_CACHE_ITEMS = 600;
     const originalTextByNode = new WeakMap();
     const originalAttributesByElement = new WeakMap();
+    const originalProblemHtmlByElement = new Map();
+    const originalProblemTextByNode = new Map();
     let enabled = false;
+    let problemTranslationActive = false;
+    let apiBaseUrlPromise = null;
+    let translationCachePromise = null;
+    let cachedProblemTranslationRunning = false;
+    let lastCachedProblemSignature = null;
+    let manuallyRestoredProblemKey = null;
+    let currentProblemKey = null;
+    const originalAnalysisTextByNode = new Map();
+    let analysisTranslationActive = false;
+    let analysisTranslationRunning = false;
+    let cachedAnalysisTranslationRunning = false;
+    let lastCachedAnalysisSignature = null;
+    let activeAnalysisSignature = null;
+    let manuallyRestoredAnalysisSignature = null;
+    let glossaryTranslationQueued = false;
+    let glossaryTranslationRunning = false;
 
     const TEXT_TRANSLATIONS = new Map([
         ['Problem List', '문제 목록'],
@@ -705,8 +734,1153 @@
             [data-peekle-strip-after]::after {
                 content: '' !important;
             }
+
+            #${TRANSLATE_TOOLBAR_ID} {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 8px;
+                margin: 8px 0 12px;
+            }
+
+            #${TRANSLATE_BUTTON_ID} {
+                appearance: none;
+                border: 1px solid rgba(229, 62, 148, 0.38);
+                border-radius: 6px;
+                background: #e24ea0;
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 700;
+                line-height: 1;
+                padding: 9px 12px;
+                transition: background-color 120ms ease, opacity 120ms ease;
+            }
+
+            #${TRANSLATE_BUTTON_ID}:hover {
+                background: #cc3f8e;
+            }
+
+            #${TRANSLATE_BUTTON_ID}:disabled {
+                cursor: not-allowed;
+                opacity: 0.68;
+            }
+
+            #${TRANSLATION_STATUS_ID} {
+                color: #71717a;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+
+            #${ANALYSIS_TRANSLATE_TOOLBAR_ID} {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 8px;
+                margin: 8px 0 10px;
+            }
+
+            #${ANALYSIS_TRANSLATE_BUTTON_ID} {
+                appearance: none;
+                border: 1px solid rgba(0, 122, 255, 0.32);
+                border-radius: 6px;
+                background: #2f7cf6;
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 700;
+                line-height: 1;
+                padding: 8px 11px;
+                transition: background-color 120ms ease, opacity 120ms ease;
+            }
+
+            #${ANALYSIS_TRANSLATE_BUTTON_ID}:hover {
+                background: #2668d8;
+            }
+
+            #${ANALYSIS_TRANSLATE_BUTTON_ID}:disabled {
+                cursor: not-allowed;
+                opacity: 0.68;
+            }
+
+            #${ANALYSIS_TRANSLATION_STATUS_ID} {
+                color: #71717a;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+
         `;
         document.documentElement.appendChild(style);
+    }
+
+    function isProblemPage() {
+        return /^\/problems\/[^/]+\/?/.test(window.location.pathname);
+    }
+
+    function getProblemKey() {
+        return window.location.pathname.match(/^\/problems\/([^/]+)/)?.[1] || '';
+    }
+
+    function syncCurrentProblemState() {
+        const nextProblemKey = getProblemKey();
+        if (currentProblemKey === nextProblemKey) return;
+
+        currentProblemKey = nextProblemKey;
+        problemTranslationActive = false;
+        cachedProblemTranslationRunning = false;
+        lastCachedProblemSignature = null;
+        manuallyRestoredProblemKey = null;
+        analysisTranslationActive = false;
+        analysisTranslationRunning = false;
+        cachedAnalysisTranslationRunning = false;
+        lastCachedAnalysisSignature = null;
+        activeAnalysisSignature = null;
+        manuallyRestoredAnalysisSignature = null;
+        originalProblemHtmlByElement.clear();
+        originalProblemTextByNode.clear();
+        originalAnalysisTextByNode.clear();
+    }
+
+    function findProblemDescription() {
+        if (!isProblemPage()) return null;
+
+        const selectors = [
+            '[data-track-load="description_content"]',
+            '[data-cy="question-content"]',
+            'div[class*="question-content"]',
+            'div[class*="description"]'
+        ];
+
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element?.innerText?.trim().length > 40) {
+                return element;
+            }
+        }
+
+        return null;
+    }
+
+    function removeProblemTranslationUi() {
+        document.getElementById(TRANSLATE_TOOLBAR_ID)?.remove();
+    }
+
+    function removeAnalysisTranslationUi() {
+        document.getElementById(ANALYSIS_TRANSLATE_TOOLBAR_ID)?.remove();
+    }
+
+    function setTranslationStatus(message) {
+        const status = document.getElementById(TRANSLATION_STATUS_ID);
+        if (!status) return;
+        status.textContent = message || '';
+    }
+
+    function setTranslationButtonLoading(isLoading) {
+        const button = document.getElementById(TRANSLATE_BUTTON_ID);
+        if (!button) return;
+
+        button.disabled = isLoading;
+        button.textContent = isLoading
+            ? '번역 중...'
+            : problemTranslationActive
+                ? '원문 보기'
+                : '문제 번역';
+    }
+
+    function syncTranslationButtonText() {
+        setTranslationButtonLoading(false);
+    }
+
+    function setAnalysisTranslationStatus(message) {
+        const status = document.getElementById(ANALYSIS_TRANSLATION_STATUS_ID);
+        if (!status) return;
+        status.textContent = message || '';
+    }
+
+    function setAnalysisTranslationButtonLoading(isLoading) {
+        const button = document.getElementById(ANALYSIS_TRANSLATE_BUTTON_ID);
+        if (!button) return;
+
+        button.disabled = isLoading;
+        button.textContent = isLoading
+            ? '번역 중...'
+            : analysisTranslationActive
+                ? 'AI 분석 원문 보기'
+                : 'AI 분석 번역';
+    }
+
+    function syncAnalysisTranslationButtonText() {
+        setAnalysisTranslationButtonLoading(false);
+    }
+
+    function rememberProblemElement(element) {
+        if (!originalProblemHtmlByElement.has(element)) {
+            originalProblemHtmlByElement.set(element, element.innerHTML);
+        }
+    }
+
+    function rememberTextNode(node) {
+        if (!originalProblemTextByNode.has(node)) {
+            originalProblemTextByNode.set(node, node.nodeValue);
+        }
+    }
+
+    function restoreProblemTranslations(root) {
+        for (const [node, text] of Array.from(originalProblemTextByNode.entries())) {
+            if (!node.isConnected) {
+                originalProblemTextByNode.delete(node);
+                continue;
+            }
+
+            if (root && root !== document.body && !root.contains(node)) continue;
+
+            node.nodeValue = text;
+            originalProblemTextByNode.delete(node);
+        }
+
+        for (const [element, html] of Array.from(originalProblemHtmlByElement.entries())) {
+            if (!element.isConnected) {
+                originalProblemHtmlByElement.delete(element);
+                continue;
+            }
+
+            if (root && root !== document.body && !root.contains(element)) continue;
+
+            element.innerHTML = html;
+            element.removeAttribute('data-peekle-ai-translated');
+            originalProblemHtmlByElement.delete(element);
+        }
+    }
+
+    function rememberAnalysisTextNode(node) {
+        if (!originalAnalysisTextByNode.has(node)) {
+            originalAnalysisTextByNode.set(node, node.nodeValue);
+        }
+    }
+
+    function getAnalysisTextNodeSourceText(node) {
+        return originalAnalysisTextByNode.get(node) || originalTextByNode.get(node) || node.nodeValue || '';
+    }
+
+    function restoreAnalysisTranslations(root) {
+        for (const [node, text] of Array.from(originalAnalysisTextByNode.entries())) {
+            if (!node.isConnected) {
+                originalAnalysisTextByNode.delete(node);
+                continue;
+            }
+
+            if (root && root !== document.body && !root.contains(node)) continue;
+
+            node.nodeValue = text;
+            originalAnalysisTextByNode.delete(node);
+        }
+    }
+
+    function restoreOriginalTextInClone(source, clone) {
+        const sourceWalker = document.createTreeWalker(source, NodeFilter.SHOW_TEXT);
+        const cloneWalker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+
+        while (sourceWalker.nextNode() && cloneWalker.nextNode()) {
+            const original = originalTextByNode.get(sourceWalker.currentNode);
+            if (original !== undefined) {
+                cloneWalker.currentNode.nodeValue = original;
+            }
+        }
+    }
+
+    function getElementSourceText(element) {
+        const originalHtml = originalProblemHtmlByElement.get(element);
+        const clone = element.cloneNode(false);
+
+        if (originalHtml !== undefined) {
+            clone.innerHTML = originalHtml;
+        } else {
+            const deepClone = element.cloneNode(true);
+            restoreOriginalTextInClone(element, deepClone);
+            return (deepClone.innerText || deepClone.textContent || '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        }
+
+        return (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function getTextNodeSourceText(node) {
+        return originalProblemTextByNode.get(node) || originalTextByNode.get(node) || node.nodeValue || '';
+    }
+
+    function hasTranslatableEnglish(text) {
+        return /[A-Za-z]{2}/.test(text);
+    }
+
+    function isExampleHeading(text) {
+        return /^Example\s+\d+:$/i.test(text.trim());
+    }
+
+    function isSectionOnlyHeading(text) {
+        return /^(Constraints|Follow[-\s]?up):$/i.test(text.trim());
+    }
+
+    function isMostlyCodeLike(text) {
+        const compact = text.replace(/\s+/g, '');
+        if (!compact) return true;
+
+        const letters = (compact.match(/[A-Za-z]/g) || []).length;
+        return letters / compact.length < 0.25;
+    }
+
+    function shouldTranslateProblemBlock(element) {
+        if (element.closest('pre, code')) return false;
+
+        const text = getElementSourceText(element).replace(/\s+/g, ' ').trim();
+        if (!text || !hasTranslatableEnglish(text)) return false;
+        if (isExampleHeading(text) || isSectionOnlyHeading(text)) return false;
+        if (isMostlyCodeLike(text)) return false;
+
+        return true;
+    }
+
+    function shouldTranslateGlossaryBlock(element) {
+        if (element.dataset.peekleAiTranslated === 'true') return false;
+        if (element.closest('pre, code')) return false;
+
+        const text = getElementSourceText(element).replace(/\s+/g, ' ').trim();
+        if (!text || !hasTranslatableEnglish(text)) return false;
+        if (isMostlyCodeLike(text)) return false;
+
+        return true;
+    }
+
+    function shouldPreserveInlineElement(element) {
+        if (element.tagName === 'CODE' || element.tagName === 'BUTTON') return true;
+        if (element.matches('[class*="cursor-pointer"]')) return true;
+        return Boolean(element.querySelector('button'));
+    }
+
+    function buildRichTranslationSource(element) {
+        const preserved = [];
+
+        function walk(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return getTextNodeSourceText(node);
+            }
+
+            if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+            if (shouldPreserveInlineElement(node)) {
+                const token = `§${preserved.length}§`;
+                preserved.push({ token, node });
+                return token;
+            }
+
+            return Array.from(node.childNodes).map(walk).join('');
+        }
+
+        return {
+            preserved,
+            sourceText: Array.from(element.childNodes).map(walk).join('').replace(/\s+/g, ' ').trim()
+        };
+    }
+
+    function renderRichTranslation(element, translatedText, preserved) {
+        const tokenPattern = /§\s*(\d+)\s*§|\[\[\s*(\d+)\s*\]\]|__\s*peekle\s*[_\s-]*(\d+)\s*__/gi;
+        const preservedByIndex = new Map(preserved.map((item, index) => [String(index), item.node]));
+        const usedTokenIndexes = new Set();
+        const insertedTokenCounts = new Map();
+        const parts = [];
+        let lastIndex = 0;
+        let match;
+
+        while ((match = tokenPattern.exec(translatedText)) !== null) {
+            if (match.index > lastIndex) {
+                parts.push(document.createTextNode(translatedText.slice(lastIndex, match.index)));
+            }
+
+            const tokenIndex = match[1] || match[2] || match[3];
+            const preservedNode = preservedByIndex.get(tokenIndex);
+            if (preservedNode) {
+                usedTokenIndexes.add(tokenIndex);
+                const insertCount = insertedTokenCounts.get(tokenIndex) || 0;
+                insertedTokenCounts.set(tokenIndex, insertCount + 1);
+                parts.push(insertCount === 0 ? preservedNode : preservedNode.cloneNode(true));
+            }
+
+            lastIndex = match.index + match[0].length;
+        }
+
+        if (lastIndex < translatedText.length) {
+            parts.push(document.createTextNode(translatedText.slice(lastIndex)));
+        }
+
+        if (preserved.length > 0 && usedTokenIndexes.size === 0) {
+            element.textContent = translatedText.trim();
+            return;
+        }
+
+        element.replaceChildren(...parts);
+    }
+
+    function applyElementTranslation(element, translatedText) {
+        rememberProblemElement(element);
+        element.textContent = translatedText.trim();
+        element.dataset.peekleAiTranslated = 'true';
+    }
+
+    function applyTextNodeTranslation(node, translatedText) {
+        const original = getTextNodeSourceText(node);
+        const leading = original.match(/^\s*/)?.[0] || '';
+        const trailing = original.match(/\s*$/)?.[0] || '';
+
+        rememberTextNode(node);
+        node.nodeValue = `${leading}${translatedText.trim()}${trailing}`;
+    }
+
+    function createBlockTranslationTarget(element) {
+        const richSource = buildRichTranslationSource(element);
+
+        return {
+            getSourceText() {
+                return richSource.sourceText || getElementSourceText(element);
+            },
+            apply(translatedText) {
+                if (richSource.preserved.length > 0) {
+                    rememberProblemElement(element);
+                    renderRichTranslation(element, translatedText.trim(), richSource.preserved);
+                    element.dataset.peekleAiTranslated = 'true';
+                    return;
+                }
+
+                applyElementTranslation(element, translatedText);
+            }
+        };
+    }
+
+    function createTextNodeTranslationTarget(node) {
+        return {
+            getSourceText() {
+                return getTextNodeSourceText(node).trim();
+            },
+            apply(translatedText) {
+                applyTextNodeTranslation(node, translatedText);
+            }
+        };
+    }
+
+    function isStrongLabel(node, label) {
+        if (node?.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'STRONG') {
+            return false;
+        }
+
+        const normalized = node.textContent.trim().replace(/\s+/g, ' ').toLowerCase();
+        if (normalized === `${label}:`) return true;
+
+        return label === 'explanation' && normalized === '설명:';
+    }
+
+    function createExplanationTranslationTarget(pre, labelNode, textNodes) {
+        return {
+            getSourceText() {
+                return textNodes.map(getTextNodeSourceText).join('').trim();
+            },
+            apply(translatedText) {
+                rememberProblemElement(pre);
+                textNodes.forEach(rememberTextNode);
+                labelNode.textContent = '설명:';
+
+                const [firstNode, ...restNodes] = textNodes;
+                if (!firstNode) return;
+
+                const original = getTextNodeSourceText(firstNode);
+                const leading = original.match(/^\s*/)?.[0] || ' ';
+                const lastOriginal = getTextNodeSourceText(textNodes[textNodes.length - 1]);
+                const trailing = lastOriginal.match(/\s*$/)?.[0] || '\n';
+
+                firstNode.nodeValue = `${leading}${translatedText.trim()}${trailing}`;
+                restNodes.forEach((node) => {
+                    node.nodeValue = '';
+                });
+            }
+        };
+    }
+
+    function createPlainPreExplanationTarget(pre) {
+        const sourceText = getElementSourceText(pre);
+        const lines = sourceText.split('\n');
+        const explanationLineIndex = lines.findIndex((line) => /^\s*Explanation:\s*/i.test(line));
+
+        if (explanationLineIndex === -1) return null;
+
+        const explanationText = lines[explanationLineIndex].replace(/^\s*Explanation:\s*/i, '').trim();
+        if (!explanationText) return null;
+
+        return {
+            getSourceText() {
+                return explanationText;
+            },
+            apply(translatedText) {
+                rememberProblemElement(pre);
+                lines[explanationLineIndex] = lines[explanationLineIndex]
+                    .replace(/^\s*Explanation:\s*/i, '설명: ')
+                    .replace(explanationText, translatedText.trim());
+                pre.textContent = lines.join('\n');
+            }
+        };
+    }
+
+    function collectPreExplanationTargets(content) {
+        const targets = [];
+
+        content.querySelectorAll('pre').forEach((pre) => {
+            const childNodes = Array.from(pre.childNodes);
+            let matched = false;
+
+            childNodes.forEach((node, index) => {
+                if (!isStrongLabel(node, 'explanation')) return;
+
+                const textNodes = [];
+                for (let i = index + 1; i < childNodes.length; i += 1) {
+                    const nextNode = childNodes[i];
+                    if (nextNode.nodeType === Node.ELEMENT_NODE && nextNode.tagName === 'STRONG') {
+                        break;
+                    }
+                    if (nextNode.nodeType === Node.TEXT_NODE) {
+                        textNodes.push(nextNode);
+                    }
+                }
+
+                const sourceText = textNodes.map(getTextNodeSourceText).join('').trim();
+                if (!sourceText || !hasTranslatableEnglish(sourceText)) return;
+
+                matched = true;
+                targets.push(createExplanationTranslationTarget(pre, node, textNodes));
+            });
+
+            if (!matched) {
+                const fallbackTarget = createPlainPreExplanationTarget(pre);
+                if (fallbackTarget) {
+                    targets.push(fallbackTarget);
+                }
+            }
+        });
+
+        return targets;
+    }
+
+    function collectProblemTranslationTargets(content) {
+        const targets = [];
+
+        content.querySelectorAll('p, li').forEach((element) => {
+            if (shouldTranslateProblemBlock(element)) {
+                targets.push(createBlockTranslationTarget(element));
+            }
+        });
+
+        Array.from(content.childNodes).forEach((node) => {
+            if (node.nodeType !== Node.TEXT_NODE) return;
+
+            const text = getTextNodeSourceText(node).trim();
+            if (!text || !hasTranslatableEnglish(text) || isMostlyCodeLike(text)) return;
+
+            targets.push(createTextNodeTranslationTarget(node));
+        });
+
+        targets.push(...collectPreExplanationTargets(content));
+        return targets.filter((target) => target.getSourceText());
+    }
+
+    function findAnalysisSections() {
+        return [
+            document.getElementById('analysis-approach-content'),
+            document.getElementById('analysis-efficiency-content'),
+            document.getElementById('analysis-code-style-content')
+        ].filter(Boolean);
+    }
+
+    function findAnalysisToolbarAnchor(sections) {
+        const firstSection = sections[0];
+        if (!firstSection) return null;
+
+        return firstSection.closest('.grid') || firstSection;
+    }
+
+    function shouldTranslateAnalysisTextNode(node) {
+        const text = getAnalysisTextNodeSourceText(node).replace(/\s+/g, ' ').trim();
+        if (!text || !hasTranslatableEnglish(text) || isMostlyCodeLike(text)) return false;
+
+        const parent = node.parentElement;
+        if (!parent || shouldSkipTextElement(parent)) return false;
+        if (parent.closest(`#${ANALYSIS_TRANSLATE_TOOLBAR_ID}`)) return false;
+        if (parent.closest('a, button, svg, math, .katex, [data-highcharts-chart], .highcharts-container')) return false;
+        if (parent.closest('[translate="no"], [class*="language-"], [class*="linenumber"]')) return false;
+
+        return true;
+    }
+
+    function createAnalysisTextNodeTranslationTarget(node) {
+        return {
+            getSourceText() {
+                return getAnalysisTextNodeSourceText(node).trim();
+            },
+            apply(translatedText) {
+                const original = getAnalysisTextNodeSourceText(node);
+                const leading = original.match(/^\s*/)?.[0] || '';
+                const trailing = original.match(/\s*$/)?.[0] || '';
+
+                rememberAnalysisTextNode(node);
+                node.nodeValue = `${leading}${translatedText.trim()}${trailing}`;
+            }
+        };
+    }
+
+    function collectAnalysisTranslationTargets(sections) {
+        const targets = [];
+        const seenNodes = new Set();
+
+        sections.forEach((section) => {
+            const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    return shouldTranslateAnalysisTextNode(node)
+                        ? NodeFilter.FILTER_ACCEPT
+                        : NodeFilter.FILTER_REJECT;
+                }
+            });
+
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (seenNodes.has(node)) continue;
+
+                seenNodes.add(node);
+                targets.push(createAnalysisTextNodeTranslationTarget(node));
+            }
+        });
+
+        return targets.filter((target) => target.getSourceText());
+    }
+
+    function isGlossaryPopover(dialog) {
+        if (!dialog.closest('[data-radix-popper-content-wrapper]')) return false;
+        return Boolean(dialog.querySelector('[class*="markdown-content"]'));
+    }
+
+    function collectGlossaryTranslationTargets(dialog) {
+        const targets = [];
+        const markdown = dialog.querySelector('[class*="markdown-content"]');
+        if (!markdown) return targets;
+
+        const title = markdown.parentElement?.previousElementSibling;
+        if (title && shouldTranslateGlossaryBlock(title)) {
+            targets.push(createBlockTranslationTarget(title));
+        }
+
+        markdown.querySelectorAll('p, li').forEach((element) => {
+            if (shouldTranslateGlossaryBlock(element)) {
+                targets.push(createBlockTranslationTarget(element));
+            }
+        });
+
+        return targets.filter((target) => target.getSourceText());
+    }
+
+    async function translateGlossaryPopovers() {
+        if (!enabled || !problemTranslationActive || glossaryTranslationRunning) return;
+
+        const dialogs = Array.from(document.querySelectorAll('[data-radix-popper-content-wrapper] [role="dialog"]'))
+            .filter(isGlossaryPopover);
+        if (dialogs.length === 0) return;
+
+        const targets = dialogs.flatMap(collectGlossaryTranslationTargets);
+        if (targets.length === 0) return;
+
+        glossaryTranslationRunning = true;
+
+        try {
+            const translatedTexts = await translateTextsWithBackend(targets.map((target) => target.getSourceText()));
+            for (let index = 0; index < targets.length; index += 1) {
+                targets[index].apply(translatedTexts[index]);
+            }
+        } catch (error) {
+            console.warn('[Peekle LeetCode] Glossary translation failed.', error);
+        } finally {
+            glossaryTranslationRunning = false;
+        }
+    }
+
+    function scheduleGlossaryTranslation() {
+        if (!enabled || !problemTranslationActive || glossaryTranslationQueued) return;
+
+        glossaryTranslationQueued = true;
+        window.setTimeout(() => {
+            glossaryTranslationQueued = false;
+            translateGlossaryPopovers();
+        }, 50);
+    }
+
+    function sendRuntimeMessage(message) {
+        return new Promise((resolve) => {
+            if (!globalThis.chrome?.runtime?.sendMessage) {
+                resolve(null);
+                return;
+            }
+
+            try {
+                chrome.runtime.sendMessage(message, (response) => {
+                    if (chrome.runtime.lastError) {
+                        resolve(null);
+                        return;
+                    }
+                    resolve(response || null);
+                });
+            } catch (error) {
+                resolve(null);
+            }
+        });
+    }
+
+    function readStorage(keys) {
+        return new Promise((resolve) => {
+            if (!globalThis.chrome?.storage?.local) {
+                resolve({});
+                return;
+            }
+
+            try {
+                chrome.storage.local.get(keys, (result) => {
+                    resolve(result || {});
+                });
+            } catch (error) {
+                resolve({});
+            }
+        });
+    }
+
+    function writeStorage(items) {
+        return new Promise((resolve) => {
+            if (!globalThis.chrome?.storage?.local?.set) {
+                resolve();
+                return;
+            }
+
+            try {
+                chrome.storage.local.set(items, () => {
+                    resolve();
+                });
+            } catch (error) {
+                resolve();
+            }
+        });
+    }
+
+    async function readTranslationCache() {
+        if (!translationCachePromise) {
+            translationCachePromise = readStorage([TRANSLATION_CACHE_KEY]).then((storage) => {
+                const cache = storage[TRANSLATION_CACHE_KEY];
+                if (cache?.texts && typeof cache.texts === 'object') {
+                    return cache;
+                }
+                return { texts: {} };
+            });
+        }
+
+        return translationCachePromise;
+    }
+
+    function pruneTranslationCache(cache) {
+        const entries = Object.entries(cache.texts || {});
+        if (entries.length <= MAX_TRANSLATION_CACHE_ITEMS) return;
+
+        entries
+            .sort(([, left], [, right]) => (right.updatedAt || 0) - (left.updatedAt || 0))
+            .slice(MAX_TRANSLATION_CACHE_ITEMS)
+            .forEach(([sourceText]) => {
+                delete cache.texts[sourceText];
+            });
+    }
+
+    async function saveTranslationCache(sourceTexts, translatedTexts) {
+        const cache = await readTranslationCache();
+        const now = Date.now();
+
+        sourceTexts.forEach((sourceText, index) => {
+            const translatedText = translatedTexts[index];
+            if (!sourceText || !translatedText) return;
+
+            cache.texts[sourceText] = {
+                translatedText,
+                updatedAt: now
+            };
+        });
+
+        pruneTranslationCache(cache);
+        translationCachePromise = Promise.resolve(cache);
+        await writeStorage({ [TRANSLATION_CACHE_KEY]: cache });
+    }
+
+    async function getCachedTranslations(sourceTexts) {
+        const cache = await readTranslationCache();
+        const translations = sourceTexts.map((sourceText) => {
+            const entry = cache.texts?.[sourceText];
+            return typeof entry?.translatedText === 'string' ? entry.translatedText : null;
+        });
+
+        return translations.every(Boolean) ? translations : null;
+    }
+
+    async function getApiBaseUrl() {
+        if (!apiBaseUrlPromise) {
+            apiBaseUrlPromise = sendRuntimeMessage({ type: 'CHECK_ENV' })
+                .then((response) => response?.apiUrl || DEFAULT_API_BASE_URL)
+                .catch(() => DEFAULT_API_BASE_URL);
+        }
+
+        return apiBaseUrlPromise;
+    }
+
+    async function getPeekleToken() {
+        const response = await sendRuntimeMessage({ type: 'GET_TOKEN' });
+        if (response?.token) return response.token;
+
+        const storage = await readStorage([PEEKLE_TOKEN_KEY]);
+        return storage[PEEKLE_TOKEN_KEY] || null;
+    }
+
+    async function requestTranslationChunk(texts) {
+        const [apiBaseUrl, token] = await Promise.all([getApiBaseUrl(), getPeekleToken()]);
+
+        if (!token) {
+            throw new Error('Peekle 로그인 후 번역을 사용할 수 있습니다.');
+        }
+
+        const response = await fetch(`${apiBaseUrl}/api/leetcode/translate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Peekle-Token': token
+            },
+            body: JSON.stringify({ texts })
+        });
+
+        let payload = null;
+        try {
+            payload = await response.json();
+        } catch (error) {
+            // Keep the user-facing error below stable when the server returns non-JSON.
+        }
+
+        if (!response.ok || payload?.success !== true) {
+            throw new Error(payload?.error?.message || '문제 번역 요청에 실패했습니다.');
+        }
+
+        const translations = payload?.data?.translations;
+        if (!Array.isArray(translations) || translations.length !== texts.length) {
+            throw new Error('번역 응답 형식이 올바르지 않습니다.');
+        }
+
+        return translations;
+    }
+
+    async function translateTextsWithBackend(texts) {
+        const cache = await readTranslationCache();
+        const translatedTexts = new Array(texts.length);
+        const missingTexts = [];
+        const missingIndexes = [];
+
+        texts.forEach((text, index) => {
+            const cachedText = cache.texts?.[text]?.translatedText;
+            if (typeof cachedText === 'string') {
+                translatedTexts[index] = cachedText;
+                return;
+            }
+
+            missingTexts.push(text);
+            missingIndexes.push(index);
+        });
+
+        if (missingTexts.length === 0) {
+            return translatedTexts;
+        }
+
+        const translatedMissingTexts = [];
+        for (let index = 0; index < missingTexts.length; index += TRANSLATION_BATCH_SIZE) {
+            const chunk = missingTexts.slice(index, index + TRANSLATION_BATCH_SIZE);
+            const translatedChunk = await requestTranslationChunk(chunk);
+
+            translatedChunk.forEach((translatedText, chunkIndex) => {
+                translatedTexts[missingIndexes[index + chunkIndex]] = translatedText;
+            });
+            translatedMissingTexts.push(...translatedChunk);
+        }
+
+        await saveTranslationCache(missingTexts, translatedMissingTexts);
+        return translatedTexts;
+    }
+
+    function createProblemTranslationSignature(sourceTexts) {
+        return `${getProblemKey()}::${sourceTexts.join('\u001f')}`;
+    }
+
+    function applyProblemTranslationTargets(targets, translatedTexts, onProgress) {
+        for (let index = 0; index < targets.length; index += 1) {
+            onProgress?.(`번역 중 ${index + 1}/${targets.length}`);
+            targets[index].apply(translatedTexts[index]);
+        }
+    }
+
+    async function applyCachedProblemTranslation(content) {
+        if (!enabled || problemTranslationActive || cachedProblemTranslationRunning) return;
+        if (manuallyRestoredProblemKey === getProblemKey()) return;
+
+        const targets = collectProblemTranslationTargets(content);
+        if (targets.length === 0) return;
+
+        const sourceTexts = targets.map((target) => target.getSourceText());
+        const signature = createProblemTranslationSignature(sourceTexts);
+        if (lastCachedProblemSignature === signature) return;
+
+        lastCachedProblemSignature = signature;
+        cachedProblemTranslationRunning = true;
+
+        try {
+            const cachedTranslations = await getCachedTranslations(sourceTexts);
+            if (!cachedTranslations || problemTranslationActive || manuallyRestoredProblemKey === getProblemKey()) {
+                return;
+            }
+
+            applyProblemTranslationTargets(targets, cachedTranslations);
+            problemTranslationActive = true;
+            scheduleGlossaryTranslation();
+            setTranslationStatus('로컬 캐시 적용');
+            syncTranslationButtonText();
+        } catch (error) {
+            console.warn('[Peekle LeetCode] Cached problem translation failed.', error);
+        } finally {
+            cachedProblemTranslationRunning = false;
+        }
+    }
+
+    function scheduleCachedProblemTranslation(content) {
+        if (!enabled || problemTranslationActive || cachedProblemTranslationRunning) return;
+        window.setTimeout(() => applyCachedProblemTranslation(content), 0);
+    }
+
+    function createAnalysisTranslationSignature(sourceTexts) {
+        return `${getProblemKey()}::analysis::${sourceTexts.join('\u001f')}`;
+    }
+
+    function applyAnalysisTranslationTargets(targets, translatedTexts, onProgress) {
+        for (let index = 0; index < targets.length; index += 1) {
+            onProgress?.(`AI 분석 번역 중 ${index + 1}/${targets.length}`);
+            targets[index].apply(translatedTexts[index]);
+        }
+    }
+
+    async function applyCachedAnalysisTranslation(sections) {
+        if (!enabled || analysisTranslationActive || cachedAnalysisTranslationRunning) return;
+
+        const targets = collectAnalysisTranslationTargets(sections);
+        if (targets.length === 0) return;
+
+        const sourceTexts = targets.map((target) => target.getSourceText());
+        const signature = createAnalysisTranslationSignature(sourceTexts);
+        if (lastCachedAnalysisSignature === signature || manuallyRestoredAnalysisSignature === signature) return;
+
+        lastCachedAnalysisSignature = signature;
+        cachedAnalysisTranslationRunning = true;
+
+        try {
+            const cachedTranslations = await getCachedTranslations(sourceTexts);
+            if (!cachedTranslations || analysisTranslationActive || manuallyRestoredAnalysisSignature === signature) {
+                return;
+            }
+
+            applyAnalysisTranslationTargets(targets, cachedTranslations);
+            analysisTranslationActive = true;
+            activeAnalysisSignature = signature;
+            setAnalysisTranslationStatus('로컬 캐시 적용');
+            syncAnalysisTranslationButtonText();
+        } catch (error) {
+            console.warn('[Peekle LeetCode] Cached AI analysis translation failed.', error);
+        } finally {
+            cachedAnalysisTranslationRunning = false;
+        }
+    }
+
+    function scheduleCachedAnalysisTranslation(sections) {
+        if (!enabled || analysisTranslationActive || cachedAnalysisTranslationRunning) return;
+        window.setTimeout(() => applyCachedAnalysisTranslation(sections), 0);
+    }
+
+    async function translateAnalysisSections(sections) {
+        if (analysisTranslationRunning) return;
+
+        if (analysisTranslationActive) {
+            restoreAnalysisTranslations(document.body);
+            manuallyRestoredAnalysisSignature = activeAnalysisSignature;
+            analysisTranslationActive = false;
+            activeAnalysisSignature = null;
+            setAnalysisTranslationStatus('원문 표시');
+            syncAnalysisTranslationButtonText();
+            return;
+        }
+
+        const targets = collectAnalysisTranslationTargets(sections);
+        if (targets.length === 0) {
+            setAnalysisTranslationStatus('번역할 AI 분석 문장을 찾지 못했습니다.');
+            syncAnalysisTranslationButtonText();
+            return;
+        }
+
+        analysisTranslationRunning = true;
+        setAnalysisTranslationButtonLoading(true);
+        setAnalysisTranslationStatus('AI 분석을 번역하는 중입니다.');
+
+        try {
+            const sourceTexts = targets.map((target) => target.getSourceText());
+            const translatedTexts = await translateTextsWithBackend(sourceTexts);
+            const signature = createAnalysisTranslationSignature(sourceTexts);
+
+            applyAnalysisTranslationTargets(targets, translatedTexts, setAnalysisTranslationStatus);
+            analysisTranslationActive = true;
+            activeAnalysisSignature = signature;
+            manuallyRestoredAnalysisSignature = null;
+            setAnalysisTranslationStatus('AI 분석 번역 완료');
+            syncAnalysisTranslationButtonText();
+        } catch (error) {
+            setAnalysisTranslationStatus(error?.message || 'AI 분석 번역 중 오류가 발생했습니다.');
+        } finally {
+            analysisTranslationRunning = false;
+            setAnalysisTranslationButtonLoading(false);
+        }
+    }
+
+    async function translateProblemDescription(content) {
+        if (problemTranslationActive) {
+            restoreProblemTranslations(document.body);
+            problemTranslationActive = false;
+            manuallyRestoredProblemKey = getProblemKey();
+            setTranslationStatus('원문 표시');
+            syncTranslationButtonText();
+            return;
+        }
+
+        const targets = collectProblemTranslationTargets(content);
+
+        if (targets.length === 0) {
+            setTranslationStatus('번역할 문제 설명을 찾지 못했습니다.');
+            syncTranslationButtonText();
+            return;
+        }
+
+        setTranslationButtonLoading(true);
+        setTranslationStatus('문제 설명을 번역하는 중입니다.');
+
+        try {
+            manuallyRestoredProblemKey = null;
+            const sourceTexts = targets.map((target) => target.getSourceText());
+            const translatedTexts = await translateTextsWithBackend(sourceTexts);
+
+            applyProblemTranslationTargets(targets, translatedTexts, setTranslationStatus);
+            problemTranslationActive = true;
+            scheduleGlossaryTranslation();
+            setTranslationStatus('번역 완료');
+            syncTranslationButtonText();
+        } catch (error) {
+            setTranslationStatus(error?.message || '번역 중 오류가 발생했습니다.');
+        } finally {
+            setTranslationButtonLoading(false);
+        }
+    }
+
+    function syncProblemTranslatorControls() {
+        if (!enabled || !isProblemPage()) {
+            removeProblemTranslationUi();
+            currentProblemKey = null;
+            problemTranslationActive = false;
+            return;
+        }
+
+        syncCurrentProblemState();
+
+        const content = findProblemDescription();
+        if (!content) return;
+
+        ensureStyle();
+
+        let toolbar = document.getElementById(TRANSLATE_TOOLBAR_ID);
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = TRANSLATE_TOOLBAR_ID;
+
+            const status = document.createElement('span');
+            status.id = TRANSLATION_STATUS_ID;
+            status.textContent = '';
+
+            const button = document.createElement('button');
+            button.id = TRANSLATE_BUTTON_ID;
+            button.type = 'button';
+            button.textContent = problemTranslationActive ? '원문 보기' : '문제 번역';
+            button.addEventListener('click', () => {
+                const currentContent = findProblemDescription();
+                if (currentContent) {
+                    translateProblemDescription(currentContent);
+                }
+            });
+
+            toolbar.append(status, button);
+        }
+
+        if (toolbar.nextElementSibling !== content) {
+            content.insertAdjacentElement('beforebegin', toolbar);
+        }
+        syncTranslationButtonText();
+        scheduleCachedProblemTranslation(content);
+    }
+
+    function syncAnalysisTranslatorControls() {
+        if (!enabled || !isProblemPage()) {
+            removeAnalysisTranslationUi();
+            analysisTranslationActive = false;
+            return;
+        }
+
+        const sections = findAnalysisSections();
+        const anchor = findAnalysisToolbarAnchor(sections);
+        if (!anchor) {
+            removeAnalysisTranslationUi();
+            analysisTranslationActive = false;
+            return;
+        }
+
+        ensureStyle();
+
+        let toolbar = document.getElementById(ANALYSIS_TRANSLATE_TOOLBAR_ID);
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = ANALYSIS_TRANSLATE_TOOLBAR_ID;
+
+            const status = document.createElement('span');
+            status.id = ANALYSIS_TRANSLATION_STATUS_ID;
+            status.textContent = '';
+
+            const button = document.createElement('button');
+            button.id = ANALYSIS_TRANSLATE_BUTTON_ID;
+            button.type = 'button';
+            button.textContent = analysisTranslationActive ? 'AI 분석 원문 보기' : 'AI 분석 번역';
+            button.addEventListener('click', () => {
+                const currentSections = findAnalysisSections();
+                if (currentSections.length > 0) {
+                    translateAnalysisSections(currentSections);
+                }
+            });
+
+            toolbar.append(status, button);
+        }
+
+        if (toolbar.nextElementSibling !== anchor) {
+            anchor.insertAdjacentElement('beforebegin', toolbar);
+        }
+
+        syncAnalysisTranslationButtonText();
+        scheduleCachedAnalysisTranslation(sections);
     }
 
     function translateValue(value) {
@@ -845,6 +2019,8 @@
         window.requestAnimationFrame(() => {
             queued = false;
             localize(document.body);
+            syncProblemTranslatorControls();
+            syncAnalysisTranslatorControls();
         });
     }
 
@@ -856,6 +2032,9 @@
 
     function restoreOriginals(root) {
         if (!root) return;
+
+        restoreProblemTranslations(root);
+        restoreAnalysisTranslations(root);
 
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
@@ -893,8 +2072,14 @@
         if (enabled) {
             ensureStyle();
             scheduleLocalize();
+            syncProblemTranslatorControls();
+            syncAnalysisTranslatorControls();
         } else {
+            problemTranslationActive = false;
+            analysisTranslationActive = false;
             restoreOriginals(document.body);
+            removeProblemTranslationUi();
+            removeAnalysisTranslationUi();
         }
     }
 
@@ -927,6 +2112,7 @@
 
             if (mutation.addedNodes.length > 0) {
                 shouldRun = true;
+                scheduleGlossaryTranslation();
             }
         }
 
