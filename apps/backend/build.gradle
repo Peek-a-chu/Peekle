@@ -97,6 +97,22 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    description = 'Runs unit tests only.'
+    exclude '**/*IntegrationTest.class'
+    exclude '**/*ConcurrencyTest.class'
+    exclude '**/PeekleBackendApplicationTests.class'
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    description = 'Runs Spring context/integration tests that may require local infrastructure.'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter test
+    include '**/*IntegrationTest.class'
+    include '**/*ConcurrencyTest.class'
+    include '**/PeekleBackendApplicationTests.class'
 }
 
 // 환경별 실행을 위한 편의용 태스크 (GradleBuild 타입)
