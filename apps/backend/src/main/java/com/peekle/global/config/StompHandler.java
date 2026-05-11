@@ -30,7 +30,7 @@ public class StompHandler implements ChannelInterceptor {
             }
             String studyId = accessor.getFirstNativeHeader("studyId");
 
-            log.info("[StompHandler] Connect request: userId={}, studyId={}", userId, studyId);
+            log.debug("[StompHandler] Connect request: userId={}, studyId={}", userId, studyId);
 
             Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
             if (sessionAttributes != null) {
@@ -38,7 +38,7 @@ public class StompHandler implements ChannelInterceptor {
                 if (userId != null) {
                     try {
                         sessionAttributes.put("userId", Long.valueOf(userId));
-                        log.info("[StompHandler] User ID set: {}", userId);
+                        log.debug("[StompHandler] User ID set: {}", userId);
                     } catch (NumberFormatException e) {
                         log.error("[StompHandler] Invalid userId format: {}", userId);
                     }
@@ -50,7 +50,7 @@ public class StompHandler implements ChannelInterceptor {
                 if (studyId != null) {
                     try {
                         sessionAttributes.put("studyId", Long.valueOf(studyId));
-                        log.info("[StompHandler] Study ID set: {}", studyId);
+                        log.debug("[StompHandler] Study ID set: {}", studyId);
                     } catch (NumberFormatException e) {
                         log.error("[StompHandler] Invalid studyId format: {}", studyId);
                     }
@@ -61,7 +61,7 @@ public class StompHandler implements ChannelInterceptor {
                 if (gameId != null) {
                     try {
                         sessionAttributes.put("gameId", Long.valueOf(gameId));
-                        log.info("[StompHandler] Game ID set: {}", gameId);
+                        log.debug("[StompHandler] Game ID set: {}", gameId);
                     } catch (NumberFormatException e) {
                         log.error("[StompHandler] Invalid gameId format: {}", gameId);
                     }

@@ -2,6 +2,7 @@ package com.peekle.domain.workbook.service;
 
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
+import com.peekle.domain.game.service.WorkbookPreviewCacheService;
 import com.peekle.domain.submission.repository.SubmissionLogRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
@@ -39,6 +40,7 @@ public class WorkbookService {
     private final ProblemRepository problemRepository;
     private final UserRepository userRepository;
     private final SubmissionLogRepository submissionLogRepository;
+    private final WorkbookPreviewCacheService workbookPreviewCacheService;
 
     // 문제집 생성
     @Transactional
@@ -167,6 +169,7 @@ public class WorkbookService {
         if (request.getProblemIds() != null && !request.getProblemIds().isEmpty()) {
             addProblemsToWorkbook(workbook, request.getProblemIds());
         }
+        workbookPreviewCacheService.invalidateWorkbookCacheAndStartSnapshots(workbookId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -190,6 +193,7 @@ public class WorkbookService {
         }
 
         workbook.deactivate();
+        workbookPreviewCacheService.invalidateWorkbookCacheAndStartSnapshots(workbookId);
     }
 
     // 문제집에 단일 문제 추가
@@ -224,7 +228,9 @@ public class WorkbookService {
                 .build();
 
         workbook.addProblem(workbookProblem);
+        workbook.update(null, null);
         workbookRepository.save(workbook);
+        workbookPreviewCacheService.invalidateWorkbookCacheAndStartSnapshots(workbookId);
     }
 
     // 북마크 토글

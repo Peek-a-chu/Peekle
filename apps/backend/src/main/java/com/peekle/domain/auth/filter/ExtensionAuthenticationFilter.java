@@ -1,7 +1,7 @@
 package com.peekle.domain.auth.filter;
 
-import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.service.UserService;
+import com.peekle.domain.user.service.UserService.ExtensionTokenAuthentication;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,19 +36,17 @@ public class ExtensionAuthenticationFilter extends OncePerRequestFilter {
 
         if (token != null && !token.isEmpty()) {
             try {
-                // 토큰으로 유저 조회 (유효하지 않으면 예외 발생하며 catch 블록으로 이동 or null 리턴 상황 처리)
-                // userService.getUserByExtensionToken(token) 은 INVALID_TOKEN 예외를 던짐
-                User user = userService.getUserByExtensionToken(token);
+                ExtensionTokenAuthentication principal = userService.getExtensionTokenAuthentication(token);
 
-                if (user != null) {
-                    String authority = "ROLE_" + (user.getRole() == null ? "USER" : user.getRole().name());
+                if (principal != null) {
+                    String authority = "ROLE_" + principal.roleName();
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    user.getId(),
+                                    principal.userId(),
                                     null,
                                     List.of(new SimpleGrantedAuthority(authority)));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                    log.debug("Authenticated user {} via extension token", user.getNickname());
+                    log.debug("Authenticated user {} via extension token", principal.userId());
                 }
             } catch (Exception e) {
                 log.warn("Failed to authenticate with extension token: {}", e.getMessage());

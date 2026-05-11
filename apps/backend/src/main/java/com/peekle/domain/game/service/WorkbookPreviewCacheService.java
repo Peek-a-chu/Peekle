@@ -9,6 +9,7 @@ import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
 import com.peekle.global.redis.RedisKeyConst;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -17,14 +18,19 @@ import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -37,17 +43,31 @@ public class WorkbookPreviewCacheService {
     public static final String PREVIEW_COUNT_FIELD = "previewCount";
     public static final String PREVIEW_CACHED_AT_FIELD = "previewCachedAt";
     public static final String WORKBOOK_CACHE_REGISTERED_FIELD = "workbookCacheRegistered";
+    public static final String START_SNAPSHOT_WORKBOOK_UPDATED_AT_FIELD = "startSnapshotWorkbookUpdatedAt";
 
     private static final String WORKBOOK_CACHE_READY_FIELD = "ready";
     private static final String WORKBOOK_CACHE_COUNT_FIELD = "count";
     private static final String WORKBOOK_CACHE_TITLE_FIELD = "workbookTitle";
     private static final String WORKBOOK_CACHE_PREVIEW_BYTES_FIELD = "previewBytes";
     private static final String WORKBOOK_CACHE_CACHED_AT_FIELD = "cachedAt";
+    private static final String WORKBOOK_CACHE_UPDATED_AT_FIELD = "workbookUpdatedAt";
     private static final String METRIC_GAME_START_PREVIEW_MISS = "game.start.preview.miss";
     private static final String METRIC_GAME_START_PREVIEW_REBUILD = "game.start.preview.rebuild";
+    private static final String METRIC_GAME_START_PREVIEW_ROOM_SNAPSHOT_FALLBACK =
+            "game.start.preview.room_snapshot_fallback";
+    private static final String METRIC_GAME_START_SNAPSHOT_FETCH = "game.start.snapshot.fetch.ms";
+    private static final String METRIC_GAME_START_SNAPSHOT_RESULT = "game.start.snapshot.result";
+    private static final String METRIC_GAME_START_FALLBACK_USED = "game.start.fallback.used";
     private static final String METRIC_REDIS_PREVIEW_BYTES = "redis.preview.bytes_per_room";
     private static final String METRIC_REDIS_WORKBOOK_CACHE_BYTES = "redis.workbook.cache.bytes_per_workbook";
+    private static final String SNAPSHOT_RESULT_HIT = "hit";
+    private static final String SNAPSHOT_RESULT_MISS = "miss";
+    private static final String SNAPSHOT_RESULT_STALE = "stale";
+    private static final String CACHE_STATUS_SNAPSHOT_HIT = "snapshot_hit";
+    private static final String CACHE_STATUS_SNAPSHOT_MISS_FALLBACK = "snapshot_miss_fallback";
+    private static final String CACHE_STATUS_SNAPSHOT_STALE_FALLBACK = "snapshot_stale_fallback";
     private static final int WAITING_ROOM_PREVIEW_LIMIT = 10;
+    private static final int SNAPSHOT_TTL_HOURS = 6;
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedissonClient redissonClient;
@@ -60,34 +80,47 @@ public class WorkbookPreviewCacheService {
         Long workbookId = parseWorkbookId(roomInfo.get("selectedWorkbookId"));
         WorkbookCacheSnapshot snapshot = ensureWorkbookCache(workbookId, requestedProblemCount, false);
         registerRoomCacheUsage(roomId, roomInfo, snapshot);
+        prepareRoomStartProblemSnapshot(roomId, roomInfo, snapshot, requestedProblemCount);
     }
 
     public WorkbookProblemSelection selectProblemsForStart(Long roomId, int problemCount) {
         Map<Object, Object> roomInfo = loadRoomInfo(roomId);
         Long workbookId = parseWorkbookId(roomInfo.get("selectedWorkbookId"));
 
-        List<Problem> selectedProblems = loadSampledProblemsFromCache(workbookId, problemCount);
-        if (!selectedProblems.isEmpty()) {
-            return new WorkbookProblemSelection(selectedProblems, "hit");
+        long snapshotFetchStartedAtNanos = System.nanoTime();
+        SnapshotLoadResult snapshotLoadResult = loadRoomStartProblemSnapshot(roomId, roomInfo, workbookId, problemCount);
+        recordSnapshotFetch(snapshotLoadResult.result(), snapshotFetchStartedAtNanos);
+        recordSnapshotResult(snapshotLoadResult.result());
+        if (SNAPSHOT_RESULT_HIT.equals(snapshotLoadResult.result())) {
+            return new WorkbookProblemSelection(snapshotLoadResult.problems(), CACHE_STATUS_SNAPSHOT_HIT);
         }
 
         markRoomPreviewUnavailable(roomId);
         meterRegistry.counter(METRIC_GAME_START_PREVIEW_MISS, "problem_source", "WORKBOOK").increment();
+        meterRegistry.counter(METRIC_GAME_START_FALLBACK_USED,
+                "problem_source", "WORKBOOK",
+                "reason", snapshotLoadResult.result()).increment();
 
         WorkbookCacheSnapshot rebuilt = ensureWorkbookCache(workbookId, problemCount, false);
         registerRoomCacheUsage(roomId, roomInfo, rebuilt);
         meterRegistry.counter(METRIC_GAME_START_PREVIEW_REBUILD, "problem_source", "WORKBOOK").increment();
 
-        List<Problem> rebuiltProblems = loadSampledProblemsFromCache(workbookId, problemCount);
+        List<Problem> rebuiltProblems = prepareRoomStartProblemSnapshot(roomId, roomInfo, rebuilt, problemCount);
         if (rebuiltProblems.isEmpty()) {
-            ensureWorkbookCache(workbookId, problemCount, true);
-            rebuiltProblems = loadSampledProblemsFromCache(workbookId, problemCount);
+            WorkbookCacheSnapshot forceRebuilt = ensureWorkbookCache(workbookId, problemCount, true);
+            registerRoomCacheUsage(roomId, roomInfo, forceRebuilt);
+            rebuiltProblems = prepareRoomStartProblemSnapshot(roomId, roomInfo, forceRebuilt, problemCount);
         }
         if (rebuiltProblems.isEmpty()) {
             throw new BusinessException(ErrorCode.GAME_INVALID_ROOM_DATA, "문제집 캐시 복구에 실패했습니다.");
         }
 
-        return new WorkbookProblemSelection(rebuiltProblems, "fallback");
+        meterRegistry.counter(METRIC_GAME_START_PREVIEW_ROOM_SNAPSHOT_FALLBACK, "problem_source", "WORKBOOK")
+                .increment();
+        String cacheStatus = SNAPSHOT_RESULT_STALE.equals(snapshotLoadResult.result())
+                ? CACHE_STATUS_SNAPSHOT_STALE_FALLBACK
+                : CACHE_STATUS_SNAPSHOT_MISS_FALLBACK;
+        return new WorkbookProblemSelection(rebuiltProblems, cacheStatus);
     }
 
     public List<Problem> loadPreviewProblems(Long roomId) {
@@ -133,6 +166,53 @@ public class WorkbookPreviewCacheService {
         }
     }
 
+    public void evictRoomStartProblemSnapshot(Long roomId) {
+        Map<Object, Object> roomInfo = loadRoomInfo(roomId);
+        if (!"WORKBOOK".equals(String.valueOf(roomInfo.getOrDefault("problemSource", "BOJ_RANDOM")))) {
+            return;
+        }
+
+        Long workbookId = parseWorkbookId(roomInfo.get("selectedWorkbookId"));
+        deleteRoomStartProblemSnapshot(roomId, workbookId);
+        log.info("🧹 [Workbook Cache] Evicted start problem snapshot for room {}", roomId);
+    }
+
+    public void invalidateWorkbookCacheAndStartSnapshots(Long workbookId) {
+        RLock lock = getWorkbookCacheLock(workbookId);
+        try {
+            if (!lock.tryLock(2, 10, TimeUnit.SECONDS)) {
+                log.warn("⚠️ [Workbook Cache] Could not acquire invalidation lock for workbook {}. Skipping.", workbookId);
+                return;
+            }
+
+            deleteWorkbookCacheKeys(workbookId);
+            redisTemplate.delete(String.format(RedisKeyConst.WORKBOOK_CACHE_REF_COUNT, workbookId));
+
+            String roomIndexKey = String.format(RedisKeyConst.WORKBOOK_START_SNAPSHOT_ROOM_IDS, workbookId);
+            Set<Object> roomIds = redisTemplate.opsForSet().members(roomIndexKey);
+            if (roomIds != null) {
+                for (Object rawRoomId : roomIds) {
+                    Long roomId = parseLongOrNull(rawRoomId);
+                    if (roomId == null) {
+                        continue;
+                    }
+                    redisTemplate.delete(String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT, roomId));
+                    redisTemplate.delete(String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT_META, roomId));
+                    markRoomPreviewUnavailable(roomId);
+                }
+            }
+            redisTemplate.delete(roomIndexKey);
+            log.info("🧹 [Workbook Cache] Invalidated cache and start snapshots for workbook {}", workbookId);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Workbook cache invalidation interrupted", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
     public void releaseRoomWorkbookCache(Long roomId) {
         String infoKey = String.format(RedisKeyConst.GAME_ROOM_INFO, roomId);
         Map<Object, Object> roomInfo = redisTemplate.opsForHash().entries(infoKey);
@@ -164,6 +244,7 @@ public class WorkbookPreviewCacheService {
                 redisTemplate.delete(String.format(RedisKeyConst.WORKBOOK_CACHE_REF_COUNT, workbookId));
                 log.info("🗑️ [Workbook Cache] Removed shared cache for workbook {}", workbookId);
             }
+            deleteRoomStartProblemSnapshot(roomId, workbookId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("⚠️ [Workbook Cache] Release interrupted for workbook {} via room {}. Skipping cache release.",
@@ -198,7 +279,7 @@ public class WorkbookPreviewCacheService {
         if (roomInfo.isEmpty()) {
             throw new BusinessException(ErrorCode.GAME_ROOM_NOT_FOUND);
         }
-        return roomInfo;
+        return new HashMap<>(roomInfo);
     }
 
     private WorkbookCacheSnapshot ensureWorkbookCache(Long workbookId, int requestedProblemCount, boolean forceRebuild) {
@@ -231,14 +312,16 @@ public class WorkbookPreviewCacheService {
 
             validateRequestedWorkbookProblemCount(requestedProblemCount, problems.size());
             long cachedAt = System.currentTimeMillis();
-            cacheWorkbookData(workbookId, workbook.getTitle(), problems, cachedAt);
+            String workbookUpdatedAt = formatWorkbookUpdatedAt(workbook);
+            cacheWorkbookData(workbookId, workbook.getTitle(), problems, cachedAt, workbookUpdatedAt);
 
             return new WorkbookCacheSnapshot(
                     workbookId,
                     workbook.getTitle(),
                     problems.size(),
                     cachedAt,
-                    estimatePreviewPayloadBytes(limitPreviewProblems(problems)));
+                    estimatePreviewPayloadBytes(limitPreviewProblems(problems)),
+                    workbookUpdatedAt);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Workbook cache preparation interrupted", e);
@@ -256,6 +339,7 @@ public class WorkbookPreviewCacheService {
         updates.put(PREVIEW_COUNT_FIELD, String.valueOf(snapshot.problemCount()));
         updates.put(PREVIEW_CACHED_AT_FIELD, String.valueOf(snapshot.cachedAt()));
         updates.put("workbookTitle", snapshot.workbookTitle());
+        updates.put(START_SNAPSHOT_WORKBOOK_UPDATED_AT_FIELD, snapshot.workbookUpdatedAt());
 
         if (!"true".equals(String.valueOf(roomInfo.getOrDefault(WORKBOOK_CACHE_REGISTERED_FIELD, "false")))) {
             redisTemplate.opsForValue().increment(String.format(RedisKeyConst.WORKBOOK_CACHE_REF_COUNT, snapshot.workbookId()));
@@ -263,8 +347,152 @@ public class WorkbookPreviewCacheService {
         }
 
         redisTemplate.opsForHash().putAll(infoKey, updates);
+        roomInfo.putAll(updates);
         meterRegistry.summary(METRIC_REDIS_PREVIEW_BYTES, "problem_source", "WORKBOOK")
                 .record(snapshot.previewBytes());
+    }
+
+    private List<Problem> prepareRoomStartProblemSnapshot(
+            Long roomId,
+            Map<Object, Object> roomInfo,
+            WorkbookCacheSnapshot workbookSnapshot,
+            int requestedProblemCount) {
+        List<Problem> sampledProblems = loadSampledProblemsFromCache(workbookSnapshot.workbookId(), requestedProblemCount);
+        if (sampledProblems.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String snapshotKey = String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT, roomId);
+        String metadataKey = String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT_META, roomId);
+        List<Map<String, String>> snapshotPayloads = sampledProblems.stream()
+                .map(this::toProblemMetadata)
+                .toList();
+        Map<String, String> snapshotMetadata = buildSnapshotMetadata(roomId, roomInfo, workbookSnapshot, requestedProblemCount);
+        redisTemplate.delete(snapshotKey);
+        if (!snapshotPayloads.isEmpty()) {
+            redisTemplate.opsForList().rightPushAll(snapshotKey, snapshotPayloads.toArray());
+        }
+        redisTemplate.expire(snapshotKey, SNAPSHOT_TTL_HOURS, TimeUnit.HOURS);
+        redisTemplate.opsForHash().putAll(metadataKey, snapshotMetadata);
+        redisTemplate.expire(metadataKey, SNAPSHOT_TTL_HOURS, TimeUnit.HOURS);
+        String roomIndexKey = String.format(RedisKeyConst.WORKBOOK_START_SNAPSHOT_ROOM_IDS, workbookSnapshot.workbookId());
+        redisTemplate.opsForSet().add(roomIndexKey, String.valueOf(roomId));
+        redisTemplate.expire(roomIndexKey, SNAPSHOT_TTL_HOURS, TimeUnit.HOURS);
+        return sampledProblems;
+    }
+
+    private SnapshotLoadResult loadRoomStartProblemSnapshot(
+            Long roomId,
+            Map<Object, Object> roomInfo,
+            Long workbookId,
+            int problemCount) {
+        String metadataKey = String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT_META, roomId);
+        Map<Object, Object> metadataMap = redisTemplate.opsForHash().entries(metadataKey);
+        if (metadataMap.isEmpty()) {
+            return SnapshotLoadResult.miss();
+        }
+
+        String staleReason = validateSnapshotMetadata(roomId, roomInfo, workbookId, problemCount, metadataMap);
+        if (staleReason != null) {
+            log.info("📋 [Game Start] Start snapshot stale for room {}: {}", roomId, staleReason);
+            return SnapshotLoadResult.stale();
+        }
+
+        String snapshotKey = String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT, roomId);
+        List<Object> metadata = redisTemplate.opsForList().range(snapshotKey, 0, problemCount - 1L);
+        if (metadata == null || metadata.size() != problemCount || metadata.stream().anyMatch(Objects::isNull)) {
+            return SnapshotLoadResult.stale();
+        }
+
+        List<Problem> problems = metadata.stream()
+                .map(this::mapMetadataToProblem)
+                .collect(Collectors.toList());
+        long distinctProblemCount = problems.stream()
+                .map(Problem::getId)
+                .distinct()
+                .count();
+        if (distinctProblemCount != problemCount) {
+            return SnapshotLoadResult.stale();
+        }
+
+        return SnapshotLoadResult.hit(problems);
+    }
+
+    private Map<String, String> buildSnapshotMetadata(
+            Long roomId,
+            Map<Object, Object> roomInfo,
+            WorkbookCacheSnapshot workbookSnapshot,
+            int requestedProblemCount) {
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("roomId", String.valueOf(roomId));
+        metadata.put("workbookId", String.valueOf(workbookSnapshot.workbookId()));
+        metadata.put("problemCount", String.valueOf(requestedProblemCount));
+        metadata.put("selectionFilterHash", selectionFilterHash(roomInfo, workbookSnapshot.workbookId(), requestedProblemCount));
+        metadata.put("roomSettingVersion", roomSettingVersion(roomInfo));
+        metadata.put("workbookUpdatedAt", workbookSnapshot.workbookUpdatedAt());
+        metadata.put("generatedAt", String.valueOf(System.currentTimeMillis()));
+        metadata.put("snapshotId", UUID.randomUUID().toString());
+        return metadata;
+    }
+
+    private String validateSnapshotMetadata(
+            Long roomId,
+            Map<Object, Object> roomInfo,
+            Long workbookId,
+            int problemCount,
+            Map<Object, Object> metadataMap) {
+        if (!Objects.equals(String.valueOf(roomId), stringValue(metadataMap.get("roomId")))) {
+            return "room_id_mismatch";
+        }
+        if (!Objects.equals(String.valueOf(workbookId), stringValue(metadataMap.get("workbookId")))) {
+            return "workbook_id_mismatch";
+        }
+        if (!Objects.equals(String.valueOf(problemCount), stringValue(metadataMap.get("problemCount")))) {
+            return "problem_count_mismatch";
+        }
+        if (!Objects.equals(selectionFilterHash(roomInfo, workbookId, problemCount),
+                stringValue(metadataMap.get("selectionFilterHash")))) {
+            return "selection_filter_mismatch";
+        }
+        if (!Objects.equals(roomSettingVersion(roomInfo), stringValue(metadataMap.get("roomSettingVersion")))) {
+            return "room_setting_mismatch";
+        }
+
+        String expectedWorkbookUpdatedAt = stringValue(roomInfo.get(START_SNAPSHOT_WORKBOOK_UPDATED_AT_FIELD));
+        if (expectedWorkbookUpdatedAt == null || expectedWorkbookUpdatedAt.isBlank()) {
+            return "workbook_updated_at_missing";
+        }
+        if (!Objects.equals(expectedWorkbookUpdatedAt, stringValue(metadataMap.get("workbookUpdatedAt")))) {
+            return "workbook_updated_at_mismatch";
+        }
+
+        return null;
+    }
+
+    private void recordSnapshotFetch(String result, long startedAtNanos) {
+        long durationNanos = Math.max(System.nanoTime() - startedAtNanos, 0L);
+        Timer.builder(METRIC_GAME_START_SNAPSHOT_FETCH)
+                .tag("problem_source", "WORKBOOK")
+                .tag("result", result)
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()
+                .register(meterRegistry)
+                .record(durationNanos, TimeUnit.NANOSECONDS);
+    }
+
+    private void recordSnapshotResult(String result) {
+        meterRegistry.counter(METRIC_GAME_START_SNAPSHOT_RESULT,
+                "problem_source", "WORKBOOK",
+                "result", result).increment();
+    }
+
+    private void deleteRoomStartProblemSnapshot(Long roomId, Long workbookId) {
+        redisTemplate.delete(String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT, roomId));
+        redisTemplate.delete(String.format(RedisKeyConst.ROOM_START_PROBLEM_SNAPSHOT_META, roomId));
+        if (workbookId != null) {
+            redisTemplate.opsForSet()
+                    .remove(String.format(RedisKeyConst.WORKBOOK_START_SNAPSHOT_ROOM_IDS, workbookId), String.valueOf(roomId));
+        }
     }
 
     private List<Problem> loadPreviewProblemsFromCache(Long workbookId) {
@@ -298,7 +526,12 @@ public class WorkbookPreviewCacheService {
                 .collect(Collectors.toList());
     }
 
-    private void cacheWorkbookData(Long workbookId, String workbookTitle, List<Problem> problems, long cachedAt) {
+    private void cacheWorkbookData(
+            Long workbookId,
+            String workbookTitle,
+            List<Problem> problems,
+            long cachedAt,
+            String workbookUpdatedAt) {
         String idsKey = String.format(RedisKeyConst.WORKBOOK_CACHE_PROBLEM_IDS, workbookId);
         String metaKey = String.format(RedisKeyConst.WORKBOOK_CACHE_PROBLEM_META, workbookId);
         String previewIdsKey = String.format(RedisKeyConst.WORKBOOK_CACHE_PREVIEW_IDS, workbookId);
@@ -334,6 +567,7 @@ public class WorkbookPreviewCacheService {
         cacheInfo.put(WORKBOOK_CACHE_TITLE_FIELD, workbookTitle);
         cacheInfo.put(WORKBOOK_CACHE_PREVIEW_BYTES_FIELD, String.valueOf(estimatePreviewPayloadBytes(previewProblems)));
         cacheInfo.put(WORKBOOK_CACHE_CACHED_AT_FIELD, String.valueOf(cachedAt));
+        cacheInfo.put(WORKBOOK_CACHE_UPDATED_AT_FIELD, workbookUpdatedAt);
         redisTemplate.opsForHash().putAll(cacheInfoKey, cacheInfo);
 
         meterRegistry.summary(METRIC_REDIS_WORKBOOK_CACHE_BYTES, "problem_source", "WORKBOOK")
@@ -360,9 +594,12 @@ public class WorkbookPreviewCacheService {
         long cachedAt = parseLong(cacheInfo.getOrDefault(WORKBOOK_CACHE_CACHED_AT_FIELD, "0"));
         long previewBytes = parseLong(cacheInfo.getOrDefault(WORKBOOK_CACHE_PREVIEW_BYTES_FIELD, "0"));
         String workbookTitle = String.valueOf(cacheInfo.getOrDefault(WORKBOOK_CACHE_TITLE_FIELD, ""));
+        String workbookUpdatedAt = stringValue(cacheInfo.get(WORKBOOK_CACHE_UPDATED_AT_FIELD));
 
         boolean cacheReady = "true".equals(ready)
                 && count > 0
+                && workbookUpdatedAt != null
+                && !workbookUpdatedAt.isBlank()
                 && Boolean.TRUE.equals(redisTemplate.hasKey(String.format(RedisKeyConst.WORKBOOK_CACHE_PROBLEM_IDS, workbookId)))
                 && Boolean.TRUE.equals(redisTemplate.hasKey(String.format(RedisKeyConst.WORKBOOK_CACHE_PROBLEM_META, workbookId)))
                 && Boolean.TRUE.equals(redisTemplate.hasKey(String.format(RedisKeyConst.WORKBOOK_CACHE_PREVIEW_IDS, workbookId)));
@@ -370,7 +607,7 @@ public class WorkbookPreviewCacheService {
             return null;
         }
 
-        return new WorkbookCacheSnapshot(workbookId, workbookTitle, count, cachedAt, previewBytes);
+        return new WorkbookCacheSnapshot(workbookId, workbookTitle, count, cachedAt, previewBytes, workbookUpdatedAt);
     }
 
     private void markRoomPreviewUnavailable(Long roomId) {
@@ -414,6 +651,10 @@ public class WorkbookPreviewCacheService {
     }
 
     private void validateRequestedWorkbookProblemCount(int requestedProblemCount, int availableProblemCount) {
+        validateRequestedWorkbookProblemCount(requestedProblemCount, (long) availableProblemCount);
+    }
+
+    private void validateRequestedWorkbookProblemCount(int requestedProblemCount, long availableProblemCount) {
         if (requestedProblemCount > availableProblemCount) {
             throw new BusinessException(
                     ErrorCode.GAME_PROBLEM_COUNT_EXCEEDED,
@@ -473,6 +714,68 @@ public class WorkbookPreviewCacheService {
         return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
     }
 
+    private String selectionFilterHash(Map<Object, Object> roomInfo, Long workbookId, int problemCount) {
+        return sha256(String.join("|",
+                "problemSource=" + stringValue(roomInfo.getOrDefault("problemSource", "WORKBOOK")),
+                "workbookId=" + workbookId,
+                "problemCount=" + problemCount,
+                "tierMin=" + stringValue(roomInfo.getOrDefault("tierMin", "")),
+                "tierMax=" + stringValue(roomInfo.getOrDefault("tierMax", "")),
+                "tags=" + normalizeTags(stringValue(roomInfo.get("tags")))));
+    }
+
+    private String roomSettingVersion(Map<Object, Object> roomInfo) {
+        return sha256(String.join("|",
+                "teamType=" + stringValue(roomInfo.getOrDefault("teamType", "")),
+                "mode=" + stringValue(roomInfo.getOrDefault("mode", "")),
+                "timeLimit=" + stringValue(roomInfo.getOrDefault("timeLimit", ""))));
+    }
+
+    private String normalizeTags(String tags) {
+        if (tags == null || tags.isBlank()) {
+            return "";
+        }
+        return Arrays.stream(tags.split(","))
+                .map(String::trim)
+                .filter(tag -> !tag.isBlank())
+                .sorted()
+                .collect(Collectors.joining(","));
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashed = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hashed.length * 2);
+            for (byte b : hashed) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 digest is not available", e);
+        }
+    }
+
+    private String formatWorkbookUpdatedAt(Workbook workbook) {
+        LocalDateTime updatedAt = workbook.getUpdatedAt() != null ? workbook.getUpdatedAt() : workbook.getCreatedAt();
+        return updatedAt == null ? "0" : updatedAt.toString();
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private Long parseLongOrNull(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
     private int parseInt(Object value) {
         try {
             return Integer.parseInt(String.valueOf(value));
@@ -494,9 +797,24 @@ public class WorkbookPreviewCacheService {
             String workbookTitle,
             int problemCount,
             long cachedAt,
-            long previewBytes) {
+            long previewBytes,
+            String workbookUpdatedAt) {
     }
 
     public record WorkbookProblemSelection(List<Problem> problems, String cacheStatus) {
+    }
+
+    private record SnapshotLoadResult(String result, List<Problem> problems) {
+        static SnapshotLoadResult hit(List<Problem> problems) {
+            return new SnapshotLoadResult(SNAPSHOT_RESULT_HIT, problems);
+        }
+
+        static SnapshotLoadResult miss() {
+            return new SnapshotLoadResult(SNAPSHOT_RESULT_MISS, Collections.emptyList());
+        }
+
+        static SnapshotLoadResult stale() {
+            return new SnapshotLoadResult(SNAPSHOT_RESULT_STALE, Collections.emptyList());
+        }
     }
 }

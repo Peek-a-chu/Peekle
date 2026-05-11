@@ -7,6 +7,7 @@ import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.problem.repository.TagRepository;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.domain.user.service.UserService;
 import com.peekle.domain.workbook.repository.WorkbookProblemRepository;
 import com.peekle.domain.workbook.repository.WorkbookRepository;
 import org.junit.jupiter.api.Assertions;
@@ -53,6 +54,9 @@ class BenchmarkFixtureServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private UserService userService;
+
+    @Mock
     private WorkbookRepository workbookRepository;
 
     @Mock
@@ -77,6 +81,7 @@ class BenchmarkFixtureServiceTest {
                 problemRepository,
                 tagRepository,
                 userRepository,
+                userService,
                 workbookRepository,
                 workbookProblemRepository,
                 redisGameService,
@@ -133,6 +138,7 @@ class BenchmarkFixtureServiceTest {
                 problemRepository,
                 tagRepository,
                 userRepository,
+                userService,
                 workbookRepository,
                 workbookProblemRepository,
                 redisGameService,

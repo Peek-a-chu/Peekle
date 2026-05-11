@@ -4,11 +4,13 @@ import com.peekle.domain.benchmark.service.BenchmarkFixtureService;
 import com.peekle.global.dto.ApiResponse;
 import com.peekle.global.exception.BusinessException;
 import com.peekle.global.exception.ErrorCode;
+import com.peekle.global.metrics.BenchmarkStartGameStageMetricsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +26,7 @@ import java.util.List;
 public class BenchmarkController {
 
     private final BenchmarkFixtureService benchmarkFixtureService;
+    private final BenchmarkStartGameStageMetricsService startGameStageMetricsService;
 
     @PostMapping("/problems/ensure")
     public ApiResponse<BenchmarkProblemSeedResponse> ensureProblems(@RequestParam int count) {
@@ -71,6 +74,20 @@ public class BenchmarkController {
     public ApiResponse<BenchmarkPreviewResponse> evictPreview(@PathVariable Long roomId) {
         benchmarkFixtureService.evictWorkbookPreview(roomId);
         return ApiResponse.success(new BenchmarkPreviewResponse(roomId, true));
+    }
+
+    @DeleteMapping("/games/{roomId}/start-snapshot")
+    public ApiResponse<BenchmarkPreviewResponse> evictStartSnapshot(@PathVariable Long roomId) {
+        benchmarkFixtureService.evictRoomStartProblemSnapshot(roomId);
+        return ApiResponse.success(new BenchmarkPreviewResponse(roomId, true));
+    }
+
+    @GetMapping("/metrics/start-game/stages")
+    public ApiResponse<BenchmarkStartGameStageMetricsService.StartGameStageSnapshot> startGameStageMetrics(
+            @RequestParam(defaultValue = "WORKBOOK") String problemSource,
+            @RequestParam(defaultValue = "success") String result,
+            @RequestParam(defaultValue = "hit") String cache) {
+        return ApiResponse.success(startGameStageMetricsService.snapshot(problemSource, result, cache));
     }
 
     private Long requireUserId(Long userId) {

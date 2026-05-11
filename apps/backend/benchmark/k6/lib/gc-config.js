@@ -11,6 +11,14 @@ function parseNumber(name, fallback) {
   return parsed;
 }
 
+function parseBoolean(name, fallback) {
+  const rawValue = __ENV[name];
+  if (rawValue === undefined || rawValue === "") {
+    return fallback;
+  }
+  return ["1", "true", "yes", "y"].includes(String(rawValue).toLowerCase());
+}
+
 function toWsBaseUrl(baseUrl) {
   if (baseUrl.startsWith("https://")) {
     return `wss://${baseUrl.slice("https://".length)}`;
@@ -60,6 +68,7 @@ export function loadGcConfig() {
     wsConnectTimeoutMs: parseNumber("WS_CONNECT_TIMEOUT_MS", 1200),
     wsChatIntervalMs: parseNumber("WS_CHAT_INTERVAL_MS", 250),
     wsChatStartDelayMs: parseNumber("WS_CHAT_START_DELAY_MS", 200),
+    evictStartSnapshot: parseBoolean("EVICT_START_SNAPSHOT", false),
   };
 }
 
@@ -74,8 +83,11 @@ function perVuIterationsScenario(exec, config, startTime = "0s") {
   };
 }
 
+const summaryTrendStats = ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"];
+
 export function buildGcHttpOptions(config, execName) {
   return {
+    summaryTrendStats,
     scenarios: {
       [execName]: perVuIterationsScenario(execName, config),
     },
@@ -88,6 +100,7 @@ export function buildGcHttpOptions(config, execName) {
 
 export function buildGcMixedOptions(config) {
   return {
+    summaryTrendStats,
     scenarios: {
       httpScenario: perVuIterationsScenario("httpScenario", config),
       wsScenario: perVuIterationsScenario("wsScenario", config),
@@ -95,6 +108,20 @@ export function buildGcMixedOptions(config) {
     setupTimeout: __ENV.SETUP_TIMEOUT || "30m",
     thresholds: {
       benchmark_failure_rate: [`rate<${config.maxFailureRate}`],
+      ws_chat_failure_rate: [`rate<${config.maxFailureRate}`],
+      ws_connect_failure_rate: [`rate<${config.maxFailureRate}`],
+    },
+  };
+}
+
+export function buildGcWsOptions(config) {
+  return {
+    summaryTrendStats,
+    scenarios: {
+      wsScenario: perVuIterationsScenario("wsScenario", config),
+    },
+    setupTimeout: __ENV.SETUP_TIMEOUT || "30m",
+    thresholds: {
       ws_chat_failure_rate: [`rate<${config.maxFailureRate}`],
       ws_connect_failure_rate: [`rate<${config.maxFailureRate}`],
     },

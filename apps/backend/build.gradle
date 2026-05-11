@@ -91,6 +91,9 @@ dependencies {
     // Redisson
     implementation 'org.redisson:redisson-spring-boot-starter:3.31.0'
 
+    // Local hot-path caches
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
     // AWS SDK (for Cloudflare R2)
     implementation 'software.amazon.awssdk:s3:2.29.23'
 }

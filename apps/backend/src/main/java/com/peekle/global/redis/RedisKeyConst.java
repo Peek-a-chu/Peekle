@@ -142,7 +142,12 @@ public class RedisKeyConst {
     public static final String WORKBOOK_CACHE_PROBLEM_META = "workbook:%d:problems:meta";
     public static final String WORKBOOK_CACHE_PREVIEW_IDS = "workbook:%d:problems:preview_ids";
     public static final String WORKBOOK_CACHE_REF_COUNT = "workbook:%d:cache:refs";
+    public static final String WORKBOOK_START_SNAPSHOT_ROOM_IDS = "workbook:%d:start_snapshot:rooms";
     public static final String LOCK_WORKBOOK_CACHE = "lock:workbook:%d:cache";
+
+    // Room-level start problem snapshot
+    public static final String ROOM_START_PROBLEM_SNAPSHOT = "game:%d:problems:start_snapshot";
+    public static final String ROOM_START_PROBLEM_SNAPSHOT_META = "game:%d:problems:start_snapshot:meta";
 
     // 게임 제출 예상 코드 길이 (Value) -> game:%d:problem:%d:user:%d:expected_length
     public static final String GAME_EXPECTED_LENGTH = "game:%d:problem:%d:user:%d:expected_length";
@@ -157,7 +162,6 @@ public class RedisKeyConst {
 
     // 개인전 스피드 레이스 1등 종료 타이머 시작 여부 (Value)
     public static final String GAME_FINISH_TIMER = "game:room:%d:finish_timer";
-    public static final String GAME_FINISH_CLAIM = "game:room:%d:finish_claim";
 
     // Game Room Broadcasted (Value) -> game:room:{roomId}:broadcasted -> "true"
     public static final String GAME_ROOM_BROADCASTED = "game:room:%d:broadcasted";

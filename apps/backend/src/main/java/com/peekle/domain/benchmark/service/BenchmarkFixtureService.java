@@ -10,6 +10,7 @@ import com.peekle.domain.problem.entity.Tag;
 import com.peekle.domain.problem.repository.ProblemRepository;
 import com.peekle.domain.user.entity.User;
 import com.peekle.domain.user.repository.UserRepository;
+import com.peekle.domain.user.service.UserService;
 import com.peekle.domain.workbook.entity.Workbook;
 import com.peekle.domain.workbook.entity.WorkbookProblem;
 import com.peekle.domain.workbook.repository.WorkbookProblemRepository;
@@ -57,6 +58,7 @@ public class BenchmarkFixtureService {
     private final ProblemRepository problemRepository;
     private final TagRepository tagRepository;
     private final UserRepository userRepository;
+    private final UserService userService;
     private final WorkbookRepository workbookRepository;
     private final WorkbookProblemRepository workbookProblemRepository;
     private final RedisGameService gameService;
@@ -67,6 +69,9 @@ public class BenchmarkFixtureService {
 
     @Value("${benchmark.problem-catalog.path:file:../ai-server/problems.csv}")
     private String problemCatalogPath;
+
+    @Value("${benchmark.extension-auth-cache-prime-enabled:true}")
+    private boolean extensionAuthCachePrimeEnabled;
 
     public List<Long> ensureProblemIds(int count) {
         if (count <= 0) {
@@ -98,6 +103,10 @@ public class BenchmarkFixtureService {
 
     public void evictWorkbookPreview(Long roomId) {
         gameService.evictWorkbookPreview(roomId);
+    }
+
+    public void evictRoomStartProblemSnapshot(Long roomId) {
+        workbookPreviewCacheService.evictRoomStartProblemSnapshot(roomId);
     }
 
     public StartFixtures createStartFixtures(BenchmarkFixtureCommand command) {
@@ -438,7 +447,9 @@ public class BenchmarkFixtureService {
                 "benchmark_" + UUID.randomUUID(),
                 "Google",
                 buildNickname(prefix, role, index));
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        primeExtensionTokenAuthentication(savedUser);
+        return savedUser;
     }
 
     private List<User> createBenchmarkUsers(String prefix, String role, int count) {
@@ -449,7 +460,15 @@ public class BenchmarkFixtureService {
                     "Google",
                     buildNickname(prefix, role, index)));
         }
-        return userRepository.saveAll(users);
+        List<User> savedUsers = userRepository.saveAll(users);
+        savedUsers.forEach(this::primeExtensionTokenAuthentication);
+        return savedUsers;
+    }
+
+    private void primeExtensionTokenAuthentication(User user) {
+        if (extensionAuthCachePrimeEnabled) {
+            userService.primeExtensionTokenAuthentication(user);
+        }
     }
 
     private String buildNickname(String prefix, String role, int index) {

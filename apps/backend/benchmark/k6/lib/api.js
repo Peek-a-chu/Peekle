@@ -136,6 +136,13 @@ export function evictPreview(baseUrl, roomId) {
   return expectSuccess(response, "evictPreview");
 }
 
+export function evictStartSnapshot(baseUrl, roomId) {
+  const response = http.del(`${baseUrl}/api/benchmark/games/${roomId}/start-snapshot`, null, {
+    headers: buildHeaders(),
+  });
+  return expectSuccess(response, "evictStartSnapshot");
+}
+
 export function strictCreateStartFixtures(baseUrl, config, prefix) {
   const response = http.post(
     `${baseUrl}/api/benchmark/fixtures/start`,

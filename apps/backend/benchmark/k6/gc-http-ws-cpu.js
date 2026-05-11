@@ -3,6 +3,7 @@ import { Rate, Trend } from "k6/metrics";
 
 import {
   evictPreview,
+  evictStartSnapshot,
   readApiResult,
   startRoom,
   strictCreateStartFixtures,
@@ -39,6 +40,9 @@ export function httpScenario(data) {
   let failed = false;
   try {
     evictPreview(config.baseUrl, fixture.roomId);
+    if (config.evictStartSnapshot) {
+      evictStartSnapshot(config.baseUrl, fixture.roomId);
+    }
   } catch (error) {
     failed = true;
   }

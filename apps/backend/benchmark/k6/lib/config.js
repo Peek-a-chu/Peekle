@@ -34,6 +34,7 @@ export function loadConfig() {
 
 export function buildOptions(name, config) {
   return {
+    summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"],
     scenarios: {
       [name]: {
         executor: "shared-iterations",
