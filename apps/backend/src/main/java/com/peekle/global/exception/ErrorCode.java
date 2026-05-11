@@ -69,6 +69,14 @@ public enum ErrorCode {
     GAME_NOT_HOST(HttpStatus.FORBIDDEN, "GAME_010", "방장만 수행할 수 있는 작업입니다."),
     GAME_CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "GAME_011", "자기 자신을 강퇴할 수 없습니다."),
 
+    // Translation
+    TRANSLATION_REQUEST_TOO_LARGE(HttpStatus.BAD_REQUEST, "TRANSLATION_001", "번역 요청이 너무 큽니다."),
+    TRANSLATION_API_KEY_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "TRANSLATION_002", "번역 API 키가 설정되어 있지 않습니다."),
+    TRANSLATION_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "TRANSLATION_003", "번역 제공자 호출에 실패했습니다."),
+    TRANSLATION_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "TRANSLATION_004", "번역 응답 형식이 올바르지 않습니다."),
+    TRANSLATION_DAILY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "TRANSLATION_005", "일일 번역 가능 횟수를 모두 사용했습니다."),
+    TRANSLATION_HOURLY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "TRANSLATION_006", "시간당 번역 가능 횟수를 모두 사용했습니다."),
+
     // CS
     CS_DOMAIN_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_001", "도메인을 찾을 수 없습니다."),
     CS_TRACK_NOT_FOUND(HttpStatus.NOT_FOUND, "CS_002", "트랙을 찾을 수 없습니다."),
