@@ -68,6 +68,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.type === 'SOLVED') {
         handleSolvedSubmission(request.payload, sender);
         return true;
+    } else if (request.type === 'LEETCODE_SUBMISSION') {
+        handleLeetcodeSubmission(request.payload, sender)
+            .then(sendResponse)
+            .catch((error) => {
+                console.error('[Background] LeetCode submission handler failed:', error);
+                sendResponse({ success: false, error: 'LeetCode submission handler failed' });
+            });
+        return true;
     } else if (request.type === 'SAVE_PENDING_SUBMISSION') {
         console.log('[Background] Received SAVE_PENDING_SUBMISSION:', request.payload);
 
@@ -366,6 +374,135 @@ async function sendToBackend(data, studyProblemId = null) {
         console.error('Failed to send to backend:', error);
         return null;
     }
+}
+
+async function sendLeetcodeToBackend(data) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/submissions/leetcode`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            const json = await response.json();
+            console.log('[Background] LeetCode backend sync successful', json);
+            return json.data;
+        }
+
+        console.error('[Background] LeetCode backend sync failed:', response.status);
+        return null;
+    } catch (error) {
+        console.error('[Background] Failed to send LeetCode submission:', error);
+        return null;
+    }
+}
+
+function normalizeLeetcodeNumber(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+async function handleLeetcodeSubmission(payload, sender) {
+    const submitId = String(payload?.submitId || '').trim();
+    if (!submitId) {
+        return { success: false, error: 'Missing submitId' };
+    }
+
+    const storageKey = `leetcode:${submitId}`;
+
+    return new Promise((resolve) => {
+        chrome.storage.local.get([PROCESSED_SUBMISSIONS_KEY], async (items) => {
+            const processed = items[PROCESSED_SUBMISSIONS_KEY] || {};
+            if (processed[storageKey]) {
+                console.log(`[Background] LeetCode submission ${submitId} already processed.`);
+                resolve({ success: true, duplicate: true });
+                return;
+            }
+
+            if (!payload?.isSuccess) {
+                console.log(`[Background] Ignoring non-accepted LeetCode submission ${submitId}.`);
+                resolve({ success: false, skipped: true });
+                return;
+            }
+
+            const extensionToken = await getPeekleToken();
+            if (!extensionToken || String(extensionToken).trim() === '') {
+                if (sender?.tab?.id) {
+                    chrome.tabs.sendMessage(sender.tab.id, {
+                        type: 'SHOW_FEEDBACK',
+                        payload: {
+                            success: false,
+                            message: '확장프로그램 토큰이 없습니다. Peekle에 로그인 후 다시 시도해주세요.'
+                        }
+                    });
+                }
+                resolve({ success: false, error: 'Missing extension token' });
+                return;
+            }
+
+            const backendPayload = {
+                extensionToken,
+                submitId,
+                result: payload.result || 'Accepted',
+                isSuccess: true,
+                submittedAt: payload.submittedAt || new Date().toISOString(),
+                language: payload.language || null,
+                code: payload.code || null,
+                runtimeMs: normalizeLeetcodeNumber(payload.runtimeMs),
+                memoryMb: normalizeLeetcodeNumber(payload.memoryMb),
+                externalId: payload.externalId || payload.titleSlug || null,
+                problemNumber: payload.problemNumber || null,
+                titleSlug: payload.titleSlug || payload.slug || null,
+                title: payload.title || payload.englishTitle || null,
+                englishTitle: payload.englishTitle || payload.title || null,
+                koreanTitle: payload.koreanTitle || null,
+                difficulty: payload.difficulty || null,
+                problemUrl: payload.problemUrl || null,
+                tags: Array.isArray(payload.tags) ? payload.tags : []
+            };
+
+            const backendResponse = await sendLeetcodeToBackend(backendPayload);
+
+            if (backendResponse) {
+                processed[storageKey] = {
+                    source: 'leetcode',
+                    submitId,
+                    titleSlug: backendPayload.titleSlug,
+                    title: backendPayload.title,
+                    timestamp: new Date().toISOString()
+                };
+
+                chrome.storage.local.set({ [PROCESSED_SUBMISSIONS_KEY]: processed }, () => {
+                    if (sender?.tab?.id) {
+                        chrome.tabs.sendMessage(sender.tab.id, {
+                            type: 'SHOW_FEEDBACK',
+                            payload: {
+                                ...backendResponse,
+                                submitId
+                            }
+                        });
+                    }
+                    resolve({ success: true, backendResponse });
+                });
+                return;
+            }
+
+            if (sender?.tab?.id) {
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    type: 'SHOW_FEEDBACK',
+                    payload: {
+                        success: false,
+                        message: 'LeetCode 제출 기록을 서버에 저장하지 못했습니다.'
+                    }
+                });
+            }
+            resolve({ success: false, error: 'Backend sync failed' });
+        });
+    });
 }
 
 async function handleSolvedSubmission(payload, sender) {

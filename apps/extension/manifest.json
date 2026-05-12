@@ -51,7 +51,8 @@
                 "https://www.leetcode.com/*"
             ],
             "js": [
-                "content/leetcode-localizer.js"
+                "content/leetcode-localizer.js",
+                "content/leetcode-submission-detector.js"
             ],
             "run_at": "document_idle"
         }
