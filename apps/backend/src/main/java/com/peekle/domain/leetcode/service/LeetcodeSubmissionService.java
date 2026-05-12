@@ -192,7 +192,7 @@ public class LeetcodeSubmissionService {
 
     private Problem resolveProblem(LeetcodeSubmissionRequest request) {
         String titleSlug = trimToNull(request.getTitleSlug());
-        String externalId = titleSlug != null ? titleSlug : trimToNull(request.getExternalId());
+        String externalId = resolveExternalId(request);
         if (externalId == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -217,6 +217,24 @@ public class LeetcodeSubmissionService {
 
         applyProblemMetadata(problem, title, englishTitle, difficulty, difficultyMetadata, problemUrl, tags, request);
         return problem;
+    }
+
+    private String resolveExternalId(LeetcodeSubmissionRequest request) {
+        String problemNumber = normalizeProblemNumber(request.getProblemNumber());
+        if (problemNumber != null) return problemNumber;
+
+        String externalId = normalizeProblemNumber(request.getExternalId());
+        if (externalId != null) return externalId;
+
+        return null;
+    }
+
+    private String normalizeProblemNumber(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) return null;
+
+        String digits = trimmed.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? null : digits;
     }
 
     private void applyProblemMetadata(

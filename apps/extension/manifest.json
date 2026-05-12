@@ -51,6 +51,7 @@
                 "https://www.leetcode.com/*"
             ],
             "js": [
+                "content.js",
                 "content/leetcode-localizer.js",
                 "content/leetcode-submission-detector.js"
             ],
@@ -65,7 +66,9 @@
                 "inject_script.js"
             ],
             "matches": [
-                "https://www.acmicpc.net/*"
+                "https://www.acmicpc.net/*",
+                "https://leetcode.com/*",
+                "https://www.leetcode.com/*"
             ]
         }
     ]

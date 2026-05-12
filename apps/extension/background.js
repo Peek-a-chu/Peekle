@@ -454,7 +454,7 @@ async function handleLeetcodeSubmission(payload, sender) {
                 code: payload.code || null,
                 runtimeMs: normalizeLeetcodeNumber(payload.runtimeMs),
                 memoryMb: normalizeLeetcodeNumber(payload.memoryMb),
-                externalId: payload.externalId || payload.titleSlug || null,
+                externalId: payload.problemNumber || payload.externalId || null,
                 problemNumber: payload.problemNumber || null,
                 titleSlug: payload.titleSlug || payload.slug || null,
                 title: payload.title || payload.englishTitle || null,

@@ -2,8 +2,6 @@
     const LEETCODE_HOSTS = new Set(['leetcode.com', 'www.leetcode.com']);
     if (!LEETCODE_HOSTS.has(window.location.hostname)) return;
 
-    const PANEL_ID = 'peekle-leetcode-submission-panel';
-    const STYLE_ID = 'peekle-leetcode-submission-style';
     const PROBLEM_CONTEXT_KEY = 'peekle_leetcode_problem_context_v1';
     const SUBMISSION_URL_PATTERN = /\/problems\/([^/]+)\/submissions\/(\d+)\/?/;
     const PROBLEM_URL_PATTERN = /\/problems\/([^/]+)(?:\/description)?\/?/;
@@ -302,243 +300,6 @@
         };
     }
 
-    function ensureStyle() {
-        if (document.getElementById(STYLE_ID)) return;
-
-        const style = document.createElement('style');
-        style.id = STYLE_ID;
-        style.textContent = `
-            #${PANEL_ID} {
-                position: fixed;
-                right: 18px;
-                bottom: 18px;
-                width: min(460px, calc(100vw - 36px));
-                max-height: min(680px, calc(100vh - 36px));
-                overflow: auto;
-                z-index: 2147483647;
-                box-sizing: border-box;
-                border: 1px solid rgba(226, 78, 160, 0.32);
-                border-radius: 8px;
-                background: #ffffff;
-                color: #111827;
-                box-shadow: 0 18px 50px rgba(17, 24, 39, 0.22);
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                font-size: 13px;
-                line-height: 1.45;
-            }
-            #${PANEL_ID} * {
-                box-sizing: border-box;
-            }
-            #${PANEL_ID} .peekle-lc-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 12px;
-                padding: 12px 14px;
-                border-bottom: 1px solid #f3f4f6;
-            }
-            #${PANEL_ID} .peekle-lc-title {
-                margin: 0;
-                color: #e24ea0;
-                font-size: 15px;
-                font-weight: 700;
-            }
-            #${PANEL_ID} .peekle-lc-close {
-                width: 28px;
-                height: 28px;
-                border: 0;
-                border-radius: 6px;
-                background: #f3f4f6;
-                color: #374151;
-                cursor: pointer;
-                font-size: 18px;
-                line-height: 1;
-            }
-            #${PANEL_ID} .peekle-lc-body {
-                padding: 12px 14px 14px;
-            }
-            #${PANEL_ID} .peekle-lc-status {
-                display: inline-flex;
-                align-items: center;
-                min-height: 24px;
-                padding: 2px 8px;
-                border-radius: 6px;
-                background: #e8f8ef;
-                color: #128347;
-                font-weight: 700;
-            }
-            #${PANEL_ID} .peekle-lc-status[data-success="false"] {
-                background: #fff3f0;
-                color: #d13f1f;
-            }
-            #${PANEL_ID} .peekle-lc-grid {
-                display: grid;
-                grid-template-columns: 96px minmax(0, 1fr);
-                gap: 7px 10px;
-                margin-top: 12px;
-            }
-            #${PANEL_ID} .peekle-lc-label {
-                color: #6b7280;
-                font-weight: 600;
-            }
-            #${PANEL_ID} .peekle-lc-value {
-                min-width: 0;
-                overflow-wrap: anywhere;
-                color: #111827;
-            }
-            #${PANEL_ID} .peekle-lc-code-label {
-                margin: 14px 0 6px;
-                color: #6b7280;
-                font-weight: 700;
-            }
-            #${PANEL_ID} .peekle-lc-code {
-                width: 100%;
-                min-height: 160px;
-                max-height: 260px;
-                resize: vertical;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
-                padding: 10px;
-                background: #f9fafb;
-                color: #111827;
-                font-family: "Cascadia Code", Consolas, monospace;
-                font-size: 12px;
-                line-height: 1.45;
-                white-space: pre;
-            }
-        `;
-        (document.head || document.documentElement).appendChild(style);
-    }
-
-    function appendRow(grid, label, value) {
-        const labelElement = document.createElement('div');
-        labelElement.className = 'peekle-lc-label';
-        labelElement.textContent = label;
-
-        const valueElement = document.createElement('div');
-        valueElement.className = 'peekle-lc-value';
-        valueElement.textContent = value || '-';
-
-        grid.append(labelElement, valueElement);
-    }
-
-    function renderPanel(data) {
-        ensureStyle();
-
-        const existing = document.getElementById(PANEL_ID);
-        if (existing) existing.remove();
-
-        const panel = document.createElement('section');
-        panel.id = PANEL_ID;
-
-        const header = document.createElement('div');
-        header.className = 'peekle-lc-header';
-
-        const title = document.createElement('h2');
-        title.className = 'peekle-lc-title';
-        title.textContent = 'Peekle LeetCode 제출 감지';
-
-        const closeButton = document.createElement('button');
-        closeButton.className = 'peekle-lc-close';
-        closeButton.type = 'button';
-        closeButton.setAttribute('aria-label', '닫기');
-        closeButton.textContent = 'x';
-        closeButton.addEventListener('click', () => panel.remove());
-
-        header.append(title, closeButton);
-
-        const body = document.createElement('div');
-        body.className = 'peekle-lc-body';
-
-        const status = document.createElement('div');
-        status.className = 'peekle-lc-status';
-        status.dataset.success = String(Boolean(data.isSuccess));
-        status.textContent = data.result || '감지됨';
-
-        const grid = document.createElement('div');
-        grid.className = 'peekle-lc-grid';
-
-        appendRow(grid, '제출 ID', data.submitId);
-        appendRow(grid, 'externalId', data.externalId);
-        appendRow(grid, '문제명', data.displayTitle || data.title);
-        appendRow(grid, 'titleSlug', data.titleSlug);
-        appendRow(grid, '난이도', data.difficulty);
-        appendRow(grid, '태그', Array.isArray(data.tags)
-            ? data.tags.map((tag) => tag.name || tag.key).join(', ')
-            : '');
-        appendRow(grid, '태그 key', Array.isArray(data.tagKeys) ? data.tagKeys.join(', ') : '');
-        appendRow(grid, '문제 URL', data.problemUrl);
-        appendRow(grid, '언어', data.language);
-        appendRow(grid, '실행 시간', data.runtimeMs ? data.runtimeMs + ' ms' : '');
-        appendRow(grid, '메모리', data.memoryMb ? data.memoryMb + ' MB' : '');
-        appendRow(grid, '제출 시각(KST)', data.submittedAt);
-
-        const codeLabel = document.createElement('div');
-        codeLabel.className = 'peekle-lc-code-label';
-        codeLabel.textContent = '내 코드';
-
-        const code = document.createElement('textarea');
-        code.className = 'peekle-lc-code';
-        code.readOnly = true;
-        code.value = data.code || '코드를 아직 읽지 못했습니다.';
-
-        body.append(status, grid, codeLabel, code);
-        panel.append(header, body);
-        (document.body || document.documentElement).appendChild(panel);
-    }
-
-    function showFeedbackToast(data) {
-        ensureStyle();
-
-        const toast = document.createElement('div');
-        const isSuccess = Boolean(data?.success);
-        toast.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 24px;
-            width: min(380px, calc(100vw - 48px));
-            z-index: 2147483647;
-            border: 1px solid ${isSuccess ? 'rgba(18, 131, 71, 0.22)' : 'rgba(209, 63, 31, 0.22)'};
-            border-top: 4px solid ${isSuccess ? '#128347' : '#d13f1f'};
-            border-radius: 8px;
-            background: #ffffff;
-            color: #111827;
-            box-shadow: 0 18px 50px rgba(17, 24, 39, 0.18);
-            padding: 16px 18px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        `;
-
-        const title = document.createElement('div');
-        title.style.cssText = `
-            margin-bottom: 6px;
-            color: ${isSuccess ? '#128347' : '#d13f1f'};
-            font-size: 15px;
-            font-weight: 800;
-        `;
-        title.textContent = isSuccess ? 'Peekle에 기록했어요' : 'Peekle 기록 실패';
-
-        const message = document.createElement('div');
-        message.style.cssText = 'font-size: 13px; line-height: 1.45; color: #4b5563;';
-        message.textContent = data?.message || (isSuccess ? 'LeetCode 풀이 기록이 저장되었습니다.' : '잠시 후 다시 시도해주세요.');
-
-        if (isSuccess && data?.earnedPoints !== undefined) {
-            const points = document.createElement('div');
-            points.style.cssText = 'margin-top: 8px; font-size: 13px; font-weight: 700; color: #111827;';
-            points.textContent = `획득 포인트: +${data.earnedPoints || 0}`;
-            toast.append(title, message, points);
-        } else {
-            toast.append(title, message);
-        }
-
-        document.body.appendChild(toast);
-        window.setTimeout(() => {
-            toast.style.transition = 'opacity 180ms ease, transform 180ms ease';
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            window.setTimeout(() => toast.remove(), 200);
-        }, 5000);
-    }
-
     function sendAcceptedSubmission(data) {
         if (!data.isSuccess || !data.submitId) return;
 
@@ -556,10 +317,7 @@
             }, (response) => {
                 if (chrome.runtime.lastError) {
                     sentSubmissionKeys.delete(key);
-                    showFeedbackToast({
-                        success: false,
-                        message: '확장 프로그램 연결이 끊겨 LeetCode 제출을 저장하지 못했습니다.'
-                    });
+                    console.warn('[Peekle LeetCode] Failed to send submission to background.', chrome.runtime.lastError);
                     return;
                 }
 
@@ -569,10 +327,7 @@
             });
         } catch (error) {
             sentSubmissionKeys.delete(key);
-            showFeedbackToast({
-                success: false,
-                message: 'LeetCode 제출 저장 요청 중 오류가 발생했습니다.'
-            });
+            console.warn('[Peekle LeetCode] Failed to request submission save.', error);
         }
     }
 
@@ -586,10 +341,9 @@
         if (!data) return;
 
         const key = data.slug + ':' + data.submitId + ':' + data.result;
-        if (lastRenderedSubmissionKey === key && document.getElementById(PANEL_ID)) return;
+        if (lastRenderedSubmissionKey === key) return;
 
         lastRenderedSubmissionKey = key;
-        renderPanel(data);
         sendAcceptedSubmission(data);
         console.log('[Peekle LeetCode] Submission detected:', data);
     }
@@ -608,9 +362,4 @@
     }
 
     start();
-
-    globalThis.chrome?.runtime?.onMessage?.addListener((request) => {
-        if (request?.type !== 'SHOW_FEEDBACK') return;
-        showFeedbackToast(request.payload || {});
-    });
 })();
