@@ -172,25 +172,42 @@
         }
     }
 
-    function detectResult(text) {
-        const normalized = normalizeText(text);
-        const resultCandidates = [
-            ['Accepted', '통과'],
-            ['Wrong Answer', '오답'],
-            ['Compile Error', '컴파일 에러'],
-            ['Runtime Error', '런타임 에러'],
-            ['Time Limit Exceeded', '시간 초과'],
-            ['Memory Limit Exceeded', '메모리 초과'],
-            ['Output Limit Exceeded', '출력 초과']
-        ];
+    const RESULT_DEFINITIONS = [
+        { result: 'Wrong Answer', aliases: ['Wrong Answer', '오답'] },
+        { result: 'Compile Error', aliases: ['Compile Error', '컴파일 에러'] },
+        { result: 'Runtime Error', aliases: ['Runtime Error', '런타임 에러'] },
+        { result: 'Time Limit Exceeded', aliases: ['Time Limit Exceeded', '시간 초과'] },
+        { result: 'Memory Limit Exceeded', aliases: ['Memory Limit Exceeded', '메모리 초과'] },
+        { result: 'Output Limit Exceeded', aliases: ['Output Limit Exceeded', '출력 초과'] },
+        { result: 'Accepted', aliases: ['Accepted', '통과'] }
+    ];
 
-        for (const [english, korean] of resultCandidates) {
-            if (normalized.includes(english) || normalized.includes(korean)) {
-                return english;
+    function findExactResultLine(lines, definitions = RESULT_DEFINITIONS) {
+        for (const line of lines) {
+            for (const definition of definitions) {
+                if (definition.aliases.includes(line)) {
+                    return definition.result;
+                }
             }
         }
 
         return '';
+    }
+
+    function detectResult(text) {
+        const lines = String(text || '')
+            .split('\n')
+            .map(normalizeText)
+            .filter(Boolean);
+
+        const primaryResult = findExactResultLine(lines.slice(0, 12));
+        if (primaryResult) return primaryResult;
+
+        const failedResults = RESULT_DEFINITIONS.filter(({ result }) => result !== 'Accepted');
+        const failedResult = findExactResultLine(lines, failedResults);
+        if (failedResult) return failedResult;
+
+        return findExactResultLine(lines, RESULT_DEFINITIONS.filter(({ result }) => result === 'Accepted'));
     }
 
     function parseNumberAfterLabel(text, labels, unitPattern) {

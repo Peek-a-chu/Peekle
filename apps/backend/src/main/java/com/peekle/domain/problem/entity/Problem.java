@@ -41,6 +41,9 @@ public class Problem {
     @Column(name = "english_title")
     private String englishTitle;
 
+    @Column(name = "korean_title")
+    private String koreanTitle;
+
     @Column(nullable = false)
     private String tier; // 표시용 난이도: Gold 5, Easy, Medium, Hard, Unrated
 

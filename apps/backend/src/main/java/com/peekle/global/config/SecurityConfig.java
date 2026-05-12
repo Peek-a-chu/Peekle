@@ -59,7 +59,9 @@ public class SecurityConfig {
                                                 // Extension / APIs
                                                 .requestMatchers("/api/submissions/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/problems/search",
-                                                                "/api/problems/by-external-id", "/api/problems/tags")
+                                                                "/api/problems/by-external-id",
+                                                                "/api/problems/by-external-id/detail",
+                                                                "/api/problems/tags")
                                                 .permitAll()
                                                 .requestMatchers("/api/problems/sync").authenticated()
                                                 .requestMatchers("/api/users/me/**").permitAll() // Extension token

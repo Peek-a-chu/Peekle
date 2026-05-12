@@ -15,14 +15,20 @@
     const TRANSLATION_CACHE_KEY = 'peekle_leetcode_translation_cache_v1';
     const TRANSLATION_BATCH_SIZE = 20;
     const MAX_TRANSLATION_CACHE_ITEMS = 600;
+    const LEETCODE_SOURCE = 'LEETCODE';
+    const TITLE_ORIGINAL_TEXT_ATTR = 'data-peekle-title-original-text';
+    const TITLE_EXTERNAL_ID_ATTR = 'data-peekle-title-external-id';
     const originalTextByNode = new WeakMap();
     const originalAttributesByElement = new WeakMap();
     const originalProblemHtmlByElement = new Map();
     const originalProblemTextByNode = new Map();
+    const problemTitleCache = new Map();
     let enabled = false;
     let problemTranslationActive = false;
     let apiBaseUrlPromise = null;
     let translationCachePromise = null;
+    let problemTitleLookupRunning = false;
+    let lastProblemTitleRenderKey = null;
     let cachedProblemTranslationRunning = false;
     let lastCachedProblemSignature = null;
     let manuallyRestoredProblemKey = null;
@@ -54,6 +60,7 @@
         ['for as low as', '월'],
         ['/month.', '부터 이용하세요.'],
         ['Go Premium', '프리미엄으로 업그레이드'],
+        ['You are submitting too frequently. Please try again later or Subscribe to Premium for shorter wait times.', '너무 자주 제출하고 있습니다. 잠시 후 다시 시도하거나 프리미엄을 구독하면 대기 시간을 줄일 수 있습니다.'],
         ['Add Card', '카드 추가'],
         ['Billing History', '결제 내역'],
         ['Contact Us', '문의하기'],
@@ -821,11 +828,119 @@
         return window.location.pathname.match(/^\/problems\/([^/]+)/)?.[1] || '';
     }
 
+    function hasKoreanText(value) {
+        return /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(value || '');
+    }
+
+    function normalizeText(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function parseProblemTitle(text) {
+        const match = normalizeText(text).match(/^(\d+)\.\s*(.+)$/);
+        if (!match) return null;
+
+        return {
+            externalId: match[1],
+            englishTitle: match[2].replace(/\s*\([^()]*[ㄱ-ㅎㅏ-ㅣ가-힣][^()]*\)\s*$/, '').trim()
+        };
+    }
+
+    function findProblemTitleElement() {
+        const slug = getProblemKey();
+        if (!slug) return null;
+
+        const selectors = [
+            '[data-cy="question-title"]',
+            `a[href="/problems/${slug}/"]`,
+            `a[href="/problems/${slug}/description/"]`
+        ];
+
+        for (const selector of selectors) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            const matched = elements.find((element) => parseProblemTitle(element.innerText || element.textContent));
+            if (matched) return matched;
+        }
+
+        return null;
+    }
+
+    function findDifficulty() {
+        const lines = (document.body?.innerText || '')
+            .split('\n')
+            .map(normalizeText)
+            .filter(Boolean);
+
+        return lines.find((line) => /^(Easy|Medium|Hard)$/.test(line)) || '';
+    }
+
+    function extractProblemTags() {
+        const tagLinks = Array.from(document.querySelectorAll('a[href^="/tag/"], a[href*="leetcode.com/tag/"]'));
+        const seen = new Set();
+
+        return tagLinks
+            .map((link) => {
+                const href = link.getAttribute('href') || '';
+                const key = href.match(/\/tag\/([^/?#]+)/)?.[1] || '';
+                const name = normalizeText(link.innerText || link.textContent) || key;
+
+                return {
+                    key,
+                    name
+                };
+            })
+            .filter((tag) => tag.key)
+            .filter((tag) => {
+                if (seen.has(tag.key)) return false;
+                seen.add(tag.key);
+                return true;
+            });
+    }
+
+    function buildProblemMetadata() {
+        const titleElement = findProblemTitleElement();
+        const parsedTitle = parseProblemTitle(titleElement?.innerText || titleElement?.textContent || '');
+        if (!parsedTitle?.externalId) return null;
+
+        const titleSlug = getProblemKey();
+        return {
+            source: LEETCODE_SOURCE,
+            externalId: parsedTitle.externalId,
+            problemNumber: parsedTitle.externalId,
+            titleSlug,
+            title: parsedTitle.englishTitle,
+            englishTitle: parsedTitle.englishTitle,
+            difficulty: findDifficulty(),
+            problemUrl: titleSlug ? `https://leetcode.com/problems/${titleSlug}/description/` : window.location.href,
+            tags: extractProblemTags()
+        };
+    }
+
+    function restoreProblemTitle() {
+        document.querySelectorAll(`[${TITLE_ORIGINAL_TEXT_ATTR}]`).forEach((element) => {
+            const originalText = element.getAttribute(TITLE_ORIGINAL_TEXT_ATTR);
+            if (originalText) element.textContent = originalText;
+            element.removeAttribute(TITLE_ORIGINAL_TEXT_ATTR);
+            element.removeAttribute(TITLE_EXTERNAL_ID_ATTR);
+        });
+        lastProblemTitleRenderKey = null;
+    }
+
+    function clearProblemTitleState() {
+        document.querySelectorAll(`[${TITLE_ORIGINAL_TEXT_ATTR}]`).forEach((element) => {
+            element.removeAttribute(TITLE_ORIGINAL_TEXT_ATTR);
+            element.removeAttribute(TITLE_EXTERNAL_ID_ATTR);
+        });
+        lastProblemTitleRenderKey = null;
+    }
+
     function syncCurrentProblemState() {
         const nextProblemKey = getProblemKey();
         if (currentProblemKey === nextProblemKey) return;
 
+        clearProblemTitleState();
         currentProblemKey = nextProblemKey;
+        lastProblemTitleRenderKey = null;
         problemTranslationActive = false;
         cachedProblemTranslationRunning = false;
         lastCachedProblemSignature = null;
@@ -1543,11 +1658,88 @@
         return storage[PEEKLE_TOKEN_KEY] || null;
     }
 
-    async function requestTranslationChunk(texts) {
+    async function getLeetcodeProblemByExternalId(externalId) {
+        const cacheKey = `${LEETCODE_SOURCE}:${externalId}`;
+        if (problemTitleCache.has(cacheKey)) {
+            return problemTitleCache.get(cacheKey);
+        }
+
+        const apiBaseUrl = await getApiBaseUrl();
+        const query = new URLSearchParams({
+            externalId,
+            source: LEETCODE_SOURCE
+        });
+
+        try {
+            const response = await fetch(`${apiBaseUrl}/api/problems/by-external-id/detail?${query.toString()}`);
+            if (!response.ok) {
+                problemTitleCache.set(cacheKey, null);
+                return null;
+            }
+
+            const payload = await response.json();
+            const problem = payload?.success === true ? payload.data || null : null;
+            problemTitleCache.set(cacheKey, problem);
+            return problem;
+        } catch (error) {
+            console.warn('[Peekle LeetCode] Failed to fetch problem title.', error);
+            return null;
+        }
+    }
+
+    function getKoreanProblemTitle(problem) {
+        const koreanTitle = normalizeText(problem?.koreanTitle);
+        if (hasKoreanText(koreanTitle)) return koreanTitle;
+
+        const title = normalizeText(problem?.title);
+        return hasKoreanText(title) ? title : '';
+    }
+
+    async function syncLeetcodeProblemTitle() {
+        if (!enabled || !isProblemPage() || problemTitleLookupRunning) return;
+
+        const titleElement = findProblemTitleElement();
+        if (!titleElement) return;
+
+        const originalText = titleElement.getAttribute(TITLE_ORIGINAL_TEXT_ATTR)
+            || normalizeText(titleElement.innerText || titleElement.textContent);
+        const parsedTitle = parseProblemTitle(originalText);
+        if (!parsedTitle) return;
+
+        const renderKey = `${getProblemKey()}:${parsedTitle.externalId}:${originalText}`;
+        if (lastProblemTitleRenderKey === renderKey) return;
+
+        problemTitleLookupRunning = true;
+        lastProblemTitleRenderKey = renderKey;
+
+        try {
+            const problem = await getLeetcodeProblemByExternalId(parsedTitle.externalId);
+            const koreanTitle = getKoreanProblemTitle(problem);
+            if (!koreanTitle) return;
+
+            const nextText = `${parsedTitle.externalId}. ${parsedTitle.englishTitle}(${koreanTitle})`;
+            if (normalizeText(titleElement.textContent) === nextText) return;
+
+            if (!titleElement.hasAttribute(TITLE_ORIGINAL_TEXT_ATTR)) {
+                titleElement.setAttribute(TITLE_ORIGINAL_TEXT_ATTR, originalText);
+            }
+            titleElement.setAttribute(TITLE_EXTERNAL_ID_ATTR, parsedTitle.externalId);
+            titleElement.textContent = nextText;
+        } finally {
+            problemTitleLookupRunning = false;
+        }
+    }
+
+    async function requestTranslationChunk(texts, problemMetadata = null) {
         const [apiBaseUrl, token] = await Promise.all([getApiBaseUrl(), getPeekleToken()]);
 
         if (!token) {
             throw new Error('Peekle 로그인 후 번역을 사용할 수 있습니다.');
+        }
+
+        const body = { texts };
+        if (problemMetadata) {
+            body.problem = problemMetadata;
         }
 
         const response = await fetch(`${apiBaseUrl}/api/leetcode/translate`, {
@@ -1556,7 +1748,7 @@
                 'Content-Type': 'application/json',
                 'X-Peekle-Token': token
             },
-            body: JSON.stringify({ texts })
+            body: JSON.stringify(body)
         });
 
         let payload = null;
@@ -1600,9 +1792,10 @@
         }
 
         const translatedMissingTexts = [];
+        const problemMetadata = buildProblemMetadata();
         for (let index = 0; index < missingTexts.length; index += TRANSLATION_BATCH_SIZE) {
             const chunk = missingTexts.slice(index, index + TRANSLATION_BATCH_SIZE);
-            const translatedChunk = await requestTranslationChunk(chunk);
+            const translatedChunk = await requestTranslationChunk(chunk, index === 0 ? problemMetadata : null);
 
             translatedChunk.forEach((translatedText, chunkIndex) => {
                 translatedTexts[missingIndexes[index + chunkIndex]] = translatedText;
@@ -2019,6 +2212,7 @@
         window.requestAnimationFrame(() => {
             queued = false;
             localize(document.body);
+            syncLeetcodeProblemTitle();
             syncProblemTranslatorControls();
             syncAnalysisTranslatorControls();
         });
@@ -2072,11 +2266,13 @@
         if (enabled) {
             ensureStyle();
             scheduleLocalize();
+            syncLeetcodeProblemTitle();
             syncProblemTranslatorControls();
             syncAnalysisTranslatorControls();
         } else {
             problemTranslationActive = false;
             analysisTranslationActive = false;
+            restoreProblemTitle();
             restoreOriginals(document.body);
             removeProblemTranslationUi();
             removeAnalysisTranslationUi();

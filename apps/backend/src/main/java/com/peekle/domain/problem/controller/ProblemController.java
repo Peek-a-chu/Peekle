@@ -1,5 +1,6 @@
 package com.peekle.domain.problem.controller;
 
+import com.peekle.domain.problem.dto.ProblemExternalIdResponse;
 import com.peekle.domain.problem.dto.ProblemSearchResponse;
 import com.peekle.domain.problem.service.ProblemService;
 import com.peekle.domain.problem.service.ProblemSyncJobService;
@@ -86,6 +87,13 @@ public class ProblemController {
             @RequestParam(defaultValue = "BOJ") String source) {
         Map<String, Long> response = problemService.getProblemIdByExternalId(externalId, source);
         return ApiResponse.success(response);
+    }
+
+    @GetMapping("/by-external-id/detail")
+    public ApiResponse<ProblemExternalIdResponse> getProblemByExternalId(
+            @RequestParam String externalId,
+            @RequestParam(defaultValue = "BOJ") String source) {
+        return ApiResponse.success(problemService.findByExternalId(externalId, source));
     }
 
     @GetMapping("/tags")
