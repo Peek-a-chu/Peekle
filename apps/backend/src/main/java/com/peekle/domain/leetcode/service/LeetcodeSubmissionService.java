@@ -1,6 +1,7 @@
 package com.peekle.domain.leetcode.service;
 
 import com.peekle.domain.ai.repository.RecommendProblemRepository;
+import com.peekle.domain.leetcode.dto.request.LeetcodeTranslationRequest;
 import com.peekle.domain.leetcode.entity.LeetcodeProblemRating;
 import com.peekle.domain.leetcode.repository.LeetcodeProblemRatingRepository;
 import com.peekle.domain.league.dto.UserLeagueStatusDto;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -102,6 +104,7 @@ public class LeetcodeSubmissionService {
     private final LeagueService leagueService;
     private final RecommendProblemRepository recommendProblemRepository;
     private final LeetcodeProblemRatingRepository leetcodeProblemRatingRepository;
+    private final LeetcodeTranslationService leetcodeTranslationService;
 
     @Transactional
     public SubmissionResponse saveLeetcodeSubmission(LeetcodeSubmissionRequest request) {
@@ -182,6 +185,34 @@ public class LeetcodeSubmissionService {
                 .build();
     }
 
+    @Transactional
+    public void upsertProblemMetadata(LeetcodeTranslationRequest.ProblemMetadata metadata) {
+        if (metadata == null) return;
+
+        LeetcodeSubmissionRequest request = new LeetcodeSubmissionRequest();
+        request.setExternalId(metadata.externalId());
+        request.setProblemNumber(metadata.problemNumber());
+        request.setTitleSlug(metadata.titleSlug());
+        request.setTitle(metadata.title());
+        request.setEnglishTitle(metadata.englishTitle());
+        request.setKoreanTitle(metadata.koreanTitle());
+        request.setDifficulty(metadata.difficulty());
+        request.setProblemUrl(metadata.problemUrl());
+        request.setTags(metadata.tags().stream()
+                .filter(Objects::nonNull)
+                .map(this::toSubmissionTagRequest)
+                .toList());
+
+        resolveProblem(request);
+    }
+
+    private LeetcodeSubmissionRequest.TagRequest toSubmissionTagRequest(LeetcodeTranslationRequest.TagMetadata metadata) {
+        LeetcodeSubmissionRequest.TagRequest tagRequest = new LeetcodeSubmissionRequest.TagRequest();
+        tagRequest.setKey(metadata.key());
+        tagRequest.setName(metadata.name());
+        return tagRequest;
+    }
+
     private User resolveUser(String extensionToken) {
         if (!hasText(extensionToken)) {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
@@ -198,31 +229,46 @@ public class LeetcodeSubmissionService {
         }
 
         Set<Tag> tags = resolveTags(request.getTags());
-        String title = resolveTitle(request);
         String englishTitle = trimToNull(request.getEnglishTitle());
         if (englishTitle == null) {
             englishTitle = trimToNull(request.getTitle());
         }
+        String koreanTitle = resolveKoreanTitle(request, englishTitle);
+        String title = koreanTitle != null ? koreanTitle : resolveTitle(request);
         String difficulty = normalizeDifficulty(request.getDifficulty());
         DifficultyMetadata difficultyMetadata = resolveDifficultyMetadata(titleSlug, difficulty);
         String problemUrl = resolveProblemUrl(titleSlug, request.getProblemUrl());
 
         Problem problem = problemRepository.findByExternalIdAndSource(externalId, LEETCODE_SOURCE)
-                .orElseGet(() -> problemRepository.save(new Problem(
-                        LEETCODE_SOURCE,
-                        externalId,
-                        title,
-                        difficulty,
-                        problemUrl)));
+                .orElseGet(() -> resolveLegacySlugProblem(titleSlug, externalId)
+                        .orElseGet(() -> problemRepository.save(new Problem(
+                                LEETCODE_SOURCE,
+                                externalId,
+                                title,
+                                difficulty,
+                                problemUrl))));
 
-        applyProblemMetadata(problem, title, englishTitle, difficulty, difficultyMetadata, problemUrl, tags, request);
+        applyProblemMetadata(problem, title, englishTitle, koreanTitle, difficulty, difficultyMetadata, problemUrl, tags, request);
         return problem;
+    }
+
+    private Optional<Problem> resolveLegacySlugProblem(String titleSlug, String externalId) {
+        if (!hasText(titleSlug) || titleSlug.equals(externalId)) {
+            return Optional.empty();
+        }
+
+        return problemRepository.findByExternalIdAndSource(titleSlug, LEETCODE_SOURCE)
+                .map(problem -> {
+                    problem.setExternalId(externalId);
+                    return problem;
+                });
     }
 
     private void applyProblemMetadata(
             Problem problem,
             String title,
             String englishTitle,
+            String koreanTitle,
             String difficulty,
             DifficultyMetadata difficultyMetadata,
             String problemUrl,
@@ -234,6 +280,9 @@ public class LeetcodeSubmissionService {
         }
         if (!Objects.equals(problem.getEnglishTitle(), englishTitle)) {
             problem.setEnglishTitle(englishTitle);
+        }
+        if (!Objects.equals(problem.getKoreanTitle(), koreanTitle)) {
+            problem.setKoreanTitle(koreanTitle);
         }
         if (!Objects.equals(problem.getTier(), difficulty)) {
             problem.setTier(difficulty);
@@ -250,7 +299,7 @@ public class LeetcodeSubmissionService {
         if (!Objects.equals(problem.getUrl(), problemUrl)) {
             problem.setUrl(problemUrl);
         }
-        String language = hasText(request.getKoreanTitle()) ? "ko" : "en";
+        String language = hasText(koreanTitle) ? "ko" : "en";
         if (!Objects.equals(problem.getLanguage(), language)) {
             problem.setLanguage(language);
         }
@@ -355,6 +404,25 @@ public class LeetcodeSubmissionService {
 
         String titleSlug = trimToNull(request.getTitleSlug());
         return titleSlug != null ? titleSlug : "제목 미상";
+    }
+
+    private String resolveKoreanTitle(LeetcodeSubmissionRequest request, String englishTitle) {
+        String koreanTitle = trimToNull(request.getKoreanTitle());
+        if (hasKoreanText(koreanTitle)) return koreanTitle;
+
+        String title = trimToNull(request.getTitle());
+        if (hasKoreanText(title)) return title;
+
+        if (!hasText(englishTitle) || hasKoreanText(englishTitle)) {
+            return hasKoreanText(englishTitle) ? englishTitle : null;
+        }
+
+        try {
+            String translatedTitle = leetcodeTranslationService.translate(List.of(englishTitle)).get(0);
+            return hasKoreanText(translatedTitle) ? trimToNull(translatedTitle) : null;
+        } catch (RuntimeException error) {
+            return null;
+        }
     }
 
     private String resolveProblemUrl(String titleSlug, String rawProblemUrl) {
@@ -487,6 +555,10 @@ public class LeetcodeSubmissionService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private boolean hasKoreanText(String value) {
+        return value != null && value.matches(".*[ㄱ-ㅎㅏ-ㅣ가-힣].*");
     }
 
     private String trimToNull(String value) {

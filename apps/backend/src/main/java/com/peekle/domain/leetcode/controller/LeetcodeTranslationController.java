@@ -2,6 +2,7 @@ package com.peekle.domain.leetcode.controller;
 
 import com.peekle.domain.leetcode.dto.request.LeetcodeTranslationRequest;
 import com.peekle.domain.leetcode.dto.response.LeetcodeTranslationResponse;
+import com.peekle.domain.leetcode.service.LeetcodeSubmissionService;
 import com.peekle.domain.leetcode.service.LeetcodeTranslationQuotaService;
 import com.peekle.domain.leetcode.service.LeetcodeTranslationService;
 import com.peekle.global.dto.ApiResponse;
@@ -24,6 +25,7 @@ public class LeetcodeTranslationController {
 
     private final LeetcodeTranslationService leetcodeTranslationService;
     private final LeetcodeTranslationQuotaService leetcodeTranslationQuotaService;
+    private final LeetcodeSubmissionService leetcodeSubmissionService;
 
     @PostMapping("/translate")
     public ApiResponse<LeetcodeTranslationResponse> translate(
@@ -37,6 +39,12 @@ public class LeetcodeTranslationController {
         log.info("LeetCode 번역 요청 - userId: {}, count: {}", userId, request.texts().size());
         leetcodeTranslationService.validateRequest(request.texts());
         leetcodeTranslationQuotaService.consume(userId);
-        return ApiResponse.success(new LeetcodeTranslationResponse(leetcodeTranslationService.translate(request.texts())));
+        LeetcodeTranslationResponse response = new LeetcodeTranslationResponse(leetcodeTranslationService.translate(request.texts()));
+        try {
+            leetcodeSubmissionService.upsertProblemMetadata(request.problem());
+        } catch (RuntimeException error) {
+            log.warn("LeetCode 문제 메타데이터 저장 실패 - userId: {}, problem: {}", userId, request.problem(), error);
+        }
+        return ApiResponse.success(response);
     }
 }
