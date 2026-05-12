@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Long>, SubmissionLogRepositoryCustom {
 
@@ -45,6 +46,8 @@ public interface SubmissionLogRepository extends JpaRepository<SubmissionLog, Lo
 
         // [New] 특정 유저가 특정 문제에 대해 *성공한* 기록 개수 조회
         long countByUserIdAndProblemIdAndIsSuccessTrue(Long userId, Long problemId);
+
+        Optional<SubmissionLog> findByUserIdAndProblemIdAndSubmitId(Long userId, Long problemId, String submitId);
 
         @org.springframework.data.jpa.repository.Query("SELECT DISTINCT s.problem.id FROM SubmissionLog s WHERE s.user.id = :userId AND s.problem.id IN :problemIds")
         List<Long> findAttemptedProblemIds(@org.springframework.data.repository.query.Param("userId") Long userId,

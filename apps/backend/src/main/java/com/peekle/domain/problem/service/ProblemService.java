@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 public class ProblemService {
 
     private static final String BOJ_SOURCE = "BOJ";
+    private static final String DIFFICULTY_SOURCE_SOLVED_AC = "SOLVED_AC";
     private static final String SOLVED_AC_URL_TEMPLATE = "https://solved.ac/api/v3/search/problem?query=solvable:true&sort=id&direction=asc&page=%d";
     private static final String BOJ_URL_TEMPLATE = "https://www.acmicpc.net/problem/%s";
     private static final long PAGE_DELAY_MILLIS = 300L;
@@ -171,6 +172,7 @@ public class ProblemService {
                     if (existing == null) {
                         Problem created = new Problem(BOJ_SOURCE, externalId, title, tier, url);
                         created.setLevel(level);
+                        created.setDifficultySource(DIFFICULTY_SOURCE_SOLVED_AC);
                         created.setAcceptedUserCount(Math.max(acceptedUserCount, 0));
                         created.setLanguage(language);
                         created.setTags(new HashSet<>(resolvedTags));
@@ -361,6 +363,10 @@ public class ProblemService {
         }
         if (!Objects.equals(problem.getLevel(), level)) {
             problem.setLevel(level);
+            changed = true;
+        }
+        if (!Objects.equals(problem.getDifficultySource(), DIFFICULTY_SOURCE_SOLVED_AC)) {
+            problem.setDifficultySource(DIFFICULTY_SOURCE_SOLVED_AC);
             changed = true;
         }
         int normalizedAcceptedUserCount = Math.max(acceptedUserCount, 0);
