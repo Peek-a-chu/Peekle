@@ -16,7 +16,13 @@ import java.util.Set;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "problems")
+@Table(
+        name = "problems",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_problems_source_external_id",
+                columnNames = { "source", "external_id" }
+        )
+)
 public class Problem {
 
     @Id
@@ -26,14 +32,23 @@ public class Problem {
     @Column(nullable = false)
     private String source; // BOJ, SWEA
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "external_id", nullable = false)
     private String externalId; // 1000
 
     @Column(nullable = false)
     private String title;
 
+    @Column(name = "english_title")
+    private String englishTitle;
+
     @Column(nullable = false)
-    private String tier; // Gold 5
+    private String tier; // 표시용 난이도: Gold 5, Easy, Medium, Hard, Unrated
+
+    @Column(name = "leetcode_rating")
+    private Double leetcodeRating;
+
+    @Column(name = "difficulty_source", length = 50)
+    private String difficultySource;
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String url;
@@ -61,6 +76,7 @@ public class Problem {
         this.title = title;
         this.tier = tier;
         this.url = url;
+        this.difficultySource = "BOJ".equalsIgnoreCase(source) ? "SOLVED_AC" : null;
         this.acceptedUserCount = 0;
         this.level = 0;
         this.language = "ko";

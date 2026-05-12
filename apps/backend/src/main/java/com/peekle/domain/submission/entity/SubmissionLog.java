@@ -48,6 +48,9 @@ public class SubmissionLog {
     @Column(name = "external_id")
     private String externalId; // BOJ Problem ID (e.g. "1000")
 
+    @Column(name = "submit_id")
+    private String submitId;
+
     @Column(name = "problem_tier")
     private String problemTier;
 

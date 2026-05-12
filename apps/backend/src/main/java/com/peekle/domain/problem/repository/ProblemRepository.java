@@ -81,14 +81,14 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
         * 특정 레벨 범위 내에서 무작위로 N개의 문제를 가져옵니다.
         * PostgreSQL의 ORDER BY RANDOM()을 사용합니다.
         */
-       @Query(nativeQuery = true, value = "SELECT id, source, external_id, title, tier, url, accepted_user_count, level, language FROM problems p " +
+       @Query(nativeQuery = true, value = "SELECT id, source, external_id, title, english_title, tier, leetcode_rating, difficulty_source, url, accepted_user_count, level, language FROM problems p " +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
                      "AND p.title ~ '[ㄱ-ㅎㅏ-ㅣ가-힣]' " +
                      "ORDER BY RANDOM() LIMIT :limit")
        List<Problem> findRandomProblemsByTiers(@Param("tiers") List<String> tiers, @Param("limit") int limit);
 
-       @Query(nativeQuery = true, value = "SELECT p.id, p.source, p.external_id, p.title, p.tier, p.url, p.accepted_user_count, p.level, p.language FROM problems p "
+       @Query(nativeQuery = true, value = "SELECT p.id, p.source, p.external_id, p.title, p.english_title, p.tier, p.leetcode_rating, p.difficulty_source, p.url, p.accepted_user_count, p.level, p.language FROM problems p "
                      +
                      "WHERE p.source = 'BOJ' " +
                      "AND p.tier IN :tiers " +
