@@ -2,6 +2,7 @@ package com.peekle.domain.problem.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.peekle.domain.problem.dto.ProblemExternalIdResponse;
 import com.peekle.domain.problem.dto.ProblemSearchResponse;
 import com.peekle.domain.problem.entity.Problem;
 import com.peekle.domain.problem.entity.Tag;
@@ -408,6 +409,13 @@ public class ProblemService {
         Map<String, Long> response = new HashMap<>();
         response.put("problemId", problem.getId());
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public ProblemExternalIdResponse findByExternalId(String externalId, String source) {
+        return problemRepository.findByExternalIdAndSource(externalId, source)
+                .map(ProblemExternalIdResponse::from)
+                .orElse(null);
     }
 
     /**
