@@ -1,5 +1,7 @@
 package com.peekle.domain.submission.controller;
 
+import com.peekle.domain.leetcode.service.LeetcodeSubmissionService;
+import com.peekle.domain.submission.dto.LeetcodeSubmissionRequest;
 import com.peekle.domain.submission.dto.SubmissionLogResponse;
 import com.peekle.domain.submission.dto.SubmissionRequest;
 import com.peekle.domain.submission.dto.SubmissionResponse;
@@ -17,11 +19,19 @@ import org.springframework.web.bind.annotation.*;
 public class SubmissionController {
 
     private final SubmissionService submissionService;
+    private final LeetcodeSubmissionService leetcodeSubmissionService;
 
     @PostMapping({ "", "/" })
     public ApiResponse<SubmissionResponse> createGeneralSubmission(@RequestBody SubmissionRequest request) {
         SubmissionResponse response = submissionService.saveGeneralSubmission(request);
         System.out.println("Received Extension Submission: " + request);
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/leetcode")
+    public ApiResponse<SubmissionResponse> createLeetcodeSubmission(@RequestBody LeetcodeSubmissionRequest request) {
+        SubmissionResponse response = leetcodeSubmissionService.saveLeetcodeSubmission(request);
+        System.out.println("Received LeetCode Extension Submission: " + request);
         return ApiResponse.success(response);
     }
 

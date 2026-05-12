@@ -179,7 +179,7 @@ public class LeagueService {
                 problem.getId());
 
         if (successCount == 1) {
-            int problemPoints = calculateProblemPoint(problem.getTier());
+            int problemPoints = calculateProblemPoint(problem);
             user.addLeaguePoint(problemPoints);
             totalEarnedPoints += problemPoints;
 
@@ -426,6 +426,16 @@ public class LeagueService {
 
     private int calculateProblemPoint(String tier) {
         return SolvedAcLevelUtil.getPointFromTier(tier);
+    }
+
+    private int calculateProblemPoint(Problem problem) {
+        if (problem != null
+                && "LEETCODE".equalsIgnoreCase(problem.getSource())
+                && problem.getLevel() != null
+                && problem.getLevel() > 0) {
+            return SolvedAcLevelUtil.calculatePoints(problem.getLevel());
+        }
+        return calculateProblemPoint(problem != null ? problem.getTier() : null);
     }
 
     @Transactional(readOnly = true)
