@@ -9,7 +9,7 @@
 
 ## Links
 
-- **Service**: [peekle.today](https://peekle.today)
+- **Service**:~~[peekle.today](https://peekle.today)~~
 - **Repository**: [Peekle GitHub](https://github.com/Peek-a-chu/Peekle)
 
 - **Chrome Extension**: [확장프로그램 링크](https://chromewebstore.google.com/detail/lgcgoodhgjalkdncpnhnjaffnnpmmcjn?utm_source=item-share-cb)
